@@ -1,0 +1,186 @@
+/* /SHARED ASSETS/[02] CSS/teacher-dashboard.css */
+
+/* --- Layout Structure --- */
+.dashboard-wrapper {
+    background-color: var(--bg-main);
+}
+
+.dashboard-header {
+    border-bottom: 2px solid var(--border-color);
+    position: relative;
+    z-index: 20;
+}
+
+.dashboard-main {
+    position: relative;
+    z-index: 10;
+}
+
+/* --- Badges & Indicators --- */
+.role-badge {
+    color: var(--accent-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.status-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-online {
+    background-color: var(--color-success);
+}
+
+.status-offline {
+    background-color: var(--color-neutral);
+}
+
+.status-inactive {
+    background-color: var(--color-warning-alt);
+}
+
+.status-smooth {
+    background-color: var(--color-smooth);
+}
+
+.status-struggling {
+    background-color: var(--color-danger-bold);
+}
+
+/* --- Interactive Elements --- */
+.nav-btn {
+    color: var(--accent-primary);
+    background-color: var(--bg-hover);
+    transition: background-color var(--transition-speed) ease;
+}
+
+.nav-btn:hover {
+    background-color: var(--bg-card);
+}
+
+.logout-btn {
+    color: var(--color-danger-bold);
+    border: 1px solid var(--color-danger-border-alt);
+    transition: all var(--transition-speed) ease;
+}
+
+.logout-btn:hover {
+    background-color: var(--color-danger-bg-hover);
+    color: var(--color-danger);
+}
+
+.filter-tab {
+    color: var(--text-secondary);
+    transition: all var(--transition-speed) ease;
+}
+
+.filter-tab:hover {
+    color: var(--text-primary);
+}
+
+.filter-tab.active {
+    color: var(--accent-primary);
+    background-color: var(--bg-hover);
+}
+
+/* --- Tables & Lists --- */
+.dashboard-table-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-card);
+}
+
+.dashboard-table {
+    width: 100%;
+    text-align: left;
+    border-collapse: collapse;
+}
+
+.dashboard-table thead tr {
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.dashboard-table tbody {
+    color: var(--text-primary);
+}
+
+.dashboard-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dashboard-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.empty-state-icon {
+    color: var(--border-color);
+}
+
+/* --- Student Profile Overlay --- */
+.profile-overlay {
+    background-color: var(--bg-main);
+}
+
+.profile-avatar-container {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: 4px 4px 0px var(--border-color);
+}
+
+.profile-persona-badge {
+    background-color: var(--color-success-bg);
+    color: var(--accent-primary);
+    border: 1px solid var(--border-color);
+}
+
+.profile-stat-box {
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+}
+
+/* --- Dynamic JS Color Bindings (Rooted to style.css) --- */
+
+/* Engagement Status Indicators */
+.status-badge-offline {
+    color: var(--color-neutral);
+}
+
+.status-dot-offline {
+    background-color: var(--color-neutral);
+}
+
+.status-badge-inactive {
+    color: var(--color-warning);
+}
+
+.status-dot-inactive {
+    background-color: var(--color-warning);
+}
+
+.status-badge-online {
+    color: var(--color-success);
+}
+
+.status-dot-online {
+    background-color: var(--color-success);
+}
+
+/* Learning Status Indicators */
+.learning-struggling {
+    color: var(--color-danger);
+}
+
+.learning-smooth {
+    color: var(--color-smooth);
+}
+
+/* Group Assignment Badge */
+.badge-group {
+    background-color: var(--color-success-bg);
+    border: 1px solid var(--color-success-border);
+    color: var(--accent-primary);
+}

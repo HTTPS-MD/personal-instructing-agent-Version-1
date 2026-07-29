@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Custom Theme Stylesheet -->
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="solid-card max-w-md w-full p-8 text-center space-y-6 shadow-xl">
+        <!-- Error Code -->
+        <div class="space-y-2">
+            <span class="text-accent text-7xl font-extrabold tracking-widest block">404</span>
+            <span
+                class="badge-custom px-3 py-1 text-xs font-semibold rounded-full uppercase tracking-wider inline-block">
+                Error / Not Found
+            </span>
+        </div>
+
+        <!-- Message -->
+        <div class="space-y-2">
+            <h1 class="text-primary text-2xl font-bold">Page Not Found</h1>
+            <p class="text-secondary text-sm leading-relaxed">
+                The page you are looking for might have been removed, had its name changed, or is temporarily
+                unavailable.
+            </p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex flex-col sm:flex-row gap-3 pt-4">
+            <a href="/" class="btn-primary w-full py-3 px-4 rounded-lg text-center text-sm inline-block">
+                Back to Home
+            </a>
+            <button onclick="history.back()" class="btn-secondary w-full py-3 px-4 rounded-lg text-sm">
+                Go Back
+            </button>
+        </div>
+    </div>
+
+</body>
+
+</html>

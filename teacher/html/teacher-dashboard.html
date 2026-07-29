@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- CSS Links (Common & Specific) -->
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../css/teacher-dashboard.css">
+
+    <title>Teacher Portal - PIA System</title>
+</head>
+
+<body class="min-h-screen flex flex-col dashboard-wrapper">
+
+    <!-- HEADER / NAVBAR -->
+    <header class="w-full px-8 py-4 flex justify-between items-center solid-nav dashboard-header">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+                <!-- Inline style removed for error fallback handling -->
+                <img src="../../assets/images/logo.png" alt="PIA Logo" class="h-10 sm:h-11">
+                <span class="text-xs uppercase tracking-widest font-mono px-2.5 py-1 role-badge">
+                    Teacher Portal
+                </span>
+            </div>
+            <!-- Navigation Links -->
+            <nav class="hidden md:flex items-center gap-2">
+                <button class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider nav-btn active">
+                    Monitoring Dashboard
+                </button>
+            </nav>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="text-right hidden sm:block">
+                <p class="text-sm font-bold leading-tight">Dr. Juan Dela Cruz</p>
+                <p class="text-[10px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">Section Earth
+                    (Grade 7)</p>
+            </div>
+            <button onclick="handleSignOut()" class="text-sm flex items-center gap-2 px-3 py-2 rounded-lg logout-btn">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8 space-y-6 dashboard-main">
+
+        <!-- DASHBOARD HEADER & STATS -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+            <div>
+                <h2 class="text-2xl font-extrabold uppercase tracking-wider flex items-center gap-2">
+                    <i data-lucide="users" class="w-6 h-6 text-accent"></i> Student Monitoring
+                </h2>
+                <p class="text-xs text-[var(--text-secondary)] mt-1">Track real-time engagement, AI-detected learning
+                    progress, and attendance.</p>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative w-full sm:w-64">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-[var(--text-secondary)]"></i>
+                    <input type="text" id="search-student" oninput="searchTable()" placeholder="Search student name..."
+                        class="rounded-xl pl-9 pr-4 py-2 text-xs w-full search-input">
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN TABLE CONTAINER -->
+        <div class="p-6 dashboard-table-container">
+
+            <!-- TABS FOR FILTERING -->
+            <div class="flex flex-wrap items-center gap-2 mb-6 border-b border-[var(--border-color)] pb-4">
+                <button onclick="filterTable('all', this)"
+                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider filter-tab active">
+                    All Students
+                </button>
+                <button onclick="filterTable('online', this)"
+                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 filter-tab">
+                    <span class="status-indicator status-online"></span> Online
+                </button>
+                <button onclick="filterTable('offline', this)"
+                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 filter-tab">
+                    <span class="status-indicator status-offline"></span> Offline
+                </button>
+                <button onclick="filterTable('inactive', this)"
+                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 filter-tab">
+                    <span class="status-indicator status-inactive"></span> Inactive (>10 mins)
+                </button>
+                <button onclick="filterTable('smooth', this)"
+                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 filter-tab">
+                    <span class="status-indicator status-smooth"></span> Smooth
+                </button>
+                <button onclick="filterTable('struggling', this)"
+                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 filter-tab">
+                    <span class="status-indicator status-struggling"></span> Struggling
+                </button>
+            </div>
+
+            <!-- ONE BIG TABLE -->
+            <div class="overflow-x-auto">
+                <table class="dashboard-table text-sm">
+                    <thead>
+                        <tr class="text-[10px] uppercase tracking-widest">
+                            <th class="py-3 px-4">Student Name</th>
+                            <th class="py-3 px-4">Group Assignment</th>
+                            <th class="py-3 px-4">Current Topic</th>
+                            <th class="py-3 px-4">Learning Status (AI)</th>
+                            <th class="py-3 px-4">Engagement Status</th>
+                            <th class="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="student-monitoring-body" class="text-xs">
+                        <!-- Dynamically populated via Supabase -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State for Search/Filter -->
+            <div id="empty-state" class="hidden py-12 text-center">
+                <i data-lucide="search-x" class="w-10 h-10 mx-auto mb-3 empty-state-icon"></i>
+                <p class="text-sm text-[var(--text-secondary)]">No students match this filter.</p>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- FULL-SCREEN STUDENT PROFILE VIEW (READ ONLY FOR TEACHER) -->
+    <div id="student-profile-screen" class="fixed inset-0 z-50 hidden flex-col overflow-y-auto profile-overlay">
+
+        <header class="w-full px-8 py-4 flex justify-between items-center solid-nav">
+            <div class="flex items-center gap-3">
+                <button onclick="closeStudentProfile()"
+                    class="btn-secondary px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Dashboard
+                </button>
+                <span class="text-xs uppercase tracking-widest text-[var(--text-secondary)] font-mono">Student
+                    Mathematical Profile</span>
+            </div>
+            <button onclick="closeStudentProfile()" class="text-[var(--text-secondary)] hover:text-white">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </header>
+
+        <main class="flex-1 max-w-7xl mx-auto w-full px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <!-- LEFT COLUMN: Persona Info -->
+            <div class="lg:col-span-4 flex flex-col items-center text-center space-y-6">
+                <div
+                    class="relative w-40 h-40 rounded-2xl flex items-center justify-center overflow-hidden profile-avatar-container">
+                    <img id="profile-avatar-img" src="/assets/images/persona-openness.png" alt="PIA Persona"
+                        class="h-32 object-contain">
+                </div>
+                <div class="space-y-2">
+                    <span id="profile-persona-badge"
+                        class="px-3 py-1 rounded-full text-xs font-mono uppercase tracking-widest profile-persona-badge">
+                        Openness Agent
+                    </span>
+                    <h3 id="profile-name" class="text-2xl font-extrabold uppercase tracking-wider">Student Name</h3>
+                    <p id="profile-email" class="text-xs text-[var(--text-secondary)] font-mono">email@student.ue.edu.ph
+                    </p>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Details -->
+            <div class="lg:col-span-8 space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="solid-card p-4 space-y-1">
+                        <p class="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-mono">Section
+                        </p>
+                        <p class="font-bold text-sm">Earth</p>
+                    </div>
+                    <div class="solid-card p-4 space-y-1">
+                        <p class="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-mono">Group
+                            Assignment</p>
+                        <p id="profile-type" class="font-bold text-accent text-sm">EXP (Assigned)</p>
+                    </div>
+                </div>
+
+                <div class="solid-card p-6 space-y-4">
+                    <h4
+                        class="text-sm font-bold uppercase tracking-wider border-b border-[var(--border-color)] pb-3 flex items-center gap-2">
+                        <i data-lucide="activity" class="w-4 h-4 text-accent"></i> Engagement & System Logs
+                    </h4>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center p-3 rounded-lg profile-stat-box">
+                            <span class="text-xs text-[var(--text-secondary)]">Pre-Test Score:</span>
+                            <span id="profile-pretest" class="text-sm font-mono font-bold">n/a</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 rounded-lg profile-stat-box">
+                            <span class="text-xs text-[var(--text-secondary)]">Post-Test Score:</span>
+                            <span id="profile-posttest" class="text-sm font-mono font-bold">n/a</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- FOOTER -->
+    <footer
+        class="w-full max-w-7xl mx-auto py-4 text-center text-xs text-[var(--text-secondary)] uppercase tracking-widest">
+        PIA SYSTEM // TEACHER PORTAL
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script src="../../assets/js/function.js"></script>
+    <script src="../js/teacher-dashboard.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

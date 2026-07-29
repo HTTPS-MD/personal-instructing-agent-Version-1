@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 🚨 STRICT PROTECTED ROUTE GUARD: Kicks out unauthenticated users immediately -->
+    <script>
+        (function () {
+            const userEmail = localStorage.getItem('pia_user_email');
+            if (!userEmail) {
+                // Kung walang naka-login, itapon agad sa Sign In page nang walang UI flash
+                window.location.replace('../../assets/html/sign-in.html');
+            }
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../css/student.css">
+    <title>Select Agent - PIA System</title>
+</head>
+
+<body class="min-h-screen flex flex-col justify-between p-4 sm:p-6 select-none overflow-y-auto">
+
+    <header
+        class="w-full max-w-7xl mx-auto py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-center border-b gap-2 text-center sm:text-left">
+        <div>
+            <p class="protocol-label">PROTOCOL // AGENT SELECT</p>
+            <h1 class="screen-title">CHOOSE YOUR COMPANION</h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-xs uppercase tracking-widest hidden sm:block">
+                STATUS: <span id="status-text">READY TO PICK</span>
+            </div>
+            <!-- Consistent Home Button -->
+            <a href="../../index.html"
+                class="uppercase tracking-wider text-xs flex items-center gap-2 px-4 py-2 rounded-lg btn-secondary">
+                <i data-lucide="home" class="w-4 h-4"></i> Home
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 my-6 items-center">
+        <!-- Agent Selection Grid -->
+        <div class="lg:col-span-4 flex justify-center">
+            <div id="agent-grid" class="grid grid-cols-3 gap-3 agent-grid-container w-full max-w-xs sm:max-w-sm">
+
+                <div class="solid-card agent-card group" data-character="pia-open" data-name="PIA OPEN"
+                    data-role="CONCEPTUAL"
+                    data-desc="Creative and exploratory guidance designed for conceptual problem solvers who enjoy exploring deep mathematical perspectives."
+                    data-img="/assets/images/char-1.png" onclick="previewCharacter(this)">
+                    <img src="/assets/images/char-1.png" alt="PIA Open" class="agent-img-thumbnail">
+                </div>
+
+                <div class="solid-card agent-card group" data-character="pia-conscientious" data-name="PIA STRUCTURE"
+                    data-role="DISCIPLINED"
+                    data-desc="Structured, highly organized, and disciplined pacing for students who thrive in step-by-step routines."
+                    data-img="/assets/images/char-conscientious.png" onclick="previewCharacter(this)">
+                    <img src="/assets/images/char-conscientious.png" alt="PIA Conscientious"
+                        class="agent-img-thumbnail">
+                </div>
+
+                <div class="solid-card agent-card group" data-character="pia-extravert" data-name="PIA DYNAMIC"
+                    data-role="HIGH-ENERGY"
+                    data-desc="High-energy, interactive, and enthusiastic reinforcement to keep active problem solvers engaged and motivated."
+                    data-img="/assets/images/char-extravert.png" onclick="previewCharacter(this)">
+                    <img src="/assets/images/char-extravert.png" alt="PIA Extravert" class="agent-img-thumbnail">
+                </div>
+
+                <div class="solid-card agent-card group" data-character="pia-agreeable" data-name="PIA EMPATH"
+                    data-role="SUPPORTIVE"
+                    data-desc="Gentle, supportive, and collaborative encouragement built for learners who prefer a low-stress environment."
+                    data-img="/assets/images/char-agreeable.png" onclick="previewCharacter(this)">
+                    <img src="/assets/images/char-agreeable.png" alt="PIA Agreeable" class="agent-img-thumbnail">
+                </div>
+
+                <div class="solid-card agent-card group" data-character="pia-calm" data-name="PIA STABLE"
+                    data-role="STRESS-FREE"
+                    data-desc="Stress-free zone focusing on calm feedback, steady progress tracking, and methodical pacing."
+                    data-img="/assets/images/char-calm.png" onclick="previewCharacter(this)">
+                    <img src="/assets/images/char-calm.png" alt="PIA Calm" class="agent-img-thumbnail">
+                </div>
+
+                <div class="solid-card agent-card group" data-character="pia-neutral" data-name="PIA NEUTRAL"
+                    data-role="BALANCED"
+                    data-desc="Standard balanced baseline assistant with no specialized bias, perfect for standard adaptive learning modules."
+                    data-img="/assets/images/char-neutral.png" onclick="previewCharacter(this)">
+                    <img src="/assets/images/char-neutral.png" alt="PIA Neutral" class="agent-img-thumbnail">
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Preview Image -->
+        <div class="lg:col-span-3 flex flex-col items-center justify-center relative">
+            <div class="preview-container w-48 h-48 sm:w-64 sm:h-64">
+                <img id="preview-bg-img" src="/assets/images/char-1.png" alt="Selected Agent Preview"
+                    class="preview-img character-glow">
+            </div>
+        </div>
+
+        <!-- Description & Actions -->
+        <div
+            class="lg:col-span-5 flex flex-col items-center lg:items-start justify-center text-center lg:text-left space-y-4 px-2 sm:px-0">
+            <div>
+                <span id="preview-role" class="protocol-label">SELECT AN AGENT</span>
+                <h2 id="preview-name" class="text-2xl sm:text-3xl lg:text-4xl uppercase tracking-wider mt-1">NO AGENT
+                    SELECTED</h2>
+            </div>
+
+            <p id="preview-desc" class="text-xs sm:text-sm leading-relaxed min-h-[60px] max-w-md">
+                Click any agent box on the left to review their attributes, tactical style, and pedagogical approach
+                before locking in your choice.
+            </p>
+
+            <div class="pt-2 w-full sm:w-auto">
+                <button id="lock-in-btn" onclick="openConfirmModal()" disabled
+                    class="btn-primary w-full sm:w-auto px-10 py-3.5 sm:px-12 sm:py-4 rounded-xl uppercase text-sm lock-in-btn">
+                    LOCK IN
+                </button>
+                <button id="continue-btn" onclick="goToDashboard()"
+                    class="hidden btn-primary w-full sm:w-auto px-10 py-3.5 sm:px-12 sm:py-4 rounded-xl uppercase text-sm">
+                    CONTINUE TO DASHBOARD
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full max-w-7xl mx-auto py-3 text-center text-xs uppercase tracking-widest">
+        PIA SYSTEM // SECURE SELECTION PROTOCOL
+    </footer>
+
+    <!-- CONFIRMATION MODAL -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-overlay p-4">
+        <div class="absolute inset-0 dark-backdrop"></div>
+        <div class="solid-card relative z-10 w-full max-w-md p-6 sm:p-8 text-center modal-content" id="modal-content">
+            <h3 class="text-lg sm:text-xl uppercase tracking-wider mb-2">CONFIRM LOCK IN?</h3>
+            <p class="text-xs sm:text-sm mb-6 leading-relaxed">
+                Once you lock in your agent, your selection will be permanently bound to your account profile for this
+                session. Proceed?
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <button onclick="closeConfirmModal()"
+                    class="btn-secondary w-full sm:w-auto px-6 py-3 rounded-xl uppercase tracking-wider text-xs">CHOOSE
+                    AGAIN</button>
+                <button onclick="finalLockIn()"
+                    class="btn-primary w-full sm:w-auto px-8 py-3 rounded-xl uppercase tracking-wider text-xs">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../assets/js/function.js"></script>
+    <script src="../js/character-selection.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

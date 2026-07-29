@@ -1,0 +1,230 @@
+/* --- STUDENT PAGES CUSTOM STYLING --- */
+
+/* --- Global / Typography --- */
+.protocol-label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--accent-primary);
+    font-weight: 700;
+}
+
+.screen-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+}
+
+/* --- Character Selection --- */
+.agent-grid-container {
+    max-width: 100%;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .agent-grid-container {
+        max-width: 280px;
+    }
+}
+
+.agent-card {
+    padding: 0.375rem;
+    cursor: pointer;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.agent-img-thumbnail {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    filter: grayscale(100%);
+    transition: filter var(--transition-speed) ease;
+}
+
+.agent-card:hover .agent-img-thumbnail {
+    filter: grayscale(0%);
+}
+
+.preview-container {
+    width: 18rem;
+    height: 18rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+@media (min-width: 1024px) {
+    .preview-container {
+        width: 20rem;
+        height: 20rem;
+    }
+}
+
+.preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: all var(--transition-speed) ease;
+}
+
+.lock-in-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* --- OCEAN Test --- */
+.gatekeeper-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    width: 100%;
+    height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-main);
+    transition: opacity var(--transition-speed) ease;
+}
+
+.pulse-text {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* --- Student Dashboard --- */
+.dashboard-award-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    height: 6rem;
+    transition: all var(--transition-speed) ease;
+}
+
+.dashboard-award-card:hover {
+    border-color: var(--accent-primary);
+    background-color: var(--bg-hover);
+}
+
+.dashboard-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 0.5rem;
+    width: 12rem;
+    padding: 0.75rem;
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-main);
+    border: 1px solid var(--accent-primary);
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-speed) ease;
+    z-index: 30;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.group:hover .dashboard-tooltip {
+    opacity: 1;
+}
+
+.action-card {
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    cursor: pointer;
+    transition: background-color var(--transition-speed) ease;
+}
+
+.action-card:hover {
+    background-color: var(--bg-hover);
+}
+
+.modal-agent-portrait {
+    width: 6rem;
+    height: 6rem;
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+/* --- Waiting Room --- */
+.waiting-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.6;
+}
+
+.waiting-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, transparent 30%, var(--bg-main) 100%);
+}
+
+.waiting-spinner-box {
+    width: 4rem;
+    height: 4rem;
+    background-color: var(--color-warning-bg);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-warning);
+    margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+    .waiting-spinner-box {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+
+/* --- Specific Components --- */
+.version-badge {
+    background-color: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
+}
+
+.logout-btn {
+    color: var(--color-danger);
+    transition: all var(--transition-speed) ease;
+}
+
+.logout-btn:hover {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger-hover);
+}
+
+/* --- Dynamic JS Color Bindings (Rooted to style.css) --- */
+
+/* Action Button Glow */
+.glow-primary-shadow {
+    box-shadow: 0 0 20px var(--accent-primary);
+}
+
+
+/* --- Dynamic JS Color Bindings (Rooted to style.css) --- */
+
+/* Character Glow Shadow */
+.glow-character-shadow {
+    filter: drop-shadow(0 0 20px var(--accent-primary));
+}

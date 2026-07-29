@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 🚨 STRICT PROTECTED ROUTE GUARD: Kicks out unauthenticated users immediately -->
+    <script>
+        (function () {
+            const userEmail = localStorage.getItem('pia_user_email');
+            if (!userEmail) {
+                // Kung walang naka-login, itapon agad sa Sign In page nang walang UI flash
+                window.location.replace('../../assets/html/sign-in.html');
+            }
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../css/student.css">
+    <title>Waiting Room - PIA System</title>
+</head>
+
+<body class="min-h-screen flex overflow-hidden">
+
+    <div class="w-full h-screen grid grid-cols-1 lg:grid-cols-2">
+
+        <div class="relative hidden lg:block h-full overflow-hidden">
+            <img src="/assets/images/ocean.png" alt="Waiting Illustration" class="waiting-bg">
+            <div class="waiting-gradient"></div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center p-8 lg:p-16 relative z-10 w-full">
+            <div class="max-w-md w-full space-y-6 text-center lg:text-left">
+
+                <div class="waiting-spinner-box">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+
+                <div class="space-y-3">
+                    <h1 id="waiting-title" class="text-3xl uppercase tracking-tight text-primary">Waiting for Instructor
+                    </h1>
+                    <p id="waiting-desc" class="text-sm leading-relaxed text-secondary">
+                        The next session is currently closed. You will be automatically redirected the moment your
+                        instructor opens it. Please stay on this page.
+                    </p>
+                </div>
+
+                <div class="pt-2 flex flex-col gap-4">
+                    <a href="../../index.html"
+                        class="btn-secondary w-full py-4 rounded-xl uppercase tracking-widest text-xs text-center block">
+                        Back to Homepage
+                    </a>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <script src="../../assets/js/function.js"></script>
+    <script src="../js/waiting-room.js"></script>
+</body>
+
+</html>

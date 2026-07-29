@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 🚨 STRICT PROTECTED ROUTE GUARD: Kicks out unauthenticated users immediately -->
+    <script>
+        (function () {
+            const userEmail = localStorage.getItem('pia_user_email');
+            if (!userEmail) {
+                // Kung walang naka-login, itapon agad sa Sign In page nang walang UI flash
+                window.location.replace('../../assets/html/sign-in.html');
+            }
+        })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../css/student.css">
+    <title>OCEAN Test - PIA System</title>
+</head>
+
+<body class="overflow-x-hidden">
+
+    <nav class="fixed top-0 left-0 z-50 w-full solid-nav">
+        <div class="flex items-center justify-between max-w-7xl mx-auto px-6 py-4">
+            <div class="flex-1">
+                <!-- Broken Logo link fixed -->
+                <a href="../../index.html"><img src="../../assets/images/logo.png" alt="PIA Logo"
+                        class="h-10 sm:h-11"></a>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="hidden md:inline uppercase tracking-wider text-xs">OCEAN Personality Assessment</span>
+                <!-- Consistent Home Button -->
+                <a href="../../index.html"
+                    class="uppercase tracking-wider text-xs flex items-center gap-2 px-4 py-2 rounded-lg btn-secondary">
+                    <i data-lucide="home" class="w-4 h-4"></i> Home
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div id="gatekeeper-screen" class="gatekeeper-screen">
+        <p class="uppercase tracking-widest text-xs pulse-text">Checking access permissions...</p>
+    </div>
+
+    <main id="test-container" class="max-w-3xl mx-auto px-6 pt-32 pb-20 hidden">
+        <div class="flex justify-between items-center mb-8">
+            <h1 id="question-counter" class="text-3xl tracking-wider uppercase">Question 1 of 50</h1>
+            <span id="progress-lbl" class="tracking-widest text-xs">0% Completed</span>
+        </div>
+
+        <div class="solid-card p-8 md:p-12 text-center">
+            <p id="question-text" class="text-xl md:text-2xl mb-12">Loading question...</p>
+
+            <div class="flex flex-col gap-4">
+                <button onclick="handleAnswer(1)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">1.
+                    Disagree</button>
+                <button onclick="handleAnswer(2)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">2.
+                    Slightly disagree</button>
+                <button onclick="handleAnswer(3)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">3.
+                    Neutral</button>
+                <button onclick="handleAnswer(4)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">4.
+                    Slightly agree</button>
+                <button onclick="handleAnswer(5)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">5.
+                    Agree</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="../../assets/js/function.js"></script>
+    <script src="../js/ocean-test.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,298 @@
+/* /SHARED ASSETS/[02] CSS/style.css - Subtle Technology Edition */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Quicksand:wght@300;400;500;600;700&display=swap');
+
+:root {
+    /* Minimalist Dark Tech Theme */
+    --bg-main: #000000;
+    --bg-card: #0a0a0c;
+    --bg-hover: #121418;
+    --text-primary: #ffffff;
+    --text-secondary: #8892b0;
+
+    /* Subtle Accents */
+    --accent-primary: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --border-color: #222222;
+    --border-accent: #38bdf8;
+
+    /* Status Colors (Connected to admin-dashboard.css) */
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-danger-hover: #dc2828;
+    --color-danger-bg: rgba(239, 68, 68, 0.1);
+    --color-danger-bg-hover: rgba(239, 68, 68, 0.2);
+    --color-danger-border: rgba(239, 68, 68, 0.3);
+
+    --color-info: #3b82f6;
+    --color-info-bg: rgba(59, 130, 246, 0.1);
+    --color-info-border: rgba(59, 130, 246, 0.3);
+
+    /* Modals & Overlays */
+    --overlay-start: rgba(0, 0, 0, 0.7);
+    --overlay-end: rgba(0, 0, 0, 0.95);
+    --backdrop-bg: rgba(0, 0, 0, 0.85);
+
+    /* Scrollbars */
+    --scroll-track: #000000;
+    --scroll-thumb: #222222;
+    --scroll-thumb-hover: #444444;
+
+    --transition-speed: 0.25s;
+    --radius-md: 6px;
+    --radius-lg: 12px;
+
+    /* Typography */
+    --font-primary: 'Poppins', sans-serif;
+    --font-secondary: 'Quicksand', sans-serif;
+}
+
+html {
+    scroll-padding-top: 5rem;
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: var(--bg-main);
+    background-image: linear-gradient(var(--overlay-start), var(--overlay-end)), url('../[04] IMAGES/background.png');
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    color: var(--text-primary);
+    font-family: var(--font-primary);
+    letter-spacing: 0.015em;
+}
+
+/* ========================================= */
+/* --- UTILITIES & TYPOGRAPHY ---            */
+/* ========================================= */
+.bg-main {
+    background-color: var(--bg-main);
+}
+
+.bg-card {
+    background-color: var(--bg-card);
+}
+
+.bg-hover {
+    background-color: var(--bg-hover);
+}
+
+.hover-bg-hover:hover {
+    background-color: var(--bg-hover);
+}
+
+.text-primary {
+    color: var(--text-primary);
+}
+
+.text-secondary,
+.text-muted {
+    color: var(--text-secondary);
+}
+
+.text-accent {
+    color: var(--accent-primary);
+}
+
+.hover-text-accent:hover {
+    color: var(--accent-primary);
+}
+
+.border-custom {
+    border-color: var(--border-color);
+}
+
+.dark-backdrop {
+    background-color: var(--backdrop-bg);
+}
+
+/* ========================================= */
+/* --- COMPONENTS (NAV, CARDS, FOOTER) ---   */
+/* ========================================= */
+.solid-nav {
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.solid-sidebar {
+    background-color: var(--bg-card);
+    border-left: 1px solid var(--border-color);
+}
+
+.solid-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-speed) ease;
+}
+
+.solid-card:hover {
+    border-color: var(--text-secondary);
+    transform: translateY(-2px);
+}
+
+.solid-footer {
+    background-color: var(--bg-main);
+    border-top: 1px solid var(--border-color);
+}
+
+/* ========================================= */
+/* --- BUTTONS & INPUTS ---                  */
+/* ========================================= */
+.btn-primary {
+    background-color: var(--accent-primary);
+    color: #000000;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-speed) ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-game-primary {
+    background-color: var(--text-primary);
+    color: #000000;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--text-primary);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-speed) ease;
+}
+
+.btn-game-primary:hover {
+    background-color: transparent;
+    color: var(--text-primary);
+}
+
+.btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-speed) ease;
+}
+
+.btn-secondary:hover {
+    border-color: var(--text-secondary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.btn-icon {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-speed) ease;
+    cursor: pointer;
+}
+
+.btn-icon:hover {
+    border-color: var(--text-secondary);
+    background-color: var(--bg-hover);
+}
+
+.form-input {
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem;
+    transition: all var(--transition-speed) ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background-color: var(--bg-card);
+}
+
+.form-checkbox {
+    accent-color: var(--accent-primary);
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+}
+
+/* Added search-input to fix the search bar overlap */
+.search-input {
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem 0.85rem 2.5rem;
+    /* Extra left padding for the icon */
+    width: 100%;
+    transition: all var(--transition-speed) ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background-color: var(--bg-card);
+}
+
+/* ========================================= */
+/* --- MODALS ---                            */
+/* ========================================= */
+.modal-overlay {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-speed) ease-in-out;
+}
+
+.modal-overlay.modal-active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    transform: scale(0.95);
+    transition: transform var(--transition-speed) ease-in-out;
+}
+
+.modal-content.modal-content-active {
+    transform: scale(1);
+}
+
+/* ========================================= */
+/* --- SCROLLBARS & ACTIVE NAV ---           */
+/* ========================================= */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scroll-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: var(--radius-md);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scroll-thumb-hover);
+}
+
+nav a.admin-nav-btn.active,
+div#mobile-menu button.mobile-nav-link.active,
+div#mobile-menu a.mobile-nav-link.active {
+    color: var(--accent-primary);
+    background-color: rgba(56, 189, 248, 0.05);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+}
