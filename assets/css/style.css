@@ -296,3 +296,53 @@ div#mobile-menu a.mobile-nav-link.active {
     font-weight: 500;
     border-radius: var(--radius-md);
 }
+
+
+/* ========================================= */
+/* --- ORIGINAL CAROUSEL CLONE STYLES ---    */
+/* ========================================= */
+.hide-scroll-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.hide-scroll-bar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.smooth-scroll {
+    scroll-behavior: smooth;
+}
+
+.blob-bg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    opacity: 0.2;
+    filter: blur(25px);
+    z-index: 0;
+}
+
+.blob-bg.alt-blob {
+    width: 160px;
+    height: 120px;
+    border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--border-color);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dot.active {
+    background-color: var(--accent-primary);
+    transform: scale(1.5);
+}
