@@ -15,14 +15,12 @@ function openAuthModal(view = 'signin') {
     box.classList.remove('scale-95');
     document.body.style.overflow = 'hidden';
 
-    // Ipakita ulit ang X button by default kapag normal na pagbukas
     if (closeBtn) closeBtn.classList.remove('hidden');
 
     switchAuthView(view);
     hideModalStatus();
 }
 
-// Global Wrapper para ma-access ang Change Password sa Dropdown menu
 window.openChangePasswordModal = function () {
     isActivationFlow = false;
     document.getElementById('setup-logo').classList.add('hidden');
@@ -82,7 +80,7 @@ function getDeviceSignature() {
 }
 
 // ------------------------------------------------------------------
-// INIT: AUTH STATE, NAV LOGIC & HERO BUTTON LOGIC
+// INIT: AUTH STATE & NAV LOGIC
 // ------------------------------------------------------------------
 async function initAuthState() {
     const heroBtn = document.getElementById('hero-btn');
@@ -109,13 +107,11 @@ async function initAuthState() {
     else if (hour >= 12 && hour < 18) timeGreeting = "Good afternoon";
 
     if (email) {
-        // 🔥 MAY NAKA-LOGIN
         const { data: profile } = await supabaseClient.from('profiles').select('full_name, group_type, is_ocean_done, selected_character').eq('email', email).maybeSingle();
 
         let fullName = profile?.full_name || "Player";
         let firstName = fullName.split(' ')[0];
 
-        // 1. UPDATE DESKTOP NAVBAR
         if (navAuthBtn && navUserDropdown) {
             navAuthBtn.classList.add('hidden');
             navUserDropdown.classList.remove('hidden');
@@ -124,7 +120,6 @@ async function initAuthState() {
             if (navUserEmail) navUserEmail.textContent = email;
         }
 
-        // 2. UPDATE MOBILE MENU
         if (mobPrefix && mobName && mobAuthBtn) {
             mobPrefix.textContent = `${timeGreeting},`;
             mobPrefix.classList.replace('uppercase', 'capitalize');
@@ -132,7 +127,6 @@ async function initAuthState() {
             mobName.style.fontSize = '1.1rem';
 
             if (mobChangePassBtn) mobChangePassBtn.classList.remove('hidden');
-
             if (mobAuthText) mobAuthText.textContent = 'SIGN OUT';
             if (mobAuthIcon) mobAuthIcon.setAttribute('data-lucide', 'log-out');
 
@@ -141,7 +135,6 @@ async function initAuthState() {
             mobAuthBtn.setAttribute('onclick', 'executeForceLogout()');
         }
 
-        // 3. UPDATE HERO BUTTON
         if (heroBtn && role !== 'admin' && role !== 'teacher') {
             heroBtn.innerHTML = `<span>Start My Mission</span><i data-lucide="play" class="w-4 h-4 fill-current pointer-events-none"></i>`;
             heroBtn.removeAttribute('onclick');
@@ -167,7 +160,6 @@ async function initAuthState() {
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
     } else {
-        // 🔥 WALANG NAKA-LOGIN
         if (heroBtn) {
             heroBtn.innerHTML = `<span>Start Adventure</span><i data-lucide="play" class="w-4 h-4 fill-current pointer-events-none"></i>`;
             heroBtn.setAttribute('onclick', "openAuthModal('signin')");
@@ -185,90 +177,7 @@ async function initAuthState() {
 }
 
 // ------------------------------------------------------------------
-// UTILITY: CLEAR "X" BUTTONS & SHOW PASSWORD TOGGLES
-// ------------------------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.clear-input-btn').forEach(btn => {
-        const input = btn.previousElementSibling;
-        input.addEventListener('input', () => {
-            if (input.value.length > 0) btn.classList.remove('hidden');
-            else btn.classList.add('hidden');
-        });
-        btn.addEventListener('click', () => {
-            input.value = '';
-            btn.classList.add('hidden');
-            input.focus();
-        });
-    });
-
-    const showSigninPass = document.getElementById('show-signin-password');
-    const signinPassInput = document.getElementById('modal-password');
-    if (showSigninPass && signinPassInput) {
-        showSigninPass.addEventListener('change', function () {
-            signinPassInput.type = this.checked ? 'text' : 'password';
-        });
-    }
-
-    const showSetupPass = document.getElementById('show-setup-password');
-    const setupPassInput1 = document.getElementById('modal-new-password');
-    const setupPassInput2 = document.getElementById('modal-confirm-password');
-    if (showSetupPass && setupPassInput1 && setupPassInput2) {
-        showSetupPass.addEventListener('change', function () {
-            const newType = this.checked ? 'text' : 'password';
-            setupPassInput1.type = newType;
-            setupPassInput2.type = newType;
-        });
-    }
-});
-
-
-// ------------------------------------------------------------------
-// AUTO-DETECT MAGIC LINK & INCOMPLETE SESSIONS (DATABASE VERIFIED)
-// ------------------------------------------------------------------
-window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(async () => {
-        if (!window.supabaseClient) return;
-
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        const localEmail = localStorage.getItem('pia_user_email');
-        const closeBtn = document.getElementById('modal-close-btn');
-        const greetingEl = document.getElementById('setup-greeting');
-
-        if (session && !localEmail) {
-            openAuthModal('set-password');
-            if (closeBtn) closeBtn.classList.add('hidden');
-
-            const { data: profile } = await supabaseClient.from('profiles')
-                .select('full_name, status')
-                .eq('email', session.user.email)
-                .maybeSingle();
-
-            let fullName = profile?.full_name || "Student";
-            let isActivationFlow = profile?.status === 'inactive';
-
-            if (isActivationFlow) {
-                document.getElementById('setup-title').innerText = "Activate Account";
-                document.getElementById('setup-desc').innerText = "Create a secure password to activate your PIA account.";
-                if (greetingEl) {
-                    greetingEl.innerText = `Hello, ${fullName}! Welcome to PIA!`;
-                    greetingEl.classList.remove('hidden');
-                }
-            } else {
-                document.getElementById('setup-logo').classList.add('hidden');
-                document.getElementById('setup-title').innerText = "Reset Password";
-                document.getElementById('setup-desc').innerText = "Enter your new password below.";
-                if (greetingEl) greetingEl.classList.add('hidden');
-            }
-
-            if (window.history.replaceState && window.location.hash) {
-                window.history.replaceState(null, null, window.location.pathname);
-            }
-        }
-    }, 600);
-});
-
-// ------------------------------------------------------------------
-// VIEW 1: SIGN IN FORM HANDLING
+// FORMS & TIMER LOGIC
 // ------------------------------------------------------------------
 const modalLoginForm = document.getElementById('modal-login-form');
 if (modalLoginForm) {
@@ -349,9 +258,6 @@ if (modalLoginForm) {
     });
 }
 
-// ------------------------------------------------------------------
-// VIEW 2 & 3: FORGOT PASSWORD FLOW (EMAIL & OTP)
-// ------------------------------------------------------------------
 const forgotEmailForm = document.getElementById('modal-forgot-form');
 const verifyOtpForm = document.getElementById('modal-verify-otp-form');
 const otpBoxes = document.querySelectorAll('#modal-otp-boxes input');
@@ -421,7 +327,6 @@ document.getElementById('modal-resend-btn')?.addEventListener('click', async (e)
     startModalTimer();
 });
 
-// OTP Input Grid Logic 
 if (otpBoxes.length > 0) {
     otpBoxes.forEach((input, index) => {
         input.addEventListener('input', (e) => {
@@ -492,9 +397,6 @@ if (verifyOtpForm) {
     });
 }
 
-// ------------------------------------------------------------------
-// VIEW 4: SET / SAVE PASSWORD (Magic Link & Reset Password)
-// ------------------------------------------------------------------
 const setPasswordForm = document.getElementById('modal-set-password-form');
 if (setPasswordForm) {
     setPasswordForm.addEventListener('submit', async (e) => {
@@ -525,12 +427,9 @@ if (setPasswordForm) {
             }
         }
 
-        // I-sign out si user mula sa background session para pwersahin mag-login gamit ang bagong credentials
         await supabaseClient.auth.signOut();
-
         showModalStatus("Password saved successfully! Please sign in.", 'success');
 
-        // Matapos ang 1.5 segundo, i-switch pabalik sa Sign In screen
         setTimeout(() => {
             const closeBtn = document.getElementById('modal-close-btn');
             if (closeBtn) closeBtn.classList.remove('hidden');
@@ -546,9 +445,8 @@ if (setPasswordForm) {
 }
 
 // ==========================================
-// UI INTERACTIONS (Tutors, FAQ, Modals, Scroll Spy)
+// UI INTERACTIONS & SINGLE DOMCONTENTLOADED
 // ==========================================
-
 const tutors = [
     { name: "The Visionary", desc: "Specializes in Openness. Always ready with creative solutions and imaginative math puzzles.", img: "/assets/images/char-1.png" },
     { name: "The Planner", desc: "Specializes in Conscientiousness. Focuses on discipline, structure, and mastery of every topic.", img: "/assets/images/char-1.png" },
@@ -584,9 +482,11 @@ if (gridEl) {
 }
 
 function toggleFaq(btn) {
-    const content = btn.nextElementSibling;
-    content.classList.toggle('hidden');
-    btn.classList.toggle('bg-muted');
+    const faqItem = btn.closest('.faq-item');
+    document.querySelectorAll('.faq-item').forEach(item => {
+        if (item !== faqItem) item.classList.remove('faq-active');
+    });
+    faqItem.classList.toggle('faq-active');
 }
 
 const modalContentMap = {
@@ -639,7 +539,44 @@ function closeModal() {
 document.getElementById('ocean-btn')?.addEventListener('click', () => openModal('ocean'));
 document.getElementById('sdt-btn')?.addEventListener('click', () => openModal('sdt'));
 
+// --- CONSOLIDATED DOM CONTENT LOADED ---
 document.addEventListener("DOMContentLoaded", () => {
+    initAuthState();
+
+    // 1. Clear input buttons & Password toggles
+    document.querySelectorAll('.clear-input-btn').forEach(btn => {
+        const input = btn.previousElementSibling;
+        input.addEventListener('input', () => {
+            if (input.value.length > 0) btn.classList.remove('hidden');
+            else btn.classList.add('hidden');
+        });
+        btn.addEventListener('click', () => {
+            input.value = '';
+            btn.classList.add('hidden');
+            input.focus();
+        });
+    });
+
+    const showSigninPass = document.getElementById('show-signin-password');
+    const signinPassInput = document.getElementById('modal-password');
+    if (showSigninPass && signinPassInput) {
+        showSigninPass.addEventListener('change', function () {
+            signinPassInput.type = this.checked ? 'text' : 'password';
+        });
+    }
+
+    const showSetupPass = document.getElementById('show-setup-password');
+    const setupPassInput1 = document.getElementById('modal-new-password');
+    const setupPassInput2 = document.getElementById('modal-confirm-password');
+    if (showSetupPass && setupPassInput1 && setupPassInput2) {
+        showSetupPass.addEventListener('change', function () {
+            const newType = this.checked ? 'text' : 'password';
+            setupPassInput1.type = newType;
+            setupPassInput2.type = newType;
+        });
+    }
+
+    // 2. Scroll Spy Nav Highlighting
     const sections = document.querySelectorAll("main[id], section[id]");
     const desktopLinks = document.querySelectorAll("nav a.admin-nav-btn[href^='#']");
 
@@ -669,30 +606,101 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.addEventListener("scroll", highlightActiveNav);
     window.addEventListener("load", highlightActiveNav);
-});
 
+    // 3. Mobile Menu Toggle Logic (Wala nang nested DOMContentLoaded)
+    const mobileToggle = document.getElementById('mobile-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const menuBackdrop = document.getElementById('menu-backdrop');
+    const closeBtn = document.getElementById('dynamic-close-btn');
 
-// Tanggalin ang DOMContentLoaded wrapper para dito:
-const mobileToggle = document.getElementById('mobile-toggle');
-const mobileMenu = document.getElementById('mobile-menu');
-const menuBackdrop = document.getElementById('menu-backdrop');
-const closeBtn = document.getElementById('dynamic-close-btn');
+    if (mobileToggle && mobileMenu) {
+        mobileToggle.addEventListener('click', () => {
+            mobileMenu.classList.remove('translate-x-full', 'pointer-events-none');
+            if (menuBackdrop) menuBackdrop.classList.remove('hidden');
+            if (closeBtn) closeBtn.classList.remove('opacity-0');
+            document.body.style.overflow = 'hidden';
+        });
 
-if (mobileToggle && mobileMenu) {
-    mobileToggle.addEventListener('click', () => {
-        mobileMenu.classList.remove('translate-x-full');
-        if (menuBackdrop) menuBackdrop.classList.remove('hidden');
-        if (closeBtn) closeBtn.classList.remove('opacity-0');
-        document.body.style.overflow = 'hidden';
+        const closeMenu = () => {
+            mobileMenu.classList.add('translate-x-full', 'pointer-events-none');
+            if (menuBackdrop) menuBackdrop.classList.add('hidden');
+            if (closeBtn) closeBtn.classList.add('opacity-0');
+            document.body.style.overflow = '';
+        };
+
+        if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+        if (menuBackdrop) menuBackdrop.addEventListener('click', closeMenu);
+    }
+
+    // Auto-close mobile menu kapag pinindot ang navigation links
+    document.querySelectorAll('#mobile-menu a').forEach(link => {
+        link.addEventListener('click', () => {
+            const closeBtn = document.getElementById('dynamic-close-btn');
+            if (closeBtn) closeBtn.click();
+        });
     });
 
-    const closeMenu = () => {
-        mobileMenu.classList.add('translate-x-full');
-        if (menuBackdrop) menuBackdrop.classList.add('hidden');
-        if (closeBtn) closeBtn.classList.add('opacity-0');
-        document.body.style.overflow = '';
-    };
+    // 4. Reveal Animations
+    const revealOptions = { threshold: 0.15, rootMargin: "0px 0px -50px 0px" };
+    const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) entry.target.classList.add("active");
+        });
+    }, revealOptions);
 
-    if (closeBtn) closeBtn.addEventListener('click', closeMenu);
-    if (menuBackdrop) menuBackdrop.addEventListener('click', closeMenu);
-}
+    document.querySelectorAll(".reveal").forEach((el) => {
+        revealObserver.observe(el);
+    });
+
+    // 5. Cinematic Scroll Zoom (Desktop) + Static Glow (Mobile)
+    const scrollZone = document.getElementById("cinematic-scroll-zone");
+    const zoomText = document.querySelector(".magic-top-text");
+    const overlay = document.getElementById("cinematic-overlay");
+
+    if (scrollZone && zoomText && overlay) {
+        let ticking = false;
+
+        const updateCinematic = () => {
+            if (window.innerWidth <= 768) {
+                overlay.style.opacity = "0";
+                zoomText.style.transform = "scale(1)";
+                zoomText.style.setProperty('--glow-intensity', '0.6');
+                zoomText.classList.add('moving-glow');
+                return;
+            }
+
+            const rect = scrollZone.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+
+            let scrollProgress = -rect.top / (rect.height - windowHeight);
+            scrollProgress = Math.max(0, Math.min(1, scrollProgress));
+
+            let intensity = 1 - Math.abs((scrollProgress - 0.5) * 2);
+
+            if (intensity > 0.05) {
+                overlay.style.opacity = (intensity * 0.95).toString();
+                zoomText.style.setProperty('--glow-intensity', intensity);
+                zoomText.classList.add('moving-glow');
+                zoomText.style.transform = `scale(${1 + (intensity * 0.35)})`;
+            } else {
+                overlay.style.opacity = "0";
+                zoomText.style.transform = "scale(1)";
+                zoomText.classList.remove('moving-glow');
+                zoomText.style.removeProperty('--glow-intensity');
+            }
+        };
+
+        window.addEventListener("scroll", () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    updateCinematic();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
+
+        window.addEventListener("resize", updateCinematic);
+        updateCinematic();
+    }
+});
