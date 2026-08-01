@@ -48,23 +48,95 @@ function switchAuthView(view) {
     document.getElementById('view-set-password').classList.add('hidden');
 
     document.getElementById(`view-${view}`).classList.remove('hidden');
+    currentAuthView = view;
     hideModalStatus();
+    clearAllFieldErrors();
+}
+
+// View-to-status-box mapping for per-view error/success banners
+const viewStatusMap = {
+    'signin': 'signin-status-box',
+    'forgot-email': 'forgot-email-status-box',
+    'forgot-otp': 'forgot-otp-status-box',
+    'set-password': 'set-password-status-box'
+};
+
+let currentAuthView = 'signin';
+
+function getActiveStatusBox() {
+    const id = viewStatusMap[currentAuthView];
+    return id ? document.getElementById(id) : null;
 }
 
 function showModalStatus(message, type) {
-    const statusBox = document.getElementById('modal-status-box');
+    const statusBox = getActiveStatusBox();
+    if (!statusBox) return;
     statusBox.textContent = message;
-    statusBox.classList.remove('hidden', 'bg-danger-light', 'text-danger', 'border-danger-border', 'bg-success-light', 'text-success', 'border-success-border');
-
-    if (type === 'error') {
-        statusBox.classList.add('bg-danger-light', 'text-danger', 'border-danger-border');
-    } else {
-        statusBox.classList.add('bg-success-light', 'text-success', 'border-success-border');
-    }
+    statusBox.classList.remove('hidden', 'status-error', 'status-success');
+    statusBox.classList.add(type === 'error' ? 'status-error' : 'status-success');
 }
 
 function hideModalStatus() {
-    document.getElementById('modal-status-box').classList.add('hidden');
+    Object.values(viewStatusMap).forEach(id => {
+        const box = document.getElementById(id);
+        if (box) box.classList.add('hidden');
+    });
+}
+
+// --- Validation Helpers ---
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function showFieldError(inputId, message) {
+    const errorEl = document.getElementById(inputId + '-error');
+    const inputEl = document.getElementById(inputId);
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+    }
+    if (inputEl) inputEl.classList.add('input-error');
+}
+
+function clearFieldError(inputId) {
+    const errorEl = document.getElementById(inputId + '-error');
+    const inputEl = document.getElementById(inputId);
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+    if (inputEl) inputEl.classList.remove('input-error');
+}
+
+function clearAllFieldErrors() {
+    document.querySelectorAll('.field-error').forEach(el => {
+        el.textContent = '';
+        el.classList.add('hidden');
+    });
+    document.querySelectorAll('.form-input.input-error').forEach(el => {
+        el.classList.remove('input-error');
+    });
+}
+
+function validateEmail(inputId) {
+    const val = document.getElementById(inputId)?.value.trim() || '';
+    if (!val) { showFieldError(inputId, 'Email is required.'); return false; }
+    if (!EMAIL_REGEX.test(val)) { showFieldError(inputId, 'Please enter a valid email address.'); return false; }
+    clearFieldError(inputId);
+    return true;
+}
+
+function validateRequired(inputId, label) {
+    const val = document.getElementById(inputId)?.value || '';
+    if (!val) { showFieldError(inputId, `${label} is required.`); return false; }
+    clearFieldError(inputId);
+    return true;
+}
+
+function validatePassword(inputId, label = 'Password') {
+    const val = document.getElementById(inputId)?.value || '';
+    if (!val) { showFieldError(inputId, `${label} is required.`); return false; }
+    if (val.length < 6) { showFieldError(inputId, `${label} must be at least 6 characters.`); return false; }
+    clearFieldError(inputId);
+    return true;
 }
 
 function getDeviceSignature() {
@@ -183,10 +255,17 @@ const modalLoginForm = document.getElementById('modal-login-form');
 if (modalLoginForm) {
     modalLoginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAllFieldErrors();
+        hideModalStatus();
+
+        // --- Client-side validation ---
+        const emailValid = validateEmail('modal-email');
+        const passValid = validateRequired('modal-password', 'Password');
+        if (!emailValid || !passValid) return;
+
         const btn = document.getElementById('modal-signin-btn');
         btn.disabled = true;
         btn.innerHTML = 'SIGNING IN...';
-        hideModalStatus();
 
         const email = document.getElementById('modal-email').value.trim();
         const password = document.getElementById('modal-password').value;
@@ -284,7 +363,12 @@ function startModalTimer() {
 if (forgotEmailForm) {
     forgotEmailForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAllFieldErrors();
         hideModalStatus();
+
+        // --- Client-side validation ---
+        if (!validateEmail('forgot-email-input')) return;
+
         const btn = document.getElementById('modal-send-otp-btn');
         const email = document.getElementById('forgot-email-input').value.trim();
 
@@ -401,12 +485,22 @@ const setPasswordForm = document.getElementById('modal-set-password-form');
 if (setPasswordForm) {
     setPasswordForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAllFieldErrors();
         hideModalStatus();
+
+        // --- Client-side validation ---
+        const newPassValid = validatePassword('modal-new-password', 'New password');
+        const confirmPassValid = validatePassword('modal-confirm-password', 'Confirm password');
+        if (!newPassValid || !confirmPassValid) return;
+
         const btn = document.getElementById('modal-save-password-btn');
         const password = document.getElementById('modal-new-password').value;
         const confirmPassword = document.getElementById('modal-confirm-password').value;
 
-        if (password !== confirmPassword) return showModalStatus("Passwords do not match.", 'error');
+        if (password !== confirmPassword) {
+            showFieldError('modal-confirm-password', 'Passwords do not match.');
+            return;
+        }
 
         btn.disabled = true;
         btn.innerHTML = 'SAVING...';
@@ -555,6 +649,12 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.classList.add('hidden');
             input.focus();
         });
+    });
+
+    // Auto-clear inline field errors on typing
+    ['modal-email', 'modal-password', 'forgot-email-input', 'modal-new-password', 'modal-confirm-password'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => clearFieldError(id));
     });
 
     const showSigninPass = document.getElementById('show-signin-password');

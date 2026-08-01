@@ -353,9 +353,7 @@
                 <i data-lucide="x" class="w-5 h-5 pointer-events-none"></i>
             </button>
 
-            <!-- COMMON STATUS BOX -->
-            <div id="modal-status-box"
-                class="hidden text-xs text-center py-2.5 px-3 rounded-lg border mb-4 font-semibold"></div>
+
 
             <!-- 1. SIGN IN VIEW -->
             <div id="view-signin" class="block">
@@ -364,7 +362,9 @@
                     <h2 class="text-3xl font-extrabold tracking-tight">Sign In</h2>
                     <p class="text-secondary text-sm mt-1">Enter your credentials to continue</p>
                 </div>
-                <form id="modal-login-form" class="space-y-4">
+                <!-- Status box: below header, above form -->
+                <div id="signin-status-box" class="modal-status-box hidden"></div>
+                <form id="modal-login-form" class="space-y-4" novalidate>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">Email
                             Address</label>
@@ -376,6 +376,7 @@
                                 <i data-lucide="x-circle" class="w-4 h-4"></i>
                             </button>
                         </div>
+                        <span class="field-error hidden" id="modal-email-error"></span>
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1.5">
@@ -392,6 +393,7 @@
                                 <i data-lucide="x-circle" class="w-4 h-4"></i>
                             </button>
                         </div>
+                        <span class="field-error hidden" id="modal-password-error"></span>
 
                         <!-- Show Password Checkbox -->
                         <div class="flex items-center mt-3 ml-1">
@@ -416,7 +418,9 @@
                     <h2 class="text-2xl font-bold tracking-tight">Reset Password</h2>
                     <p class="text-secondary text-sm mt-1">We'll send an OTP to your email</p>
                 </div>
-                <form id="modal-forgot-form" class="space-y-4">
+                <!-- Status box: below header, above form -->
+                <div id="forgot-email-status-box" class="modal-status-box hidden"></div>
+                <form id="modal-forgot-form" class="space-y-4" novalidate>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">Email
                             Address</label>
@@ -428,6 +432,7 @@
                                 <i data-lucide="x-circle" class="w-4 h-4"></i>
                             </button>
                         </div>
+                        <span class="field-error hidden" id="forgot-email-error"></span>
                     </div>
                     <button type="submit" id="modal-send-otp-btn"
                         class="btn-primary w-full py-4 mt-2 font-extrabold tracking-widest">SEND OTP</button>
@@ -440,7 +445,9 @@
                     <h2 class="text-2xl font-bold tracking-tight">Enter OTP</h2>
                     <p class="text-secondary text-sm mt-1">Enter the 8-digit code sent to your email.</p>
                 </div>
-                <form id="modal-verify-otp-form" class="space-y-4">
+                <!-- Status box: below header, above form -->
+                <div id="forgot-otp-status-box" class="modal-status-box hidden"></div>
+                <form id="modal-verify-otp-form" class="space-y-4" novalidate>
                     <div class="grid grid-cols-8 gap-1 w-full" id="modal-otp-boxes">
                         <input type="text" inputmode="numeric" pattern="[0-9]*"
                             class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
@@ -479,7 +486,9 @@
                     <h2 class="text-2xl font-bold tracking-tight" id="setup-title">Set Password</h2>
                     <p class="text-secondary text-sm mt-1" id="setup-desc">Please create a secure password.</p>
                 </div>
-                <form id="modal-set-password-form" class="space-y-4">
+                <!-- Status box: below header, above form -->
+                <div id="set-password-status-box" class="modal-status-box hidden"></div>
+                <form id="modal-set-password-form" class="space-y-4" novalidate>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">New
                             Password</label>
@@ -491,6 +500,7 @@
                                 <i data-lucide="x-circle" class="w-4 h-4"></i>
                             </button>
                         </div>
+                        <span class="field-error hidden" id="modal-new-password-error"></span>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">Confirm
@@ -503,6 +513,7 @@
                                 <i data-lucide="x-circle" class="w-4 h-4"></i>
                             </button>
                         </div>
+                        <span class="field-error hidden" id="modal-confirm-password-error"></span>
 
                         <div class="flex items-center mt-3 ml-1">
                             <input type="checkbox" id="show-setup-password" class="form-checkbox h-3.5 w-3.5">
