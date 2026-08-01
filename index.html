@@ -186,98 +186,21 @@
         <div id="tutor-grid" class="flex flex-wrap gap-3 md:gap-4 justify-center md:justify-start"></div>
     </section>
 
-    <!-- Carousel Feature Section (Original Clone) -->
-    <section class="max-w-7xl mx-auto px-6 py-16 md:py-24 overflow-hidden relative" id="core-features">
-        <div class="text-center mb-12">
-            <h2 class="text-3xl md:text-4xl font-black tracking-tight uppercase">PIA HIGHLIGHTS</h2>
-        </div>
-
-        <div class="carousel-track flex overflow-x-auto snap-x snap-mandatory gap-6 pb-10 pt-4 px-4 hide-scroll-bar smooth-scroll w-full"
-            id="feature-track">
-
-            <!-- Card 1 -->
-            <div
-                class="carousel-card min-w-[300px] md:min-w-[360px] snap-center shrink-0 solid-card rounded-[32px] flex flex-col items-center text-center p-8 transition-transform hover:-translate-y-2">
-                <div class="relative w-full h-40 flex justify-center items-center mb-6">
-                    <div class="blob-bg bg-gradient-to-tr from-[var(--accent-primary)] to-transparent"></div>
-                    <img src="/assets/images/Lock-Image.png" loading="lazy" alt="Fun Challenges"
-                        class="relative z-10 h-32 object-contain transition-transform hover:scale-110">
-                </div>
-                <div class="flex flex-col flex-1 w-full">
-                    <h3 class="text-xl font-bold mb-3 text-accent">100% Data Privacy</h3>
-                    <p class="text-secondary text-sm leading-relaxed flex-1 mb-6">Your child's privacy is our priority.
-                        All information gathered is highly secured and used exclusively for our research project.</p>
-                    <a href="#privacy-policy"
-                        class="mt-auto text-xs font-bold uppercase tracking-widest text-primary hover:text-accent transition-colors">Read
-                        Privacy Policy</a>
-                </div>
+    <!-- Core Features section -->
+    <section class="max-w-7xl mx-auto px-6 py-16 md:py-24" id="core-features">
+        <h2 class="text-3xl font-black text-center mb-12 tracking-tight">Core Features</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="group relative p-8 solid-card rounded-2xl overflow-hidden">
+                <h3 class="text-xl font-bold mb-4 relative z-10 text-accent">AI-Tutoring</h3>
+                <p class="text-secondary relative z-10">Personalized math lessons na akma sa pacing mo.</p>
             </div>
-
-            <!-- Card 2 -->
-            <div
-                class="carousel-card min-w-[300px] md:min-w-[360px] snap-center shrink-0 solid-card rounded-[32px] flex flex-col items-center text-center p-8 transition-transform hover:-translate-y-2">
-                <div class="relative w-full h-40 flex justify-center items-center mb-6">
-                    <div class="blob-bg alt-blob bg-gradient-to-tr from-[var(--color-success)] to-transparent"></div>
-                    <img src="/assets/images/HOME-CARD-2 IMAGE.png" loading="lazy" alt="Smart AI Tutors"
-                        class="relative z-10 h-32 object-contain transition-transform hover:scale-110">
-                </div>
-                <div class="flex flex-col flex-1 w-full">
-                    <h3 class="text-xl font-bold mb-3 text-accent">See PIA in Action!</h3>
-                    <p class="text-secondary text-sm leading-relaxed flex-1 mb-6">Curious how it works? Try our quick
-                        demo to see exactly how you'll chat, learn, and solve math problems with your AI tutor.</p>
-                    <a href="/HTML/demo.html#Demo-Page"
-                        class="mt-auto text-xs font-bold uppercase tracking-widest text-primary hover:text-accent transition-colors">Demo</a>
-                </div>
+            <div class="group relative p-8 solid-card rounded-2xl overflow-hidden">
+                <h3 class="text-xl font-bold mb-4 relative z-10 text-accent">Real-time Progress</h3>
+                <p class="text-secondary relative z-10">I-track ang iyong improvement araw-araw.</p>
             </div>
-
-            <!-- Card 3 -->
-            <div
-                class="carousel-card min-w-[300px] md:min-w-[360px] snap-center shrink-0 solid-card rounded-[32px] flex flex-col items-center text-center p-8 transition-transform hover:-translate-y-2">
-                <div class="relative w-full h-40 flex justify-center items-center mb-6">
-                    <div class="blob-bg bg-gradient-to-tr from-[var(--color-warning)] to-transparent"></div>
-                    <img src="/assets/images/HOME-CARD-3 IMAGE.png" loading="lazy" alt="Track Progress"
-                        class="relative z-10 h-32 object-contain transition-transform hover:scale-110">
-                </div>
-                <div class="flex flex-col flex-1 w-full">
-                    <h3 class="text-xl font-bold mb-3 text-accent">Real-time Progress</h3>
-                    <p class="text-secondary text-sm leading-relaxed flex-1 mb-6">Watch your stats level up as you
-                        complete different sessions and conquer math anxiety once and for all.</p>
-                </div>
-            </div>
-
-            <!-- Card 4 -->
-            <div
-                class="carousel-card min-w-[300px] md:min-w-[360px] snap-center shrink-0 solid-card rounded-[32px] flex flex-col items-center text-center p-8 transition-transform hover:-translate-y-2">
-                <div class="relative w-full h-40 flex justify-center items-center mb-6">
-                    <div class="blob-bg alt-blob bg-gradient-to-tr from-[var(--color-info)] to-transparent"></div>
-                    <img src="/assets/images/HOME-CARD-2 IMAGE.png" loading="lazy" alt="Smart AI Tutors"
-                        class="relative z-10 h-32 object-contain transition-transform hover:scale-110">
-                </div>
-                <div class="flex flex-col flex-1 w-full">
-                    <h3 class="text-xl font-bold mb-3 text-accent">Smart AI Tutors</h3>
-                    <p class="text-secondary text-sm leading-relaxed flex-1 mb-6">Master Algebraic expressions
-                        step-by-step with interactive, guided exercises tailored specifically to how your brain works.
-                    </p>
-                    <button
-                        class="mt-auto text-xs font-bold uppercase tracking-widest text-primary hover:text-accent transition-colors">Explore
-                        Feature</button>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Controls Pill -->
-        <div class="flex justify-center mt-6">
-            <div
-                class="controls-pill flex items-center gap-6 px-8 py-4 rounded-full solid-card shadow-2xl bg-card border-custom">
-                <div id="carousel-dots" class="flex items-center gap-3"></div>
-                <div class="w-px h-6 bg-[var(--border-color)]"></div>
-                <button id="carousel-play-btn"
-                    class="text-secondary hover:text-primary transition-colors flex items-center justify-center w-6 h-6 outline-none"
-                    aria-label="Toggle Auto-play">
-                    <i data-lucide="pause" id="pause-icon" class="w-5 h-5"></i>
-                    <i data-lucide="play" id="play-icon" class="w-5 h-5 hidden"></i>
-                </button>
+            <div class="group relative p-8 solid-card rounded-2xl overflow-hidden">
+                <h3 class="text-xl font-bold mb-4 relative z-10 text-accent">Adaptive Learning</h3>
+                <p class="text-secondary relative z-10">Focus sa mga topics na kailangan mong i-master.</p>
             </div>
         </div>
     </section>
@@ -285,14 +208,9 @@
     <!-- The Science Behind PIA -->
     <section id="how-it-works" class="max-w-6xl mx-auto px-6 py-16 md:py-24">
         <div class="text-center mb-20">
-            <!-- Balot sa magic-top-text para ito lang ang mag-zoom -->
-            <div class="magic-top-text origin-center inline-block" style="will-change: transform, opacity;">
-                <h2 class="text-4xl md:text-5xl font-black mb-4 tracking-tight leading-tight">
-                    The Power of Personality.<br>Self-Determination Theory.
-                </h2>
-            </div>
-            <p class="text-secondary text-lg font-medium mt-4">We use proven psychological models to make math easier
-                and more fun.</p>
+            <h2 class="text-4xl md:text-5xl font-black mb-4 tracking-tight">How we help you learn</h2>
+            <p class="text-secondary text-lg font-medium">We use proven psychological models to make math easier and
+                more fun.</p>
         </div>
         <div class="space-y-32">
             <div class="flex flex-col md:flex-row items-center gap-16">
