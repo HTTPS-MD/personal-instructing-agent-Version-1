@@ -583,10 +583,18 @@ if (gridEl) {
     selectTutor(0);
 }
 
+// ==========================================
+// FAQ ANIMATION LOGIC
+// ==========================================
 function toggleFaq(btn) {
-    const content = btn.nextElementSibling;
-    content.classList.toggle('hidden');
-    btn.classList.toggle('bg-muted');
+    const faqItem = btn.closest('.faq-item');
+
+    // Opsiyonal: Kung gusto mong sumara yung iba kapag may binuksang bago
+    document.querySelectorAll('.faq-item').forEach(item => {
+        if (item !== faqItem) item.classList.remove('faq-active');
+    });
+
+    faqItem.classList.toggle('faq-active');
 }
 
 const modalContentMap = {
@@ -696,3 +704,86 @@ if (mobileToggle && mobileMenu) {
     if (closeBtn) closeBtn.addEventListener('click', closeMenu);
     if (menuBackdrop) menuBackdrop.addEventListener('click', closeMenu);
 }
+
+// ==========================================
+// ANIMATIONS: REVEAL & APPLE-STYLE ZOOM
+// ==========================================
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. Reveal Animation (Fade in & Slide up)
+    const revealOptions = {
+        threshold: 0.15,
+        rootMargin: "0px 0px -50px 0px"
+    };
+
+    const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add("active");
+            }
+        });
+    }, revealOptions);
+
+    document.querySelectorAll(".reveal").forEach((el) => {
+        revealObserver.observe(el);
+    });
+});
+
+// ==========================================
+// CINEMATIC SCROLL ZOOM (DESKTOP) + STATIC GLOW (MOBILE)
+// ==========================================
+document.addEventListener("DOMContentLoaded", () => {
+    const scrollZone = document.getElementById("cinematic-scroll-zone");
+    const zoomText = document.querySelector(".magic-top-text");
+    const overlay = document.getElementById("cinematic-overlay");
+
+    if (scrollZone && zoomText && overlay) {
+        let ticking = false;
+
+        const updateCinematic = () => {
+            // KAPAG MOBILE (<= 768px): Walang zoom/blackout, pero naka-on ang glow
+            if (window.innerWidth <= 768) {
+                overlay.style.opacity = "0";
+                zoomText.style.transform = "scale(1)";
+
+                // Naka-steady sa 0.6 ang intensity ng ilaw para smooth sa phone
+                zoomText.style.setProperty('--glow-intensity', '0.6');
+                zoomText.classList.add('moving-glow');
+                return;
+            }
+
+            // KAPAG DESKTOP: Full cinematic effect
+            const rect = scrollZone.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+
+            let scrollProgress = -rect.top / (rect.height - windowHeight);
+            scrollProgress = Math.max(0, Math.min(1, scrollProgress));
+
+            let intensity = 1 - Math.abs((scrollProgress - 0.5) * 2);
+
+            if (intensity > 0.05) {
+                overlay.style.opacity = (intensity * 0.95).toString();
+                zoomText.style.setProperty('--glow-intensity', intensity);
+                zoomText.classList.add('moving-glow');
+                zoomText.style.transform = `scale(${1 + (intensity * 0.35)})`;
+            } else {
+                overlay.style.opacity = "0";
+                zoomText.style.transform = "scale(1)";
+                zoomText.classList.remove('moving-glow');
+                zoomText.style.removeProperty('--glow-intensity');
+            }
+        };
+
+        window.addEventListener("scroll", () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    updateCinematic();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
+
+        window.addEventListener("resize", updateCinematic);
+        updateCinematic();
+    }
+});

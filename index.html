@@ -206,13 +206,35 @@
     </section>
 
     <!-- The Science Behind PIA -->
-    <section id="how-it-works" class="max-w-6xl mx-auto px-6 py-16 md:py-24">
-        <div class="text-center mb-20">
-            <h2 class="text-4xl md:text-5xl font-black mb-4 tracking-tight">How we help you learn</h2>
-            <p class="text-secondary text-lg font-medium">We use proven psychological models to make math easier and
-                more fun.</p>
+    <section id="how-it-works" class="relative w-full">
+
+        <!-- 1. SCROLL ZONE PARA SA ANIMATION (Desktop Only) -->
+        <div id="cinematic-scroll-zone" class="h-auto md:h-[200vh] w-full relative">
+            <!-- Naka-pin lang sa screen kapag desktop (md:sticky) -->
+            <div
+                class="md:sticky md:top-0 md:h-screen w-full flex flex-col items-center justify-center z-[40] overflow-hidden px-4 py-16 md:py-0">
+                <!-- Blackout Overlay (Nakatago sa mobile) -->
+                <div id="cinematic-overlay"
+                    class="hidden md:block absolute inset-0 bg-black pointer-events-none opacity-0 transition-opacity duration-100 -z-10">
+                </div>
+
+                <div class="magic-top-text origin-center inline-flex flex-col items-center text-center w-full"
+                    style="will-change: transform, text-shadow;">
+                    <!-- Pinalaki ang text sa mobile (text-4xl) -->
+                    <h2
+                        class="text-4xl md:text-5xl font-black mb-3 md:mb-4 tracking-tight leading-tight w-full break-words">
+                        The Power of Personality.<br class="hidden md:block">
+                        <span class="md:hidden"> </span>Self-Determination Theory.
+                    </h2>
+                    <p class="text-secondary text-base md:text-lg font-medium mt-2 md:mt-4 max-w-2xl px-2">
+                        We use proven psychological models to make math easier and more fun.
+                    </p>
+                </div>
+            </div>
         </div>
-        <div class="space-y-32">
+        <!-- 2. MGA CONTENT NA AANGAT PAGKATAPOS NG ANIMATION -->
+        <div class="max-w-6xl mx-auto px-6 py-16 md:py-24 space-y-32">
+
             <div class="flex flex-col md:flex-row items-center gap-16">
                 <div class="w-full md:w-1/2">
                     <img src="/assets/images/ocean.png" alt="Learning Personality"
@@ -229,6 +251,7 @@
                         Personality Test →</button>
                 </div>
             </div>
+
             <div class="flex flex-col md:flex-row-reverse items-center gap-16">
                 <div class="w-full md:w-1/2">
                     <img src="/assets/images/board.png" alt="Motivation" class="w-full h-auto rounded-3xl shadow-2xl">
@@ -244,6 +267,7 @@
                         →</button>
                 </div>
             </div>
+
         </div>
     </section>
 
@@ -269,25 +293,47 @@
     <section id="faq" class="max-w-3xl mx-auto px-6 py-16 md:py-24">
         <h2 class="text-3xl font-black text-center mb-12 tracking-tight">Frequently Asked Questions</h2>
         <div class="space-y-4">
-            <div class="solid-card rounded-xl overflow-hidden">
-                <button onclick="toggleFaq(this)" class="w-full text-left p-6 flex justify-between items-center">
-                    <span class="font-semibold">What is PIA System?</span>
-                    <span class="text-accent">▼</span>
+
+            <!-- FAQ Item 1 -->
+            <div class="solid-card rounded-xl overflow-hidden faq-item transition-all duration-300">
+                <button onclick="toggleFaq(this)"
+                    class="w-full text-left p-6 flex justify-between items-center group focus:outline-none">
+                    <span class="font-semibold group-hover:text-accent transition-colors">What is PIA System?</span>
+                    <i data-lucide="chevron-down"
+                        class="w-5 h-5 text-accent transition-transform duration-300 faq-icon"></i>
                 </button>
-                <div class="hidden px-6 pb-6 text-secondary">
-                    Ang Personal Instructing Agent (PIA) ay isang AI-powered tool na ginawa para tulungan ang mga Grade
-                    7 students sa kanilang math subjects.
+                <div
+                    class="faq-content-wrapper grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                    <div class="overflow-hidden">
+                        <div
+                            class="px-6 pb-6 text-secondary faq-text border-l-2 border-transparent transition-all duration-300">
+                            Ang Personal Instructing Agent (PIA) ay isang AI-powered tool na ginawa para tulungan ang
+                            mga Grade 7 students sa kanilang math subjects.
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="solid-card rounded-xl overflow-hidden">
-                <button onclick="toggleFaq(this)" class="w-full text-left p-6 flex justify-between items-center">
-                    <span class="font-semibold">Paano ako makakapagsimula?</span>
-                    <span class="text-accent">▼</span>
+
+            <!-- FAQ Item 2 -->
+            <div class="solid-card rounded-xl overflow-hidden faq-item transition-all duration-300">
+                <button onclick="toggleFaq(this)"
+                    class="w-full text-left p-6 flex justify-between items-center group focus:outline-none">
+                    <span class="font-semibold group-hover:text-accent transition-colors">Paano ako
+                        makakapagsimula?</span>
+                    <i data-lucide="chevron-down"
+                        class="w-5 h-5 text-accent transition-transform duration-300 faq-icon"></i>
                 </button>
-                <div class="hidden px-6 pb-6 text-secondary">
-                    I-click lang ang "Get Started" button sa ating home page at sundin ang registration steps.
+                <div
+                    class="faq-content-wrapper grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 ease-in-out">
+                    <div class="overflow-hidden">
+                        <div
+                            class="px-6 pb-6 text-secondary faq-text border-l-2 border-transparent transition-all duration-300">
+                            I-click lang ang "Get Started" button sa ating home page at sundin ang registration steps.
+                        </div>
+                    </div>
                 </div>
             </div>
+
         </div>
     </section>
 

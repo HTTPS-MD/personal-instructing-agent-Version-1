@@ -296,3 +296,90 @@ div#mobile-menu a.mobile-nav-link.active {
     font-weight: 500;
     border-radius: var(--radius-md);
 }
+
+
+/* ========================================= */
+/* --- REVEAL & FLOAT ANIMATIONS ---         */
+/* ========================================= */
+.reveal {
+    opacity: 0.3;
+    transform: translateY(50px);
+    transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+    visibility: visible;
+    will-change: transform, opacity;
+}
+
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.floating-graphic {
+    animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-15px);
+    }
+}
+
+/* ========================================= */
+/* --- CINEMATIC MOVING GLOW (AI STYLE) ---  */
+/* ========================================= */
+.moving-glow {
+    animation: ai-iridescent-glow 5s infinite alternate ease-in-out;
+}
+
+@keyframes ai-iridescent-glow {
+    0% {
+        text-shadow:
+            0 0 calc(var(--glow-intensity) * 30px) rgba(45, 212, 191, var(--glow-intensity)),
+            -20px 10px calc(var(--glow-intensity) * 40px) rgba(59, 130, 246, calc(var(--glow-intensity) * 0.8)),
+            20px -10px calc(var(--glow-intensity) * 40px) rgba(168, 85, 247, calc(var(--glow-intensity) * 0.6));
+    }
+
+    33% {
+        text-shadow:
+            0 0 calc(var(--glow-intensity) * 30px) rgba(168, 85, 247, var(--glow-intensity)),
+            20px 15px calc(var(--glow-intensity) * 40px) rgba(236, 72, 153, calc(var(--glow-intensity) * 0.8)),
+            -15px -20px calc(var(--glow-intensity) * 40px) rgba(59, 130, 246, calc(var(--glow-intensity) * 0.6));
+    }
+
+    66% {
+        text-shadow:
+            0 0 calc(var(--glow-intensity) * 30px) rgba(236, 72, 153, var(--glow-intensity)),
+            -20px -15px calc(var(--glow-intensity) * 40px) rgba(249, 115, 22, calc(var(--glow-intensity) * 0.8)),
+            15px 20px calc(var(--glow-intensity) * 40px) rgba(168, 85, 247, calc(var(--glow-intensity) * 0.6));
+    }
+
+    100% {
+        text-shadow:
+            0 0 calc(var(--glow-intensity) * 30px) rgba(249, 115, 22, var(--glow-intensity)),
+            15px -20px calc(var(--glow-intensity) * 40px) rgba(45, 212, 191, calc(var(--glow-intensity) * 0.8)),
+            -20px 15px calc(var(--glow-intensity) * 40px) rgba(236, 72, 153, calc(var(--glow-intensity) * 0.6));
+    }
+}
+
+
+/* ========================================= */
+/* --- CYBER-SLIDE & GLOW FAQ ANIMATION ---- */
+/* ========================================= */
+.faq-active .faq-content-wrapper {
+    grid-template-rows: 1fr;
+}
+
+.faq-active .faq-icon {
+    transform: rotate(180deg);
+}
+
+.faq-active .faq-text {
+    border-color: var(--accent-primary);
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.05) 0%, transparent 100%);
+}
