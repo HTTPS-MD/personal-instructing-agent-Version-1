@@ -30,21 +30,26 @@
     let lastSearchQuery = '';
 
     function triggerDeferredRealtimeUpdate() {
+        if (pendingRealtimeUpdate) return;
+        pendingRealtimeUpdate = true;
+
         if (realtimeUpdateTimeout) clearTimeout(realtimeUpdateTimeout);
         realtimeUpdateTimeout = setTimeout(() => {
+            pendingRealtimeUpdate = false;
+
             const activeEl = document.activeElement;
             const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
             const isInteracting = isTyping || (activeEl && activeEl.closest('form')) || document.querySelector('.modal-active') || document.querySelector('.show-menu');
 
             if (isInteracting) {
-                // Hintayin matapos ang pakikipag-ugnayan ng user bago mag-load muli
+                // Kung aktibong nakikipag-ugnayan ang user, mag-antay sandali nang hindi nagba-build up ng recursion stack
                 triggerDeferredRealtimeUpdate();
                 return;
             }
 
             loadStudents();
             loadSections();
-        }, 1000); // Ginawang 1 segundo para mas ligtas sa background ticks
+        }, 1000);
     }
 
     // Pagination States
@@ -943,22 +948,26 @@
         const group_type = document.getElementById('edit-student-type').value;
         const max_devices = parseInt(document.getElementById('edit-student-device-limit').value) || 1;
 
-        // 1. I-update muna ang mga detalye maliban sa email para maiwasan ang query conflict
-        const { error } = await sb.from('profiles').update({
-            full_name, section, pre_test_score, group_type, max_devices
-        }).eq('email', originalEmail);
-
-        if (error) return showCustomAlert("Update Error", error.message, "error");
-
-        // 2. Kung nagbago ang email, i-sync ito hiwalay sa Auth at Profile
+        // 1. Unahing i-validate at i-sync sa Supabase Auth RPC kung nagbago ang email
         if (email !== originalEmail) {
-            await sb.from('profiles').update({ email }).eq('email', originalEmail);
             const { error: rpcError } = await sb.rpc('admin_update_user_email', {
                 target_email: originalEmail,
                 new_email: email
             });
             if (rpcError) return showCustomAlert("Auth Sync Error", rpcError.message, "error");
         }
+
+        // 2. Sunod na i-update ang profiles table gamit ang mga bagong detalye (pati na rin ang bagong email)
+        const updatePayload = {
+            full_name, section, pre_test_score, group_type, max_devices
+        };
+        if (email !== originalEmail) {
+            updatePayload.email = email;
+        }
+
+        const { error } = await sb.from('profiles').update(updatePayload).eq('email', originalEmail);
+
+        if (error) return showCustomAlert("Update Error", error.message, "error");
 
         closeModal('edit-student-modal');
         loadStudents();
