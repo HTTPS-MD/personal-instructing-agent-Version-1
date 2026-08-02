@@ -167,10 +167,11 @@
             ]);
 
             restoreUIState();
-            setupRealtimeSubscriptions();
 
             currentAdminEmail = email;
-            loadAdminDeviceSettings(email);
+            setupRealtimeSubscriptions();
+            
+            loadAdminDeviceSettings(currentAdminEmail);
         } catch (e) {
             console.error("Initialization error:", e);
             const errorBanner = document.getElementById('global-error-banner');
@@ -514,7 +515,7 @@
         const { data, error, count } = await query;
         if (error) return console.error('Error loading profiles:', error);
 
-        studentDataCache = data;
+        studentDataCache = data || [];
         totalStudentCount = count || 0;
         renderUnifiedTable();
     }
@@ -1026,7 +1027,7 @@
             });
         }
 
-        for (const sec of data) {
+        for (const sec of (data || [])) {
             const name = sec.name;
             sectionSelects.forEach(select => {
                 const option = document.createElement('option');
@@ -1220,7 +1221,7 @@
         tbody.innerHTML = '';
         if (cardsContainer) cardsContainer.innerHTML = '';
 
-        data.forEach(prof => {
+        (data || []).forEach(prof => {
             const safeEmailId = prof.email.replace(/[@.]/g, '_');
 
             // Desktop Row HTML
@@ -1913,7 +1914,7 @@
             if (btn) { btn.disabled = true; btn.textContent = 'SENDING...'; }
 
             // Palitan ang '/index.html' papunta sa '/assets/html/sign-up.html'
-            const redirectPath = window.location.origin + '/assets/html/sign-up.html';
+            const redirectPath = new URL('../../assets/html/sign-up.html', window.location.href).href;
             const { error } = await sb.auth.signInWithOtp({
                 email: email,
                 options: { shouldCreateUser: false, emailRedirectTo: redirectPath }
@@ -1942,7 +1943,7 @@
             }
 
             // Palitan ang '/index.html' papunta sa '/assets/html/sign-up.html'
-            const redirectPath = window.location.origin + '/assets/html/sign-up.html';
+            const redirectPath = new URL('../../assets/html/sign-up.html', window.location.href).href;
             let successCount = 0;
 
             for (const student of students) {
