@@ -155,6 +155,7 @@
                 initAdminProfile(email),
                 loadSections(),
                 loadStudents(),
+                updateStageCounters(),
                 loadProfessors(),
                 loadSettings(),
                 checkSuperAdmin(profile.is_super_admin)
@@ -308,6 +309,7 @@
 
     // fully working
     function switchTab(tabName) {
+        if (tabName === 'students') updateStageCounters();
         sessionStorage.setItem('activeTab', tabName);
         ['sections', 'students', 'professors', 'controls', 'settings'].forEach(t => {
             const el = document.getElementById(`view-${t}`);
@@ -504,12 +506,6 @@
 
         studentDataCache = data;
         totalStudentCount = count || 0;
-        
-        // Update stage counters only if we aren't filtering/searching, to save queries
-        if (stateStageDrilldown === null && !searchQuery) {
-            updateStageCounters();
-        }
-        
         renderUnifiedTable();
     }
 
@@ -757,7 +753,7 @@
                     </div>
                     <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td data-label="Email" class="py-3 px-3 font-mono text-secondary text-[10px] truncate">${student.email}</td>
+                <td data-label="Email" class="py-3 px-3 font-mono text-secondary text-[10px] truncate">${escapeHTML(student.email)}</td>
                 <td data-label="Section" class="py-3 px-3 text-secondary text-xs truncate">${escapeHTML(student.section || 'N/A')}</td>
                 <td data-label="Group" class="py-3 px-3 font-bold ${groupColor} text-[10px] uppercase tracking-wider">${groupLabel}</td>
                 <td data-label="Setup" class="py-3 px-3 text-secondary text-[10px] uppercase tracking-wider truncate">${personaSetup}</td>
@@ -1081,7 +1077,7 @@
 
                 tr.innerHTML = `
                 <td class="py-4 px-3 font-medium text-primary">${escapeHTML(student.full_name)}</td>
-                <td class="py-4 px-3 text-secondary">${student.email}</td>
+                <td class="py-4 px-3 text-secondary">${escapeHTML(student.email)}</td>
                 <td class="py-4 px-3"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[10px] font-bold uppercase tracking-wider">${escapeHTML(student.group_type || 'N/A')}</span></td>
                 <td class="py-4 px-3">
                     <div class="flex items-center gap-1.5">
@@ -1608,17 +1604,11 @@
         showCustomConfirm("Critical Warning", `Completely delete ${email}?`, async () => {
             let error = null;
             if (table === 'profiles' || table === 'professors') {
-                const rpcRes = await sb.rpc('admin_delete_user', { target_email: email });
-                if (!rpcRes.error) {
-                    error = (await sb.from('profiles').delete().eq('email', email)).error;
-                    if (!error && table === 'professors') {
-                        error = (await sb.from('professors').delete().eq('email', email)).error;
-                    }
-                } else {
-                    error = rpcRes.error;
-                }
+                const { error: rpcError } = await sb.rpc('admin_delete_user', { target_email: email });
+                error = rpcError;
             } else {
-                error = (await sb.from(table).delete().eq('email', email)).error;
+                const { error: dbError } = await sb.from(table).delete().eq('email', email);
+                error = dbError;
             }
 
             if (error) return showCustomAlert("Deletion Failed", error.message, "error");
@@ -1743,8 +1733,8 @@
 
             item.innerHTML = `
             <div class="overflow-hidden">
-                <p class="text-xs font-bold text-primary truncate">${student.full_name}</p>
-                <p class="text-[10px] font-mono text-secondary truncate">${student.email}</p>
+                <p class="text-xs font-bold text-primary truncate">${escapeHTML(student.full_name)}</p>
+                <p class="text-[10px] font-mono text-secondary truncate">${escapeHTML(student.email)}</p>
             </div>
         `;
             listContainer.appendChild(item);
@@ -2007,6 +1997,7 @@
                     options: { shouldCreateUser: false, emailRedirectTo: redirectPath }
                 });
                 if (!mailError) successCount++;
+                await new Promise(r => setTimeout(r, 1500));
             }
             showCustomAlert("Broadcast Complete", `Successfully sent activation emails to ${successCount} student(s) in section ${sectionName}.`, "success");
         });
