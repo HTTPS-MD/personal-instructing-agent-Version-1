@@ -229,8 +229,17 @@ if (loginForm) {
         if (statusMessage) statusMessage.classList.add('hidden');
 
         const passwordInput = document.getElementById('password');
+        const email = loginEmailInput ? loginEmailInput.value.trim() : '';
+        
+        if (!email) {
+            showStatus("Please enter your email address.", 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Sign In';
+            return;
+        }
+
         const { data: authData, error: authError } = await window.supabaseClient.auth.signInWithPassword({
-            email: loginEmailInput.value.trim(),
+            email: email,
             password: passwordInput ? passwordInput.value : ''
         });
 
@@ -241,7 +250,7 @@ if (loginForm) {
             return;
         }
 
-        localStorage.setItem('pia_user_email', loginEmailInput.value.trim());
+        localStorage.setItem('pia_user_email', email);
 
         const { data: profile, error: profileError } = await window.supabaseClient
             .from('profiles')
@@ -327,7 +336,7 @@ const resetEmailInput = document.getElementById('email');
 if (checkEmailBtn && isResetPage) {
     checkEmailBtn.addEventListener('click', async () => {
         if (statusMessage) statusMessage.classList.add('hidden');
-        const email = resetEmailInput.value.trim();
+        const email = resetEmailInput ? resetEmailInput.value.trim() : '';
         if (!email) return showStatus("Please enter an email address.", 'error');
 
         checkEmailBtn.disabled = true;
