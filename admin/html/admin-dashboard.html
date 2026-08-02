@@ -239,7 +239,7 @@
                         <div class="relative w-full sm:w-64">
                             <i data-lucide="search"
                                 class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondary"></i>
-                            <input type="text" id="search-student" oninput="renderUnifiedTable()"
+                            <input type="text" id="search-student" oninput="debouncedSearchStudents()"
                                 placeholder="Search student..." class="search-input">
                         </div>
                         <button onclick="openModal('add-student-modal')"
@@ -1247,7 +1247,7 @@
         <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeCustomAlert()"></div>
         <div class="solid-card relative z-10 w-full max-w-sm p-6 space-y-5 modal-content" id="custom-alert-content">
             <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <i data-lucide="info" class="w-6 h-6 text-accent" id="alert-icon"></i>
+                <div id="alert-icon-container"><i data-lucide="info" class="w-6 h-6 text-accent" id="alert-icon"></i></div>
                 <h3 class="text-base font-extrabold text-primary uppercase tracking-wider" id="alert-title">Notification
                 </h3>
             </div>
