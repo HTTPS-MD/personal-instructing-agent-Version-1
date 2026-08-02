@@ -156,8 +156,8 @@ function getDeviceSignature() {
 // ------------------------------------------------------------------
 async function initAuthState() {
     const heroBtn = document.getElementById('hero-btn');
-    const navAuthBtn = document.getElementById('nav-auth-btn');
-    const navUserDropdown = document.getElementById('nav-user-dropdown');
+    const loggedOutContainer = document.getElementById('logged-out-container');
+    const loggedInContainer = document.getElementById('logged-in-container');
     const navUserGreeting = document.getElementById('nav-user-greeting');
     const navUserEmail = document.getElementById('nav-user-email');
 
@@ -184,13 +184,14 @@ async function initAuthState() {
         let fullName = profile?.full_name || "Player";
         let firstName = fullName.split(' ')[0];
 
-        if (navAuthBtn && navUserDropdown) {
-            navAuthBtn.classList.add('hidden');
-            navUserDropdown.classList.remove('hidden');
-            navUserDropdown.classList.add('flex');
-            navUserGreeting.textContent = `${timeGreeting}, ${firstName}!`;
-            if (navUserEmail) navUserEmail.textContent = email;
+        // Desktop nav: hide Sign In, show user dropdown
+        if (loggedOutContainer) loggedOutContainer.classList.add('hidden');
+        if (loggedInContainer) {
+            loggedInContainer.classList.remove('hidden');
+            loggedInContainer.classList.add('md:flex');
         }
+        if (navUserGreeting) navUserGreeting.textContent = `${timeGreeting}, ${firstName}!`;
+        if (navUserEmail) navUserEmail.textContent = email;
 
         if (mobPrefix && mobName && mobAuthBtn) {
             mobPrefix.textContent = `${timeGreeting},`;
@@ -232,6 +233,16 @@ async function initAuthState() {
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
     } else {
+        // Desktop nav: show Sign In, hide user dropdown
+        if (loggedOutContainer) {
+            loggedOutContainer.classList.remove('hidden');
+            loggedOutContainer.classList.add('md:flex');
+        }
+        if (loggedInContainer) {
+            loggedInContainer.classList.add('hidden');
+            loggedInContainer.classList.remove('md:flex');
+        }
+
         if (heroBtn) {
             heroBtn.innerHTML = `<span>Start Adventure</span><i data-lucide="play" class="w-4 h-4 fill-current pointer-events-none"></i>`;
             heroBtn.setAttribute('onclick', "openAuthModal('signin')");

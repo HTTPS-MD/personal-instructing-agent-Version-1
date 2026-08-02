@@ -38,15 +38,17 @@
 
         <!-- Right: Auth Button & Mobile Toggle -->
         <div class="flex items-center justify-end gap-3">
-            <div id="auth-btn-container" class="hidden md:flex items-center h-full relative group">
-                <!-- Logged Out State -->
+            <!-- Logged Out State -->
+            <div id="logged-out-container" class="hidden md:flex items-center h-full">
                 <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="nav-auth-btn"
                     class="btn-primary px-6 py-2.5 rounded-lg text-xs uppercase tracking-wider font-bold shadow-md text-center">Sign
                     In</a>
+            </div>
 
-                <!-- Logged In State (Hover to see Change Password) -->
+            <!-- Logged In State (Hover to see dropdown) -->
+            <div id="logged-in-container" class="hidden items-center h-full relative group">
                 <button id="nav-user-dropdown"
-                    class="hidden items-center gap-2 text-primary hover:text-accent font-medium text-sm tracking-wider transition-colors py-2 bg-transparent border-none">
+                    class="flex items-center gap-2 text-primary hover:text-accent font-medium text-sm tracking-wider transition-colors py-2 bg-transparent border-none">
                     <span id="nav-user-greeting">Loading...</span>
                     <i data-lucide="chevron-down" class="w-4 h-4 text-secondary"></i>
                 </button>
