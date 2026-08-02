@@ -107,13 +107,13 @@ if (slides.length > 0) startAutoSlide();
 // ==========================================
 // 3. SHOW PASSWORD LOGIC
 // ==========================================
-const passwordInput = document.getElementById('password');
-const confirmPasswordInput = document.getElementById('confirm-password');
 const showPasswordCheckbox = document.getElementById('show-password');
 
 if (showPasswordCheckbox) {
     showPasswordCheckbox.addEventListener('change', function () {
         const type = this.checked ? 'text' : 'password';
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
         if (passwordInput) passwordInput.type = type;
         if (confirmPasswordInput) confirmPasswordInput.type = type;
     });
@@ -169,7 +169,6 @@ if (otpInputs.length > 0) {
 // 5. HELPER FUNCTIONS & DEVICE DETECTOR
 // ==========================================
 const statusMessage = document.getElementById('status-message') || document.getElementById('error-message');
-const timerSpan = document.getElementById('timer');
 const resendBtn = document.getElementById('resend-btn');
 let countdownInterval;
 
@@ -194,15 +193,19 @@ function showStatus(message, type) {
 }
 
 function startTimer() {
-    if (!resendBtn || !timerSpan) return;
+    if (!resendBtn) return;
     let timeLeft = 60;
     resendBtn.disabled = true;
-    timerSpan.textContent = timeLeft;
+    
+    let currentTimerSpan = document.getElementById('timer');
+    if (currentTimerSpan) currentTimerSpan.textContent = timeLeft;
 
     clearInterval(countdownInterval);
     countdownInterval = setInterval(() => {
         timeLeft--;
-        timerSpan.textContent = timeLeft;
+        currentTimerSpan = document.getElementById('timer');
+        if (currentTimerSpan) currentTimerSpan.textContent = timeLeft;
+        
         if (timeLeft <= 0) {
             clearInterval(countdownInterval);
             resendBtn.disabled = false;
@@ -224,9 +227,10 @@ if (loginForm) {
         submitBtn.innerHTML = 'Signing in...';
         if (statusMessage) statusMessage.classList.add('hidden');
 
+        const passwordInput = document.getElementById('password');
         const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: emailInput.value.trim(),
-            password: passwordInput.value
+            password: passwordInput ? passwordInput.value : ''
         });
 
         if (authError) {
@@ -322,7 +326,7 @@ let pendingEmail = '';
 // Check Email (Para sa Reset Password page lang ito ngayon)
 if (checkEmailBtn && isResetPage) {
     checkEmailBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
+        if (statusMessage) statusMessage.classList.add('hidden');
         const email = emailInput.value.trim();
         if (!email) return showStatus("Please enter an email address.", 'error');
 
@@ -362,7 +366,7 @@ if (checkEmailBtn && isResetPage) {
 // Resend OTP (Reset Password)
 if (resendBtn && isResetPage) {
     resendBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
+        if (statusMessage) statusMessage.classList.add('hidden');
         resendBtn.disabled = true;
         resendBtn.innerHTML = 'Resending...';
 
@@ -384,7 +388,7 @@ if (resendBtn && isResetPage) {
 // Verify OTP (Reset Password)
 if (verifyBtn && isResetPage) {
     verifyBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
+        if (statusMessage) statusMessage.classList.add('hidden');
         let otpCode = '';
         otpInputs.forEach(input => otpCode += input.value.trim());
 
@@ -417,9 +421,11 @@ if (verifyBtn && isResetPage) {
 // ==========================================
 if (finalizeBtn) {
     finalizeBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
-        const password = passwordInput.value;
-        const confirmPassword = confirmPasswordInput.value;
+        if (statusMessage) statusMessage.classList.add('hidden');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        const password = passwordInput ? passwordInput.value : '';
+        const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
 
         if (password.length < 6) return showStatus("Password must be at least 6 characters.", 'error');
         if (password !== confirmPassword) return showStatus("Passwords do not match.", 'error');

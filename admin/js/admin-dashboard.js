@@ -157,8 +157,7 @@
                 loadStudents(),
                 updateStageCounters(),
                 loadProfessors(),
-                loadSettings(),
-                checkSuperAdmin(profile.is_super_admin)
+                loadSettings()
             ]);
 
             restoreUIState();
@@ -1850,79 +1849,6 @@
     }
 
     // fully working
-    async function checkSuperAdmin(isSuperAdmin) {
-        if (isSuperAdmin) {
-            document.getElementById('super-admin-panel').classList.remove('hidden');
-            loadCoAdmins();
-        }
-    }
-
-    // fully working
-    async function loadCoAdmins() {
-        const { data } = await sb.from('profiles').select('*').eq('role', 'admin');
-        const tbody = document.getElementById('admins-tbody');
-        tbody.innerHTML = '';
-
-        data.forEach(admin => {
-            const isMeOrSuper = admin.email === currentAdminEmail || admin.is_super_admin;
-            const actionBtn = isMeOrSuper
-                ? `<span class="text-[10px] text-accent font-bold uppercase tracking-wider">${admin.is_super_admin ? 'Super Admin' : 'Admin (You)'}</span>`
-                : `<button onclick="kickAdmin('${admin.email}')" class="btn-danger-outline px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">Kick</button>`;
-
-            const tr = document.createElement('tr');
-            tr.className = "hover:bg-[var(--bg-hover)] transition-colors";
-            tr.innerHTML = `
-            <td class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2">
-                <i data-lucide="shield-check" class="w-4 h-4 text-accent"></i> ${admin.full_name}
-            </td>
-            <td class="py-3 px-3 text-secondary text-[10px] font-mono">${admin.email}</td>
-            <td class="py-3 px-3 text-right">${actionBtn}</td>
-        `;
-            tbody.appendChild(tr);
-        });
-        lucide.createIcons();
-    }
-
-    // fully working
-    async function handleRegisterAdmin(event) {
-        event.preventDefault();
-        const first = document.getElementById('new-admin-first').value.trim();
-        const middle = document.getElementById('new-admin-middle').value.trim();
-        const last = document.getElementById('new-admin-last').value.trim();
-        const full_name = [first, middle, last].filter(Boolean).join(' ');
-        const email = document.getElementById('new-admin-email').value.trim();
-        const defaultPass = document.getElementById('global-default-pass')?.value || 'PIA2026!';
-
-        const { error: authError } = await sb.rpc('admin_create_auth_user', {
-            target_email: email,
-            default_password: defaultPass
-        });
-
-        if (authError) return showCustomAlert("Auth Error", authError.message, "error");
-
-        const { error } = await sb.from('profiles').insert([{
-            full_name, email, role: 'admin', status: 'inactive', max_devices: 1
-        }]);
-
-        if (error) return showCustomAlert("Registration Error", error.message, "error");
-
-        document.getElementById('add-admin-form').reset();
-        closeModal('add-admin-modal');
-        loadCoAdmins();
-        showCustomAlert("Success", `${full_name} added as admin (Inactive until emailed).`, "success");
-    }
-
-    // fully working
-    function kickAdmin(email) {
-        showCustomConfirm("Kick Admin", `Remove ${email} from admin roster?`, async () => {
-            await sb.rpc('admin_delete_user', { target_email: email });
-            await sb.from('profiles').delete().eq('email', email);
-            showCustomAlert("Admin Kicked", `${email} removed successfully.`, "success");
-            loadCoAdmins();
-        });
-    }
-
-    // fully working
     async function handleAdminPasswordUpdate(event) {
         event.preventDefault();
         const newPass = document.getElementById('admin-new-password').value;
@@ -2038,9 +1964,9 @@
         sendActivationEmail, sendSectionEmails, resetPasswordFromMenu,
         debouncedSearchStudents,
         openEditStudent, openDeviceManager, allowStudentRetakeOcean, allowStudentRetakeCharacter,
-        openProfessorProfile, openSectionDetails, filterProfessors, kickAdmin,
+        openProfessorProfile, openSectionDetails, filterProfessors,
         previousStudentPage, nextStudentPage,
-        showCustomAlert, handleAdminPasswordUpdate, handleRegisterAdmin,
+        showCustomAlert, handleAdminPasswordUpdate,
         handleRegisterStudent, handleUpdateStudent, handleRegisterProfessor, toggleActionMenu,
         openStudentProfile, saveBatchScores, showCustomConfirm,
         saveNewSection, updateStageControl, togglePasswordVisibilityCheckbox, openScoresModal,
