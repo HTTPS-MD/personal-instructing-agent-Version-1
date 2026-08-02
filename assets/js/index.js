@@ -185,10 +185,12 @@ async function initAuthState() {
         let firstName = fullName.split(' ')[0];
 
         // Desktop nav: hide Sign In, show user dropdown
-        if (loggedOutContainer) loggedOutContainer.classList.add('hidden');
+        if (loggedOutContainer) {
+            loggedOutContainer.classList.add('hidden');
+            loggedOutContainer.classList.remove('md:flex');
+        }
         if (loggedInContainer) {
-            loggedInContainer.classList.remove('hidden');
-            loggedInContainer.classList.add('md:flex');
+            loggedInContainer.classList.add('hidden', 'md:flex');
         }
         if (navUserGreeting) navUserGreeting.textContent = `${timeGreeting}, ${firstName}!`;
         if (navUserEmail) navUserEmail.textContent = email;
@@ -235,8 +237,7 @@ async function initAuthState() {
     } else {
         // Desktop nav: show Sign In, hide user dropdown
         if (loggedOutContainer) {
-            loggedOutContainer.classList.remove('hidden');
-            loggedOutContainer.classList.add('md:flex');
+            loggedOutContainer.classList.add('hidden', 'md:flex');
         }
         if (loggedInContainer) {
             loggedInContainer.classList.add('hidden');
