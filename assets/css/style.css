@@ -1,19 +1,19 @@
-/* /SHARED ASSETS/[02] CSS/style.css - Subtle Technology Edition */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Quicksand:wght@300;400;500;600;700&display=swap');
+/* /SHARED ASSETS/[02] CSS/style.css - Cyber Neon Pulse Edition */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=Rajdhani:wght@400;500;600;700&display=swap');
 
 :root {
     /* Minimalist Dark Tech Theme */
-    --bg-main: #000000;
-    --bg-card: #0a0a0c;
-    --bg-hover: #121418;
-    --text-primary: #ffffff;
-    --text-secondary: #8892b0;
+    --bg-main: #05050a;
+    --bg-card: #0d0d15;
+    --bg-hover: #161622;
+    --text-primary: #f0f4f8;
+    --text-secondary: #94a3b8;
 
     /* Subtle Accents */
-    --accent-primary: #38bdf8;
-    --accent-hover: #7dd3fc;
-    --border-color: #222222;
-    --border-accent: #38bdf8;
+    --accent-primary: #10b981;
+    --accent-hover: #34d399;
+    --border-color: #1e1e2f;
+    --border-accent: #10b981;
 
     /* Status Colors (Connected to admin-dashboard.css) */
     --color-success: #10b981;
@@ -29,22 +29,22 @@
     --color-info-border: rgba(59, 130, 246, 0.3);
 
     /* Modals & Overlays */
-    --overlay-start: rgba(0, 0, 0, 0.7);
-    --overlay-end: rgba(0, 0, 0, 0.95);
-    --backdrop-bg: rgba(0, 0, 0, 0.85);
+    --overlay-start: rgba(5, 5, 10, 0.85);
+    --overlay-end: rgba(5, 5, 10, 0.98);
+    --backdrop-bg: rgba(5, 5, 10, 0.9);
 
     /* Scrollbars */
-    --scroll-track: #000000;
-    --scroll-thumb: #222222;
-    --scroll-thumb-hover: #444444;
+    --scroll-track: #05050a;
+    --scroll-thumb: #1e1e2f;
+    --scroll-thumb-hover: #10b981;
 
     --transition-speed: 0.25s;
     --radius-md: 6px;
     --radius-lg: 12px;
 
     /* Typography */
-    --font-primary: 'Poppins', sans-serif;
-    --font-secondary: 'Quicksand', sans-serif;
+    --font-primary: 'Rajdhani', sans-serif;
+    --font-secondary: 'Orbitron', sans-serif;
 }
 
 html {
@@ -112,7 +112,7 @@ body {
 /* --- COMPONENTS (NAV, CARDS, FOOTER) ---   */
 /* ========================================= */
 .solid-nav {
-    background-color: rgba(0, 0, 0, 0.75);
+    background-color: rgba(5, 5, 10, 0.85);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
@@ -133,8 +133,9 @@ body {
 }
 
 .solid-card:hover {
-    border-color: var(--text-secondary);
+    border-color: var(--accent-primary);
     transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
 }
 
 .solid-footer {
@@ -147,7 +148,7 @@ body {
 /* ========================================= */
 .btn-primary {
     background-color: var(--accent-primary);
-    color: #000000;
+    color: #05050a;
     font-weight: 600;
     letter-spacing: 0.05em;
     border: 1px solid var(--accent-primary);
@@ -158,11 +159,12 @@ body {
 .btn-primary:hover {
     background-color: var(--accent-hover);
     border-color: var(--accent-hover);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
 
 .btn-game-primary {
     background-color: var(--text-primary);
-    color: #000000;
+    color: #05050a;
     font-weight: 600;
     letter-spacing: 0.05em;
     border: 1px solid var(--text-primary);
@@ -186,8 +188,8 @@ body {
 }
 
 .btn-secondary:hover {
-    border-color: var(--text-secondary);
-    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--accent-primary);
+    background-color: rgba(16, 185, 129, 0.05);
 }
 
 .btn-icon {
@@ -200,7 +202,7 @@ body {
 }
 
 .btn-icon:hover {
-    border-color: var(--text-secondary);
+    border-color: var(--accent-primary);
     background-color: var(--bg-hover);
 }
 
@@ -217,6 +219,7 @@ body {
     outline: none;
     border-color: var(--accent-primary);
     background-color: var(--bg-card);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
 }
 
 .form-checkbox {
@@ -242,6 +245,7 @@ body {
     outline: none;
     border-color: var(--accent-primary);
     background-color: var(--bg-card);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
 }
 
 /* ========================================= */
@@ -297,6 +301,7 @@ body {
         opacity: 0;
         transform: translateY(-6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -348,8 +353,8 @@ nav a.admin-nav-btn.active,
 div#mobile-menu button.mobile-nav-link.active,
 div#mobile-menu a.mobile-nav-link.active {
     color: var(--accent-primary);
-    background-color: rgba(56, 189, 248, 0.05);
-    border: 1px solid rgba(56, 189, 248, 0.2);
+    background-color: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
     font-weight: 500;
     border-radius: var(--radius-md);
 }
