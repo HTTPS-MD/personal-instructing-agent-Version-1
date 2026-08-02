@@ -1,5 +1,5 @@
 // ==========================================
-// 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER
+// 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER (eto yung sa dev)
 // ==========================================
 const isSignUpPage = document.getElementById('signup-form') !== null;
 const isResetPage = document.getElementById('reset-form') !== null;
@@ -197,7 +197,7 @@ function startTimer() {
     if (!resendBtn) return;
     let timeLeft = 60;
     resendBtn.disabled = true;
-    
+
     let currentTimerSpan = document.getElementById('timer');
     if (currentTimerSpan) currentTimerSpan.textContent = timeLeft;
 
@@ -206,7 +206,7 @@ function startTimer() {
         timeLeft--;
         currentTimerSpan = document.getElementById('timer');
         if (currentTimerSpan) currentTimerSpan.textContent = timeLeft;
-        
+
         if (timeLeft <= 0) {
             clearInterval(countdownInterval);
             resendBtn.disabled = false;
@@ -230,7 +230,7 @@ if (loginForm) {
 
         const passwordInput = document.getElementById('password');
         const email = loginEmailInput ? loginEmailInput.value.trim() : '';
-        
+
         if (!email) {
             showStatus("Please enter your email address.", 'error');
             submitBtn.disabled = false;
@@ -468,7 +468,7 @@ if (finalizeBtn) {
         }
 
         sessionStorage.removeItem('pending_reset_email');
-        
+
         const successMsg = isSignUpPage ? "Account activated successfully! Redirecting to sign in..." : "Password updated successfully! Redirecting to sign in...";
         showStatus(successMsg, 'success');
         setTimeout(() => { window.location.replace('sign-in.html'); }, 2000);
