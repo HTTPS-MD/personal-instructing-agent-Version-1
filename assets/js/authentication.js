@@ -7,7 +7,7 @@ const loginForm = document.getElementById('login-form');
 
 // Auto-detect Magic Link Token from Email
 window.addEventListener('DOMContentLoaded', async () => {
-    if (isSignUpPage && window.supabaseClient) {
+    if ((isSignUpPage || isResetPage) && window.supabaseClient) {
         const hash = window.location.hash;
 
         // 🚨 Idinagdag ang 'type=magiclink' sa detector
@@ -21,14 +21,15 @@ window.addEventListener('DOMContentLoaded', async () => {
                 passwordContainer.classList.remove('hidden');
 
                 // Fetch user data para sa Dynamic Greeting
-                const { data: authData } = await window.supabaseClient.auth.getUser();
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                const user = session?.user;
 
-                if (authData && authData.user) {
+                if (user) {
                     // Kunin ang full name sa profiles table gamit ang authenticated email
                     const { data: profile } = await window.supabaseClient
                         .from('profiles')
                         .select('full_name')
-                        .eq('email', authData.user.email)
+                        .eq('email', user.email)
                         .maybeSingle();
 
                     const fullName = profile?.full_name || 'Student';
@@ -219,7 +220,7 @@ function startTimer() {
 // ==========================================
 if (loginForm) {
     const submitBtn = document.getElementById('submit-btn');
-    const emailInput = document.getElementById('email');
+    const loginEmailInput = document.getElementById('email');
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -229,7 +230,7 @@ if (loginForm) {
 
         const passwordInput = document.getElementById('password');
         const { data: authData, error: authError } = await window.supabaseClient.auth.signInWithPassword({
-            email: emailInput.value.trim(),
+            email: loginEmailInput.value.trim(),
             password: passwordInput ? passwordInput.value : ''
         });
 
@@ -240,7 +241,7 @@ if (loginForm) {
             return;
         }
 
-        localStorage.setItem('pia_user_email', emailInput.value.trim());
+        localStorage.setItem('pia_user_email', loginEmailInput.value.trim());
 
         const { data: profile, error: profileError } = await window.supabaseClient
             .from('profiles')
@@ -270,6 +271,7 @@ if (loginForm) {
             if (!activeDevices.includes(currentDeviceId)) {
                 if (activeDevices.length >= maxAllowedDevices) {
                     await window.supabaseClient.auth.signOut();
+                    localStorage.removeItem('pia_user_email');
                     showStatus(`${maxAllowedDevices} device limit lang. Please log out from your other active device.`, 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = 'Sign In';
@@ -319,15 +321,13 @@ const step3Container = document.getElementById('step-3-container');
 const checkEmailBtn = document.getElementById('check-email-btn');
 const verifyBtn = document.getElementById('verify-btn');
 const finalizeBtn = document.getElementById('finalize-btn');
-const emailInput = document.getElementById('email');
-
-let pendingEmail = '';
+const resetEmailInput = document.getElementById('email');
 
 // Check Email (Para sa Reset Password page lang ito ngayon)
 if (checkEmailBtn && isResetPage) {
     checkEmailBtn.addEventListener('click', async () => {
         if (statusMessage) statusMessage.classList.add('hidden');
-        const email = emailInput.value.trim();
+        const email = resetEmailInput.value.trim();
         if (!email) return showStatus("Please enter an email address.", 'error');
 
         checkEmailBtn.disabled = true;
@@ -355,7 +355,7 @@ if (checkEmailBtn && isResetPage) {
             return;
         }
 
-        pendingEmail = email;
+        sessionStorage.setItem('pending_reset_email', email);
         step1Container.classList.add('hidden');
         step2Container.classList.remove('hidden');
         showStatus("Verification code sent to your email.", 'success');
@@ -369,6 +369,9 @@ if (resendBtn && isResetPage) {
         if (statusMessage) statusMessage.classList.add('hidden');
         resendBtn.disabled = true;
         resendBtn.innerHTML = 'Resending...';
+
+        const pendingEmail = sessionStorage.getItem('pending_reset_email');
+        if (!pendingEmail) return showStatus("Session expired. Please start over.", 'error');
 
         const { error: otpError } = await window.supabaseClient.auth.resetPasswordForEmail(pendingEmail);
 
@@ -396,6 +399,9 @@ if (verifyBtn && isResetPage) {
 
         verifyBtn.disabled = true;
         verifyBtn.innerHTML = 'Verifying...';
+
+        const pendingEmail = sessionStorage.getItem('pending_reset_email');
+        if (!pendingEmail) return showStatus("Session expired. Please start over.", 'error');
 
         const { error } = await window.supabaseClient.auth.verifyOtp({
             email: pendingEmail,
@@ -452,6 +458,8 @@ if (finalizeBtn) {
             }
         }
 
+        sessionStorage.removeItem('pending_reset_email');
+        
         const successMsg = isSignUpPage ? "Account activated successfully! Redirecting to sign in..." : "Password updated successfully! Redirecting to sign in...";
         showStatus(successMsg, 'success');
         setTimeout(() => { window.location.replace('sign-in.html'); }, 2000);
