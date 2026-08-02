@@ -269,8 +269,14 @@
 
     // fully working
     function cleanupGhostMenus() {
-        document.querySelectorAll('.action-menu').forEach(menu => {
-            if (menu.id !== 'menu-backdrop' && menu.id !== 'mobile-menu') menu.remove();
+        document.querySelectorAll('body > .action-menu, body > [id^="menu-"]').forEach(menu => {
+            if (menu.id !== 'menu-backdrop' && menu.id !== 'mobile-menu') {
+                if (menu.originalParent && document.body.contains(menu.originalParent)) {
+                    menu.originalParent.appendChild(menu);
+                } else {
+                    menu.remove();
+                }
+            }
         });
     }
 
@@ -311,6 +317,7 @@
     function switchTab(tabName) {
         if (tabName === 'students') updateStageCounters();
         sessionStorage.setItem('activeTab', tabName);
+        cleanupGhostMenus();
         ['sections', 'students', 'professors', 'controls', 'settings'].forEach(t => {
             const el = document.getElementById(`view-${t}`);
             if (el) el.style.display = 'none';
@@ -341,6 +348,9 @@
         closeAllMenus();
 
         if (targetMenu && !isOpen) {
+            if (!targetMenu.originalParent) {
+                targetMenu.originalParent = targetMenu.parentElement;
+            }
             document.body.appendChild(targetMenu);
             targetMenu.classList.remove('hidden');
             targetMenu.classList.add('show-menu');
@@ -373,6 +383,9 @@
             m.classList.add('hidden');
             m.classList.remove('show-menu');
         });
+        
+        cleanupGhostMenus();
+
         if (wasOpen && pendingRealtimeUpdate && !document.querySelector('.modal-active')) {
             pendingRealtimeUpdate = false;
             triggerDeferredRealtimeUpdate();
@@ -904,7 +917,17 @@
         document.getElementById('edit-middle-name').value = middle;
         document.getElementById('edit-last-name').value = last;
         document.getElementById('edit-student-email-input').value = email;
-        document.getElementById('edit-student-section').value = section;
+        
+        const sectionSelect = document.getElementById('edit-student-section');
+        const optionExists = Array.from(sectionSelect.options).some(opt => opt.value === section);
+        if (!optionExists && section) {
+            const newOpt = document.createElement('option');
+            newOpt.value = section;
+            newOpt.textContent = section;
+            sectionSelect.appendChild(newOpt);
+        }
+        sectionSelect.value = section;
+        
         document.getElementById('edit-student-pretest').value = pretest;
         document.getElementById('edit-student-type').value = type;
         document.getElementById('edit-student-device-limit').value = maxDevices || 1;
