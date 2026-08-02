@@ -37,13 +37,14 @@
             const isInteracting = isTyping || (activeEl && activeEl.closest('form')) || document.querySelector('.modal-active') || document.querySelector('.show-menu');
 
             if (isInteracting) {
+                // Hintayin matapos ang pakikipag-ugnayan ng user bago mag-load muli
                 triggerDeferredRealtimeUpdate();
                 return;
             }
 
             loadStudents();
             loadSections();
-        }, 500);
+        }, 1000); // Ginawang 1 segundo para mas ligtas sa background ticks
     }
 
     // Pagination States
@@ -338,7 +339,6 @@
         if (activeMobBtn) activeMobBtn.className = "mobile-nav-link admin-nav-btn text-left block active";
     }
 
-    // fully working
     function toggleActionMenu(event, safeId, explicitBtn = null) {
         event.stopPropagation();
         const btn = explicitBtn || event.currentTarget;
@@ -371,24 +371,17 @@
         }
     }
 
-    // fully working
     function closeAllMenus() {
-        let wasOpen = false;
         document.querySelectorAll('.action-menu, [id^="menu-"]').forEach(m => {
-            // 🔥 FIX: Prevent this function from accidentally closing the mobile background
             if (m.id === 'menu-backdrop' || m.id === 'mobile-menu') return;
-
-            if (m.classList.contains('show-menu')) wasOpen = true;
             m.classList.add('hidden');
             m.classList.remove('show-menu');
-        });
-        
-        cleanupGhostMenus();
 
-        if (wasOpen && pendingRealtimeUpdate && !document.querySelector('.modal-active')) {
-            pendingRealtimeUpdate = false;
-            triggerDeferredRealtimeUpdate();
-        }
+            // Ibalik sa original parent para walang maiwang ghost element sa body
+            if (m.originalParent && document.body.contains(m.originalParent)) {
+                m.originalParent.appendChild(m);
+            }
+        });
     }
     window.addEventListener('click', closeAllMenus);
 
@@ -916,7 +909,7 @@
         document.getElementById('edit-middle-name').value = middle;
         document.getElementById('edit-last-name').value = last;
         document.getElementById('edit-student-email-input').value = email;
-        
+
         const sectionSelect = document.getElementById('edit-student-section');
         const optionExists = Array.from(sectionSelect.options).some(opt => opt.value === section);
         if (!optionExists && section) {
@@ -926,7 +919,7 @@
             sectionSelect.appendChild(newOpt);
         }
         sectionSelect.value = section;
-        
+
         document.getElementById('edit-student-pretest').value = pretest;
         document.getElementById('edit-student-type').value = type;
         document.getElementById('edit-student-device-limit').value = maxDevices || 1;
@@ -934,7 +927,6 @@
         openModal('edit-student-modal');
     }
 
-    // fully working
     async function handleUpdateStudent(event) {
         event.preventDefault();
         const originalEmail = document.getElementById('edit-student-original-email').value;
@@ -951,14 +943,16 @@
         const group_type = document.getElementById('edit-student-type').value;
         const max_devices = parseInt(document.getElementById('edit-student-device-limit').value) || 1;
 
+        // 1. I-update muna ang mga detalye maliban sa email para maiwasan ang query conflict
         const { error } = await sb.from('profiles').update({
-            full_name, email, section, pre_test_score, group_type, max_devices
+            full_name, section, pre_test_score, group_type, max_devices
         }).eq('email', originalEmail);
 
         if (error) return showCustomAlert("Update Error", error.message, "error");
 
-        // If the email changed, sync the Supabase Auth identity AFTER profile update
+        // 2. Kung nagbago ang email, i-sync ito hiwalay sa Auth at Profile
         if (email !== originalEmail) {
+            await sb.from('profiles').update({ email }).eq('email', originalEmail);
             const { error: rpcError } = await sb.rpc('admin_update_user_email', {
                 target_email: originalEmail,
                 new_email: email
