@@ -1,5 +1,5 @@
 // ==========================================
-// 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER (eto yung sa dev)
+// 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER 
 // ==========================================
 const isSignUpPage = document.getElementById('signup-form') !== null;
 const isResetPage = document.getElementById('reset-form') !== null;
