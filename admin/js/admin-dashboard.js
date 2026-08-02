@@ -7,25 +7,84 @@
  * ============================================================================
  */
 
+/// ==========================================
+// 0. IIFE GLOBAL ENCAPSULATION
 // ==========================================
-// 1. GLOBAL STATE & INITIALIZATION
+(function(global) {
+
+// ==========================================
+// 1. STATE MANAGEMENT & UTILS
 // ==========================================
 
 let currentActiveSection = '';
 let currentManagingEmail = '';
-let currentAdminEmail = '';
+let currentAdminEmail = null;
 
 // Unified Roster States
 let studentDataCache = [];
 let stateGroupFilter = 'all';
 let stateSubgroupFilter = 'all';
 let stateStageDrilldown = null;
+let pendingRealtimeUpdate = false;
+let realtimeUpdateTimeout = null;
+let lastSearchQuery = '';
+
+function triggerDeferredRealtimeUpdate() {
+    if (realtimeUpdateTimeout) clearTimeout(realtimeUpdateTimeout);
+    realtimeUpdateTimeout = setTimeout(() => {
+        const activeEl = document.activeElement;
+        const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        const isInteracting = isTyping || (activeEl && activeEl.closest('form')) || document.querySelector('.modal-active') || document.querySelector('.show-menu');
+        
+        if (isInteracting) {
+            triggerDeferredRealtimeUpdate();
+            return;
+        }
+
+        loadStudents();
+        loadSections();
+    }, 500);
+}
+
+// Pagination States
+let currentStudentPage = 1;
+const STUDENTS_PER_PAGE = 50;
+
+function previousStudentPage() {
+    if (currentStudentPage > 1) {
+        currentStudentPage--;
+        renderUnifiedTable();
+    }
+}
+
+function nextStudentPage() {
+    currentStudentPage++;
+    renderUnifiedTable();
+}
 
 // UI State Persistence
 const uiState = {
     tab: sessionStorage.getItem('activeTab') || 'sections',
-    modal: JSON.parse(sessionStorage.getItem('activeModal')) || null
+    modal: sessionStorage.getItem('activeModal') || null
 };
+
+// ==========================================
+// 2. INITIALIZATION
+// ==========================================
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function escapeJS(str) {
+    return String(str).replace(/'/g, "\\'");
+}
 
 // fully working
 document.addEventListener("DOMContentLoaded", async () => {
@@ -47,40 +106,80 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    const email = localStorage.getItem('pia_user_email');
-
-    // 🚨 STRICT AUTHORIZATION GUARD
-    if (email && typeof sb !== 'undefined') {
-        const { data: profile, error } = await sb.from('profiles')
-            .select('role')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (error || !profile || profile.role !== 'admin') {
-            localStorage.removeItem('pia_user_email');
-            window.location.replace('../../index.html');
-            return;
+    try {
+        const { data: { session }, error: sessionError } = await sb.auth.getSession();
+        if (sessionError || !session) {
+            throw new Error("Session expired. Please log in again.");
         }
-    } else if (!email) {
-        window.location.replace('../../index.html');
-        return;
-    }
+        
+        const email = session.user.email;
+        const { data: profile, error } = await sb.from('profiles').select('role, is_super_admin').eq('email', email).maybeSingle();
+        
+        if (error || !profile || profile.role !== 'admin') {
+            throw new Error("Unauthorized access. Admin privileges required.");
+        }
+        
+        localStorage.setItem('pia_user_email', email); // For legacy calls
+        
+        // Reveal the dashboard now that the backend has confirmed admin role
+        document.body.classList.remove('opacity-0');
 
-    await Promise.all([
-        initAdminProfile(),
-        loadSections(),
-        loadStudents(),
-        loadProfessors(),
-        loadSettings(),
-        checkSuperAdmin()
-    ]);
+        await Promise.all([
+            initAdminProfile(email),
+            loadSections(),
+            loadStudents(),
+            loadProfessors(),
+            loadSettings(),
+            checkSuperAdmin(profile.is_super_admin)
+        ]);
 
-    restoreUIState();
-    setupRealtimeSubscriptions();
+        restoreUIState();
+        setupRealtimeSubscriptions();
 
-    if (email) {
         currentAdminEmail = email;
         loadAdminDeviceSettings(email);
+    } catch (e) {
+        console.error("Initialization error:", e);
+        const errorBanner = document.getElementById('global-error-banner');
+        const errorMessage = document.getElementById('global-error-message');
+        if (errorBanner && errorMessage) {
+            errorMessage.textContent = e.message || "Failed to initialize dashboard. Please check your connection.";
+            errorBanner.classList.remove('hidden');
+        }
+        localStorage.removeItem('pia_user_email');
+        setTimeout(() => window.location.replace('../../index.html'), 3000);
+    }
+
+    // ==========================================
+    // TABLE EVENT DELEGATION
+    // ==========================================
+    const unifiedTbody = document.getElementById('unified-tbody');
+    if (unifiedTbody) {
+        unifiedTbody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            e.stopPropagation();
+
+            const action = btn.getAttribute('data-action');
+            if (action === 'toggle-menu') {
+                toggleActionMenu(e, btn.getAttribute('data-email-id'));
+                return;
+            }
+
+            const email = btn.getAttribute('data-email');
+            const student = studentDataCache.find(s => s.email === email);
+            
+            if (action === 'send-activation') { sendActivationEmail(email); closeAllMenus(); }
+            else if (action === 'edit-student' && student) {
+                openEditStudent(student.full_name, email, student.section || '', student.pre_test_score ?? '', student.group_type, student.max_devices ?? 1);
+                closeAllMenus();
+            }
+            else if (action === 'device-manager') { openDeviceManager(email); closeAllMenus(); }
+            else if (action === 'retake-ocean') { allowStudentRetakeOcean(email); closeAllMenus(); }
+            else if (action === 'retake-character') { allowStudentRetakeCharacter(email); closeAllMenus(); }
+            else if (action === 'reset-password') { resetPasswordFromMenu(email); closeAllMenus(); }
+            else if (action === 'delete-user') { deleteUserFromMenu(email, 'profiles'); closeAllMenus(); }
+        });
     }
 });
 
@@ -93,15 +192,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 function setupRealtimeSubscriptions() {
     sb.channel('admin-realtime-profiles')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-            loadStudents();
-            loadSections();
+            triggerDeferredRealtimeUpdate();
 
             const modalEmailEl = document.getElementById('device-modal-email');
-            if (modalEmailEl && payload.new && modalEmailEl.textContent === payload.new.email) {
+            if (modalEmailEl && payload.new?.email && modalEmailEl.textContent === payload.new.email) {
                 renderDeviceList(payload.new.active_devices || []);
             }
 
-            if (currentAdminEmail && payload.new && currentAdminEmail === payload.new.email) {
+            if (currentAdminEmail && payload.new?.email && currentAdminEmail === payload.new.email) {
                 loadAdminDeviceSettings(currentAdminEmail);
             }
         })
@@ -127,7 +225,7 @@ function calculateDuration(startedAt) {
 
 // fully working
 setInterval(() => {
-    document.querySelectorAll('tr[data-started-at]').forEach(tr => {
+    document.querySelectorAll('#unified-tbody tr[data-started-at]').forEach(tr => {
         const startedAt = tr.getAttribute('data-started-at');
         const durationEl = tr.querySelector('.student-duration');
         if (durationEl && startedAt) {
@@ -177,6 +275,9 @@ function toggleMobileMenu(event) {
 // fully working
 function restoreUIState() {
     switchTab(uiState.tab);
+    if (uiState.modal) {
+        openModal(uiState.modal);
+    }
 }
 
 // fully working
@@ -217,16 +318,16 @@ function toggleActionMenu(event, safeId) {
         targetMenu.classList.add('show-menu');
 
         const rect = btn.getBoundingClientRect();
-        targetMenu.style.position = 'fixed';
+        targetMenu.style.position = 'absolute';
         targetMenu.style.zIndex = '999999';
 
         const menuWidth = targetMenu.offsetWidth || 220;
-        let leftPos = rect.right - menuWidth;
-        if (leftPos < 10) leftPos = 10;
+        let leftPos = rect.right - menuWidth + window.scrollX;
+        if (leftPos < 10 + window.scrollX) leftPos = 10 + window.scrollX;
 
-        let topPos = rect.bottom + 4;
+        let topPos = rect.bottom + 4 + window.scrollY;
         const menuHeight = targetMenu.offsetHeight || 200;
-        if (topPos + menuHeight > window.innerHeight) topPos = rect.top - menuHeight - 4;
+        if (rect.bottom + 4 + menuHeight > window.innerHeight) topPos = rect.top - menuHeight - 4 + window.scrollY;
 
         targetMenu.style.top = topPos + 'px';
         targetMenu.style.left = leftPos + 'px';
@@ -235,13 +336,19 @@ function toggleActionMenu(event, safeId) {
 
 // fully working
 function closeAllMenus() {
+    let wasOpen = false;
     document.querySelectorAll('.action-menu, [id^="menu-"]').forEach(m => {
         // 🔥 FIX: Prevent this function from accidentally closing the mobile background
         if (m.id === 'menu-backdrop' || m.id === 'mobile-menu') return;
 
+        if (m.classList.contains('show-menu')) wasOpen = true;
         m.classList.add('hidden');
         m.classList.remove('show-menu');
     });
+    if (wasOpen && pendingRealtimeUpdate && !document.querySelector('.modal-active')) {
+        pendingRealtimeUpdate = false;
+        triggerDeferredRealtimeUpdate();
+    }
 }
 window.addEventListener('click', closeAllMenus);
 
@@ -256,6 +363,8 @@ function openModal(id) {
     const content = document.getElementById(id + '-content');
     if (modal) modal.classList.add('modal-active');
     if (content) content.classList.add('modal-content-active');
+    document.body.style.overflow = 'hidden';
+    sessionStorage.setItem('activeModal', id);
 }
 
 // fully working
@@ -264,6 +373,13 @@ function closeModal(id) {
     const content = document.getElementById(id + '-content');
     if (modal) modal.classList.remove('modal-active');
     if (content) content.classList.remove('modal-content-active');
+    document.body.style.overflow = '';
+    sessionStorage.removeItem('activeModal');
+
+    if (pendingRealtimeUpdate && !document.querySelector('.modal-active') && !document.querySelector('.show-menu')) {
+        pendingRealtimeUpdate = false;
+        triggerDeferredRealtimeUpdate();
+    }
 }
 
 // fully working
@@ -308,8 +424,17 @@ function closeCustomConfirm() {
 }
 
 // fully working
-document.getElementById('confirm-yes-btn').addEventListener('click', () => {
-    if (currentConfirmCallback) currentConfirmCallback();
+document.getElementById('confirm-yes-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('confirm-yes-btn');
+    if (currentConfirmCallback) {
+        btn.disabled = true;
+        try {
+            await currentConfirmCallback();
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Proceed';
+        }
+    }
     closeCustomConfirm();
 });
 
@@ -320,10 +445,10 @@ document.getElementById('confirm-yes-btn').addEventListener('click', () => {
 
 // fully working
 async function loadStudents() {
-    const { data, error } = await sb.from('profiles').select('*');
+    const { data, error } = await sb.from('profiles').select('*').neq('role', 'admin');
     if (error) return console.error('Error loading profiles:', error);
 
-    studentDataCache = data.filter(student => (student.role || '').toLowerCase() !== 'admin');
+    studentDataCache = data;
     updateStageCounters();
     renderUnifiedTable();
 }
@@ -435,6 +560,11 @@ function renderUnifiedTable() {
     const tbody = document.getElementById('unified-tbody');
     const searchQuery = (document.getElementById('search-student') ? document.getElementById('search-student').value.toLowerCase() : '');
 
+    if (searchQuery !== lastSearchQuery) {
+        currentStudentPage = 1;
+        lastSearchQuery = searchQuery;
+    }
+
     thead.innerHTML = '';
     tbody.innerHTML = '';
 
@@ -499,11 +629,34 @@ function renderUnifiedTable() {
 
     if (filteredData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="10" class="text-center py-10 text-secondary text-xs">No students match the current filters.</td></tr>`;
+        const paginationControls = document.getElementById('pagination-controls');
+        if (paginationControls) paginationControls.classList.add('hidden');
         lucide.createIcons();
         return;
     }
 
-    filteredData.forEach(student => {
+    const totalPages = Math.ceil(filteredData.length / STUDENTS_PER_PAGE);
+    if (currentStudentPage > totalPages) currentStudentPage = totalPages;
+    if (currentStudentPage < 1) currentStudentPage = 1;
+
+    const startIndex = (currentStudentPage - 1) * STUDENTS_PER_PAGE;
+    const paginatedData = filteredData.slice(startIndex, startIndex + STUDENTS_PER_PAGE);
+
+    const paginationControls = document.getElementById('pagination-controls');
+    if (paginationControls) {
+        if (totalPages > 1) {
+            paginationControls.classList.remove('hidden');
+            document.getElementById('pagination-info').textContent = `Page ${currentStudentPage} of ${totalPages} (${filteredData.length} students)`;
+            document.getElementById('btn-prev-page').disabled = currentStudentPage === 1;
+            document.getElementById('btn-next-page').disabled = currentStudentPage === totalPages;
+            document.getElementById('btn-prev-page').onclick = previousStudentPage;
+            document.getElementById('btn-next-page').onclick = nextStudentPage;
+        } else {
+            paginationControls.classList.add('hidden');
+        }
+    }
+
+    paginatedData.forEach(student => {
         const tr = document.createElement('tr');
         tr.className = "hover:bg-[var(--bg-hover)] transition-colors cursor-pointer student-row";
         tr.setAttribute('data-started-at', student.stage_started_at || '');
@@ -523,32 +676,32 @@ function renderUnifiedTable() {
 
         const actionMenuHTML = `
             <td class="py-3 px-3 text-right relative action-cell" onclick="event.stopPropagation()">
-                <button class="action-toggle-btn p-1.5 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-primary transition-colors" onclick="toggleActionMenu(event, '${safeEmailId}')">
-                    <i data-lucide="more-vertical" class="w-3.5 h-3.5"></i>
+                <button class="action-toggle-btn p-1.5 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-primary transition-colors" data-action="toggle-menu" data-email-id="${safeEmailId}">
+                    <i data-lucide="more-vertical" class="w-3.5 h-3.5 pointer-events-none"></i>
                 </button>
                 <div id="menu-${safeEmailId}" class="action-menu hidden absolute right-0 w-56 bg-[var(--bg-card)] p-1.5 shadow-2xl rounded-xl border border-[var(--border-color)] space-y-1 text-left z-50">
-                    <button onclick="sendActivationEmail('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="mail" class="w-3.5 h-3.5 text-info"></i> Send Activation Email
+                    <button data-action="send-activation" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
+                        <i data-lucide="mail" class="w-3.5 h-3.5 text-info pointer-events-none"></i> Send Activation Email
                     </button>
-                    <button onclick="openEditStudent('${student.full_name}', '${student.email}', '${student.section || ''}', '${student.pre_test_score ?? ''}', '${student.group_type}', ${student.max_devices ?? 1}); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="edit-3" class="w-3.5 h-3.5 icon-edit"></i> Edit Details
+                    <button data-action="edit-student" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5 icon-edit pointer-events-none"></i> Edit Details
                     </button>
-                    <button onclick="openDeviceManager('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="monitor" class="w-3.5 h-3.5 text-accent"></i> Active Devices
-                    </button>
-                    <div class="border-t border-[var(--border-color)] my-1"></div>
-                    <button onclick="allowStudentRetakeOcean('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-warning"></i> Retake OCEAN Test
-                    </button>
-                    <button onclick="allowStudentRetakeCharacter('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="user-cog" class="w-3.5 h-3.5 text-accent"></i> Retake Char Select
-                    </button>
-                    <button onclick="resetPasswordFromMenu('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="key" class="w-3.5 h-3.5 icon-reset"></i> Reset Password
+                    <button data-action="device-manager" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
+                        <i data-lucide="monitor" class="w-3.5 h-3.5 text-accent pointer-events-none"></i> Active Devices
                     </button>
                     <div class="border-t border-[var(--border-color)] my-1"></div>
-                    <button onclick="deleteUserFromMenu('${student.email}', 'profiles'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left action-delete hover:bg-[var(--color-danger-bg)] flex items-center gap-2">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete User
+                    <button data-action="retake-ocean" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-warning pointer-events-none"></i> Retake OCEAN Test
+                    </button>
+                    <button data-action="retake-character" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
+                        <i data-lucide="user-cog" class="w-3.5 h-3.5 text-accent pointer-events-none"></i> Retake Char Select
+                    </button>
+                    <button data-action="reset-password" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
+                        <i data-lucide="key" class="w-3.5 h-3.5 icon-reset pointer-events-none"></i> Reset Password
+                    </button>
+                    <div class="border-t border-[var(--border-color)] my-1"></div>
+                    <button data-action="delete-user" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left action-delete hover:bg-[var(--color-danger-bg)] flex items-center gap-2">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i> Delete User
                     </button>
                 </div>
             </td>
@@ -562,33 +715,33 @@ function renderUnifiedTable() {
                 : 'Traditional';
 
             tr.innerHTML = `
-                <td class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
+                <td data-label="Student Name" class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
                     <div class="relative flex items-center justify-center shrink-0">
                         <div class="w-6 h-6 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center ${groupColor}"><i data-lucide="${groupLabel === 'CTRL' ? 'book' : 'user'}" class="w-3 h-3"></i></div>
                         <span class="status-dot absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-card ${statusClass}"></span>
                     </div>
-                    <span class="truncate">${student.full_name}</span>
+                    <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td class="py-3 px-3 font-mono text-secondary text-[10px] truncate">${student.email}</td>
-                <td class="py-3 px-3 text-secondary text-xs truncate">${student.section || 'N/A'}</td>
-                <td class="py-3 px-3 font-bold ${groupColor} text-[10px] uppercase tracking-wider">${groupLabel}</td>
-                <td class="py-3 px-3 text-secondary text-[10px] uppercase tracking-wider truncate">${personaSetup}</td>
-                <td class="py-3 px-3 font-medium text-primary text-xs truncate">${student.current_stage || 'Idle'}</td>
-                <td class="py-3 px-3 font-mono text-primary text-xs">${student.pre_test_score ?? 'n/a'}</td>
+                <td data-label="Email" class="py-3 px-3 font-mono text-secondary text-[10px] truncate">${student.email}</td>
+                <td data-label="Section" class="py-3 px-3 text-secondary text-xs truncate">${escapeHTML(student.section || 'N/A')}</td>
+                <td data-label="Group" class="py-3 px-3 font-bold ${groupColor} text-[10px] uppercase tracking-wider">${groupLabel}</td>
+                <td data-label="Setup" class="py-3 px-3 text-secondary text-[10px] uppercase tracking-wider truncate">${personaSetup}</td>
+                <td data-label="Stage" class="py-3 px-3 font-medium text-primary text-xs truncate">${student.current_stage || 'Idle'}</td>
+                <td data-label="Pre-Test" class="py-3 px-3 font-mono text-primary text-xs">${student.pre_test_score ?? 'n/a'}</td>
                 ${actionMenuHTML}
             `;
         } else if (stateStageDrilldown === 'Active Game') {
             const duration = calculateDuration(student.stage_started_at);
             tr.innerHTML = `
-                <td class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
+                <td data-label="Student Name" class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
                     <div class="w-6 h-6 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-success"><i data-lucide="gamepad-2" class="w-3 h-3"></i></div>
-                    <span class="truncate">${student.full_name}</span>
+                    <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td class="py-3 px-3 font-mono text-secondary text-xs truncate">Question ${student.current_problem || '1'}</td>
-                <td class="py-3 px-3 font-bold text-info text-xs uppercase tracking-wider">${student.current_difficulty || 'Normal'}</td>
-                <td class="py-3 px-3 font-mono text-warning text-xs font-bold">${student.hints_used || 0}</td>
-                <td class="py-3 px-3 font-mono text-success text-xs font-bold">${student.consecutive_correct || 0}</td>
-                <td class="py-3 px-3 font-mono text-primary text-xs student-duration">${duration}</td>
+                <td data-label="Problem" class="py-3 px-3 font-mono text-secondary text-xs truncate">Question ${student.current_problem || '1'}</td>
+                <td data-label="Difficulty" class="py-3 px-3 font-bold text-info text-xs uppercase tracking-wider">${student.current_difficulty || 'Normal'}</td>
+                <td data-label="Hints" class="py-3 px-3 font-mono text-warning text-xs font-bold">${student.hints_used || 0}</td>
+                <td data-label="Correct" class="py-3 px-3 font-mono text-success text-xs font-bold">${student.consecutive_correct || 0}</td>
+                <td data-label="Duration" class="py-3 px-3 font-mono text-primary text-xs student-duration">${duration}</td>
                 ${actionMenuHTML}
             `;
         } else {
@@ -599,13 +752,13 @@ function renderUnifiedTable() {
             if (stateStageDrilldown === 'Tutoring Dashboard') activity = `Browsing Dashboard`;
 
             tr.innerHTML = `
-                <td class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
+                <td data-label="Student Name" class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
                     <span class="status-dot w-2 h-2 rounded-full ${statusClass}"></span>
-                    <span class="truncate">${student.full_name}</span>
+                    <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td class="py-3 px-3 text-secondary text-xs truncate">${student.section || 'N/A'}</td>
-                <td class="py-3 px-3 font-bold text-accent text-xs truncate">${activity}</td>
-                <td class="py-3 px-3 font-mono text-primary text-xs student-duration">${duration}</td>
+                <td data-label="Section" class="py-3 px-3 text-secondary text-xs truncate">${escapeHTML(student.section || 'N/A')}</td>
+                <td data-label="Activity" class="py-3 px-3 font-bold text-accent text-xs truncate">${activity}</td>
+                <td data-label="Duration" class="py-3 px-3 font-mono text-primary text-xs student-duration">${duration}</td>
                 ${actionMenuHTML}
             `;
         }
@@ -745,6 +898,15 @@ async function handleUpdateStudent(event) {
     const group_type = document.getElementById('edit-student-type').value;
     const max_devices = parseInt(document.getElementById('edit-student-device-limit').value) || 1;
 
+    // If the email changed, sync the Supabase Auth identity first
+    if (email !== originalEmail) {
+        const { error: rpcError } = await sb.rpc('admin_update_user_email', {
+            target_email: originalEmail,
+            new_email: email
+        });
+        if (rpcError) return showCustomAlert("Auth Sync Error", rpcError.message, "error");
+    }
+
     const { error } = await sb.from('profiles').update({
         full_name, email, section, pre_test_score, group_type, max_devices
     }).eq('email', originalEmail);
@@ -800,6 +962,14 @@ async function loadSections() {
         return;
     }
 
+    const { data: allProfiles } = await sb.from('profiles').select('section').neq('role', 'admin');
+    const sectionCounts = {};
+    if (allProfiles) {
+        allProfiles.forEach(p => {
+            if (p.section) sectionCounts[p.section] = (sectionCounts[p.section] || 0) + 1;
+        });
+    }
+
     for (const sec of data) {
         const name = sec.name;
         sectionSelects.forEach(select => {
@@ -809,8 +979,7 @@ async function loadSections() {
             select.appendChild(option);
         });
 
-        const { data: profileData } = await sb.from('profiles').select('role').eq('section', name);
-        const count = profileData ? profileData.filter(p => p.role !== 'admin').length : 0;
+        const count = sectionCounts[name] || 0;
 
         const card = document.createElement('div');
         card.className = "solid-card p-6 space-y-5 cursor-pointer hover:border-[var(--accent-primary)] transition-all group";
@@ -876,9 +1045,9 @@ async function openSectionDetails(sectionName) {
             tr.onclick = () => { openStudentProfile(student.full_name, student.email, sectionName, student.group_type, student.status, student.max_devices ?? 1, student.pre_test_score ?? 'n/a', student.post_test_score ?? 'n/a', student.ocean_o ?? 'n/a', student.ocean_c ?? 'n/a', student.ocean_e ?? 'n/a', student.ocean_a ?? 'n/a', student.ocean_n ?? 'n/a'); };
 
             tr.innerHTML = `
-                <td class="py-4 px-3 font-medium text-primary">${student.full_name}</td>
+                <td class="py-4 px-3 font-medium text-primary">${escapeHTML(student.full_name)}</td>
                 <td class="py-4 px-3 text-secondary">${student.email}</td>
-                <td class="py-4 px-3"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[10px] font-bold uppercase tracking-wider">${student.group_type}</span></td>
+                <td class="py-4 px-3"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[10px] font-bold uppercase tracking-wider">${escapeHTML(student.group_type || 'N/A')}</span></td>
                 <td class="py-4 px-3">
                     <div class="flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full ${student.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
@@ -893,7 +1062,7 @@ async function openSectionDetails(sectionName) {
                         <button onclick="sendActivationEmail('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
                             <i data-lucide="mail" class="w-3.5 h-3.5 text-info"></i> Send Email
                         </button>
-                        <button onclick="openEditStudent('${student.full_name}', '${student.email}', '${student.section || ''}', '${student.pre_test_score ?? ''}', '${student.group_type}', ${student.max_devices ?? 1}); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all">
+                        <button onclick="closeModal('section-details-modal'); openEditStudent('${escapeJS(student.full_name)}', '${student.email}', '${escapeJS(student.section || '')}', '${student.pre_test_score ?? ''}', '${student.group_type}', ${student.max_devices ?? 1}); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all">
                             <i data-lucide="edit-3" class="w-3.5 h-3.5 icon-edit"></i> Edit Details
                         </button>
                         <button onclick="resetPasswordFromMenu('${student.email}'); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors">
@@ -926,7 +1095,7 @@ async function openScoresModal(sectionName) {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-[var(--bg-hover)] transition-colors";
             tr.innerHTML = `
-                <td class="py-4 px-3 font-medium text-primary">${student.full_name}</td>
+                <td class="py-4 px-3 font-medium text-primary">${escapeHTML(student.full_name)}</td>
                 <td class="py-4 px-3"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider">${student.group_type}</span></td>
                 <td class="py-4 px-3"><input type="number" step="0.1" class="score-pre w-full max-w-[120px] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 h-[44px] text-sm text-primary input-focus font-mono" value="${student.pre_test_score ?? ''}" data-email="${student.email}"></td>
                 <td class="py-4 px-3"><input type="number" step="0.1" class="score-post w-full max-w-[120px] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 h-[44px] text-sm text-[var(--accent-primary)] font-bold input-focus font-mono" value="${student.post_test_score ?? ''}" data-email="${student.email}"></td>
@@ -945,7 +1114,12 @@ function openScoresModalFromDetails() {
 
 // fully working
 async function saveBatchScores() {
+    const btn = document.querySelector('#scores-modal .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = 'PROCESSING...'; }
+
     const rows = document.querySelectorAll('#scores-table-body tr');
+    const updates = [];
+
     for (const tr of rows) {
         const preInput = tr.querySelector('.score-pre');
         const postInput = tr.querySelector('.score-post');
@@ -955,8 +1129,19 @@ async function saveBatchScores() {
         const pre_test_score = preInput.value !== '' ? parseFloat(preInput.value) : null;
         const post_test_score = postInput.value !== '' ? parseFloat(postInput.value) : null;
 
-        await sb.from('profiles').update({ pre_test_score, post_test_score }).eq('email', email);
+        updates.push({ email, pre_test_score, post_test_score });
     }
+
+    if (updates.length > 0) {
+        const { error } = await sb.from('profiles').upsert(updates, { onConflict: 'email' });
+        if (error) {
+            if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
+            console.error('Batch save error:', error);
+            return showCustomAlert("Error", error.message, "error");
+        }
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
     closeModal('scores-modal');
     showCustomAlert("Scores Updated", `Grades for ${currentActiveSection} have been saved successfully.`, "success");
 }
@@ -992,11 +1177,11 @@ async function loadProfessors() {
                 <div class="w-8 h-8 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-info">
                     <i data-lucide="shield-alert" class="w-4 h-4"></i>
                 </div>
-                ${prof.name}
+                ${escapeHTML(prof.name)}
             </td>
             <td class="py-4 px-4 text-secondary prof-email">${prof.email}</td>
-            <td class="py-4 px-4 text-secondary">${prof.department}</td>
-            <td class="py-4 px-4"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-info text-[10px] font-bold uppercase tracking-wider">${prof.assigned_section}</span></td>
+            <td class="py-4 px-4 text-secondary">${escapeHTML(prof.department)}</td>
+            <td class="py-4 px-4"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-info text-[10px] font-bold uppercase tracking-wider">${escapeHTML(prof.assigned_section)}</span></td>
             <td class="py-4 px-4">
                 <div class="flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full ${prof.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
@@ -1033,7 +1218,7 @@ async function loadProfessors() {
                             <i data-lucide="shield-alert" class="w-5 h-5"></i>
                         </div>
                         <div>
-                            <p class="font-bold text-primary text-sm">${prof.name}</p>
+                            <p class="font-bold text-primary text-sm">${escapeHTML(prof.name)}</p>
                             <p class="text-[10px] text-secondary font-mono">${prof.email}</p>
                         </div>
                     </div>
@@ -1055,11 +1240,11 @@ async function loadProfessors() {
                 <div class="grid grid-cols-2 gap-3 pt-3 border-t border-[var(--border-color)]">
                     <div>
                         <p class="text-[9px] uppercase tracking-widest text-secondary font-mono">Department</p>
-                        <p class="text-xs text-primary font-medium truncate">${prof.department}</p>
+                        <p class="text-xs text-primary font-medium truncate">${escapeHTML(prof.department)}</p>
                     </div>
                     <div>
                         <p class="text-[9px] uppercase tracking-widest text-secondary font-mono">Section</p>
-                        <p class="text-xs text-info font-bold uppercase truncate">${prof.assigned_section}</p>
+                        <p class="text-xs text-info font-bold uppercase truncate">${escapeHTML(prof.assigned_section)}</p>
                     </div>
                 </div>
             `;
@@ -1086,6 +1271,10 @@ async function handleRegisterProfessor(event) {
     const email = document.getElementById('prof-email').value;
     const department = document.getElementById('prof-dept').value;
     const assigned_section = document.getElementById('prof-section').value;
+    const defaultPass = document.getElementById('global-default-pass')?.value || 'PIA2026!';
+
+    const authRes = await sb.rpc('admin_create_auth_user', { target_email: email, default_password: defaultPass });
+    if (authRes.error) return showCustomAlert("Auth Creation Error", authRes.error.message, "error");
 
     const { error } = await sb.from('professors').insert([{ name, email, department, assigned_section, status: 'inactive' }]);
     if (error) return showCustomAlert("Registration Error", error.message, "error");
@@ -1171,9 +1360,9 @@ function renderDeviceList(devices) {
                     <i data-lucide="${iconName}" class="w-3.5 h-3.5 text-accent shrink-0"></i> 
                     <span>${platform}</span>
                 </p>
-                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${devId}</p>
+                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${escapeHTML(devId)}</p>
             </div>
-            <button onclick="revokeStudentDevice('${currentManagingEmail}', '${devId}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
+            <button onclick="revokeStudentDevice('${escapeHTML(currentManagingEmail)}', '${escapeHTML(devId)}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
                 Logout
             </button>
         `;
@@ -1213,8 +1402,7 @@ async function loadAdminDeviceSettings(email) {
 
     if (!activeDevices.includes(currentDeviceId)) {
         if (activeDevices.length >= currentLimit) {
-            showCustomAlert("Device Limit Reached", `You have reached the limit of ${currentLimit} admin device(s).`, "error");
-            setTimeout(() => { handleAdminSignOut(); }, 3000);
+            showDeviceLimitModal(activeDevices, email);
             return;
         } else {
             activeDevices.push(currentDeviceId);
@@ -1222,6 +1410,77 @@ async function loadAdminDeviceSettings(email) {
         }
     }
     renderAdminDeviceList(activeDevices);
+}
+
+// Shows a forced modal when the admin's device limit is reached.
+// The admin must revoke an older session to free up a slot — no dismiss without action.
+function showDeviceLimitModal(activeDevices, email) {
+    const currentDeviceId = localStorage.getItem('pia_device_id');
+    const modal = document.getElementById('device-limit-modal');
+    const list = document.getElementById('device-limit-list');
+    if (!modal || !list) return;
+
+    list.innerHTML = '';
+
+    activeDevices.forEach((devId) => {
+        let platform = "Unknown Device";
+        let iconName = "monitor";
+        if (devId.includes('Android')) { platform = "Android Smartphone"; iconName = "smartphone"; }
+        else if (devId.includes('iOS')) { platform = "iOS Device"; iconName = "smartphone"; }
+        else if (devId.includes('iPad')) { platform = "iPad Tablet"; iconName = "tablet"; }
+        else if (devId.includes('macOS')) { platform = "macOS Computer"; iconName = "laptop"; }
+        else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
+
+        const isCurrentDevice = (devId === currentDeviceId);
+        const badgeHTML = isCurrentDevice ? `<span class="px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[9px] uppercase tracking-wider font-bold shadow-sm">This Device</span>` : '';
+
+        const item = document.createElement('div');
+        item.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-main)] p-3 rounded-xl border border-[var(--border-color)]";
+        item.innerHTML = `
+            <div class="space-y-1">
+                <p class="text-xs font-bold text-primary flex items-center flex-wrap gap-2">
+                    <i data-lucide="${iconName}" class="w-3.5 h-3.5 text-accent shrink-0"></i>
+                    <span>${platform}</span>
+                    ${badgeHTML}
+                </p>
+                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${escapeHTML(devId)}</p>
+            </div>
+            <button onclick="revokeDeviceFromLimitModal('${escapeHTML(devId)}', '${escapeHTML(email)}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
+                Revoke
+            </button>
+        `;
+        list.appendChild(item);
+    });
+
+    lucide.createIcons();
+    openModal('device-limit-modal');
+}
+
+// Revokes a device from the device-limit modal, then re-registers the current device and continues loading.
+async function revokeDeviceFromLimitModal(deviceId, email) {
+    const { data: adminProfile } = await sb.from('profiles').select('active_devices, max_devices').eq('email', email).maybeSingle();
+    let updated = (adminProfile?.active_devices || []).filter(id => id !== deviceId);
+
+    // Register the current device now that a slot is free
+    let currentDeviceId = localStorage.getItem('pia_device_id');
+    if (!currentDeviceId || !currentDeviceId.includes('[')) {
+        currentDeviceId = getDeviceSignature();
+        localStorage.setItem('pia_device_id', currentDeviceId);
+    }
+
+    if (deviceId !== currentDeviceId && !updated.includes(currentDeviceId)) {
+        updated.push(currentDeviceId);
+    }
+
+    await sb.from('profiles').update({ active_devices: updated }).eq('email', email);
+    closeModal('device-limit-modal');
+    showCustomAlert("Device Revoked", "The session was revoked and this device is now registered.", "success");
+    renderAdminDeviceList(updated);
+
+    // If the admin revoked their own current device, sign them out
+    if (localStorage.getItem('pia_device_id') === deviceId) {
+        await handleAdminSignOut();
+    }
 }
 
 // fully working
@@ -1281,9 +1540,9 @@ function renderAdminDeviceList(devices) {
                     <span>${platform}</span>
                     ${badgeHTML}
                 </p>
-                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${devId}</p>
+                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${escapeHTML(devId)}</p>
             </div>
-            <button onclick="revokeAdminDevice('${devId}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
+            <button onclick="revokeAdminDevice('${escapeHTML(devId)}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
                 Logout
             </button>
         `;
@@ -1312,9 +1571,16 @@ async function revokeAdminDevice(deviceId) {
 async function deleteUserFromMenu(email, table) {
     showCustomConfirm("Critical Warning", `Completely delete ${email}?`, async () => {
         let error = null;
-        if (table === 'profiles') {
+        if (table === 'profiles' || table === 'professors') {
             const rpcRes = await sb.rpc('admin_delete_user', { target_email: email });
-            error = rpcRes.error ? (await sb.from('profiles').delete().eq('email', email)).error : null;
+            if (!rpcRes.error) {
+                error = (await sb.from('profiles').delete().eq('email', email)).error;
+                if (!error && table === 'professors') {
+                    error = (await sb.from('professors').delete().eq('email', email)).error;
+                }
+            } else {
+                error = rpcRes.error;
+            }
         } else {
             error = (await sb.from(table).delete().eq('email', email)).error;
         }
@@ -1498,20 +1764,9 @@ async function executeTargetedOpen() {
 // 11. ADMIN ACCOUNT & SUPER ADMIN LOGIC
 // ==========================================
 
-const SUPER_ADMIN_EMAIL = 'personalinstructingagent@gmail.com';
-
 // fully working
-async function initAdminProfile() {
+async function initAdminProfile(email) {
     try {
-        let email = localStorage.getItem('pia_user_email');
-        if (!email && typeof sb !== 'undefined') {
-            const { data: { user } } = await sb.auth.getUser();
-            if (user) {
-                email = user.email;
-                localStorage.setItem('pia_user_email', email);
-            }
-        }
-
         let name = "Admin";
         if (email) {
             name = email.split('@')[0];
@@ -1546,9 +1801,8 @@ async function initAdminProfile() {
 }
 
 // fully working
-async function checkSuperAdmin() {
-    const currentEmail = localStorage.getItem('pia_user_email');
-    if (currentEmail === SUPER_ADMIN_EMAIL) {
+async function checkSuperAdmin(isSuperAdmin) {
+    if (isSuperAdmin) {
         document.getElementById('super-admin-panel').classList.remove('hidden');
         loadCoAdmins();
     }
@@ -1561,9 +1815,9 @@ async function loadCoAdmins() {
     tbody.innerHTML = '';
 
     data.forEach(admin => {
-        const isMe = admin.email === SUPER_ADMIN_EMAIL;
-        const actionBtn = isMe
-            ? `<span class="text-[10px] text-accent font-bold uppercase tracking-wider">Super Admin</span>`
+        const isMeOrSuper = admin.email === currentAdminEmail || admin.is_super_admin;
+        const actionBtn = isMeOrSuper
+            ? `<span class="text-[10px] text-accent font-bold uppercase tracking-wider">${admin.is_super_admin ? 'Super Admin' : 'Admin (You)'}</span>`
             : `<button onclick="kickAdmin('${admin.email}')" class="btn-danger-outline px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">Kick</button>`;
 
         const tr = document.createElement('tr');
@@ -1652,7 +1906,14 @@ async function resetPasswordFromMenu(email) {
 async function handleAdminSignOut() {
     try {
         const email = localStorage.getItem('pia_user_email');
-        if (email && typeof sb !== 'undefined') await sb.from('profiles').update({ active_devices: [] }).eq('email', email);
+        const deviceId = localStorage.getItem('pia_device_id');
+        if (email && typeof sb !== 'undefined') {
+            const { data } = await sb.from('profiles').select('active_devices').eq('email', email).maybeSingle();
+            if (data && data.active_devices) {
+                const updated = data.active_devices.filter(d => d !== deviceId);
+                await sb.from('profiles').update({ active_devices: updated }).eq('email', email);
+            }
+        }
         if (typeof sb !== 'undefined') await sb.auth.signOut();
     } catch (err) {
         console.error("Sign out error:", err);
@@ -1670,12 +1931,19 @@ async function handleAdminSignOut() {
 // fully working
 async function sendActivationEmail(email) {
     showCustomConfirm("Send Email", `Trigger activation link to ${email}?`, async () => {
-        const redirectPath = window.location.origin + encodeURI('/index.html');
+        const btn = document.getElementById('confirm-yes-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'SENDING...'; }
+        
+        const redirectPath = window.location.origin + '/index.html';
         const { error } = await sb.auth.signInWithOtp({
             email: email,
             options: { shouldCreateUser: false, emailRedirectTo: redirectPath }
         });
-        if (error) return showCustomAlert("Error", error.message, "error");
+        
+        if (error) {
+            if (btn) { btn.disabled = false; btn.textContent = 'PROCEED'; }
+            return showCustomAlert("Error", error.message, "error");
+        }
         showCustomAlert("Email Sent", `Activation link successfully sent to ${email}.`, "success");
     });
 }
@@ -1683,12 +1951,18 @@ async function sendActivationEmail(email) {
 // fully working
 async function sendSectionEmails(sectionName) {
     showCustomConfirm("Broadcast Section", `Send activation emails to all inactive students in section ${sectionName}?`, async () => {
+        const btn = document.getElementById('confirm-yes-btn');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
         const { data: students } = await sb.from('profiles').select('email').eq('section', sectionName).eq('status', 'inactive');
         if (!students || students.length === 0) {
+            btn.disabled = false;
+            btn.textContent = 'Proceed';
             return showCustomAlert("Notice", "No inactive students found in this section.", "info");
         }
 
-        const redirectPath = window.location.origin + encodeURI('/assets/html/sign-up.html');
+        const redirectPath = window.location.origin + '/index.html';
         let successCount = 0;
 
         for (const student of students) {
@@ -1701,3 +1975,21 @@ async function sendSectionEmails(sectionName) {
         showCustomAlert("Broadcast Complete", `Successfully sent activation emails to ${successCount} student(s) in section ${sectionName}.`, "success");
     });
 }
+
+// Export functions to global scope for HTML inline handlers
+Object.assign(global, {
+    switchTab, toggleMobileMenu, handleAdminSignOut, openModal, closeModal,
+    toggleStageDrilldown, clearStageDrilldown, setGroupFilter, setSubgroupFilter,
+    toggleEditPassword, saveGlobalPassword, openTargetedModal, executeTargetedOpen,
+    toggleEditAdminLimit, saveAdminDeviceLimit, closeStudentProfile, toggleAvatarVisibility,
+    closeProfessorProfile, revokeAdminDevice, deleteUserFromMenu,
+    sendActivationEmail, sendSectionEmails, resetPasswordFromMenu,
+    openEditStudent, openDeviceManager, allowStudentRetakeOcean, allowStudentRetakeCharacter,
+    openProfessorProfile, openSectionDetails, filterProfessors, kickAdmin,
+    previousStudentPage, nextStudentPage, 
+    showCustomAlert, handleAdminPasswordUpdate, handleRegisterAdmin,
+    handleRegisterStudent, handleUpdateStudent, handleRegisterProfessor, toggleActionMenu,
+    openStudentProfile, saveBatchScores, showCustomConfirm
+});
+
+})(window);

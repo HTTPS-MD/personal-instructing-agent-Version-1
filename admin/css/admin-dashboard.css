@@ -109,6 +109,55 @@
     background-color: var(--bg-hover);
 }
 
+/* Mobile responsive table */
+@media (max-width: 768px) {
+    .admin-table thead {
+        display: none;
+    }
+    .admin-table tbody tr {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        margin-bottom: 1rem;
+        padding: 1rem;
+        position: relative;
+        background-color: var(--bg-card);
+    }
+    .admin-table tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+        text-align: right;
+    }
+    .admin-table tbody td:last-child {
+        border-bottom: none;
+    }
+    .admin-table tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-align: left;
+        margin-right: 1rem;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.05em;
+    }
+    /* Action cell specific */
+    .admin-table tbody td.action-cell {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        padding: 0;
+        border: none;
+    }
+    .admin-table tbody td.action-cell::before {
+        display: none;
+    }
+}
+
 /* Mobile Stacked Cards Layout Control */
 /* Removed !important by targeting specific container states */
 #student-cards-container,
