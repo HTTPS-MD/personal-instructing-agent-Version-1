@@ -472,7 +472,7 @@
     async function loadStudents() {
         const searchQueryEl = document.getElementById('search-student');
         const searchQuery = searchQueryEl ? searchQueryEl.value.trim().toLowerCase() : '';
-        
+
         let query = sb.from('profiles').select('*', { count: 'exact' }).neq('role', 'admin');
 
         if (searchQuery) {
@@ -517,7 +517,7 @@
             sb.from('profiles').select('id', { count: 'exact', head: true }).eq('current_stage', 'Tutoring Dashboard').neq('role', 'admin').eq('is_in_game', false),
             sb.from('profiles').select('id', { count: 'exact', head: true }).eq('is_in_game', true).neq('role', 'admin')
         ];
-        
+
         try {
             const [oceanRes, charRes, dashRes, gameRes] = await Promise.all(promises);
             document.getElementById('count-ocean').textContent = oceanRes.count || 0;
@@ -525,7 +525,7 @@
             document.getElementById('count-dash').textContent = dashRes.count || 0;
             document.getElementById('count-game').textContent = gameRes.count || 0;
             lucide.createIcons();
-        } catch(err) {
+        } catch (err) {
             console.error("Error updating stage counters:", err);
         }
     }
@@ -1960,7 +1960,8 @@
             const btn = document.getElementById('confirm-yes-btn');
             if (btn) { btn.disabled = true; btn.textContent = 'SENDING...'; }
 
-            const redirectPath = window.location.origin + '/index.html';
+            // Palitan ang '/index.html' papunta sa '/assets/html/sign-up.html'
+            const redirectPath = window.location.origin + '/assets/html/sign-up.html';
             const { error } = await sb.auth.signInWithOtp({
                 email: email,
                 options: { shouldCreateUser: false, emailRedirectTo: redirectPath }
@@ -1988,7 +1989,8 @@
                 return showCustomAlert("Notice", "No inactive students found in this section.", "info");
             }
 
-            const redirectPath = window.location.origin + '/index.html';
+            // Palitan ang '/index.html' papunta sa '/assets/html/sign-up.html'
+            const redirectPath = window.location.origin + '/assets/html/sign-up.html';
             let successCount = 0;
 
             for (const student of students) {
