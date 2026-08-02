@@ -1,5 +1,5 @@
 // ==========================================
-// 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER
+// 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER (eto yung sa dev)
 // ==========================================
 const isSignUpPage = document.getElementById('signup-form') !== null;
 const isResetPage = document.getElementById('reset-form') !== null;
@@ -7,7 +7,7 @@ const loginForm = document.getElementById('login-form');
 
 // Auto-detect Magic Link Token from Email
 window.addEventListener('DOMContentLoaded', async () => {
-    if (isSignUpPage && window.supabaseClient) {
+    if ((isSignUpPage || isResetPage) && window.supabaseClient) {
         const hash = window.location.hash;
 
         // 🚨 Idinagdag ang 'type=magiclink' sa detector
@@ -21,14 +21,15 @@ window.addEventListener('DOMContentLoaded', async () => {
                 passwordContainer.classList.remove('hidden');
 
                 // Fetch user data para sa Dynamic Greeting
-                const { data: authData } = await supabaseClient.auth.getUser();
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                const user = session?.user;
 
-                if (authData && authData.user) {
+                if (user) {
                     // Kunin ang full name sa profiles table gamit ang authenticated email
-                    const { data: profile } = await supabaseClient
+                    const { data: profile } = await window.supabaseClient
                         .from('profiles')
                         .select('full_name')
-                        .eq('email', authData.user.email)
+                        .eq('email', user.email)
                         .maybeSingle();
 
                     const fullName = profile?.full_name || 'Student';
@@ -107,13 +108,13 @@ if (slides.length > 0) startAutoSlide();
 // ==========================================
 // 3. SHOW PASSWORD LOGIC
 // ==========================================
-const passwordInput = document.getElementById('password');
-const confirmPasswordInput = document.getElementById('confirm-password');
 const showPasswordCheckbox = document.getElementById('show-password');
 
 if (showPasswordCheckbox) {
     showPasswordCheckbox.addEventListener('change', function () {
         const type = this.checked ? 'text' : 'password';
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
         if (passwordInput) passwordInput.type = type;
         if (confirmPasswordInput) confirmPasswordInput.type = type;
     });
@@ -169,7 +170,6 @@ if (otpInputs.length > 0) {
 // 5. HELPER FUNCTIONS & DEVICE DETECTOR
 // ==========================================
 const statusMessage = document.getElementById('status-message') || document.getElementById('error-message');
-const timerSpan = document.getElementById('timer');
 const resendBtn = document.getElementById('resend-btn');
 let countdownInterval;
 
@@ -194,15 +194,19 @@ function showStatus(message, type) {
 }
 
 function startTimer() {
-    if (!resendBtn || !timerSpan) return;
+    if (!resendBtn) return;
     let timeLeft = 60;
     resendBtn.disabled = true;
-    timerSpan.textContent = timeLeft;
+
+    let currentTimerSpan = document.getElementById('timer');
+    if (currentTimerSpan) currentTimerSpan.textContent = timeLeft;
 
     clearInterval(countdownInterval);
     countdownInterval = setInterval(() => {
         timeLeft--;
-        timerSpan.textContent = timeLeft;
+        currentTimerSpan = document.getElementById('timer');
+        if (currentTimerSpan) currentTimerSpan.textContent = timeLeft;
+
         if (timeLeft <= 0) {
             clearInterval(countdownInterval);
             resendBtn.disabled = false;
@@ -216,7 +220,7 @@ function startTimer() {
 // ==========================================
 if (loginForm) {
     const submitBtn = document.getElementById('submit-btn');
-    const emailInput = document.getElementById('email');
+    const loginEmailInput = document.getElementById('email');
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -224,9 +228,19 @@ if (loginForm) {
         submitBtn.innerHTML = 'Signing in...';
         if (statusMessage) statusMessage.classList.add('hidden');
 
-        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
-            email: emailInput.value.trim(),
-            password: passwordInput.value
+        const passwordInput = document.getElementById('password');
+        const email = loginEmailInput ? loginEmailInput.value.trim() : '';
+
+        if (!email) {
+            showStatus("Please enter your email address.", 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Sign In';
+            return;
+        }
+
+        const { data: authData, error: authError } = await window.supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: passwordInput ? passwordInput.value : ''
         });
 
         if (authError) {
@@ -236,9 +250,9 @@ if (loginForm) {
             return;
         }
 
-        localStorage.setItem('pia_user_email', emailInput.value.trim());
+        localStorage.setItem('pia_user_email', email);
 
-        const { data: profile, error: profileError } = await supabaseClient
+        const { data: profile, error: profileError } = await window.supabaseClient
             .from('profiles')
             .select('*')
             .eq('email', authData.user.email)
@@ -265,14 +279,15 @@ if (loginForm) {
             let activeDevices = profile.active_devices || [];
             if (!activeDevices.includes(currentDeviceId)) {
                 if (activeDevices.length >= maxAllowedDevices) {
-                    await supabaseClient.auth.signOut();
+                    await window.supabaseClient.auth.signOut();
+                    localStorage.removeItem('pia_user_email');
                     showStatus(`${maxAllowedDevices} device limit lang. Please log out from your other active device.`, 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = 'Sign In';
                     return;
                 } else {
                     activeDevices.push(currentDeviceId);
-                    await supabaseClient.from('profiles').update({ active_devices: activeDevices }).eq('email', authData.user.email);
+                    await window.supabaseClient.from('profiles').update({ active_devices: activeDevices }).eq('email', authData.user.email);
                 }
             }
         }
@@ -291,15 +306,15 @@ if (loginForm) {
         const isNonAssigned = (groupType === 'non-assigned' || groupType === 'non_assigned');
 
         if (!profile.is_ocean_done) {
-            const { data: settingData } = await supabaseClient.from('settings').select('value').eq('key', 'stage_ocean').maybeSingle();
+            const { data: settingData } = await window.supabaseClient.from('settings').select('value').eq('key', 'stage_ocean').maybeSingle();
             const isOceanOpen = settingData ? (settingData.value === true || settingData.value === 'true') : false;
             window.location.replace(isOceanOpen ? '../../student/html/ocean-test.html' : '../../student/html/waiting-room.html');
         } else if (isNonAssigned && !profile.selected_character) {
-            const { data: charSetting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_char').maybeSingle();
+            const { data: charSetting } = await window.supabaseClient.from('settings').select('value').eq('key', 'stage_char').maybeSingle();
             const isCharOpen = charSetting ? (charSetting.value === true || charSetting.value === 'true') : false;
             window.location.replace(isCharOpen ? '../../student/html/character-selection.html' : '../../student/html/waiting-room.html');
         } else {
-            const { data: dashSetting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_dash').maybeSingle();
+            const { data: dashSetting } = await window.supabaseClient.from('settings').select('value').eq('key', 'stage_dash').maybeSingle();
             const isDashOpen = dashSetting ? (dashSetting.value === true || dashSetting.value === 'true') : false;
             window.location.replace(isDashOpen ? '../../student/html/student-dashboard.html' : '../../student/html/waiting-room.html');
         }
@@ -315,21 +330,19 @@ const step3Container = document.getElementById('step-3-container');
 const checkEmailBtn = document.getElementById('check-email-btn');
 const verifyBtn = document.getElementById('verify-btn');
 const finalizeBtn = document.getElementById('finalize-btn');
-const emailInput = document.getElementById('email');
-
-let pendingEmail = '';
+const resetEmailInput = document.getElementById('email');
 
 // Check Email (Para sa Reset Password page lang ito ngayon)
 if (checkEmailBtn && isResetPage) {
     checkEmailBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
-        const email = emailInput.value.trim();
+        if (statusMessage) statusMessage.classList.add('hidden');
+        const email = resetEmailInput ? resetEmailInput.value.trim() : '';
         if (!email) return showStatus("Please enter an email address.", 'error');
 
         checkEmailBtn.disabled = true;
         checkEmailBtn.innerHTML = 'Sending OTP...';
 
-        const { data: student, error: dbError } = await supabaseClient
+        const { data: student, error: dbError } = await window.supabaseClient
             .from('profiles')
             .select('id, email, status')
             .eq('email', email)
@@ -342,7 +355,7 @@ if (checkEmailBtn && isResetPage) {
             return;
         }
 
-        const { error: otpError } = await supabaseClient.auth.resetPasswordForEmail(email);
+        const { error: otpError } = await window.supabaseClient.auth.resetPasswordForEmail(email);
 
         if (otpError) {
             showStatus("Error sending OTP: " + otpError.message, 'error');
@@ -351,7 +364,7 @@ if (checkEmailBtn && isResetPage) {
             return;
         }
 
-        pendingEmail = email;
+        sessionStorage.setItem('pending_reset_email', email);
         step1Container.classList.add('hidden');
         step2Container.classList.remove('hidden');
         showStatus("Verification code sent to your email.", 'success');
@@ -362,11 +375,14 @@ if (checkEmailBtn && isResetPage) {
 // Resend OTP (Reset Password)
 if (resendBtn && isResetPage) {
     resendBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
+        if (statusMessage) statusMessage.classList.add('hidden');
         resendBtn.disabled = true;
         resendBtn.innerHTML = 'Resending...';
 
-        const { error: otpError } = await supabaseClient.auth.resetPasswordForEmail(pendingEmail);
+        const pendingEmail = sessionStorage.getItem('pending_reset_email');
+        if (!pendingEmail) return showStatus("Session expired. Please start over.", 'error');
+
+        const { error: otpError } = await window.supabaseClient.auth.resetPasswordForEmail(pendingEmail);
 
         if (otpError) {
             showStatus("Error resending OTP: " + otpError.message, 'error');
@@ -384,7 +400,7 @@ if (resendBtn && isResetPage) {
 // Verify OTP (Reset Password)
 if (verifyBtn && isResetPage) {
     verifyBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
+        if (statusMessage) statusMessage.classList.add('hidden');
         let otpCode = '';
         otpInputs.forEach(input => otpCode += input.value.trim());
 
@@ -393,7 +409,10 @@ if (verifyBtn && isResetPage) {
         verifyBtn.disabled = true;
         verifyBtn.innerHTML = 'Verifying...';
 
-        const { error } = await supabaseClient.auth.verifyOtp({
+        const pendingEmail = sessionStorage.getItem('pending_reset_email');
+        if (!pendingEmail) return showStatus("Session expired. Please start over.", 'error');
+
+        const { error } = await window.supabaseClient.auth.verifyOtp({
             email: pendingEmail,
             token: otpCode,
             type: 'recovery'
@@ -417,9 +436,11 @@ if (verifyBtn && isResetPage) {
 // ==========================================
 if (finalizeBtn) {
     finalizeBtn.addEventListener('click', async () => {
-        statusMessage.classList.add('hidden');
-        const password = passwordInput.value;
-        const confirmPassword = confirmPasswordInput.value;
+        if (statusMessage) statusMessage.classList.add('hidden');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        const password = passwordInput ? passwordInput.value : '';
+        const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
 
         if (password.length < 6) return showStatus("Password must be at least 6 characters.", 'error');
         if (password !== confirmPassword) return showStatus("Passwords do not match.", 'error');
@@ -427,7 +448,7 @@ if (finalizeBtn) {
         finalizeBtn.disabled = true;
         finalizeBtn.innerHTML = isSignUpPage ? 'Activating...' : 'Updating...';
 
-        const { error: updateError } = await supabaseClient.auth.updateUser({ password });
+        const { error: updateError } = await window.supabaseClient.auth.updateUser({ password });
 
         if (updateError) {
             showStatus(updateError.message, 'error');
@@ -438,13 +459,15 @@ if (finalizeBtn) {
 
         // Kung sign-up page (Activation via Magic Link), i-set na rin natin sa active status sa DB
         if (isSignUpPage) {
-            const { data: authData } = await supabaseClient.auth.getUser();
+            const { data: authData } = await window.supabaseClient.auth.getUser();
             if (authData?.user) {
-                await supabaseClient.from('profiles')
+                await window.supabaseClient.from('profiles')
                     .update({ status: 'active' })
                     .eq('email', authData.user.email);
             }
         }
+
+        sessionStorage.removeItem('pending_reset_email');
 
         const successMsg = isSignUpPage ? "Account activated successfully! Redirecting to sign in..." : "Password updated successfully! Redirecting to sign in...";
         showStatus(successMsg, 'success');
