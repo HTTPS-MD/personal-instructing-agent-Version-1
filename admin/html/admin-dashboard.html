@@ -359,35 +359,6 @@
         <!-- VIEW 4: SYSTEM CONTROLS -->
         <div id="view-controls" class="space-y-6 view-section" style="display: none;">
 
-            <!-- SUPER ADMIN PANEL (Nakikita lang ng Super Admin) -->
-            <div id="super-admin-panel" class="solid-card p-6 sm:p-8 space-y-6 hidden border-2 border-accent">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h2
-                            class="text-lg sm:text-xl font-bold text-accent uppercase tracking-wider flex items-center gap-2">
-                            <i data-lucide="crown" class="w-5 h-5"></i> Super Admin Management
-                        </h2>
-                        <p class="text-xs text-secondary mt-0.5">Add or Kick co-administrators.</p>
-                    </div>
-                    <button onclick="openModal('add-admin-modal')"
-                        class="btn-primary px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider shadow-md font-bold">
-                        Add New Admin
-                    </button>
-                </div>
-                <div class="overflow-x-auto w-full custom-scrollbar">
-                    <table class="admin-table w-full whitespace-nowrap">
-                        <thead>
-                            <tr>
-                                <th>Admin Name</th>
-                                <th>Email</th>
-                                <th class="text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admins-tbody"></tbody>
-                    </table>
-                </div>
-            </div>
-
             <div class="solid-card p-6 sm:p-8 space-y-4">
                 <div>
                     <h2 class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider">System Configurations
@@ -785,50 +756,6 @@
         class="w-full max-w-7xl mx-auto py-6 px-4 text-center text-[10px] text-secondary uppercase tracking-widest font-mono border-t border-custom mt-auto">
         PIA SYSTEM // ADMIN CONTROL PANEL
     </footer>
-
-    <!-- GENERAL / NORMAL MODALS -->
-    <div id="add-admin-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('add-admin-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto modal-content"
-            id="add-admin-modal-content">
-            <div class="flex justify-between items-center border-b border-custom pb-4">
-                <h3
-                    class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-primary flex items-center gap-2">
-                    <i data-lucide="shield" class="w-5 h-5 text-accent"></i> Add Administrator
-                </h3>
-                <button onclick="closeModal('add-admin-modal')"
-                    class="btn-icon p-2 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
-            </div>
-            <form id="add-admin-form" onsubmit="handleRegisterAdmin(event)" class="space-y-5">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Admin
-                        Name</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <input type="text" id="new-admin-first" required placeholder="First Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                        <input type="text" id="new-admin-middle" placeholder="Middle Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                        <input type="text" id="new-admin-last" required placeholder="Last Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Email
-                        Address</label>
-                    <input type="email" id="new-admin-email" required placeholder="admin@ue.edu.ph"
-                        class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                </div>
-                <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="closeModal('add-admin-modal')"
-                        class="btn-secondary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Cancel</button>
-                    <button type="submit"
-                        class="btn-primary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold shadow-md">Register</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- TARGETED ACCESS MODAL -->
     <div id="targeted-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
