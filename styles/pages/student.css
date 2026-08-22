@@ -403,21 +403,61 @@
     gap: 1rem;
 }
 
+/* Kahoot-style choice cards: chunky enough to be an obvious tap target for a
+   12-year-old, with weight and lift so choosing feels like pressing something
+   real rather than ticking a form. */
 .ocean-answer-btn {
-    background-color: transparent;
-    border: 1px solid var(--border-color);
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
     color: var(--text-primary);
-    font-weight: 500;
+    font-family: var(--font-primary);
+    font-weight: 600;
+    font-size: 1rem;
     border-radius: var(--radius-lg);
-    padding: 1rem 1.5rem;
+    padding: 1.15rem 1.5rem;
     width: 100%;
     text-align: left;
-    transition: all var(--transition-speed) ease;
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow: var(--shadow-depth);
+    transition: transform var(--transition-tactile), box-shadow var(--transition-tactile),
+                border-color var(--transition-tactile), background-color var(--transition-tactile),
+                color var(--transition-tactile);
+    will-change: transform;
+}
+
+/* Light sweeps across the card on hover -- the "alive" cue, kept slow and
+   low-contrast so a room of 76 screens doesn't turn into a strobe. */
+.ocean-answer-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.07) 50%, transparent 70%);
+    transform: translateX(-60%);
+    transition: opacity var(--transition-tactile), transform 0.6s var(--ease-out-expo);
 }
 
 .ocean-answer-btn:hover {
-    border-color: var(--accent-primary);
-    background-color: rgba(16, 185, 129, 0.05);
+    border-color: var(--glass-border-hover);
+    transform: var(--lift-hover);
+    box-shadow: var(--shadow-depth), var(--shadow-ambient);
+}
+
+.ocean-answer-btn:hover::after { opacity: 1; transform: translateX(60%); }
+
+.ocean-answer-btn:active {
+    transform: var(--lift-press);
+    transition-duration: 0.08s;
+}
+
+.ocean-answer-btn:focus-visible {
+    outline: 2px solid var(--aurora-indigo);
+    outline-offset: 3px;
 }
 
 /* ==========================================================================
@@ -835,7 +875,7 @@
 
 .btn-start-game {
     background-color: var(--accent-primary);
-    color: #05050a;
+    color: var(--bg-void);
     font-weight: 700;
     letter-spacing: 0.05em;
     border: 1px solid var(--accent-primary);
