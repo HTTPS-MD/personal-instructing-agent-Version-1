@@ -19,11 +19,7 @@
             }
         });
     </script>
-<<<<<<< HEAD
-    <script src="https://cdn.tailwindcss.com"></script>
-=======
 
->>>>>>> dev
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -34,18 +30,10 @@
     <title>Admin Dashboard - PIA System</title>
 </head>
 
-<<<<<<< HEAD
-<body class="min-h-screen flex flex-col relative fade-in bg-main text-primary overflow-x-hidden opacity-0">
-
-    <!-- GLOBAL ERROR BANNER -->
-    <div id="global-error-banner"
-        class="hidden w-full bg-[var(--color-danger-bg)] text-[var(--color-danger)] p-4 text-center font-medium text-sm border-b border-[var(--color-danger)] z-50">
-=======
 <body class="admin-body fade-in opacity-0">
 
     <!-- GLOBAL ERROR BANNER -->
     <div id="global-error-banner" class="error-banner hidden">
->>>>>>> dev
         <span id="global-error-message"></span>
     </div>
 
@@ -210,17 +198,9 @@
                         <button id="btn-clear-drilldown" onclick="clearStageDrilldown()" class="btn-secondary hidden">
                             <i data-lucide="arrow-left" class="icon-xs"></i> Back to Roster
                         </button>
-<<<<<<< HEAD
-                        <div class="relative w-full sm:w-64">
-                            <i data-lucide="search"
-                                class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondary"></i>
-                            <input type="text" id="search-student" oninput="debouncedSearchStudents()"
-                                placeholder="Search student..." class="search-input">
-=======
                         <div class="search-input-wrap">
                             <i data-lucide="search" class="icon-sm search-input-icon"></i>
                             <input type="text" id="search-student" oninput="debouncedSearchStudents()" placeholder="Search student..." class="search-input">
->>>>>>> dev
                         </div>
                         <button onclick="openModal('add-student-modal')" class="btn-primary">Pre-Register</button>
                     </div>
@@ -247,22 +227,11 @@
                         <thead id="unified-thead"></thead>
                         <tbody id="unified-tbody"></tbody>
                     </table>
-<<<<<<< HEAD
-                    <div id="pagination-controls"
-                        class="w-full flex items-center justify-between p-4 border-t border-[var(--border-color)] text-xs text-secondary hidden">
-                        <span id="pagination-info">Page 1 of 1</span>
-                        <div class="flex items-center gap-2">
-                            <button id="btn-prev-page"
-                                class="px-3 py-1.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-                            <button id="btn-next-page"
-                                class="px-3 py-1.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-=======
                     <div id="pagination-controls" class="pagination-bar hidden">
                         <span id="pagination-info">Page 1 of 1</span>
                         <div class="flex-row gap-xs">
                             <button id="btn-prev-page" class="btn-secondary btn-sm">Previous</button>
                             <button id="btn-next-page" class="btn-secondary btn-sm">Next</button>
->>>>>>> dev
                         </div>
                     </div>
                 </div>
@@ -308,9 +277,6 @@
         <!-- VIEW 4: SYSTEM CONTROLS -->
         <div id="view-controls" class="view-section admin-stack" style="display: none;">
 
-<<<<<<< HEAD
-            <div class="solid-card p-6 sm:p-8 space-y-4">
-=======
             <div class="solid-card card-padded-lg admin-stack">
                 <div>
                     <h2 class="admin-card-title">System Configurations</h2>
@@ -330,7 +296,6 @@
             </div>
 
             <div class="solid-card card-padded-lg admin-stack-lg">
->>>>>>> dev
                 <div>
                     <h2 class="admin-card-title">Experiment Session Controls</h2>
                     <p class="admin-card-subtitle">Control stage accessibility globally or grant targeted access per section/student.</p>
@@ -481,20 +446,10 @@
             </button>
         </header>
 
-<<<<<<< HEAD
-        <main
-            class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            <div class="lg:col-span-4 flex flex-col items-center text-center space-y-6">
-                <div id="avatar-container"
-                    class="relative w-48 sm:w-56 h-48 sm:h-56 flex items-center justify-center overflow-hidden admin-avatar-container">
-                    <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="PIA Persona"
-                        class="h-36 sm:h-44 object-contain drop-shadow-2xl">
-=======
         <main class="page-container profile-full-main">
             <div class="profile-full-side">
                 <div id="avatar-container" class="admin-avatar-container">
                     <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="PIA Persona" class="admin-avatar-img">
->>>>>>> dev
                 </div>
                 <div class="profile-full-identity">
                     <div class="flex-row gap-sm flex-wrap">
@@ -626,14 +581,6 @@
         </main>
     </div>
 
-<<<<<<< HEAD
-    <footer
-        class="w-full max-w-7xl mx-auto py-6 px-4 text-center text-[10px] text-secondary uppercase tracking-widest font-mono border-t border-custom mt-auto">
-        PIA SYSTEM // ADMIN CONTROL PANEL
-    </footer>
-
-=======
->>>>>>> dev
     <!-- TARGETED ACCESS MODAL -->
     <div id="targeted-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('targeted-modal')">
         <div class="solid-card modal-content modal-w-xl" id="targeted-modal-content">
@@ -916,46 +863,12 @@
         </div>
     </div>
 
-<<<<<<< HEAD
-    <!-- DEVICE LIMIT FORCED REVOKE MODAL -->
-    <div id="device-limit-modal" class="fixed inset-0 flex items-center justify-center modal-overlay p-4"
-        style="z-index: 99997;">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm"></div>
-        <div class="solid-card relative z-10 w-full max-w-md p-6 space-y-5 modal-content"
-            id="device-limit-modal-content">
-            <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <i data-lucide="shield-alert" class="w-6 h-6 text-danger"></i>
-                <h3 class="text-base font-extrabold text-primary uppercase tracking-wider">Device Limit Reached</h3>
-            </div>
-            <p class="text-sm text-secondary leading-relaxed">
-                You have reached your admin device limit. Please revoke an older session below to continue on this
-                device.
-            </p>
-            <div id="device-limit-list" class="space-y-3 max-h-60 overflow-y-auto">
-                <!-- JS will inject device items here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- 🚨 TOP-LEVEL PRIORITY POPUPS 🚨 -->
-    <!-- Inilagay sa pinakadulo ng DOM bago mag scripts para siguradong laging lilitaw sa ibabaw ng lahat! -->
-
-    <div id="custom-confirm" class="fixed inset-0 flex items-center justify-center modal-overlay p-4"
-        style="z-index: 99998;">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeCustomConfirm()"></div>
-        <div class="solid-card relative z-10 w-full max-w-sm p-6 space-y-5 modal-content" id="custom-confirm-content">
-            <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <i data-lucide="alert-triangle" class="w-6 h-6 text-warning"></i>
-                <h3 class="text-base font-extrabold text-primary uppercase tracking-wider" id="confirm-title">Confirm
-                    Action</h3>
-=======
     <!-- DEVICE LIMIT FORCED REVOKE MODAL (no backdrop dismiss -- forced action) -->
     <div id="device-limit-modal" class="modal-overlay" style="z-index: 99997;">
         <div class="solid-card modal-content" id="device-limit-modal-content">
             <div class="modal-icon-header">
                 <i data-lucide="shield-alert" class="icon-md text-danger"></i>
                 <h3 class="modal-title">Device Limit Reached</h3>
->>>>>>> dev
             </div>
             <p class="modal-body-text">
                 You have reached your admin device limit. Please revoke an older session below to continue on this device.
@@ -979,28 +892,11 @@
         </div>
     </div>
 
-<<<<<<< HEAD
-    <div id="custom-alert" class="fixed inset-0 flex items-center justify-center modal-overlay p-4"
-        style="z-index: 99999;">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeCustomAlert()"></div>
-        <div class="solid-card relative z-10 w-full max-w-sm p-6 space-y-5 modal-content" id="custom-alert-content">
-            <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <div id="alert-icon-container"><i data-lucide="info" class="w-6 h-6 text-accent" id="alert-icon"></i>
-                </div>
-                <h3 class="text-base font-extrabold text-primary uppercase tracking-wider" id="alert-title">Notification
-                </h3>
-            </div>
-            <p class="text-sm text-secondary leading-relaxed" id="alert-message"></p>
-            <div class="pt-2">
-                <button onclick="closeCustomAlert()"
-                    class="btn-primary w-full py-3 rounded-lg text-xs font-bold uppercase tracking-wider">Understood</button>
-=======
     <div id="custom-alert" class="modal-overlay" style="z-index: 99999;" onclick="if(event.target===this) closeCustomAlert()">
         <div class="solid-card modal-content modal-w-sm" id="custom-alert-content">
             <div class="modal-icon-header">
                 <div id="alert-icon-container"><i data-lucide="info" class="icon-md text-accent" id="alert-icon"></i></div>
                 <h3 class="modal-title" id="alert-title">Notification</h3>
->>>>>>> dev
             </div>
             <p class="modal-body-text" id="alert-message"></p>
             <button onclick="closeCustomAlert()" class="btn-primary btn-block">Understood</button>
