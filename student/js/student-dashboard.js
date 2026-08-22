@@ -1,40 +1,34 @@
 // Supabase Configuration & Initialization ay nasa function.js na
 
 /**
- * Initializes the student dashboard upon DOM content loading. 
- * Enforces stage accessibility locks, validates student session identity, 
+ * Initializes the student dashboard upon DOM content loading.
+ * Enforces stage accessibility locks, validates student session identity,
  * updates real-time tracking status to 'Tutoring Dashboard', and loads user profile details.
  */
 document.addEventListener('DOMContentLoaded', async () => {
     lucide.createIcons();
 
     // --- STRICT GATEKEEPER CHECK ON LOAD ---
-    if (window.supabaseClient) {
-        const { data: setting } = await window.supabaseClient.from('settings').select('value').eq('key', 'stage_dash').maybeSingle();
-        if (!setting || (setting.value !== true && setting.value !== 'true')) {
-            window.location.href = 'waiting-room.html'; // Bawal um-access kung naka-lock ang stage
-            return;
-        }
-    }
+    // Dating stage_dash flag lang + localStorage email. Kaya kayang laktawan
+    // ang OCEAN test at character selection sa pamamagitan lang ng pag-type
+    // ng URL. Nasa enforceStudentStage('dash') na ang session + buong chain.
+    const profile = await enforceStudentStage('dash');
+    if (!profile) return;
+
+    const currentUserEmail = profile.email; // verified, hindi galing localStorage
     // --------------------------------------------
 
-    const currentUserEmail = localStorage.getItem('pia_user_email');
-
-    // Redirect kapag walang nakasave na email
-    if (!currentUserEmail) {
-        window.location.href = '../sign-in.html';
-        return;
-    }
-
     // --- REALTIME ADMIN TRACKING UPDATE ---
-    if (window.supabaseClient && currentUserEmail) {
-        await window.supabaseClient
-            .from('profiles')
-            .update({
-                current_stage: 'Tutoring Dashboard',
-                stage_started_at: new Date().toISOString()
-            })
-            .eq('email', currentUserEmail);
+    // Dumadaan na sa set_student_stage() RPC (hinaharangan na ng profile write
+    // guard ang direktang pagsulat sa current_stage). Kung sinara na pala ng
+    // admin ang stage, 'Waiting Room' ang ibinabalik ng server -- sundin natin,
+    // sa halip na manatili sa isang page na hindi na dapat bukas.
+    const { data: stageRes } = await window.supabaseClient
+        .rpc('set_student_stage', { p_stage: 'Tutoring Dashboard' });
+
+    if (stageRes && stageRes.granted === false) {
+        window.location.replace('waiting-room.html');
+        return;
     }
     // --------------------------------------
 
@@ -46,11 +40,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         'pia-calm': '/assets/images/char-calm.png',
         'pia-neutral': '/assets/images/char-neutral.png'
     };
+    document.getElementById('dashboard-agent-img').addEventListener('error', function () {
+        this.src = '/assets/images/char-1.png';
+    }, { once: true });
 
     if (window.supabaseClient && currentUserEmail) {
         try {
             const { data, error } = await window.supabaseClient
                 .from('profiles')
+                // RESEARCH INTEGRITY: ocean_* is deliberately NOT selected.
+                // The Big Five breakdown must not reach the student's browser
+                // at all -- not merely be hidden with CSS. A student who learns
+                // they scored low on Conscientiousness may behave differently
+                // for the rest of the study, which would contaminate the very
+                // measure the thesis depends on. Scores are for the admin and
+                // researcher views only.
                 .select('full_name, selected_character')
                 .eq('email', currentUserEmail)
                 .single();
@@ -65,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Fallback sa localStorage kung walang nakuha sa DB
                     loadFromLocalStorage(characterImages);
                 }
+                renderOceanProfile(data);
             } else {
                 loadFromLocalStorage(characterImages);
             }
@@ -88,6 +93,26 @@ function loadFromLocalStorage(characterImages) {
 }
 
 /**
+ * Panelist Revision: nagpapakita ng UI indicator na integrated ang OCEAN Test
+ * sa system -- nire-render ang Big Five trait breakdown ng estudyante bilang
+ * mga proportional bars sa Learning Profile card.
+ */
+// Dating ipinapakita nito ang lahat ng limang OCEAN trait bilang porsyento.
+// Wala nang score na ipinapakita: kinukumpirma lang nito na tapos na ang
+// assessment at may naka-match nang agent. Ang mga numero ay nasa admin view.
+function renderOceanProfile(profile) {
+    const container = document.getElementById('ocean-trait-bars');
+    if (!container) return;
+
+    container.innerHTML = `
+        <p class="ocean-profile-empty">
+            Tapos na ang iyong assessment. Ang iyong agent ay naitugma na sa
+            iyong learning profile -- handa ka nang magsimula!
+        </p>
+    `;
+}
+
+/**
  * Redirects the student to the active math tutoring problem-solving session page.
  */
 function startGame() {
@@ -95,18 +120,19 @@ function startGame() {
 }
 
 /**
- * Clears local session caches and signs out the user back to the landing page.
+ * Dating nag-aalis lang ng dalawang localStorage key at hindi kailanman
+ * tumatawag ng auth.signOut() -- kaya nananatili ang buong Supabase session sa
+ * PC. (Hindi rin ito kailanman na-wire sa kahit anong button.) Ang shared na
+ * executeForceLogout() na ang gumagawa ng totoong trabaho: device release,
+ * global signOut, at storage cleanup.
  */
 function handleSignOut() {
-    localStorage.removeItem('pia_user_email');
-    localStorage.removeItem('selected_character');
-    window.location.href = '../../index.html';
+    return executeForceLogout();
 }
 
 // Modal Logic
 const aboutAgentBtn = document.getElementById('about-agent-btn');
 const agentModal = document.getElementById('agent-modal');
-const modalBackdrop = document.getElementById('modal-backdrop');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const modalContent = document.getElementById('modal-content');
 
@@ -114,12 +140,8 @@ const modalContent = document.getElementById('modal-content');
  * Opens the 'About the Agent' modal with smooth transition animation.
  */
 function openModal() {
-    agentModal.classList.remove('hidden');
-    setTimeout(() => {
-        agentModal.classList.remove('opacity-0');
-        modalContent.classList.remove('scale-95');
-        modalContent.classList.add('scale-100');
-    }, 10);
+    agentModal.classList.add('modal-active');
+    modalContent.classList.add('modal-content-active');
     document.body.style.overflow = 'hidden';
 }
 
@@ -127,24 +149,20 @@ function openModal() {
  * Closes the 'About the Agent' modal and restores standard body scrolling.
  */
 function closeModal() {
-    agentModal.classList.add('opacity-0');
-    modalContent.classList.remove('scale-100');
-    modalContent.classList.add('scale-95');
-
-    setTimeout(() => {
-        agentModal.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-    }, 300);
+    agentModal.classList.remove('modal-active');
+    modalContent.classList.remove('modal-content-active');
+    document.body.style.overflow = 'auto';
 }
 
 if (aboutAgentBtn) aboutAgentBtn.addEventListener('click', openModal);
 if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-if (modalBackdrop) modalBackdrop.addEventListener('click', closeModal);
+if (agentModal) agentModal.addEventListener('click', (e) => {
+    if (e.target === agentModal) closeModal();
+});
 
 // Realtime listener para sa Student Dashboard (Mag-a-auto close pag sinara ni admin)
 if (window.supabaseClient) {
-    window.supabaseClient
-        .channel('realtime-dashboard-lock')
+    registerChannel('realtime-dashboard-lock', (ch) => ch
         .on(
             'postgres_changes',
             {
@@ -160,5 +178,5 @@ if (window.supabaseClient) {
                 }
             }
         )
-        .subscribe();
+        .subscribe());
 }

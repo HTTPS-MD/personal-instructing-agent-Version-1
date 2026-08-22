@@ -4,71 +4,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 🚨 STRICT PROTECTED ROUTE GUARD: Kicks out unauthenticated users immediately -->
+    <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
+         Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
+         tumutugma sa totoong Supabase Auth session. Nakatago ang body
+         (opacity-0) hangga't hindi pa kumpirmado ang session. -->
     <script>
         (function () {
-            const userEmail = localStorage.getItem('pia_user_email');
-            if (!userEmail) {
-                // Kung walang naka-login, itapon agad sa Sign In page nang walang UI flash
-                window.location.replace('../../assets/html/sign-in.html');
-            }
+            var hasToken = false;
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { hasToken = true; break; }
+                }
+            } catch (e) { /* storage blocked -- hayaan ang async guard ang bahala */ }
+            if (!hasToken) window.location.replace('../../index.html');
         })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../css/student.css">
+    <link rel="stylesheet" href="../../styles/tokens.css">
+    <link rel="stylesheet" href="../../styles/base.css">
+    <link rel="stylesheet" href="../../styles/components.css">
+    <link rel="stylesheet" href="../../styles/pages/student.css">
     <title>OCEAN Test - PIA System</title>
 </head>
 
-<body class="overflow-x-hidden">
+<body class="opacity-0">
 
-    <nav class="fixed top-0 left-0 z-50 w-full solid-nav">
-        <div class="flex items-center justify-between max-w-7xl mx-auto px-6 py-4">
-            <div class="flex-1">
-                <!-- Broken Logo link fixed -->
-                <a href="../../index.html"><img src="../../assets/images/logo.png" alt="PIA Logo"
-                        class="h-10 sm:h-11"></a>
-            </div>
-            <div class="flex items-center gap-4">
-                <span class="hidden md:inline uppercase tracking-wider text-xs">OCEAN Personality Assessment</span>
-                <!-- Consistent Home Button -->
-                <a href="../../index.html"
-                    class="uppercase tracking-wider text-xs flex items-center gap-2 px-4 py-2 rounded-lg btn-secondary">
-                    <i data-lucide="home" class="w-4 h-4"></i> Home
+    <nav class="site-nav">
+        <div class="site-nav-inner">
+            <a href="../../index.html" class="site-nav-logo"><img src="../../assets/images/logo.png"
+                    alt="PIA Logo"></a>
+            <div class="flex-row gap-md">
+                <span class="site-nav-label hide-mobile">OCEAN Personality Assessment</span>
+                <a href="../../index.html" class="btn btn-secondary btn-sm">
+                    <i data-lucide="home" class="icon-sm"></i> Home
                 </a>
             </div>
         </div>
     </nav>
 
     <div id="gatekeeper-screen" class="gatekeeper-screen">
-        <p class="uppercase tracking-widest text-xs pulse-text">Checking access permissions...</p>
+        <p class="eyebrow pulse-text">Checking access permissions...</p>
     </div>
 
-    <main id="test-container" class="max-w-3xl mx-auto px-6 pt-32 pb-20 hidden">
-        <div class="flex justify-between items-center mb-8">
-            <h1 id="question-counter" class="text-3xl tracking-wider uppercase">Question 1 of 50</h1>
-            <span id="progress-lbl" class="tracking-widest text-xs">0% Completed</span>
-        </div>
+    <main id="test-container" class="content-container ocean-test-main hidden">
+        <div class="ocean-test-layout">
 
-        <div class="solid-card p-8 md:p-12 text-center">
-            <p id="question-text" class="text-xl md:text-2xl mb-12">Loading question...</p>
+            <!-- LEFT: the question -->
+            <div class="ocean-question-col">
+                <div class="flex-between ocean-question-header">
+                    <h1 id="question-counter" class="ocean-question-count">Question 1 of 50</h1>
+                    <span id="progress-lbl" class="ocean-progress-label">0% Completed</span>
+                </div>
 
-            <div class="flex flex-col gap-4">
-                <button onclick="handleAnswer(1)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">1.
-                    Disagree</button>
-                <button onclick="handleAnswer(2)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">2.
-                    Slightly disagree</button>
-                <button onclick="handleAnswer(3)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">3.
-                    Neutral</button>
-                <button onclick="handleAnswer(4)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">4.
-                    Slightly agree</button>
-                <button onclick="handleAnswer(5)" class="btn-secondary py-4 rounded-xl w-full text-left px-6">5.
-                    Agree</button>
+                <div class="solid-card card-padded-lg ocean-question-card">
+                    <p id="question-text" class="ocean-question-text">Loading question...</p>
+
+                    <div class="ocean-answer-list" id="ocean-answer-list">
+                        <button type="button" data-score="1" class="ocean-answer-btn">1. Disagree</button>
+                        <button type="button" data-score="2" class="ocean-answer-btn">2. Slightly disagree</button>
+                        <button type="button" data-score="3" class="ocean-answer-btn">3. Neutral</button>
+                        <button type="button" data-score="4" class="ocean-answer-btn">4. Slightly agree</button>
+                        <button type="button" data-score="5" class="ocean-answer-btn">5. Agree</button>
+                    </div>
+                </div>
+
+                <div class="ocean-nav-row">
+                    <button type="button" id="btn-prev" class="btn-secondary">
+                        <i data-lucide="chevron-left" class="icon-sm"></i> Previous
+                    </button>
+                    <span id="answered-tally" class="ocean-tally">0 of 50 answered</span>
+                    <button type="button" id="btn-next" class="btn-secondary">
+                        Next <i data-lucide="chevron-right" class="icon-sm"></i>
+                    </button>
+                </div>
             </div>
+
+            <!-- RIGHT: question navigator -->
+            <aside class="ocean-nav-panel solid-card card-padded">
+                <div class="qnav-head">
+                    <h2 class="qnav-title">Question Navigator</h2>
+                    <span id="qnav-count" class="qnav-count">0/50</span>
+                </div>
+
+                <div id="question-grid" class="qgrid" role="group" aria-label="Jump to question"></div>
+
+                <div class="qnav-legend">
+                    <span class="qnav-legend-item"><i class="qnav-dot qnav-dot-answered"></i> Answered</span>
+                    <span class="qnav-legend-item"><i class="qnav-dot qnav-dot-current"></i> Current</span>
+                    <span class="qnav-legend-item"><i class="qnav-dot qnav-dot-empty"></i> Unanswered</span>
+                </div>
+
+                <button type="button" id="btn-submit-ocean" class="btn-primary btn-block" disabled>
+                    Submit Assessment
+                </button>
+                <p id="submit-hint" class="qnav-hint">Answer all 50 questions to submit.</p>
+            </aside>
+
         </div>
     </main>
+
+    <!-- QUIT CONFIRMATION -- replaces the native confirm() box -->
+    <div id="quit-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-modal="true"
+         aria-labelledby="quit-modal-title">
+        <div class="solid-card card-padded modal-content" id="quit-modal-content">
+            <div class="quit-modal-icon"><i data-lucide="log-out" class="icon-md"></i></div>
+
+            <h3 id="quit-modal-title" class="quit-modal-title">Are you sure you want to quit?</h3>
+            <p class="quit-modal-desc">You can come back here anytime&mdash;your progress is saved.</p>
+
+            <div class="quit-modal-progress">
+                <div class="quit-progress-head">
+                    <span class="quit-progress-label">Your progress</span>
+                    <span id="quit-progress-count" class="quit-progress-count">0 of 50</span>
+                </div>
+                <div class="quit-progress-track">
+                    <div id="quit-progress-fill" class="quit-progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="quit-modal-actions">
+                <button type="button" id="quit-modal-stay" class="btn-primary btn-block">Continue the test</button>
+                <button type="button" id="quit-modal-leave" class="btn-secondary btn-block">Quit for now</button>
+            </div>
+        </div>
+    </div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/ocean-test.js"></script>

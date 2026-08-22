@@ -1,12 +1,28 @@
 // ==========================================
+<<<<<<< HEAD
 // 1. PAGE IDENTIFIERS & MAGIC LINK HANDLER 
+=======
+// ACCOUNT ACTIVATION / PASSWORD SETUP
+// (sign-up.html lang ang gumagamit nito -- ito ang landing page ng
+//  "Send Activation Email" at "Reset Password" magic-link mula sa admin.
+//  Ang normal na sign-in + forgot-password (OTP) flow ay nasa index.js na
+//  modal -- hindi na dinuplicate dito.)
+>>>>>>> dev
 // ==========================================
-const isSignUpPage = document.getElementById('signup-form') !== null;
-const isResetPage = document.getElementById('reset-form') !== null;
-const loginForm = document.getElementById('login-form');
 
-// Auto-detect Magic Link Token from Email
+const setupForm = document.getElementById('setup-password-form');
+const setupStatus = document.getElementById('setup-status-box');
+const setupSubmitBtn = document.getElementById('setup-submit-btn');
+
+function showSetupStatus(message, type) {
+    if (!setupStatus) return;
+    setupStatus.textContent = message;
+    setupStatus.classList.remove('hidden', 'auth-status-error', 'auth-status-success');
+    setupStatus.classList.add(type === 'error' ? 'auth-status-error' : 'auth-status-success');
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+<<<<<<< HEAD
     if ((isSignUpPage || isResetPage) && window.supabaseClient) {
         const hash = window.location.hash;
 
@@ -53,9 +69,38 @@ window.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         }
+=======
+    if (!window.supabaseClient) {
+        showSetupStatus("Connection error. Please refresh the page.", "error");
+        return;
+>>>>>>> dev
     }
+
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    const user = session?.user;
+
+    if (!user) {
+        showSetupStatus("This link is invalid or has expired. Please request a new one.", "error");
+        if (setupForm) setupForm.classList.add('hidden');
+        return;
+    }
+
+    // Dynamic greeting gamit ang full_name mula sa profiles table
+    const { data: profile } = await window.supabaseClient
+        .from('profiles')
+        .select('full_name')
+        .eq('email', user.email)
+        .maybeSingle();
+
+    const fullName = profile?.full_name || 'there';
+    const greetingEl = document.getElementById('setup-greeting');
+    if (greetingEl) greetingEl.textContent = `${getTimeGreeting()}, ${fullName}!`;
+
+    const emailEl = document.getElementById('setup-email');
+    if (emailEl) emailEl.textContent = user.email;
 });
 
+<<<<<<< HEAD
 // ==========================================
 // 2. CAROUSEL LOGIC
 // ==========================================
@@ -223,11 +268,25 @@ if (loginForm) {
     const loginEmailInput = document.getElementById('email');
 
     loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = 'Signing in...';
-        if (statusMessage) statusMessage.classList.add('hidden');
+=======
+// Show/Hide password toggle
+const showPasswordCheckbox = document.getElementById('setup-show-password');
+if (showPasswordCheckbox) {
+    showPasswordCheckbox.addEventListener('change', function () {
+        const type = this.checked ? 'text' : 'password';
+        const p1 = document.getElementById('setup-password');
+        const p2 = document.getElementById('setup-confirm-password');
+        if (p1) p1.type = type;
+        if (p2) p2.type = type;
+    });
+}
 
+if (setupForm) {
+    setupForm.addEventListener('submit', async (e) => {
+>>>>>>> dev
+        e.preventDefault();
+
+<<<<<<< HEAD
         const passwordInput = document.getElementById('password');
         const email = loginEmailInput ? loginEmailInput.value.trim() : '';
 
@@ -242,14 +301,15 @@ if (loginForm) {
             email: email,
             password: passwordInput ? passwordInput.value : ''
         });
+=======
+        const password = document.getElementById('setup-password').value;
+        const confirmPassword = document.getElementById('setup-confirm-password').value;
+>>>>>>> dev
 
-        if (authError) {
-            showStatus(authError.message, 'error');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Sign In';
-            return;
-        }
+        if (password.length < 6) return showSetupStatus("Password must be at least 6 characters.", "error");
+        if (password !== confirmPassword) return showSetupStatus("Passwords do not match.", "error");
 
+<<<<<<< HEAD
         localStorage.setItem('pia_user_email', email);
 
         const { data: profile, error: profileError } = await window.supabaseClient
@@ -448,15 +508,21 @@ if (finalizeBtn) {
         finalizeBtn.disabled = true;
         finalizeBtn.innerHTML = isSignUpPage ? 'Activating...' : 'Updating...';
 
+=======
+        setupSubmitBtn.disabled = true;
+        setupSubmitBtn.innerHTML = 'Saving...';
+
+>>>>>>> dev
         const { error: updateError } = await window.supabaseClient.auth.updateUser({ password });
 
         if (updateError) {
-            showStatus(updateError.message, 'error');
-            finalizeBtn.disabled = false;
-            finalizeBtn.innerHTML = isSignUpPage ? 'Activate Account' : 'Update Password';
+            showSetupStatus(updateError.message, "error");
+            setupSubmitBtn.disabled = false;
+            setupSubmitBtn.innerHTML = 'Activate Account';
             return;
         }
 
+<<<<<<< HEAD
         // Kung sign-up page (Activation via Magic Link), i-set na rin natin sa active status sa DB
         if (isSignUpPage) {
             const { data: authData } = await window.supabaseClient.auth.getUser();
@@ -472,5 +538,18 @@ if (finalizeBtn) {
         const successMsg = isSignUpPage ? "Account activated successfully! Redirecting to sign in..." : "Password updated successfully! Redirecting to sign in...";
         showStatus(successMsg, 'success');
         setTimeout(() => { window.location.replace('sign-in.html'); }, 2000);
+=======
+        const { data: { user } } = await window.supabaseClient.auth.getUser();
+        if (user) {
+            await window.supabaseClient.from('profiles').update({ status: 'active' }).eq('email', user.email);
+        }
+
+        // Palabas na sa session na ito (galing sa magic-link) para pumunta sila
+        // sa normal sign-in gamit ang bago nilang password.
+        await window.supabaseClient.auth.signOut();
+
+        showSetupStatus("Account activated! Redirecting to sign in...", "success");
+        setTimeout(() => { window.location.replace('../../index.html'); }, 2000);
+>>>>>>> dev
     });
 }

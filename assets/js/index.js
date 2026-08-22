@@ -11,8 +11,8 @@ function openAuthModal(view = 'signin') {
     const box = document.getElementById('auth-box');
     const closeBtn = document.getElementById('modal-close-btn');
 
-    modal.classList.remove('opacity-0', 'pointer-events-none');
-    box.classList.remove('scale-95');
+    modal.classList.add('modal-active');
+    box.classList.add('modal-content-active');
     document.body.style.overflow = 'hidden';
 
     if (closeBtn) closeBtn.classList.remove('hidden');
@@ -36,8 +36,8 @@ window.openChangePasswordModal = function () {
 function closeAuthModal() {
     const modal = document.getElementById('auth-modal');
     const box = document.getElementById('auth-box');
-    modal.classList.add('opacity-0', 'pointer-events-none');
-    box.classList.add('scale-95');
+    modal.classList.remove('modal-active');
+    box.classList.remove('modal-content-active');
     document.body.style.overflow = '';
 }
 
@@ -139,17 +139,7 @@ function validatePassword(inputId, label = 'Password') {
     return true;
 }
 
-function getDeviceSignature() {
-    const ua = navigator.userAgent;
-    let platform = "Unknown Device";
-    if (/android/i.test(ua)) platform = "Android Smartphone";
-    else if (/iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) platform = "iPadOS";
-    else if (/iPhone|iPod/.test(ua)) platform = "iOS";
-    else if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) platform = "macOS";
-    else if (/Windows/.test(ua)) platform = "Windows PC";
-
-    return `${Math.random().toString(36).substring(2, 9)} [${platform}]`;
-}
+// getDeviceSignature() ay nasa function.js na (shared helper)
 
 // ------------------------------------------------------------------
 // INIT: AUTH STATE & NAV LOGIC
@@ -173,10 +163,7 @@ async function initAuthState() {
     const email = localStorage.getItem('pia_user_email');
     const role = localStorage.getItem('pia_user_role') || 'student';
 
-    const hour = new Date().getHours();
-    let timeGreeting = "Good evening";
-    if (hour >= 0 && hour < 12) timeGreeting = "Good morning";
-    else if (hour >= 12 && hour < 18) timeGreeting = "Good afternoon";
+    const timeGreeting = getTimeGreeting();
 
     if (email) {
         const { data: profile } = await supabaseClient.from('profiles').select('full_name, group_type, is_ocean_done, selected_character').eq('email', email).maybeSingle();
@@ -185,19 +172,14 @@ async function initAuthState() {
         let firstName = fullName.split(' ')[0];
 
         // Desktop nav: hide Sign In, show user dropdown
-        if (loggedOutContainer) {
-            loggedOutContainer.classList.add('hidden');
-            loggedOutContainer.classList.remove('md:flex');
-        }
-        if (loggedInContainer) {
-            loggedInContainer.classList.add('hidden', 'md:flex');
-        }
+        if (loggedOutContainer) loggedOutContainer.classList.add('hidden');
+        if (loggedInContainer) loggedInContainer.classList.remove('hidden');
         if (navUserGreeting) navUserGreeting.textContent = `${timeGreeting}, ${firstName}!`;
         if (navUserEmail) navUserEmail.textContent = email;
 
         if (mobPrefix && mobName && mobAuthBtn) {
             mobPrefix.textContent = `${timeGreeting},`;
-            mobPrefix.classList.replace('uppercase', 'capitalize');
+            mobPrefix.style.textTransform = 'capitalize';
             mobName.textContent = fullName;
             mobName.style.fontSize = '1.1rem';
 
@@ -206,46 +188,26 @@ async function initAuthState() {
             if (mobAuthIcon) mobAuthIcon.setAttribute('data-lucide', 'log-out');
 
             mobAuthBtn.classList.replace('btn-primary', 'btn-secondary');
-            mobAuthBtn.classList.add('text-danger', 'border-danger-border', 'hover:bg-[var(--color-danger-bg)]');
+            mobAuthBtn.classList.add('mobile-auth-danger');
             mobAuthBtn.setAttribute('onclick', 'executeForceLogout()');
         }
 
         if (heroBtn && role !== 'admin' && role !== 'teacher') {
-            heroBtn.innerHTML = `<span>Start My Mission</span><i data-lucide="play" class="w-4 h-4 fill-current pointer-events-none"></i>`;
+            heroBtn.innerHTML = `<span>Start My Mission</span><i data-lucide="play" class="icon-sm"></i>`;
             heroBtn.removeAttribute('onclick');
             heroBtn.addEventListener('click', async () => {
-                const groupType = profile?.group_type ? profile.group_type.trim().toLowerCase() : '';
-                const isNonAssigned = (groupType === 'non-assigned' || groupType === 'non_assigned');
-
-                if (!profile?.is_ocean_done) {
-                    const { data: settingData } = await supabaseClient.from('settings').select('value').eq('key', 'stage_ocean').maybeSingle();
-                    const isOceanOpen = settingData ? (settingData.value === true || settingData.value === 'true') : false;
-                    window.location.replace(isOceanOpen ? '/student/html/ocean-test.html' : '/student/html/waiting-room.html');
-                } else if (isNonAssigned && !profile?.selected_character) {
-                    const { data: charSetting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_char').maybeSingle();
-                    const isCharOpen = charSetting ? (charSetting.value === true || charSetting.value === 'true') : false;
-                    window.location.replace(isCharOpen ? '/student/html/character-selection.html' : '/student/html/waiting-room.html');
-                } else {
-                    const { data: dashSetting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_dash').maybeSingle();
-                    const isDashOpen = dashSetting ? (dashSetting.value === true || dashSetting.value === 'true') : false;
-                    window.location.replace(isDashOpen ? '/student/html/student-dashboard.html' : '/student/html/waiting-room.html');
-                }
+                window.location.replace(await resolveStudentRedirect(profile || {}));
             });
         }
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
     } else {
         // Desktop nav: show Sign In, hide user dropdown
-        if (loggedOutContainer) {
-            loggedOutContainer.classList.add('hidden', 'md:flex');
-        }
-        if (loggedInContainer) {
-            loggedInContainer.classList.add('hidden');
-            loggedInContainer.classList.remove('md:flex');
-        }
+        if (loggedOutContainer) loggedOutContainer.classList.remove('hidden');
+        if (loggedInContainer) loggedInContainer.classList.add('hidden');
 
         if (heroBtn) {
-            heroBtn.innerHTML = `<span>Start Adventure</span><i data-lucide="play" class="w-4 h-4 fill-current pointer-events-none"></i>`;
+            heroBtn.innerHTML = `<span>Start Adventure</span><i data-lucide="play" class="icon-sm"></i>`;
             heroBtn.setAttribute('onclick', "openAuthModal('signin')");
         }
         if (mobChangePassBtn) mobChangePassBtn.classList.add('hidden');
@@ -254,7 +216,7 @@ async function initAuthState() {
 
         if (mobAuthBtn) {
             mobAuthBtn.classList.replace('btn-secondary', 'btn-primary');
-            mobAuthBtn.classList.remove('text-danger', 'border-danger-border', 'hover:bg-[var(--color-danger-bg)]');
+            mobAuthBtn.classList.remove('mobile-auth-danger');
             mobAuthBtn.setAttribute('onclick', "openAuthModal('signin'); document.getElementById('dynamic-close-btn').click();");
         }
     }
@@ -307,45 +269,19 @@ if (modalLoginForm) {
         localStorage.setItem('pia_user_role', role);
 
         if (role !== 'admin') {
-            const maxAllowedDevices = profile.max_devices ?? 1;
-            let currentDeviceId = localStorage.getItem('pia_device_id') || getDeviceSignature();
-            localStorage.setItem('pia_device_id', currentDeviceId);
-
-            let activeDevices = profile.active_devices || [];
-            if (!activeDevices.includes(currentDeviceId)) {
-                if (activeDevices.length >= maxAllowedDevices) {
-                    await supabaseClient.auth.signOut();
-                    showModalStatus(`Device limit reached. Log out from other devices first.`, 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = 'SIGN IN';
-                    return;
-                } else {
-                    activeDevices.push(currentDeviceId);
-                    await supabaseClient.from('profiles').update({ active_devices: activeDevices }).eq('email', authData.user.email);
-                }
+            const deviceCheck = await enforceDeviceLimit(authData.user.email, profile);
+            if (!deviceCheck.allowed) {
+                await supabaseClient.auth.signOut();
+                showModalStatus(deviceCheck.reason, 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'SIGN IN';
+                return;
             }
         }
 
         if (role === 'admin') window.location.replace('/admin/html/admin-dashboard.html');
         else if (role === 'teacher') window.location.replace('/teacher/html/teacher-dashboard.html');
-        else {
-            const groupType = profile.group_type ? profile.group_type.trim().toLowerCase() : '';
-            const isNonAssigned = (groupType === 'non-assigned' || groupType === 'non_assigned');
-
-            if (!profile.is_ocean_done) {
-                const { data: settingData } = await supabaseClient.from('settings').select('value').eq('key', 'stage_ocean').maybeSingle();
-                const isOceanOpen = settingData ? (settingData.value === true || settingData.value === 'true') : false;
-                window.location.replace(isOceanOpen ? '/student/html/ocean-test.html' : '/student/html/waiting-room.html');
-            } else if (isNonAssigned && !profile.selected_character) {
-                const { data: charSetting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_char').maybeSingle();
-                const isCharOpen = charSetting ? (charSetting.value === true || charSetting.value === 'true') : false;
-                window.location.replace(isCharOpen ? '/student/html/character-selection.html' : '/student/html/waiting-room.html');
-            } else {
-                const { data: dashSetting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_dash').maybeSingle();
-                const isDashOpen = dashSetting ? (dashSetting.value === true || dashSetting.value === 'true') : false;
-                window.location.replace(isDashOpen ? '/student/html/student-dashboard.html' : '/student/html/waiting-room.html');
-            }
-        }
+        else window.location.replace(await resolveStudentRedirect(profile));
     });
 }
 
@@ -354,22 +290,11 @@ const verifyOtpForm = document.getElementById('modal-verify-otp-form');
 const otpBoxes = document.querySelectorAll('#modal-otp-boxes input');
 
 function startModalTimer() {
-    const resendBtn = document.getElementById('modal-resend-btn');
-    const timerSpan = document.getElementById('modal-timer');
-    let timeLeft = 60;
-    resendBtn.disabled = true;
-    timerSpan.textContent = timeLeft;
-
     clearInterval(countdownInterval);
-    countdownInterval = setInterval(() => {
-        timeLeft--;
-        timerSpan.textContent = timeLeft;
-        if (timeLeft <= 0) {
-            clearInterval(countdownInterval);
-            resendBtn.disabled = false;
-            resendBtn.innerHTML = "Resend Code";
-        }
-    }, 1000);
+    countdownInterval = startResendTimer(
+        document.getElementById('modal-resend-btn'),
+        document.getElementById('modal-timer')
+    );
 }
 
 if (forgotEmailForm) {
@@ -423,34 +348,7 @@ document.getElementById('modal-resend-btn')?.addEventListener('click', async (e)
     startModalTimer();
 });
 
-if (otpBoxes.length > 0) {
-    otpBoxes.forEach((input, index) => {
-        input.addEventListener('input', (e) => {
-            let val = e.target.value.replace(/\D/g, '');
-            if (val.length > 1) {
-                const chars = val.split('');
-                otpBoxes.forEach((box, i) => box.value = chars[i] || '');
-                const lastIdx = Math.min(chars.length, otpBoxes.length) - 1;
-                otpBoxes[lastIdx].focus();
-            } else {
-                e.target.value = val;
-                if (val && index < otpBoxes.length - 1) otpBoxes[index + 1].focus();
-            }
-        });
-
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !input.value && index > 0) otpBoxes[index - 1].focus();
-        });
-
-        input.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const chars = e.clipboardData.getData('text').replace(/\D/g, '').split('');
-            otpBoxes.forEach((box, i) => box.value = chars[i] || '');
-            const lastIdx = Math.min(chars.length, otpBoxes.length) - 1;
-            if (lastIdx >= 0) otpBoxes[lastIdx].focus();
-        });
-    });
-}
+wireOtpInputs(otpBoxes);
 
 if (verifyOtpForm) {
     verifyOtpForm.addEventListener('submit', async (e) => {
@@ -580,8 +478,8 @@ function selectTutor(index) {
 if (gridEl) {
     tutors.forEach((t, i) => {
         gridEl.innerHTML += `
-            <button onclick="selectTutor(${i})" class="w-14 h-14 md:w-16 md:h-16 rounded-xl md:rounded-2xl overflow-hidden border-2 border-custom hover-border-accent transition-all hover:scale-105 active:scale-95 focus:outline-none shrink-0">
-                 <img src="${t.img}" class="w-full h-full object-cover">
+            <button onclick="selectTutor(${i})" class="tutor-thumb">
+                 <img src="${t.img}" alt="${t.name}">
             </button>`;
     });
     selectTutor(0);
@@ -589,6 +487,7 @@ if (gridEl) {
 
 function toggleFaq(btn) {
     const faqItem = btn.closest('.faq-item');
+    if (!faqItem) return;
     document.querySelectorAll('.faq-item').forEach(item => {
         if (item !== faqItem) item.classList.remove('faq-active');
     });
@@ -620,25 +519,25 @@ function openModal(id) {
     document.getElementById('modal-title').innerText = data.title;
     document.getElementById('modal-desc').innerText = data.desc;
     document.getElementById('modal-list-container').innerHTML = data.items.map(item => `
-        <div class="flex items-start gap-4">
-            <div class="bg-muted p-3 rounded-xl border border-custom">
-                <img src="${item.icon}" class="w-10 h-10 object-cover">
+        <div class="framework-item">
+            <div class="framework-item-icon-wrap">
+                <img src="${item.icon}" alt="">
             </div>
             <div>
-                <h4 class="font-semibold">${item.title}</h4>
-                <p class="text-secondary text-sm font-light">${item.desc}</p>
+                <h4 class="framework-item-title">${item.title}</h4>
+                <p class="text-secondary framework-item-desc">${item.desc}</p>
             </div>
         </div>
     `).join('');
 
-    document.getElementById('modal').classList.remove('opacity-0', 'pointer-events-none');
-    document.getElementById('modal-content').classList.remove('scale-95');
+    document.getElementById('modal').classList.add('modal-active');
+    document.getElementById('modal-content').classList.add('modal-content-active');
     document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-    document.getElementById('modal').classList.add('opacity-0', 'pointer-events-none');
-    document.getElementById('modal-content').classList.add('scale-95');
+    document.getElementById('modal').classList.remove('modal-active');
+    document.getElementById('modal-content').classList.remove('modal-content-active');
     document.body.style.overflow = '';
 }
 
@@ -727,16 +626,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (mobileToggle && mobileMenu) {
         mobileToggle.addEventListener('click', () => {
-            mobileMenu.classList.remove('translate-x-full', 'pointer-events-none');
+            mobileMenu.classList.add('mobile-menu-open');
             if (menuBackdrop) menuBackdrop.classList.remove('hidden');
-            if (closeBtn) closeBtn.classList.remove('opacity-0');
+            if (closeBtn) closeBtn.classList.add('mobile-menu-close-visible');
             document.body.style.overflow = 'hidden';
         });
 
         const closeMenu = () => {
-            mobileMenu.classList.add('translate-x-full', 'pointer-events-none');
+            mobileMenu.classList.remove('mobile-menu-open');
             if (menuBackdrop) menuBackdrop.classList.add('hidden');
-            if (closeBtn) closeBtn.classList.add('opacity-0');
+            if (closeBtn) closeBtn.classList.remove('mobile-menu-close-visible');
             document.body.style.overflow = '';
         };
 

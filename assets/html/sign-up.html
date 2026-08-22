@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="../../styles/tokens.css">
+    <link rel="stylesheet" href="../../styles/base.css">
+    <link rel="stylesheet" href="../../styles/components.css">
+    <link rel="stylesheet" href="../../styles/pages/auth.css">
+    <title>Activate Account - PIA System</title>
+</head>
+
+<body class="auth-page-body">
+
+    <div class="solid-card card-padded-lg auth-card">
+        <div class="auth-card-header">
+            <img src="../images/logo.png" alt="PIA Logo" class="auth-logo">
+            <h1 id="setup-greeting" class="auth-title">Set up your account</h1>
+            <p id="setup-email" class="text-secondary font-mono"></p>
+        </div>
+
+        <div id="setup-status-box" class="status-box hidden" role="status"></div>
+
+        <form id="setup-password-form" class="auth-form">
+            <div class="form-group">
+                <label class="form-label" for="setup-password">New Password</label>
+                <input type="password" id="setup-password" class="form-input" placeholder="At least 6 characters"
+                    autocomplete="new-password" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="setup-confirm-password">Confirm Password</label>
+                <input type="password" id="setup-confirm-password" class="form-input" placeholder="Re-type password"
+                    autocomplete="new-password" required>
+            </div>
+            <div class="form-checkbox-row">
+                <input type="checkbox" id="setup-show-password" class="form-checkbox">
+                <label for="setup-show-password" class="form-checkbox-label">Show password</label>
+            </div>
+            <button type="submit" id="setup-submit-btn" class="btn btn-primary btn-lg btn-block">Activate
+                Account</button>
+        </form>
+
+        <p class="auth-bottom-text">
+            <a href="../../index.html" class="auth-link">Back to home</a>
+        </p>
+    </div>
+
+    <script src="../js/function.js"></script>
+    <script src="../js/authentication.js"></script>
+</body>
+
+</html>

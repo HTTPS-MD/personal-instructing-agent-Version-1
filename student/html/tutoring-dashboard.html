@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
+         Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
+         tumutugma sa totoong Supabase Auth session. Nakatago ang body
+         (opacity-0) hangga't hindi pa kumpirmado ang session. -->
+    <script>
+        (function () {
+            var hasToken = false;
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { hasToken = true; break; }
+                }
+            } catch (e) { /* storage blocked -- hayaan ang async guard ang bahala */ }
+            if (!hasToken) window.location.replace('../../index.html');
+        })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="../../styles/tokens.css">
+    <link rel="stylesheet" href="../../styles/base.css">
+    <link rel="stylesheet" href="../../styles/components.css">
+    <link rel="stylesheet" href="../../styles/pages/student.css">
+    <link rel="stylesheet" href="../../styles/pages/tutoring.css">
+    <title>Tutoring Session - PIA System</title>
+</head>
+
+<body class="opacity-0">
+
+    <nav class="site-nav">
+        <div class="site-nav-inner">
+            <a href="../../index.html" class="site-nav-logo"><img src="../../assets/images/logo.png"
+                    alt="PIA Logo"></a>
+            <div class="flex-row gap-md">
+                <span class="site-nav-label hide-mobile">Math Tutoring Session</span>
+                <button id="back-to-dashboard-btn" class="btn-secondary btn-sm">
+                    <i data-lucide="log-out" class="icon-sm"></i> Exit
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content-container tutoring-main">
+
+        <!-- ============ GAMIFICATION BAR (top) ============ -->
+        <div class="solid-card card-padded tutoring-progress-bar">
+            <div class="tutoring-progress-info">
+                <div class="flex-between">
+                    <span class="protocol-label">Session Progress</span>
+                    <span id="progress-label" class="tutoring-progress-count">0 / 10 problems</span>
+                </div>
+                <div class="progress-track">
+                    <div id="progress-bar-fill" class="progress-track-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+            <div class="tutoring-progress-stats">
+                <div class="stat-chip">
+                    <span class="stat-chip-label">Level</span>
+                    <span id="level-badge" class="stat-chip-value">Level 1</span>
+                </div>
+                <div class="stat-chip">
+                    <span class="stat-chip-label">Streak</span>
+                    <span id="streak-count" class="stat-chip-value">0</span>
+                </div>
+                <div id="medals-container" class="flex-row gap-xs"></div>
+            </div>
+        </div>
+
+        <!-- ============ PROBLEM SCREEN ============ -->
+        <div id="problem-screen" class="tutoring-layout">
+
+            <!-- Kaliwa: Agent Avatar + Speech Bubble (6 expression states) -->
+            <div class="solid-card card-padded tutoring-agent-panel">
+                <div id="agent-avatar-wrap" class="agent-avatar-wrap agent-trait-neutral">
+                    <img id="agent-avatar-img" src="../../assets/images/char-1.png" alt="Tutor Agent"
+                        class="agent-avatar-img">
+                    <span id="agent-expression-badge" class="agent-expression-badge">
+                        <i data-lucide="smile" class="icon-sm"></i>
+                    </span>
+                </div>
+                <div id="agent-speech-bubble" class="agent-speech-bubble">
+                    Kaya mo 'yan! Isulat ang value ni x.
+                </div>
+            </div>
+
+            <!-- Gitna: Active Math Problem -->
+            <div class="solid-card card-padded-lg tutoring-problem-panel">
+                <span class="protocol-label">Algebraic Expressions</span>
+                <p id="problem-instruction" class="tutoring-instruction">Solve for x.</p>
+                <p id="problem-expression" class="tutoring-expression">Loading...</p>
+
+                <div class="tutoring-input-row">
+                    <input id="answer-input" type="text" inputmode="text" autocomplete="off" placeholder="hal. x = 5"
+                        class="form-input tutoring-answer-input">
+                    <button id="submit-answer-btn" class="btn-primary btn-lg">Submit</button>
+                </div>
+
+                <div id="feedback-panel" class="feedback-panel hidden"></div>
+
+                <div class="tutoring-hint-row">
+                    <button id="show-hint-btn" class="btn-secondary btn-sm">Show Hint</button>
+                </div>
+                <div id="hint-panel" class="hint-panel hidden"></div>
+            </div>
+        </div>
+
+        <!-- ============ SESSION SUMMARY SCREEN ============ -->
+        <div id="summary-screen" class="solid-card card-padded-lg tutoring-summary hidden">
+            <span class="tutoring-summary-emoji">🎉</span>
+            <h2 class="tutoring-summary-title">Session Complete!</h2>
+            <div class="tutoring-summary-stats">
+                <div class="dashboard-award-card">
+                    <span class="tutoring-summary-value" id="summary-accuracy">0%</span>
+                    <span class="tutoring-summary-label">Accuracy</span>
+                </div>
+                <div class="dashboard-award-card">
+                    <span class="tutoring-summary-value" id="summary-level">Level 1</span>
+                    <span class="tutoring-summary-label">Highest Level</span>
+                </div>
+                <div class="dashboard-award-card">
+                    <span class="tutoring-summary-value" id="summary-correct">0 / 0</span>
+                    <span class="tutoring-summary-label">Correct</span>
+                </div>
+            </div>
+            <p class="tutoring-summary-medals">Medals earned: <span id="summary-medals" class="text-primary">None yet</span></p>
+            <button onclick="backToDashboard()" class="btn-primary btn-lg">Back to Dashboard</button>
+        </div>
+    </main>
+
+    <script src="../../assets/js/function.js"></script>
+    <script src="../js/math-problems.js"></script>
+    <script src="../js/tutoring-dashboard.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+
+</html>
