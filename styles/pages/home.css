@@ -155,7 +155,7 @@ body {
 
 .btn-game-primary {
     background-color: var(--text-primary);
-    color: #05050a;
+    color: var(--bg-void);
     font-weight: 600;
     letter-spacing: 0.05em;
     border: 1px solid var(--text-primary);

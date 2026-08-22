@@ -1,47 +1,71 @@
 /* ==========================================================================
-   PIA DESIGN TOKENS
-   Negative Polarity (Dark Mode) + Green Accents -- ang layunin ng dark+green
-   palette ay bawasan ang "math anxiety": mababang glare, walang mapupulang
-   babala maliban sa totoong error states, at green bilang "positive/progress"
-   signal sa buong system (tama = green, level up = green glow).
+   PIA DESIGN TOKENS -- "Cinematic Aurora"
+   --------------------------------------------------------------------------
+   Two layers, deliberately separated:
+
+   1. ATMOSPHERE (violet / cyan / indigo) -- light, depth, mood. Never carries
+      meaning. This is the cinematic layer.
+   2. SEMANTICS (emerald / amber / red) -- meaning only. Emerald stays the
+      "correct / progress / safe" signal it has always been in this system;
+      the original palette note is still true, and re-colouring feedback would
+      undo it: low glare, no red except real errors, green as the reward
+      signal that keeps math anxiety down for Grade 7 learners.
+
+   So the room is lit in violet and cyan, but the answer still glows green.
    ========================================================================== */
 
 :root {
-    /* --- Surface & Text --- */
-    --bg-main: #05050a;
+    /* --- Void & surfaces ------------------------------------------------ */
+    --bg-void: #040406;          /* true OLED black -- the canvas */
+    --bg-main: #040406;
     --bg-card: #0d0d15;
     --bg-hover: #161622;
     --bg-elevated: #14141f;
-    --text-primary: #f5f7fa;
-    --text-secondary: #99a3b3;
-    --text-faint: #5b6472;
 
-    /* --- Accent (Green) --- */
+    /* --- Aurora atmosphere ---------------------------------------------- */
+    --aurora-violet: #3b0764;    /* midnight violet -- upper-left whisper  */
+    --aurora-cyan: #0e7490;      /* deep cyan       -- lower-right whisper */
+    --aurora-indigo: #6366f1;    /* ambient light source for glow physics  */
+    --aurora-veil-1: rgba(59, 7, 100, 0.42);
+    --aurora-veil-2: rgba(14, 116, 144, 0.30);
+    --aurora-veil-3: rgba(99, 102, 241, 0.14);
+
+    /* --- Text ------------------------------------------------------------ */
+    --text-primary: #f5f7fa;
+    --text-secondary: #a3adbd;
+    --text-faint: #5f6878;
+
+    /* --- Semantic accent (meaning, not mood) ----------------------------- */
     --accent-primary: #10b981;
     --accent-hover: #34d399;
     --accent-soft-bg: rgba(16, 185, 129, 0.1);
     --accent-soft-border: rgba(16, 185, 129, 0.3);
 
-    --border-color: #1e1e2f;
+    --border-color: #1b1b2b;
     --border-accent: #10b981;
 
-    /* --- Glass surfaces (premium SaaS card treatment) --- */
-    --glass-bg: rgba(16, 18, 26, 0.6);
-    --glass-bg-elevated: rgba(20, 22, 32, 0.72);
+    /* --- Advanced glassmorphism ------------------------------------------ */
+    --glass-bg: rgba(18, 18, 24, 0.6);
+    --glass-bg-elevated: rgba(24, 24, 32, 0.72);
     --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-hover: rgba(16, 185, 129, 0.35);
-    --glass-highlight: rgba(255, 255, 255, 0.04);
-    --glass-blur: 20px;
-    --glass-blur-lg: 32px;
+    --glass-border-hover: rgba(139, 143, 255, 0.34);
+    --glass-highlight: rgba(255, 255, 255, 0.05);
+    --glass-blur: 24px;
+    --glass-blur-lg: 40px;
 
-    /* --- Elevation / glow shadows --- */
-    --shadow-elevated: 0 24px 60px -20px rgba(0, 0, 0, 0.65), 0 1px 0 0 rgba(255, 255, 255, 0.03) inset;
+    /* --- Lighting: diffused ambience, not neon outlines ------------------ */
+    --shadow-ambient: 0 10px 30px -10px rgba(99, 102, 241, 0.3);
+    --shadow-ambient-lg: 0 24px 60px -18px rgba(99, 102, 241, 0.35);
+    --shadow-depth: 0 24px 60px -20px rgba(0, 0, 0, 0.75), 0 1px 0 0 rgba(255, 255, 255, 0.04) inset;
+    --shadow-elevated: var(--shadow-depth);
+
+    /* Emerald glows stay for success/progress moments only. */
     --shadow-glow-xs: 0 0 0 1px rgba(16, 185, 129, 0.12);
     --shadow-glow-sm: 0 4px 24px -6px rgba(16, 185, 129, 0.18);
     --shadow-glow-md: 0 8px 40px -8px rgba(16, 185, 129, 0.28);
     --shadow-glow-lg: 0 0 48px -4px rgba(16, 185, 129, 0.4);
 
-    /* --- Status Colors --- */
+    /* --- Status ---------------------------------------------------------- */
     --color-success: #10b981;
     --color-success-bg: rgba(16, 185, 129, 0.1);
     --color-success-border: rgba(16, 185, 129, 0.3);
@@ -56,43 +80,56 @@
     --color-danger-bg-hover: rgba(239, 68, 68, 0.2);
     --color-danger-border: rgba(239, 68, 68, 0.3);
 
-    --color-info: #3b82f6;
-    --color-info-bg: rgba(59, 130, 246, 0.1);
-    --color-info-border: rgba(59, 130, 246, 0.3);
+    --color-info: #818cf8;
+    --color-info-bg: rgba(129, 140, 248, 0.1);
+    --color-info-border: rgba(129, 140, 248, 0.3);
 
     --color-neutral: #64748b;
     --color-smooth: #10b981;
 
-    /* --- Overlays --- */
-    --overlay-start: rgba(5, 5, 10, 0.85);
-    --overlay-end: rgba(5, 5, 10, 0.98);
-    --backdrop-bg: rgba(5, 5, 10, 0.9);
+    /* --- Overlays -------------------------------------------------------- */
+    --overlay-start: rgba(4, 4, 6, 0.85);
+    --overlay-end: rgba(4, 4, 6, 0.98);
+    --backdrop-bg: rgba(4, 4, 6, 0.88);
 
-    /* --- Scrollbars --- */
-    --scroll-track: #05050a;
+    /* --- Scrollbars ------------------------------------------------------ */
+    --scroll-track: #040406;
     --scroll-thumb: #1e1e2f;
-    --scroll-thumb-hover: #10b981;
+    --scroll-thumb-hover: #6366f1;
 
-    /* --- Motion & Shape --- */
+    /* --- Motion physics --------------------------------------------------
+       One easing curve across the whole system so every surface decelerates
+       the same way -- that shared rhythm is what reads as "polished". */
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --transition-speed: 0.25s;
-    --transition-spring: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
+    --transition-spring: 0.35s var(--ease-out-expo);
+    --transition-tactile: 0.28s var(--ease-out-expo);
+    --lift-hover: translateY(-4px) scale(1.01);
+    --lift-press: translateY(-1px) scale(0.995);
+
+    /* --- Shape ------------------------------------------------------------ */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
     --radius-xl: 1.75rem;
     --radius-2xl: 2.25rem;
-    --shadow-card: 0 4px 20px rgba(16, 185, 129, 0.1);
-    --shadow-soft: var(--shadow-elevated);
+    /* Organic asymmetry -- breaks the rigid-grid monotony on focal surfaces. */
+    --radius-organic: 1.9rem 1.1rem 1.9rem 1.1rem;
+    --radius-organic-alt: 1.1rem 1.9rem 1.1rem 1.9rem;
 
-    /* --- Typography ---
-       Plus Jakarta Sans (UI/body) + Sora (display headings) replace the old
-       gamified Rajdhani/Orbitron pairing for a premium SaaS/EdTech read.
-       JetBrains Mono stays for data, stats and technical labels. */
-    --font-primary: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
-    --font-secondary: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
+    --shadow-card: var(--shadow-ambient);
+    --shadow-soft: var(--shadow-depth);
+
+    /* --- Typography -------------------------------------------------------
+       Poppins for headers: geometric, confident, tightened tracking.
+       Quicksand for body/UI: rounded terminals read as warm and friendly,
+       which suits 12-13 year olds without becoming childish. */
+    --font-display: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    --font-primary: 'Quicksand', 'Segoe UI', system-ui, sans-serif;
+    --font-secondary: var(--font-display);
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-    /* --- Spacing scale (para sa mga bagong semantic component) --- */
+    /* --- Spacing ---------------------------------------------------------- */
     --space-1: 0.25rem;
     --space-2: 0.5rem;
     --space-3: 0.75rem;
@@ -103,7 +140,7 @@
     --space-10: 2.5rem;
     --space-12: 3rem;
 
-    /* --- Layout --- */
+    /* --- Layout ------------------------------------------------------------ */
     --page-max-width: 1280px;
     --content-max-width: 1024px;
 }
