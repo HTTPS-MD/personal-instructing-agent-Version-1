@@ -1,0 +1,512 @@
+/* ==========================================================================
+   TEACHER DASHBOARD
+   ========================================================================== */
+.dashboard-wrapper {
+    background-color: var(--bg-main);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.3s ease;
+}
+
+.dashboard-header {
+    border-bottom: 2px solid var(--border-color);
+    position: relative;
+    z-index: 20;
+}
+
+.teacher-logo {
+    height: 2.5rem;
+}
+
+.role-badge {
+    color: var(--accent-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-family: var(--font-mono);
+    padding: 0.3rem 0.65rem;
+}
+
+.nav-btn {
+    color: var(--accent-primary);
+    background-color: var(--bg-hover);
+    transition: background-color var(--transition-speed) ease;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.nav-btn:hover {
+    background-color: var(--bg-card);
+}
+
+.teacher-identity {
+    text-align: right;
+}
+
+.teacher-name {
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.teacher-section {
+    font-size: 0.625rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+
+.logout-btn {
+    color: var(--color-danger);
+    border-color: var(--color-danger-border);
+    background-color: transparent;
+}
+
+.logout-btn:hover {
+    background-color: var(--color-danger-bg-hover);
+    color: var(--color-danger-hover);
+}
+
+.dashboard-main {
+    flex: 1;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.dashboard-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+@media (min-width: 768px) {
+    .dashboard-toolbar {
+        flex-direction: row;
+        align-items: flex-end;
+    }
+}
+
+.dashboard-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.dashboard-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.dashboard-table-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-card);
+}
+
+.filter-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+.filter-tab {
+    background: transparent;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all var(--transition-speed) ease;
+}
+
+.filter-tab:hover {
+    color: var(--text-primary);
+}
+
+.filter-tab.active {
+    color: var(--accent-primary);
+    background-color: var(--bg-hover);
+}
+
+.status-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-online { background-color: var(--color-success); }
+.status-offline { background-color: var(--color-neutral); }
+.status-inactive { background-color: var(--color-warning); }
+.status-smooth { background-color: var(--color-smooth); }
+.status-struggling { background-color: var(--color-danger); }
+
+.dashboard-table {
+    width: 100%;
+    text-align: left;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.dashboard-table thead tr {
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+    padding: 0.75rem 1rem;
+}
+
+.dashboard-table tbody {
+    color: var(--text-primary);
+    font-size: 0.75rem;
+}
+
+.dashboard-table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dashboard-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.empty-state {
+    padding: 3rem 0;
+    text-align: center;
+}
+
+.empty-state-icon {
+    color: var(--border-color);
+    margin: 0 auto 0.75rem;
+}
+
+/* --- Student Profile Overlay --- */
+.profile-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background-color: var(--bg-main);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+}
+
+.profile-overlay-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.profile-overlay-close {
+    color: var(--text-secondary);
+}
+
+.profile-overlay-close:hover {
+    color: var(--text-primary);
+}
+
+.profile-overlay-main {
+    flex: 1;
+    padding: 2.5rem 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+@media (min-width: 1024px) {
+    .profile-overlay-main {
+        grid-template-columns: repeat(12, 1fr);
+    }
+}
+
+.profile-persona-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .profile-persona-col {
+        grid-column: span 4;
+    }
+}
+
+.profile-avatar-container {
+    width: 10rem;
+    height: 10rem;
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: 4px 4px 0px var(--border-color);
+}
+
+.profile-avatar-img {
+    height: 8rem;
+    object-fit: contain;
+}
+
+.profile-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.profile-persona-badge {
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background-color: var(--color-success-bg);
+    color: var(--accent-primary);
+    border: 1px solid var(--border-color);
+    display: inline-block;
+}
+
+.profile-name {
+    font-size: 1.5rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-primary);
+}
+
+.profile-email {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.profile-details-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .profile-details-col {
+        grid-column: span 8;
+    }
+}
+
+.profile-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.profile-info-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.profile-info-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.profile-info-value {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.profile-logs-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.profile-logs-heading {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.profile-stat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.profile-stat-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    font-size: 0.75rem;
+}
+
+.profile-stat-value {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.teacher-footer {
+    width: 100%;
+    max-width: var(--page-max-width);
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* --- Learning Status Indicators (dynamic JS bindings) --- */
+.learning-struggling { color: var(--color-danger); }
+.learning-smooth { color: var(--color-smooth); }
+
+.status-badge-offline,
+.status-dot-offline { color: var(--color-neutral); }
+.status-dot-offline { background-color: var(--color-neutral); }
+.status-badge-inactive { color: var(--color-warning); }
+.status-badge-online { color: var(--color-success); }
+
+.badge-group {
+    background-color: var(--color-success-bg);
+    border: 1px solid var(--color-success-border);
+    color: var(--accent-primary);
+}
+
+.empty-cell {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.engagement-badge {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.learning-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+}
+
+.engagement-dot-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.student-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.student-avatar-wrap {
+    position: relative;
+}
+
+.student-avatar-initial {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: var(--color-info-bg);
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.student-avatar-status {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    border: 1px solid var(--bg-main);
+}
+
+.student-name {
+    color: var(--text-primary);
+}
+
+.student-email {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}

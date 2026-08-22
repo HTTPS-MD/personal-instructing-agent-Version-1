@@ -27,6 +27,7 @@
     let stateStageDrilldown = null;
     let pendingRealtimeUpdate = false;
     let realtimeUpdateTimeout = null;
+    let realtimeBackoffMs = 1000;
     let lastSearchQuery = '';
 
     function triggerDeferredRealtimeUpdate() {
@@ -42,14 +43,26 @@
             const isInteracting = isTyping || (activeEl && activeEl.closest('form')) || document.querySelector('.modal-active') || document.querySelector('.show-menu');
 
             if (isInteracting) {
-                // Kung aktibong nakikipag-ugnayan ang user, mag-antay sandali nang hindi nagba-build up ng recursion stack
+                // Kung aktibong nakikipag-ugnayan ang user, mag-antay sandali.
+                // BACKOFF: dati, muling nag-a-arm ito bawat 1s nang walang hanggan
+                // habang bukas ang modal -- 600 na wakeup sa 10 minutong nakabukas
+                // na form. Dumadoble na ito hanggang 8s, at nire-reset kapag
+                // tumakbo na ang refresh.
+                realtimeBackoffMs = Math.min(realtimeBackoffMs * 2, 8000);
                 triggerDeferredRealtimeUpdate();
                 return;
             }
+            realtimeBackoffMs = 1000;
 
             loadStudents();
             loadSections();
-        }, 1000);
+            // Dating WALA dito: ang apat na stage counter box (OCEAN /
+            // Character / Dashboard / Active Game) ay ina-update lang sa init,
+            // sa tab switch, at pagkatapos ng targeted grant. Kaya sa gitna ng
+            // isang live na session -- ang mismong oras na tinitingnan mo sila
+            // -- naiiwan silang luma habang gumagalaw ang roster sa ibaba.
+            updateStageCounters();
+        }, realtimeBackoffMs);
     }
 
     // Pagination States
@@ -82,8 +95,15 @@
     }
 
     function nextStudentPage() {
-        currentStudentPage++;
-        loadStudents();
+        // May bounds check na, katulad ng previousStudentPage(). Dati, walang
+        // upper limit dito -- kaya kung luma na ang UI state (halimbawa, may
+        // nabura habang nakabukas ang huling page), kayang lumagpas sa huling
+        // page at magpakita ng walang laman na table.
+        const totalPages = Math.max(1, Math.ceil(totalStudentCount / STUDENTS_PER_PAGE));
+        if (currentStudentPage < totalPages) {
+            currentStudentPage++;
+            loadStudents();
+        }
     }
 
     // UI State Persistence
@@ -96,18 +116,17 @@
     // 2. INITIALIZATION
     // ==========================================
 
-    function escapeHTML(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
+    // escapeHTML() / escapeJS() ay nasa function.js na (shared helper)
 
-    function escapeJS(str) {
-        return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    // Gumagawa ng random, hindi-nahuhulaang initial password gamit ang Web Crypto API.
+    // Hindi na ito naka-store kahit saan at hindi na kailangang malaman ng estudyante --
+    // ang account ay 'inactive' hanggang sa i-click nila ang activation magic-link
+    // (sign-up.html) at doon nila itatakda ang sarili nilang totoong password.
+    function generateSecurePassword(length = 20) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+        const bytes = new Uint32Array(length);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, b => chars[b % chars.length]).join('');
     }
 
     // fully working
@@ -139,24 +158,49 @@
             });
         }
 
+        // FIX: dating iisang try/catch lang ang bumabalot sa AUTH check AT sa
+        // buong data-loading -- kaya kahit anong maliit na kabiguan sa pag-load
+        // ng data (transient network hiccup, isang hindi inaasahang null field,
+        // atbp.) pagkatapos ma-verify na valid admin, ay natreat bilang
+        // "unauthorized" at pinipilit ang admin na mag-logout + ma-redirect.
+        // Ngayon, hiwalay na: (1) AUTH phase -- kapag nabigo ito, tama lang na
+        // i-redirect dahil hindi talaga authorized ang user; (2) DATA-LOAD
+        // phase -- kapag nabigo ito, ipakita lang ang error banner, HINDI na
+        // pipilitin ang pag-logout ng isang valid na admin session.
+        let email;
         try {
             const { data: { session }, error: sessionError } = await sb.auth.getSession();
             if (sessionError || !session) {
                 throw new Error("Session expired. Please log in again.");
             }
 
-            const email = session.user.email;
-            const { data: profile, error } = await sb.from('profiles').select('role, is_super_admin').eq('email', email).maybeSingle();
+            email = session.user.email;
+            const { data: profile, error } = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
 
             if (error || !profile || profile.role !== 'admin') {
                 throw new Error("Unauthorized access. Admin privileges required.");
             }
+        } catch (e) {
+            console.error("Auth check failed:", e);
+            const errorBanner = document.getElementById('global-error-banner');
+            const errorMessage = document.getElementById('global-error-message');
+            if (errorBanner && errorMessage) {
+                errorMessage.textContent = e.message || "Failed to verify admin access.";
+                errorBanner.classList.remove('hidden');
+            }
+            localStorage.removeItem('pia_user_email');
+            setTimeout(() => window.location.replace('../../index.html'), 3000);
+            return;
+        }
 
-            localStorage.setItem('pia_user_email', email); // For legacy calls
+        localStorage.setItem('pia_user_email', email); // For legacy calls
 
-            // Reveal the dashboard now that the backend has confirmed admin role
-            document.body.classList.remove('opacity-0');
+        // Reveal the dashboard now that the backend has confirmed admin role.
+        // Mula dito, hindi na natin i-eevict ang admin dahil lang sa isang
+        // paikutan ng data-loading na nabigo -- na-verify na ang identity nila.
+        document.body.classList.remove('opacity-0');
 
+        try {
             await Promise.all([
                 initAdminProfile(email),
                 loadSections(),
@@ -170,26 +214,46 @@
 
             currentAdminEmail = email;
             setupRealtimeSubscriptions();
-            
+
             loadAdminDeviceSettings(currentAdminEmail);
         } catch (e) {
-            console.error("Initialization error:", e);
+            console.error("Dashboard data failed to load:", e);
             const errorBanner = document.getElementById('global-error-banner');
             const errorMessage = document.getElementById('global-error-message');
             if (errorBanner && errorMessage) {
-                errorMessage.textContent = e.message || "Failed to initialize dashboard. Please check your connection.";
+                errorMessage.textContent = (e.message ? `Some data failed to load: ${e.message}` : "Some data failed to load.") + " Please refresh the page.";
                 errorBanner.classList.remove('hidden');
             }
-            localStorage.removeItem('pia_user_email');
-            setTimeout(() => window.location.replace('../../index.html'), 3000);
+            // Sadyang WALANG logout/redirect dito -- valid pa rin ang session,
+            // kaya panatilihin lang ang admin sa page kahit may naging error
+            // sa data-loading, sa halip na basta i-force logout.
         }
 
         // ==========================================
         // TABLE EVENT DELEGATION
         // ==========================================
-        const unifiedTbody = document.getElementById('unified-tbody');
-        if (unifiedTbody) {
-            unifiedTbody.addEventListener('click', (e) => {
+        // DALAWANG BUG DITO DATI, kaya patay ang 3-dots menu ng student roster:
+        //
+        // (1) Ang action <td> ay may inline na onclick="event.stopPropagation()".
+        //     Ang event ay umaakyat: button -> td -> tr -> tbody. Pinapatigil ito
+        //     ng td BAGO pa marating ang tbody, kaya HINDI KAILANMAN tumatakbo
+        //     ang delegated listener at walang nangyayari sa pag-click.
+        //
+        // (2) Kahit tumakbo pa ito, inililipat ng toggleActionMenu() ang menu sa
+        //     document.body (para hindi ito ma-clip ng table overflow). Sa
+        //     sandaling iyon, ang menu ay WALA NA sa loob ng tbody -- kaya ang
+        //     mga item nito (Edit / Delete / Retake) ay hindi rin maaabot ng
+        //     isang tbody-scoped na listener.
+        //
+        // Ang delegation ay nasa `document` na, kaya nahuhuli nito ang toggle
+        // button (nasa tbody) AT ang mga menu item (nailipat na sa body).
+        // Ang stopPropagation() sa ibaba ang pumipigil sa window-level na
+        // closeAllMenus na agad itong isara.
+        //
+        // Ganito na rin gumagana ang professors tab -- inline onclick ang gamit
+        // nito, kaya hindi ito naapektuhan ng bug na ito.
+        {
+            document.addEventListener('click', (e) => {
                 const btn = e.target.closest('button[data-action]');
                 if (!btn) return;
                 e.stopPropagation();
@@ -224,7 +288,7 @@
 
     // fully working
     function setupRealtimeSubscriptions() {
-        sb.channel('admin-realtime-profiles')
+        registerChannel('admin-realtime-profiles', (ch) => ch
             .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
                 triggerDeferredRealtimeUpdate();
 
@@ -237,7 +301,17 @@
                     loadAdminDeviceSettings(currentAdminEmail);
                 }
             })
-            .subscribe();
+            .subscribe());
+
+        // Ang mga estudyante ay nakikinig sa `settings`, pero ang admin ay
+        // HINDI kailanman -- kaya ang tatlong stage switch ay nananatiling luma
+        // kung may ibang admin (o ibang tab) na nagpalit, at walang senyas na
+        // hindi na tugma ang ipinapakita sa totoong estado ng lab.
+        registerChannel('admin-realtime-settings', (ch) => ch
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+                loadSettings();
+            })
+            .subscribe());
     }
 
     // fully working
@@ -332,7 +406,7 @@
             if (navBtn) navBtn.className = "admin-nav-btn inactive";
 
             const mobBtn = document.getElementById(`mob-nav-${t}`);
-            if (mobBtn) mobBtn.className = "mobile-nav-link admin-nav-btn text-left block inactive";
+            if (mobBtn) mobBtn.className = "mobile-nav-link admin-nav-btn inactive";
         });
 
         const activeView = document.getElementById(`view-${tabName}`);
@@ -342,7 +416,7 @@
         if (activeBtn) activeBtn.className = "admin-nav-btn active";
 
         const activeMobBtn = document.getElementById(`mob-nav-${tabName}`);
-        if (activeMobBtn) activeMobBtn.className = "mobile-nav-link admin-nav-btn text-left block active";
+        if (activeMobBtn) activeMobBtn.className = "mobile-nav-link admin-nav-btn active";
     }
 
     function toggleActionMenu(event, safeId, explicitBtn = null) {
@@ -428,11 +502,11 @@
 
         const container = document.getElementById('alert-icon-container');
         if (type === 'error') {
-            container.innerHTML = `<i data-lucide="alert-circle" class="w-6 h-6 text-danger" id="alert-icon"></i>`;
+            container.innerHTML = `<i data-lucide="alert-circle" class="icon-md text-danger" id="alert-icon"></i>`;
         } else if (type === 'success') {
-            container.innerHTML = `<i data-lucide="check-circle" class="w-6 h-6 text-accent" id="alert-icon"></i>`;
+            container.innerHTML = `<i data-lucide="check-circle" class="icon-md text-accent" id="alert-icon"></i>`;
         } else {
-            container.innerHTML = `<i data-lucide="info" class="w-6 h-6 text-info" id="alert-icon"></i>`;
+            container.innerHTML = `<i data-lucide="info" class="icon-md text-info" id="alert-icon"></i>`;
         }
         lucide.createIcons();
         openModal('custom-alert');
@@ -523,10 +597,15 @@
     // fully working
     async function updateStageCounters() {
         const promises = [
-            sb.from('profiles').select('id', { count: 'exact', head: true }).eq('current_stage', 'OCEAN').neq('role', 'admin').eq('is_in_game', false),
-            sb.from('profiles').select('id', { count: 'exact', head: true }).eq('current_stage', 'Character Selection').neq('role', 'admin').eq('is_in_game', false),
-            sb.from('profiles').select('id', { count: 'exact', head: true }).eq('current_stage', 'Tutoring Dashboard').neq('role', 'admin').eq('is_in_game', false),
-            sb.from('profiles').select('id', { count: 'exact', head: true }).eq('is_in_game', true).neq('role', 'admin')
+            // 'email' sa halip na 'id': ang 'id' ay wala sa profiles, kaya ang
+            // apat na counter query na ito ay bumabagsak sa 42703 (undefined
+            // column) at nagbabalik ng 400. Dahil head:true + count:'exact'
+            // ang gamit, hindi naman talaga binabasa ang column -- kailangan
+            // lang nitong umiral. Ang 'email' ay tiyak na meron.
+            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('current_stage', 'OCEAN').neq('role', 'admin').eq('is_in_game', false),
+            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('current_stage', 'Character Selection').neq('role', 'admin').eq('is_in_game', false),
+            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('current_stage', 'Tutoring Dashboard').neq('role', 'admin').eq('is_in_game', false),
+            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('is_in_game', true).neq('role', 'admin')
         ];
 
         try {
@@ -569,8 +648,8 @@
             const btn = document.getElementById(`filter-sub-${sub}`);
             if (btn) {
                 btn.className = (sub === subgroup)
-                    ? "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-hover)] text-accent border border-accent transition-colors"
-                    : "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-main)] text-secondary border border-custom hover:text-primary transition-colors";
+                    ? "badge badge-pill badge-success"
+                    : "badge badge-pill badge-neutral";
             }
         });
         loadStudents();
@@ -590,25 +669,25 @@
         const descEl = document.getElementById('table-view-desc');
 
         ['ocean', 'char', 'dash', 'game'].forEach(box => {
-            document.getElementById(`box-${box}`).classList.remove('border-accent', 'border-info', 'border-warning', 'border-success', 'bg-[var(--bg-hover)]');
+            document.getElementById(`box-${box}`).classList.remove('selected');
         });
 
         if (stage === 'OCEAN') {
-            titleEl.innerHTML = `<i data-lucide="brain" class="w-5 h-5 text-accent"></i> OCEAN Test Live View`;
+            titleEl.innerHTML = `<i data-lucide="brain" class="icon-sm text-accent"></i> OCEAN Test Live View`;
             descEl.textContent = "Monitoring students currently taking the Big Five Personality Inventory.";
-            document.getElementById('box-ocean').classList.add('border-accent', 'bg-[var(--bg-hover)]');
+            document.getElementById('box-ocean').classList.add('selected');
         } else if (stage === 'Character Selection') {
-            titleEl.innerHTML = `<i data-lucide="users" class="w-5 h-5 text-info"></i> Character Select Live View`;
+            titleEl.innerHTML = `<i data-lucide="users" class="icon-sm text-info"></i> Character Select Live View`;
             descEl.textContent = "Monitoring Non-Assigned subgroup choosing their persona.";
-            document.getElementById('box-char').classList.add('border-info', 'bg-[var(--bg-hover)]');
+            document.getElementById('box-char').classList.add('selected');
         } else if (stage === 'Tutoring Dashboard') {
-            titleEl.innerHTML = `<i data-lucide="layout-dashboard" class="w-5 h-5 text-warning"></i> Dashboard Live View`;
+            titleEl.innerHTML = `<i data-lucide="layout-dashboard" class="icon-sm text-warning"></i> Dashboard Live View`;
             descEl.textContent = "Students browsing the main tutoring dashboard.";
-            document.getElementById('box-dash').classList.add('border-warning', 'bg-[var(--bg-hover)]');
+            document.getElementById('box-dash').classList.add('selected');
         } else if (stage === 'Active Game') {
-            titleEl.innerHTML = `<i data-lucide="gamepad-2" class="w-5 h-5 text-success"></i> Active Session Live View`;
+            titleEl.innerHTML = `<i data-lucide="gamepad-2" class="icon-sm text-success"></i> Active Session Live View`;
             descEl.textContent = "Students actively solving math problems. Tracking Decision Tree metrics.";
-            document.getElementById('box-game').classList.add('border-success', 'bg-[var(--bg-hover)]');
+            document.getElementById('box-game').classList.add('selected');
         }
         loadStudents();
     }
@@ -619,11 +698,11 @@
         stateStageDrilldown = null;
         document.getElementById('nested-filters-container').classList.remove('hidden');
         document.getElementById('btn-clear-drilldown').classList.add('hidden');
-        document.getElementById('table-view-title').innerHTML = `<i data-lucide="users" class="w-5 h-5 text-accent"></i> General Student Roster`;
+        document.getElementById('table-view-title').innerHTML = `<i data-lucide="users" class="icon-sm text-accent"></i> General Student Roster`;
         document.getElementById('table-view-desc').textContent = "Click any student row to view full-screen profile and alignment metrics.";
 
         ['ocean', 'char', 'dash', 'game'].forEach(box => {
-            document.getElementById(`box-${box}`).classList.remove('border-accent', 'border-info', 'border-warning', 'border-success', 'bg-[var(--bg-hover)]');
+            document.getElementById(`box-${box}`).classList.remove('selected');
         });
         loadStudents();
     }
@@ -641,42 +720,42 @@
         if (stateStageDrilldown === null) {
             thead.innerHTML = `
             <tr>
-                <th class="w-[20%]">Student Name</th>
-                <th class="w-[18%]">Email Address</th>
-                <th class="w-[10%]">Section</th>
-                <th class="w-[10%]">Group</th>
-                <th class="w-[14%]">Persona Setup</th>
-                <th class="w-[12%]">Current Stage</th>
-                <th class="w-[8%]">Pre-Test</th>
-                <th class="w-[8%] text-right">Actions</th>
+                <th>Student Name</th>
+                <th>Email Address</th>
+                <th>Section</th>
+                <th>Group</th>
+                <th>Persona Setup</th>
+                <th>Current Stage</th>
+                <th>Pre-Test</th>
+                <th class="text-right">Actions</th>
             </tr>
         `;
         } else if (stateStageDrilldown === 'Active Game') {
             thead.innerHTML = `
             <tr>
-                <th class="w-[20%]">Student Name</th>
-                <th class="w-[15%]">Current Problem</th>
-                <th class="w-[12%]">Difficulty</th>
-                <th class="w-[10%]">Hints Used</th>
-                <th class="w-[15%]">Consecutive Correct</th>
-                <th class="w-[15%]">Duration</th>
-                <th class="w-[13%] text-right">Actions</th>
+                <th>Student Name</th>
+                <th>Current Problem</th>
+                <th>Difficulty</th>
+                <th>Hints Used</th>
+                <th>Consecutive Correct</th>
+                <th>Duration</th>
+                <th class="text-right">Actions</th>
             </tr>
         `;
         } else {
             thead.innerHTML = `
             <tr>
-                <th class="w-[25%]">Student Name</th>
-                <th class="w-[15%]">Section</th>
-                <th class="w-[25%]">Current Activity</th>
-                <th class="w-[20%]">Time Elapsed</th>
-                <th class="w-[15%] text-right">Actions</th>
+                <th>Student Name</th>
+                <th>Section</th>
+                <th>Current Activity</th>
+                <th>Time Elapsed</th>
+                <th class="text-right">Actions</th>
             </tr>
         `;
         }
 
         if (studentDataCache.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-10 text-secondary text-xs">No students match the current filters.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="empty-row">No students match the current filters.</td></tr>`;
             const paginationControls = document.getElementById('pagination-controls');
             if (paginationControls) paginationControls.classList.add('hidden');
             lucide.createIcons();
@@ -700,14 +779,20 @@
 
         studentDataCache.forEach(student => {
             const tr = document.createElement('tr');
-            tr.className = "hover:bg-[var(--bg-hover)] transition-colors cursor-pointer student-row";
+            tr.className = "student-row";
             tr.setAttribute('data-started-at', student.stage_started_at || '');
 
-            const safeEmailId = student.email.replace(/[@.]/g, '_');
+            const safeEmailId = escapeHTML(String(student.email).replace(/[@.]/g, '_'));
+            const safeEmail = escapeHTML(student.email);
             const isOnline = (student.active_devices || []).length > 0;
             const statusClass = isOnline ? 'status-dot-active' : 'status-dot-offline';
 
-            tr.onclick = () => {
+            tr.onclick = (e) => {
+                // Ang action cell ay hindi na humihinto ng propagation (tingnan
+                // ang delegation fix), kaya dito na tahasang inaalis ang row
+                // click -- kung hindi, sabay na magbubukas ang profile overlay
+                // at ang menu.
+                if (e.target.closest('.action-cell') || e.target.closest('.action-menu')) return;
                 openStudentProfile(
                     student.full_name, student.email, student.section || 'N/A', student.group_type || 'N/A',
                     isOnline ? 'Online' : 'Offline', student.max_devices ?? 1,
@@ -717,33 +802,33 @@
             };
 
             const actionMenuHTML = `
-            <td class="py-3 px-3 text-right relative action-cell" onclick="event.stopPropagation()">
-                <button class="action-toggle-btn p-1.5 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-primary transition-colors" data-action="toggle-menu" data-email-id="${safeEmailId}">
-                    <i data-lucide="more-vertical" class="w-3.5 h-3.5 pointer-events-none"></i>
+            <td class="action-cell">
+                <button class="action-toggle-btn" data-action="toggle-menu" data-email-id="${safeEmailId}">
+                    <i data-lucide="more-vertical" class="icon-xs"></i>
                 </button>
-                <div id="menu-${safeEmailId}" class="action-menu hidden absolute right-0 w-56 bg-[var(--bg-card)] p-1.5 shadow-2xl rounded-xl border border-[var(--border-color)] space-y-1 text-left z-50">
-                    <button data-action="send-activation" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="mail" class="w-3.5 h-3.5 text-info pointer-events-none"></i> Send Activation Email
+                <div id="menu-${safeEmailId}" class="action-menu hidden">
+                    <button data-action="send-activation" data-email="${safeEmail}" class="action-menu-item">
+                        <i data-lucide="mail" class="icon-xs text-info"></i> Send Activation Email
                     </button>
-                    <button data-action="edit-student" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="edit-3" class="w-3.5 h-3.5 icon-edit pointer-events-none"></i> Edit Details
+                    <button data-action="edit-student" data-email="${safeEmail}" class="action-menu-item">
+                        <i data-lucide="edit-3" class="icon-xs icon-edit"></i> Edit Details
                     </button>
-                    <button data-action="device-manager" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="monitor" class="w-3.5 h-3.5 text-accent pointer-events-none"></i> Active Devices
+                    <button data-action="device-manager" data-email="${safeEmail}" class="action-menu-item">
+                        <i data-lucide="monitor" class="icon-xs text-accent"></i> Active Devices
                     </button>
-                    <div class="border-t border-[var(--border-color)] my-1"></div>
-                    <button data-action="retake-ocean" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-warning pointer-events-none"></i> Retake OCEAN Test
+                    <div class="action-menu-divider"></div>
+                    <button data-action="retake-ocean" data-email="${safeEmail}" class="action-menu-item">
+                        <i data-lucide="rotate-ccw" class="icon-xs text-warning"></i> Retake OCEAN Test
                     </button>
-                    <button data-action="retake-character" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="user-cog" class="w-3.5 h-3.5 text-accent pointer-events-none"></i> Retake Char Select
+                    <button data-action="retake-character" data-email="${safeEmail}" class="action-menu-item">
+                        <i data-lucide="user-cog" class="icon-xs text-accent"></i> Retake Char Select
                     </button>
-                    <button data-action="reset-password" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                        <i data-lucide="key" class="w-3.5 h-3.5 icon-reset pointer-events-none"></i> Reset Password
+                    <button data-action="reset-password" data-email="${safeEmail}" class="action-menu-item">
+                        <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
                     </button>
-                    <div class="border-t border-[var(--border-color)] my-1"></div>
-                    <button data-action="delete-user" data-email="${student.email}" class="w-full px-3 py-2 rounded-xs text-xs text-left action-delete hover:bg-[var(--color-danger-bg)] flex items-center gap-2">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i> Delete User
+                    <div class="action-menu-divider"></div>
+                    <button data-action="delete-user" data-email="${safeEmail}" class="action-menu-item action-delete">
+                        <i data-lucide="trash-2" class="icon-xs"></i> Delete User
                     </button>
                 </div>
             </td>
@@ -757,50 +842,50 @@
                     : 'Traditional';
 
                 tr.innerHTML = `
-                <td data-label="Student Name" class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
-                    <div class="relative flex items-center justify-center shrink-0">
-                        <div class="w-6 h-6 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center ${groupColor}"><i data-lucide="${groupLabel === 'CTRL' ? 'book' : 'user'}" class="w-3 h-3"></i></div>
-                        <span class="status-dot absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-card ${statusClass}"></span>
+                <td data-label="Student Name" class="row-name-cell">
+                    <div class="row-avatar-wrap">
+                        <div class="row-avatar-icon ${groupColor}"><i data-lucide="${groupLabel === 'CTRL' ? 'book' : 'user'}" class="icon-xs"></i></div>
+                        <span class="row-status-dot ${statusClass}"></span>
                     </div>
                     <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td data-label="Email" class="py-3 px-3 font-mono text-secondary text-[10px] truncate">${escapeHTML(student.email)}</td>
-                <td data-label="Section" class="py-3 px-3 text-secondary text-xs truncate">${escapeHTML(student.section || 'N/A')}</td>
-                <td data-label="Group" class="py-3 px-3 font-bold ${groupColor} text-[10px] uppercase tracking-wider">${groupLabel}</td>
-                <td data-label="Setup" class="py-3 px-3 text-secondary text-[10px] uppercase tracking-wider truncate">${personaSetup}</td>
-                <td data-label="Stage" class="py-3 px-3 font-medium text-primary text-xs truncate">${student.current_stage || 'Idle'}</td>
-                <td data-label="Pre-Test" class="py-3 px-3 font-mono text-primary text-xs">${student.pre_test_score ?? 'n/a'}</td>
+                <td data-label="Email" class="cell-mono-xs truncate">${escapeHTML(student.email)}</td>
+                <td data-label="Section" class="text-secondary truncate">${escapeHTML(student.section || 'N/A')}</td>
+                <td data-label="Group" class="cell-label ${groupColor}">${groupLabel}</td>
+                <td data-label="Setup" class="cell-label text-secondary truncate">${personaSetup}</td>
+                <td data-label="Stage" class="text-primary truncate">${escapeHTML(student.current_stage || 'Idle')}</td>
+                <td data-label="Pre-Test" class="cell-mono-xs">${escapeHTML(student.pre_test_score ?? 'n/a')}</td>
                 ${actionMenuHTML}
             `;
             } else if (stateStageDrilldown === 'Active Game') {
                 const duration = calculateDuration(student.stage_started_at);
                 tr.innerHTML = `
-                <td data-label="Student Name" class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
-                    <div class="w-6 h-6 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-success"><i data-lucide="gamepad-2" class="w-3 h-3"></i></div>
+                <td data-label="Student Name" class="row-name-cell">
+                    <div class="row-avatar-icon text-success"><i data-lucide="gamepad-2" class="icon-xs"></i></div>
                     <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td data-label="Problem" class="py-3 px-3 font-mono text-secondary text-xs truncate">Question ${student.current_problem || '1'}</td>
-                <td data-label="Difficulty" class="py-3 px-3 font-bold text-info text-xs uppercase tracking-wider">${student.current_difficulty || 'Normal'}</td>
-                <td data-label="Hints" class="py-3 px-3 font-mono text-warning text-xs font-bold">${student.hints_used || 0}</td>
-                <td data-label="Correct" class="py-3 px-3 font-mono text-success text-xs font-bold">${student.consecutive_correct || 0}</td>
-                <td data-label="Duration" class="py-3 px-3 font-mono text-primary text-xs student-duration">${duration}</td>
+                <td data-label="Problem" class="cell-mono-xs truncate">Question ${safeInt(student.current_problem, 1)}</td>
+                <td data-label="Difficulty" class="cell-label text-info">${escapeHTML(student.current_difficulty || 'Normal')}</td>
+                <td data-label="Hints" class="cell-mono-xs text-warning">${safeInt(student.hints_used, 0)}</td>
+                <td data-label="Correct" class="cell-mono-xs text-success">${safeInt(student.consecutive_correct, 0)}</td>
+                <td data-label="Duration" class="cell-mono-xs student-duration">${duration}</td>
                 ${actionMenuHTML}
             `;
             } else {
                 const duration = calculateDuration(student.stage_started_at);
                 let activity = "Reading Instructions";
-                if (stateStageDrilldown === 'OCEAN') activity = `Answering Item ${student.ocean_current_item || 1}/50`;
+                if (stateStageDrilldown === 'OCEAN') activity = `Answering Item ${safeInt(student.ocean_current_item, 1)}/50`;
                 if (stateStageDrilldown === 'Character Selection') activity = `Browsing Personas`;
                 if (stateStageDrilldown === 'Tutoring Dashboard') activity = `Browsing Dashboard`;
 
                 tr.innerHTML = `
-                <td data-label="Student Name" class="py-3 px-3 font-medium text-primary text-xs flex items-center gap-2.5">
-                    <span class="status-dot w-2 h-2 rounded-full ${statusClass}"></span>
+                <td data-label="Student Name" class="row-name-cell">
+                    <span class="status-dot ${statusClass}"></span>
                     <span class="truncate">${escapeHTML(student.full_name)}</span>
                 </td>
-                <td data-label="Section" class="py-3 px-3 text-secondary text-xs truncate">${escapeHTML(student.section || 'N/A')}</td>
-                <td data-label="Activity" class="py-3 px-3 font-bold text-accent text-xs truncate">${activity}</td>
-                <td data-label="Duration" class="py-3 px-3 font-mono text-primary text-xs student-duration">${duration}</td>
+                <td data-label="Section" class="text-secondary truncate">${escapeHTML(student.section || 'N/A')}</td>
+                <td data-label="Activity" class="cell-label text-accent truncate">${activity}</td>
+                <td data-label="Duration" class="cell-mono-xs student-duration">${duration}</td>
                 ${actionMenuHTML}
             `;
             }
@@ -815,7 +900,8 @@
     // 6. STUDENT PROFILE OVERLAYS & FORMS
     // ==========================================
 
-    // fully working
+    // normalizeOceanScore() / OCEAN_SCORE_MAX ay nasa function.js na (shared helper)
+
     function openStudentProfile(name, email, section, type, status, maxDevices, pre, post, o, c, e, a, n) {
         document.getElementById('profile-name').textContent = name;
         document.getElementById('profile-email').textContent = email;
@@ -825,21 +911,28 @@
         document.getElementById('profile-pre').textContent = pre;
         document.getElementById('profile-post').textContent = post;
 
-        document.getElementById('profile-ocean-o').textContent = o;
-        document.getElementById('profile-ocean-c').textContent = c;
-        document.getElementById('profile-ocean-e').textContent = e;
-        document.getElementById('profile-ocean-a').textContent = a;
-        document.getElementById('profile-ocean-n').textContent = n;
+        const normalized = {
+            Openness: normalizeOceanScore(o),
+            Conscientiousness: normalizeOceanScore(c),
+            Extroversion: normalizeOceanScore(e),
+            Agreeableness: normalizeOceanScore(a),
+            Neuroticism: normalizeOceanScore(n)
+        };
 
-        let dominantTraits = ['Openness'];
-        if (o !== 'n/a' && o !== 'undefined') {
-            const scores = { 'Openness': parseFloat(o) || 0, 'Conscientiousness': parseFloat(c) || 0, 'Extroversion': parseFloat(e) || 0, 'Agreeableness': parseFloat(a) || 0, 'Neuroticism': parseFloat(n) || 0 };
-            let maxScore = -1; dominantTraits = [];
-            for (const [trait, score] of Object.entries(scores)) {
-                if (score > maxScore) { maxScore = score; dominantTraits = [trait]; }
-                else if (score === maxScore) dominantTraits.push(trait);
-            }
+        document.getElementById('profile-ocean-o').textContent = normalized.Openness !== null ? `${normalized.Openness}%` : 'n/a';
+        document.getElementById('profile-ocean-c').textContent = normalized.Conscientiousness !== null ? `${normalized.Conscientiousness}%` : 'n/a';
+        document.getElementById('profile-ocean-e').textContent = normalized.Extroversion !== null ? `${normalized.Extroversion}%` : 'n/a';
+        document.getElementById('profile-ocean-a').textContent = normalized.Agreeableness !== null ? `${normalized.Agreeableness}%` : 'n/a';
+        document.getElementById('profile-ocean-n').textContent = normalized.Neuroticism !== null ? `${normalized.Neuroticism}%` : 'n/a';
+
+        let dominantTraits = [];
+        let maxScore = -1;
+        for (const [trait, score] of Object.entries(normalized)) {
+            if (score === null) continue;
+            if (score > maxScore) { maxScore = score; dominantTraits = [trait]; }
+            else if (score === maxScore) dominantTraits.push(trait);
         }
+        if (dominantTraits.length === 0) dominantTraits = ['Openness'];
 
         document.getElementById('profile-persona-badge').textContent = `${dominantTraits.join(' & ')} Persona`;
         document.getElementById('student-profile-screen').classList.remove('hidden');
@@ -868,39 +961,119 @@
     }
 
     // fully working
+    // ==========================================
+    // SHARED HELPERS PARA SA REGISTER / EDIT
+    // ==========================================
+
+    // Ang Supabase Auth ay nag-iimbak ng email nang LOWERCASE, at ang app ay
+    // eksaktong tugma ang hinahanap: .eq('email', session.user.email). Kaya ang
+    // isang 'Juan@UE.edu.ph' na na-type sa form ay gumagawa ng profile row na
+    // HINDI KAILANMAN matutugma sa session -- nagla-log in ang estudyante, wala
+    // namang nakikitang profile ang requireStudentSession(), at agad silang
+    // itinatapon pabalik sa index. Iyon ang "Account configuration error".
+    // Sa 76 na account na manu-manong itina-type, tiyak itong mangyayari.
+    function normalizeEmail(raw) {
+        return (raw || '').trim().toLowerCase();
+    }
+
+    // Ginagawang nababasang mensahe ang mga Postgres error code.
+    function friendlyDbError(error, fallback) {
+        if (!error) return fallback;
+        const msg = error.message || '';
+        if (error.code === '23505' || /duplicate key|already exists/i.test(msg)) {
+            return 'An account already uses this email. Only one account per email is allowed.';
+        }
+        if (error.code === '42501' || /permission denied|row-level security/i.test(msg)) {
+            return 'You do not have permission for this action. Make sure you are signed in as an admin.';
+        }
+        return msg || fallback;
+    }
+
+    // 0-100 ang saklaw ng pre/post test. Ang isang mali-type na 1000 ay tahimik
+    // na sumisira ng research data -- at ginagamit ito ng teacher dashboard sa
+    // threshold na < 70 para sa "Struggling".
+    function parseScore(raw) {
+        if (raw === null || raw === undefined || String(raw).trim() === '') return { ok: true, value: null };
+        const n = parseFloat(raw);
+        if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false, value: null };
+        return { ok: true, value: n };
+    }
+
     async function handleRegisterStudent(event) {
         event.preventDefault();
+
+        const form = event.target;
+        const btn = form.querySelector('button[type="submit"]');
 
         const first = document.getElementById('add-first-name').value.trim();
         const middle = document.getElementById('add-middle-name').value.trim();
         const last = document.getElementById('add-last-name').value.trim();
         const full_name = [first, middle, last].filter(Boolean).join(' ');
 
-        const email = document.getElementById('student-email').value;
+        const email = normalizeEmail(document.getElementById('student-email').value);
         const section = document.getElementById('student-section').value;
         const group_type = document.getElementById('student-type').value;
-        const pretest = document.getElementById('student-pretest').value;
-        const pre_test_score = pretest ? parseFloat(pretest) : null;
         const max_devices = parseInt(document.getElementById('student-device-limit').value) || 1;
-        const defaultPass = document.getElementById('global-default-pass')?.value || 'PIA2026!';
 
-        const { error: authError } = await sb.rpc('admin_create_auth_user', {
-            target_email: email,
-            default_password: defaultPass
-        });
+        const score = parseScore(document.getElementById('student-pretest').value);
+        if (!score.ok) return showCustomAlert("Validation Error", "Pre-test score must be between 0 and 100.", "error");
 
-        if (authError) return showCustomAlert("Auth Error", authError.message, "error");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return showCustomAlert("Validation Error", "Invalid email address.", "error");
+        }
 
-        const { error } = await sb.from('profiles').insert([{
-            full_name, email, section, group_type, pre_test_score, max_devices, status: 'inactive'
-        }]);
+        // DOUBLE-SUBMIT GUARD: kung wala ito, ang dalawang mabilis na click ay
+        // dalawang beses tumatawag ng admin_create_auth_user bago pa makabalik
+        // ang una.
+        if (btn) { btn.disabled = true; btn.textContent = 'Registering...'; }
 
-        if (error) return showCustomAlert("Registration Error", error.message, "error");
+        try {
+            // PRE-CHECK BAGO GUMAWA NG AUTH USER. Ang admin_create_auth_user ay
+            // tumatakbo MUNA; kung mabibigo ang profiles insert pagkatapos (hal.
+            // duplicate email), may naiwang auth user na WALANG profile -- at
+            // ang susunod na pagsubok ay babagsak sa "user already exists",
+            // kaya hindi na talaga mairerehistro ang estudyanteng iyon.
+            // Ang pagsusuri muna ang umiiwas sa buong sitwasyong iyon.
+            const { data: existing } = await sb.from('profiles')
+                .select('email').eq('email', email).maybeSingle();
 
-        document.getElementById('add-student-form').reset();
-        closeModal('add-student-modal');
-        loadStudents();
-        showCustomAlert("Registration Success", `${full_name} added to roster (Inactive until emailed).`, "success");
+            if (existing) {
+                return showCustomAlert("Duplicate Email",
+                    `${email} is already on the roster. Use Edit Details to change it.`, "error");
+            }
+
+            const { error: authError } = await sb.rpc('admin_create_auth_user', {
+                target_email: email,
+                default_password: generateSecurePassword()
+            });
+
+            if (authError) {
+                return showCustomAlert("Auth Error", friendlyDbError(authError, "Could not create the auth user."), "error");
+            }
+
+            const { error } = await sb.from('profiles').insert([{
+                full_name, email, section, group_type,
+                pre_test_score: score.value, max_devices,
+                status: 'inactive', role: 'student'
+            }]);
+
+            if (error) {
+                // Naging matagumpay ang auth user pero nabigo ang profile row.
+                // Sabihin ito nang tahasan -- may naiwang orphan na kailangang
+                // linisin bago muling subukan.
+                return showCustomAlert("Registration Error",
+                    friendlyDbError(error, "Could not save the profile.") +
+                    ' (NOTE: an auth user was already created for ' + email +
+                    ' -- it must be deleted before registering again.)', "error");
+            }
+
+            document.getElementById('add-student-form').reset();
+            closeModal('add-student-modal');
+            loadStudents();
+            showCustomAlert("Registration Success", `${full_name} added to roster (Inactive until emailed).`, "success");
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Register'; }
+        }
     }
 
     // fully working
@@ -935,6 +1108,9 @@
 
     async function handleUpdateStudent(event) {
         event.preventDefault();
+
+        const form = event.target;
+        const btn = form.querySelector('button[type="submit"]');
         const originalEmail = document.getElementById('edit-student-original-email').value;
 
         const first = document.getElementById('edit-first-name').value.trim();
@@ -942,37 +1118,68 @@
         const last = document.getElementById('edit-last-name').value.trim();
         const full_name = [first, middle, last].filter(Boolean).join(' ');
 
-        const email = document.getElementById('edit-student-email-input').value;
+        const email = normalizeEmail(document.getElementById('edit-student-email-input').value);
         const section = document.getElementById('edit-student-section').value;
-        const pre_test_val = document.getElementById('edit-student-pretest').value;
-        const pre_test_score = pre_test_val ? parseFloat(pre_test_val) : null;
         const group_type = document.getElementById('edit-student-type').value;
         const max_devices = parseInt(document.getElementById('edit-student-device-limit').value) || 1;
 
-        // 1. Unahing i-validate at i-sync sa Supabase Auth RPC kung nagbago ang email
-        if (email !== originalEmail) {
-            const { error: rpcError } = await sb.rpc('admin_update_user_email', {
-                target_email: originalEmail,
-                new_email: email
-            });
-            if (rpcError) return showCustomAlert("Auth Sync Error", rpcError.message, "error");
+        const score = parseScore(document.getElementById('edit-student-pretest').value);
+        if (!score.ok) return showCustomAlert("Validation Error", "Pre-test score must be between 0 and 100.", "error");
+
+        const emailChanged = (email !== normalizeEmail(originalEmail));
+
+        if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return showCustomAlert("Validation Error", "Invalid email address.", "error");
         }
 
-        // 2. Sunod na i-update ang profiles table gamit ang mga bagong detalye (pati na rin ang bagong email)
-        const updatePayload = {
-            full_name, section, pre_test_score, group_type, max_devices
-        };
-        if (email !== originalEmail) {
-            updatePayload.email = email;
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+        try {
+            // BANGGAAN MUNA, BAGO ANG AUTH. Dati, tumatakbo agad ang
+            // admin_update_user_email, tapos saka lang ang profiles update.
+            // Kapag nabigo ang pangalawa (hal. may ibang profile na gamit na ang
+            // bagong email), ang auth ay may BAGONG email na, ang profiles ay
+            // LUMA pa rin -- at wala nang tumutugmang profile ang session ng
+            // estudyante. Hindi na sila makaka-login, at tahimik ang pagkasira.
+            if (emailChanged) {
+                const { data: clash } = await sb.from('profiles')
+                    .select('email').eq('email', email).maybeSingle();
+
+                if (clash) {
+                    return showCustomAlert("Duplicate Email",
+                        `${email} is already using that email. Choose a different one.`, "error");
+                }
+
+                const { error: rpcError } = await sb.rpc('admin_update_user_email', {
+                    target_email: originalEmail,
+                    new_email: email
+                });
+                if (rpcError) {
+                    return showCustomAlert("Auth Sync Error",
+                        friendlyDbError(rpcError, "Could not update the auth email."), "error");
+                }
+            }
+
+            const updatePayload = {
+                full_name, section, pre_test_score: score.value, group_type, max_devices
+            };
+            if (emailChanged) updatePayload.email = email;
+
+            const { error } = await sb.from('profiles').update(updatePayload).eq('email', originalEmail);
+
+            if (error) {
+                return showCustomAlert("Update Error",
+                    friendlyDbError(error, "Could not update the profile.") +
+                    (emailChanged ? ' (WARNING: the auth email was already changed to ' + email +
+                                    ' but the profile was not -- these must be reconciled immediately.)' : ''), "error");
+            }
+
+            closeModal('edit-student-modal');
+            loadStudents();
+            showCustomAlert("Update Success", `Student details updated successfully.`, "success");
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
         }
-
-        const { error } = await sb.from('profiles').update(updatePayload).eq('email', originalEmail);
-
-        if (error) return showCustomAlert("Update Error", error.message, "error");
-
-        closeModal('edit-student-modal');
-        loadStudents();
-        showCustomAlert("Update Success", `Student details updated successfully.`, "success");
     }
 
     // fully working
@@ -1004,9 +1211,19 @@
     // ==========================================
 
     // fully working
+    let lastSectionsSignature = null;
+
     async function loadSections() {
         const { data, error } = await sb.from('sections').select('*');
         if (error) return console.error('Error loading sections:', error);
+
+        // Tumatakbo ito bawat realtime tick. Dati, muling itinatayo nito ang
+        // buong sections grid, nililinis at pinupuno ang APAT na <select>, at
+        // pinapatakbo ang lucide.createIcons() sa buong DOM -- bawat segundo sa
+        // isang live na session. Kapag hindi nagbago ang listahan, laktawan.
+        const signature = JSON.stringify((data || []).map(x => x.name).sort());
+        const sectionsChanged = (signature !== lastSectionsSignature);
+        lastSectionsSignature = signature;
 
         const grid = document.getElementById('sections-grid');
         grid.innerHTML = '';
@@ -1015,11 +1232,26 @@
         sectionSelects.forEach(select => { select.innerHTML = ''; });
 
         if (!data || data.length === 0) {
-            grid.innerHTML = `<p class="text-xs text-[var(--text-secondary)] col-span-3">No sections found. Click "Add Section" to create one.</p>`;
+            grid.innerHTML = `<p class="empty-row admin-grid-span-all">No sections found. Click "Add Section" to create one.</p>`;
             return;
         }
 
         const { data: allProfiles } = await sb.from('profiles').select('section').neq('role', 'admin');
+
+        // Ang enrolled count lang ang nagbabago kapag pareho pa rin ang mga
+        // section -- pero mura ang buong redraw sa ganitong laki, at ang
+        // mahalaga ay hindi na natatanggal ang napili ng admin sa dropdown
+        // kung walang tunay na pagbabago.
+        if (!sectionsChanged && grid.childElementCount > 0) {
+            const counts = {};
+            (allProfiles || []).forEach(pr => { if (pr.section) counts[pr.section] = (counts[pr.section] || 0) + 1; });
+            grid.querySelectorAll('.section-card').forEach(card => {
+                const title = card.querySelector('.section-card-title');
+                const badge = card.querySelector('.badge');
+                if (title && badge) badge.textContent = `${counts[title.textContent] || 0} Enrolled`;
+            });
+            return;
+        }
         const sectionCounts = {};
         if (allProfiles) {
             allProfiles.forEach(p => {
@@ -1039,27 +1271,25 @@
             const count = sectionCounts[name] || 0;
 
             const card = document.createElement('div');
-            card.className = "solid-card p-6 space-y-5 cursor-pointer hover:border-[var(--accent-primary)] transition-all group";
+            card.className = "solid-card card-padded section-card";
             card.onclick = () => openSectionDetails(name);
 
             card.innerHTML = `
-            <div class="flex justify-between items-center border-b border-[var(--border-color)] pb-4">
-                <div class="flex items-center gap-3">
-                    <h3 class="text-lg font-bold text-primary group-hover:text-[var(--accent-primary)] transition-colors">${name}</h3>
-                    <span class="px-2.5 py-1 rounded-lg bg-[var(--bg-main)] text-[var(--text-secondary)] text-[10px] font-mono border border-[var(--border-color)]">${count} Enrolled</span>
+            <div class="section-card-head">
+                <div class="flex-row gap-sm">
+                    <h3 class="section-card-title">${escapeHTML(name)}</h3>
+                    <span class="badge badge-neutral">${count} Enrolled</span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-[var(--text-secondary)] flex items-center gap-1 group-hover:text-primary"><i data-lucide="chevron-right" class="w-4 h-4"></i></span>
-                </div>
+                <span class="section-card-arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div class="bg-[var(--bg-main)] p-4 rounded-xl border border-[var(--border-color)] space-y-1 hover:border-[var(--accent-primary)] transition-colors" onclick="event.stopPropagation(); openScoresModal('${name}')">
-                    <p class="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-mono flex justify-between">Scores <i data-lucide="edit-2" class="w-3 h-3 text-[var(--accent-primary)]"></i></p>
-                    <p class="text-primary text-xs font-medium pt-1">Input / View</p>
+            <div class="admin-grid-2">
+                <div class="section-action-tile" onclick="event.stopPropagation(); openScoresModal('${escapeJS(name)}')">
+                    <p class="section-action-label">Scores <i data-lucide="edit-2" class="icon-xs text-accent"></i></p>
+                    <p class="section-action-value">Input / View</p>
                 </div>
-                <div class="bg-[var(--bg-main)] p-4 rounded-xl border border-[var(--border-color)] space-y-1 cursor-pointer hover:border-[var(--accent-primary)] transition-colors" onclick="event.stopPropagation(); sendSectionEmails('${name}')">
-                    <p class="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-mono flex justify-between">Broadcast <i data-lucide="send" class="w-3 h-3 text-[var(--accent-primary)]"></i></p>
-                    <p class="text-[var(--accent-primary)] text-xs font-bold pt-1">Email Roster</p>
+                <div class="section-action-tile" onclick="event.stopPropagation(); sendSectionEmails('${escapeJS(name)}')">
+                    <p class="section-action-label">Broadcast <i data-lucide="send" class="icon-xs text-accent"></i></p>
+                    <p class="section-action-value text-accent">Email Roster</p>
                 </div>
             </div>
         `;
@@ -1087,43 +1317,46 @@
         currentActiveSection = sectionName;
         document.getElementById('modal-section-title').textContent = `Section: ${sectionName}`;
 
-        const { data } = await sb.from('profiles').select('*').eq('section', sectionName);
+        // Ang eksaktong columns lang na ginagamit ng table na ito (dating '*',
+        // na naghahatid ng buong row kasama ang active_devices at iba pang
+        // field na hindi naman ipinapakita dito).
+        const { data } = await sb.from('profiles').select('role, full_name, email, section, group_type, status, max_devices, pre_test_score, post_test_score, ocean_o, ocean_c, ocean_e, ocean_a, ocean_n').eq('section', sectionName);
         const studentsOnly = data ? data.filter(student => (student.role || '').toLowerCase() !== 'admin') : [];
         const tbody = document.getElementById('section-students-tbody');
         tbody.innerHTML = '';
 
         if (studentsOnly.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-[var(--text-secondary)]">No students found in this section.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No students found in this section.</td></tr>`;
         } else {
             studentsOnly.forEach(student => {
-                const safeEmailId = student.email.replace(/[@.]/g, '_');
+                const safeEmailId = escapeHTML(String(student.email).replace(/[@.]/g, '_'));
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-[var(--bg-hover)] transition-colors cursor-pointer student-row";
+                tr.className = "student-row";
                 tr.onclick = () => { openStudentProfile(student.full_name, student.email, sectionName, student.group_type, student.status, student.max_devices ?? 1, student.pre_test_score ?? 'n/a', student.post_test_score ?? 'n/a', student.ocean_o ?? 'n/a', student.ocean_c ?? 'n/a', student.ocean_e ?? 'n/a', student.ocean_a ?? 'n/a', student.ocean_n ?? 'n/a'); };
 
                 tr.innerHTML = `
-                <td class="py-4 px-3 font-medium text-primary">${escapeHTML(student.full_name)}</td>
-                <td class="py-4 px-3 text-secondary">${escapeHTML(student.email)}</td>
-                <td class="py-4 px-3"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[10px] font-bold uppercase tracking-wider">${escapeHTML(student.group_type || 'N/A')}</span></td>
-                <td class="py-4 px-3">
-                    <div class="flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full ${student.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
-                        <span class="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">${student.status === 'active' ? 'Active' : 'Inactive'}</span>
+                <td class="text-primary" style="font-weight:500;">${escapeHTML(student.full_name)}</td>
+                <td class="text-secondary">${escapeHTML(student.email)}</td>
+                <td><span class="badge badge-success">${escapeHTML(student.group_type || 'N/A')}</span></td>
+                <td>
+                    <div class="flex-row gap-xs">
+                        <span class="status-dot ${student.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
+                        <span class="cell-label text-secondary">${student.status === 'active' ? 'Active' : 'Inactive'}</span>
                     </div>
                 </td>
-                <td class="py-4 px-3 text-right relative" onclick="event.stopPropagation()">
-                    <button onclick="toggleActionMenu(event, 'sec-${safeEmailId}')" class="p-2 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-primary transition-colors">
-                        <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                <td class="action-cell" onclick="event.stopPropagation()">
+                    <button onclick="toggleActionMenu(event, 'sec-${safeEmailId}')" class="action-toggle-btn">
+                        <i data-lucide="more-vertical" class="icon-sm"></i>
                     </button>
-                    <div id="menu-sec-${safeEmailId}" onclick="event.stopPropagation()" class="hidden absolute w-44 bg-[var(--bg-card)] p-1.5 shadow-2xl rounded-xl border border-[var(--border-color)] space-y-1 text-left z-50">
-                        <button onclick="sendActivationEmail('${student.email}'); closeAllMenus();" class="w-full px-3 py-2 rounded-xs text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2">
-                            <i data-lucide="mail" class="w-3.5 h-3.5 text-info"></i> Send Email
+                    <div id="menu-sec-${safeEmailId}" onclick="event.stopPropagation()" class="action-menu hidden">
+                        <button onclick="sendActivationEmail('${escapeJS(student.email)}'); closeAllMenus();" class="action-menu-item">
+                            <i data-lucide="mail" class="icon-xs text-info"></i> Send Email
                         </button>
-                        <button onclick="closeModal('section-details-modal'); openEditStudent('${escapeJS(student.full_name)}', '${student.email}', '${escapeJS(student.section || '')}', '${student.pre_test_score ?? ''}', '${escapeJS(student.group_type || '')}', ${student.max_devices ?? 1}); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all">
-                            <i data-lucide="edit-3" class="w-3.5 h-3.5 icon-edit"></i> Edit Details
+                        <button onclick="closeModal('section-details-modal'); openEditStudent('${escapeJS(student.full_name)}', '${escapeJS(student.email)}', '${escapeJS(student.section || '')}', '${escapeJS(student.pre_test_score ?? '')}', '${escapeJS(student.group_type || '')}', ${safeInt(student.max_devices, 1)}); closeAllMenus();" class="action-menu-item">
+                            <i data-lucide="edit-3" class="icon-xs icon-edit"></i> Edit Details
                         </button>
-                        <button onclick="resetPasswordFromMenu('${student.email}'); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors">
-                            <i data-lucide="key" class="w-3.5 h-3.5 icon-reset"></i> Reset Password
+                        <button onclick="resetPasswordFromMenu('${escapeJS(student.email)}'); closeAllMenus();" class="action-menu-item">
+                            <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
                         </button>
                     </div>
                 </td>
@@ -1140,22 +1373,21 @@
         currentActiveSection = sectionName;
         document.getElementById('scores-modal-title').textContent = `Input Scores: ${sectionName}`;
 
-        const { data } = await sb.from('profiles').select('*').eq('section', sectionName);
+        const { data } = await sb.from('profiles').select('role, full_name, email, group_type, pre_test_score, post_test_score').eq('section', sectionName);
         const studentsOnly = data ? data.filter(student => (student.role || '').toLowerCase() !== 'admin') : [];
         const tbody = document.getElementById('scores-table-body');
         tbody.innerHTML = '';
 
         if (studentsOnly.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-[var(--text-secondary)]">No students found in this section.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="empty-row">No students found in this section.</td></tr>`;
         } else {
             studentsOnly.forEach(student => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-[var(--bg-hover)] transition-colors";
                 tr.innerHTML = `
-                <td class="py-4 px-3 font-medium text-primary">${escapeHTML(student.full_name)}</td>
-                <td class="py-4 px-3"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider">${student.group_type}</span></td>
-                <td class="py-4 px-3"><input type="number" step="0.1" class="score-pre w-full max-w-[120px] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 h-[44px] text-sm text-primary input-focus font-mono" value="${student.pre_test_score ?? ''}" data-email="${student.email}"></td>
-                <td class="py-4 px-3"><input type="number" step="0.1" class="score-post w-full max-w-[120px] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 h-[44px] text-sm text-[var(--accent-primary)] font-bold input-focus font-mono" value="${student.post_test_score ?? ''}" data-email="${student.email}"></td>
+                <td class="text-primary" style="font-weight:500;">${escapeHTML(student.full_name)}</td>
+                <td><span class="badge badge-neutral">${escapeHTML(student.group_type || '')}</span></td>
+                <td><input type="number" step="0.1" class="form-input score-input score-pre" value="${escapeHTML(student.pre_test_score ?? '')}" data-email="${escapeHTML(student.email)}"></td>
+                <td><input type="number" step="0.1" class="form-input score-input score-post text-accent" value="${escapeHTML(student.post_test_score ?? '')}" data-email="${escapeHTML(student.email)}"></td>
             `;
                 tbody.appendChild(tr);
             });
@@ -1183,18 +1415,48 @@
             if (!preInput || !postInput) continue;
 
             const email = preInput.getAttribute('data-email');
-            const pre_test_score = preInput.value !== '' ? parseFloat(preInput.value) : null;
-            const post_test_score = postInput.value !== '' ? parseFloat(postInput.value) : null;
+            const pre = parseScore(preInput.value);
+            const post = parseScore(postInput.value);
 
-            updates.push({ email, pre_test_score, post_test_score });
+            // 0-100 lang. Ang isang mali-type na 1000 ay tahimik na sumisira ng
+            // research data, at ginagamit ito ng teacher dashboard sa threshold
+            // na < 70 para sa "Struggling".
+            if (!pre.ok || !post.ok) {
+                if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
+                return showCustomAlert("Validation Error",
+                    `The score for ${email} must be between 0 and 100.`, "error");
+            }
+
+            updates.push({ email, pre_test_score: pre.value, post_test_score: post.value });
         }
 
         if (updates.length > 0) {
-            const { error } = await sb.from('profiles').upsert(updates, { onConflict: 'email' });
-            if (error) {
+            // Dating .upsert(..., { onConflict: 'email' }).
+            //
+            // Dalawang bagay ang mahalaga:
+            //   * Bago ang 0010, WALANG unique constraint sa email -- kaya ang
+            //     ON CONFLICT (email) ay palaging bumabagsak. Hindi kailanman
+            //     gumana ang batch scores hangga't hindi naidadagdag iyon.
+            //   * Kahit gumagana na ito, ang upsert ay NAG-I-INSERT kapag walang
+            //     tugma. Kung may ibang admin na magbubura ng estudyante habang
+            //     nakabukas ang modal na ito, MULING BUBUHAYIN ng pag-save ang
+            //     row nila bilang multo: email at score lang, NULL ang pangalan,
+            //     at role='student' dahil sa default -- tapos lalabas ito sa
+            //     roster at sa research export.
+            //
+            // UPDATE na lang: kung wala na ang row, 0 row ang matatamaan --
+            // walang multong nagagawa.
+            const results = await Promise.all(updates.map(u =>
+                sb.from('profiles')
+                  .update({ pre_test_score: u.pre_test_score, post_test_score: u.post_test_score })
+                  .eq('email', u.email)
+            ));
+
+            const failed = results.find(r => r.error);
+            if (failed) {
                 if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
-                console.error('Batch save error:', error);
-                return showCustomAlert("Error", error.message, "error");
+                console.error('Batch save error:', failed.error);
+                return showCustomAlert("Error", friendlyDbError(failed.error, "Could not save the scores."), "error");
             }
         }
 
@@ -1226,36 +1488,36 @@
 
             // Desktop Row HTML
             const tr = document.createElement('tr');
-            tr.className = "hover:bg-[var(--bg-hover)] transition-colors professor-row cursor-pointer";
+            tr.className = "professor-row";
             tr.onclick = () => { openProfessorProfile(prof.name, prof.email, prof.department, prof.assigned_section, prof.status); };
 
             tr.innerHTML = `
-            <td class="py-4 px-4 font-medium text-primary prof-name flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-info">
-                    <i data-lucide="shield-alert" class="w-4 h-4"></i>
+            <td class="row-name-cell">
+                <div class="row-avatar-icon text-info">
+                    <i data-lucide="shield-alert" class="icon-xs"></i>
                 </div>
                 ${escapeHTML(prof.name)}
             </td>
-            <td class="py-4 px-4 text-secondary prof-email">${prof.email}</td>
-            <td class="py-4 px-4 text-secondary">${escapeHTML(prof.department)}</td>
-            <td class="py-4 px-4"><span class="px-3 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)] text-info text-[10px] font-bold uppercase tracking-wider">${escapeHTML(prof.assigned_section)}</span></td>
-            <td class="py-4 px-4">
-                <div class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full ${prof.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
-                    <span class="text-[10px] uppercase tracking-wider text-secondary">${prof.status === 'active' ? 'Active' : 'Inactive'}</span>
+            <td class="text-secondary">${escapeHTML(prof.email)}</td>
+            <td class="text-secondary">${escapeHTML(prof.department)}</td>
+            <td><span class="badge badge-info">${escapeHTML(prof.assigned_section)}</span></td>
+            <td>
+                <div class="flex-row gap-xs">
+                    <span class="status-dot ${prof.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
+                    <span class="cell-label text-secondary">${prof.status === 'active' ? 'Active' : 'Inactive'}</span>
                 </div>
             </td>
-            <td class="py-4 px-4 text-right relative" onclick="event.stopPropagation()">
-                <button onclick="toggleActionMenu(event, 'prof-${safeEmailId}')" class="p-2 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-primary transition-colors">
-                    <i data-lucide="more-vertical" class="w-4 h-4"></i>
+            <td class="action-cell" onclick="event.stopPropagation()">
+                <button onclick="toggleActionMenu(event, 'prof-${safeEmailId}')" class="action-toggle-btn">
+                    <i data-lucide="more-vertical" class="icon-sm"></i>
                 </button>
-                <div id="menu-prof-${safeEmailId}" onclick="event.stopPropagation()" class="hidden absolute w-44 bg-[var(--bg-card)] p-1.5 shadow-2xl rounded-xl border border-[var(--border-color)] space-y-1 text-left">
-                    <button onclick="resetPasswordFromMenu('${prof.email}'); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all">
-                        <i data-lucide="key" class="w-3.5 h-3.5 icon-reset"></i> Reset Password
+                <div id="menu-prof-${safeEmailId}" onclick="event.stopPropagation()" class="action-menu hidden">
+                    <button onclick="resetPasswordFromMenu('${escapeJS(prof.email)}'); closeAllMenus();" class="action-menu-item">
+                        <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
                     </button>
-                    <div class="border-t border-[var(--border-color)] my-1"></div>
-                    <button onclick="deleteUserFromMenu('${prof.email}', 'professors'); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left action-delete hover:bg-[var(--color-danger-bg)] flex items-center gap-2 transition-all">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Remove Faculty
+                    <div class="action-menu-divider"></div>
+                    <button onclick="deleteUserFromMenu('${escapeJS(prof.email)}', 'professors'); closeAllMenus();" class="action-menu-item action-delete">
+                        <i data-lucide="trash-2" class="icon-xs"></i> Remove Faculty
                     </button>
                 </div>
             </td>
@@ -1265,43 +1527,43 @@
             // Mobile Card HTML
             if (cardsContainer) {
                 const card = document.createElement('div');
-                card.className = "solid-card p-4 space-y-4 cursor-pointer professor-row hover:border-info transition-colors";
+                card.className = "solid-card card-padded professor-row prof-card";
                 card.onclick = () => { openProfessorProfile(prof.name, prof.email, prof.department, prof.assigned_section, prof.status); };
 
                 card.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-info shrink-0">
-                            <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                <div class="prof-card-head">
+                    <div class="row-name-cell">
+                        <div class="row-avatar-icon text-info prof-card-icon">
+                            <i data-lucide="shield-alert" class="icon-sm"></i>
                         </div>
                         <div>
-                            <p class="font-bold text-primary text-sm">${escapeHTML(prof.name)}</p>
-                            <p class="text-[10px] text-secondary font-mono">${prof.email}</p>
+                            <p class="prof-card-name">${escapeHTML(prof.name)}</p>
+                            <p class="cell-mono-xs">${escapeHTML(prof.email)}</p>
                         </div>
                     </div>
-                    <div class="relative" onclick="event.stopPropagation()">
-                        <button onclick="toggleActionMenu(event, 'prof-mob-${safeEmailId}')" class="p-1.5 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-primary transition-colors">
-                            <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                    <div class="action-cell" onclick="event.stopPropagation()">
+                        <button onclick="toggleActionMenu(event, 'prof-mob-${safeEmailId}')" class="action-toggle-btn">
+                            <i data-lucide="more-vertical" class="icon-sm"></i>
                         </button>
-                        <div id="menu-prof-mob-${safeEmailId}" class="hidden absolute right-0 w-44 bg-[var(--bg-card)] p-1.5 shadow-2xl rounded-xl border border-[var(--border-color)] space-y-1 text-left z-50">
-                            <button onclick="resetPasswordFromMenu('${prof.email}'); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all">
-                                <i data-lucide="key" class="w-3.5 h-3.5 icon-reset"></i> Reset Password
+                        <div id="menu-prof-mob-${safeEmailId}" class="action-menu hidden">
+                            <button onclick="resetPasswordFromMenu('${escapeJS(prof.email)}'); closeAllMenus();" class="action-menu-item">
+                                <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
                             </button>
-                            <div class="border-t border-[var(--border-color)] my-1"></div>
-                            <button onclick="deleteUserFromMenu('${prof.email}', 'professors'); closeAllMenus();" class="w-full px-3 py-2.5 rounded-lg text-xs text-left action-delete hover:bg-[var(--color-danger-bg)] flex items-center gap-2 transition-all">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Remove Faculty
+                            <div class="action-menu-divider"></div>
+                            <button onclick="deleteUserFromMenu('${escapeJS(prof.email)}', 'professors'); closeAllMenus();" class="action-menu-item action-delete">
+                                <i data-lucide="trash-2" class="icon-xs"></i> Remove Faculty
                             </button>
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3 pt-3 border-t border-[var(--border-color)]">
+                <div class="prof-card-details">
                     <div>
-                        <p class="text-[9px] uppercase tracking-widest text-secondary font-mono">Department</p>
-                        <p class="text-xs text-primary font-medium truncate">${escapeHTML(prof.department)}</p>
+                        <p class="cell-label text-secondary">Department</p>
+                        <p class="prof-card-detail-value truncate">${escapeHTML(prof.department)}</p>
                     </div>
                     <div>
-                        <p class="text-[9px] uppercase tracking-widest text-secondary font-mono">Section</p>
-                        <p class="text-xs text-info font-bold uppercase truncate">${escapeHTML(prof.assigned_section)}</p>
+                        <p class="cell-label text-secondary">Section</p>
+                        <p class="prof-card-detail-value text-info truncate">${escapeHTML(prof.assigned_section)}</p>
                     </div>
                 </div>
             `;
@@ -1324,30 +1586,82 @@
     // fully working
     async function handleRegisterProfessor(event) {
         event.preventDefault();
-        const name = document.getElementById('prof-name').value;
-        const email = document.getElementById('prof-email').value;
+
+        const form = event.target;
+        const btn = form.querySelector('button[type="submit"]');
+
+        const name = document.getElementById('prof-name').value.trim();
+        const email = normalizeEmail(document.getElementById('prof-email').value);
         const department = document.getElementById('prof-dept').value;
         const assigned_section = document.getElementById('prof-section').value;
-        const defaultPass = document.getElementById('global-default-pass')?.value || 'PIA2026!';
 
-        const authRes = await sb.rpc('admin_create_auth_user', { target_email: email, default_password: defaultPass });
-        if (authRes.error) return showCustomAlert("Auth Creation Error", authRes.error.message, "error");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return showCustomAlert("Validation Error", "Invalid email address.", "error");
+        }
 
-        const { error } = await sb.from('professors').insert([{ name, email, department, assigned_section, status: 'inactive' }]);
-        if (error) return showCustomAlert("Registration Error", error.message, "error");
+        if (btn) { btn.disabled = true; btn.textContent = 'Registering...'; }
+
+        try {
+        // Katulad ng student registration: suriin MUNA bago gumawa ng auth user.
+        // Ang admin_register_teacher ay naglalagay ng profiles row, at may
+        // UNIQUE(email) na ito mula sa 0010 -- kaya ang email na ginagamit na ng
+        // isang estudyante ay babagsak DOON, pagkatapos nang magawa ang auth
+        // user, at maiiwan ang isang orphan na hindi na kayang irehistro muli.
+        const { data: existing } = await sb.from('profiles')
+            .select('email').eq('email', email).maybeSingle();
+
+        if (existing) {
+            return showCustomAlert("Duplicate Email",
+                `${email} is already used by another account.`, "error");
+        }
+
+        const authRes = await sb.rpc('admin_create_auth_user', { target_email: email, default_password: generateSecurePassword() });
+        if (authRes.error) return showCustomAlert("Auth Creation Error", friendlyDbError(authRes.error, "Could not create the auth user."), "error");
+
+        // FIX: dati, sa `professors` table lang ipinapasok ang bagong teacher.
+        // Pero ang login (index.js) at ang teacher guard (teacher-dashboard.js)
+        // ay parehong naghahanap ng profiles row na may role='teacher' -- kaya
+        // WALA NI ISANG admin-created na teacher ang nakapasok kailanman.
+        // Iisang RPC na ngayon ang naglalagay ng DALAWANG row sa isang
+        // transaction, kaya hindi na pwedeng ma-create nang kalahati lang.
+        const { error } = await sb.rpc('admin_register_teacher', {
+            p_email: email,
+            p_name: name,
+            p_department: department,
+            p_assigned_section: assigned_section
+        });
+        if (error) return showCustomAlert("Registration Error",
+            friendlyDbError(error, "Could not save the teacher.") +
+            ' (NOTE: an auth user was already created for ' + email +
+            ' -- it must be deleted before registering again.)', "error");
 
         document.getElementById('add-professor-form').reset();
         closeModal('add-professor-modal');
         loadProfessors();
         showCustomAlert("Registration Success", `${name} added to the faculty roster.`, "success");
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Register'; }
+        }
     }
 
     // fully working
-    function openProfessorProfile(name, email, dept, section) {
+    // Tinatawag ito ng dalawang call site na may 5 argument (kasama ang status),
+    // pero 4 lang ang dating parameter dito kaya tahimik na nalalaglag ang status.
+    function openProfessorProfile(name, email, dept, section, status) {
         document.getElementById('prof-profile-name').textContent = name;
         document.getElementById('prof-profile-email').textContent = email;
         document.getElementById('prof-profile-dept').textContent = dept;
-        document.getElementById('prof-profile-section').textContent = section;
+        document.getElementById('prof-profile-section').textContent = section || 'Unassigned';
+
+        const statusEl = document.getElementById('prof-profile-status');
+        const statusDot = document.getElementById('prof-profile-status-dot');
+        if (statusEl && statusDot) {
+            const isActive = status === 'active';
+            statusEl.textContent = isActive ? 'Active' : 'Offline';
+            statusDot.className = isActive
+                ? 'status-dot status-dot-active'
+                : 'status-dot status-dot-offline';
+        }
 
         document.getElementById('professor-profile-screen').classList.remove('hidden');
         document.getElementById('professor-profile-screen').classList.add('flex');
@@ -1367,18 +1681,7 @@
     // ==========================================
 
     // fully working
-    function getDeviceSignature() {
-        const ua = navigator.userAgent;
-        let platform = "Unknown Device";
-        if (/android/i.test(ua)) platform = "Android Smartphone";
-        else if (/iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) platform = "iPadOS Tablet";
-        else if (/iPhone|iPod/.test(ua)) platform = "iOS Device";
-        else if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) platform = "macOS Computer";
-        else if (/Windows/.test(ua)) platform = "Windows PC";
-
-        const uniqueId = Math.random().toString(36).substring(2, 9);
-        return `${uniqueId} [${platform}]`;
-    }
+    // getDeviceSignature() ay nasa function.js na (shared helper)
 
     // fully working
     async function openDeviceManager(email) {
@@ -1396,7 +1699,7 @@
         container.innerHTML = '';
 
         if (!devices || devices.length === 0) {
-            container.innerHTML = `<p class="text-xs text-[var(--text-secondary)] text-center py-6">No active devices logged in.</p>`;
+            container.innerHTML = `<p class="empty-row">No active devices logged in.</p>`;
             return;
         }
 
@@ -1410,16 +1713,16 @@
             else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
 
             const item = document.createElement('div');
-            item.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-main)] p-3 rounded-xl border border-[var(--border-color)]";
+            item.className = "device-item";
             item.innerHTML = `
-            <div class="space-y-1">
-                <p class="text-xs font-bold text-primary flex items-center flex-wrap gap-2">
-                    <i data-lucide="${iconName}" class="w-3.5 h-3.5 text-accent shrink-0"></i> 
+            <div class="device-item-info">
+                <p class="device-item-name">
+                    <i data-lucide="${iconName}" class="icon-xs text-accent"></i>
                     <span>${platform}</span>
                 </p>
-                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${escapeHTML(devId)}</p>
+                <p class="device-item-id truncate">${escapeHTML(devId)}</p>
             </div>
-            <button onclick="revokeStudentDevice('${escapeHTML(currentManagingEmail)}', '${escapeHTML(devId)}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
+            <button onclick="revokeStudentDevice('${escapeJS(currentManagingEmail)}', '${escapeJS(devId)}')" class="btn-danger-outline btn-sm">
                 Logout
             </button>
         `;
@@ -1429,21 +1732,42 @@
     }
 
     // fully working
+    // BAGONG SEMANTICS: sinasara nito ang LAHAT ng session ng estudyante, hindi
+    // lang ang isang device. Ito lang ang paraan para talagang mamatay ang mga
+    // access token na naipamahagi na -- ang dating pag-edit lang sa
+    // active_devices array ay pampalamuti: nananatiling gumagana ang session ng
+    // estudyante hanggang sa mag-expire ito nang kusa (hanggang isang oras).
     async function revokeStudentDevice(email, deviceId) {
-        showCustomConfirm("Logout Device", `Log out this device session for ${email}?`, async () => {
-            const { data: student } = await sb.from('profiles').select('active_devices').eq('email', email).maybeSingle();
-            let updated = (student?.active_devices || []).filter(id => id !== deviceId);
+        showCustomConfirm(
+            "Log Out Student",
+            `Sign ${email} out of ALL devices? Kakailanganin nilang mag-log in ulit.`,
+            async () => {
+                const { error } = await sb.rpc('admin_revoke_sessions', { p_email: email });
+                if (error) return showCustomAlert("Revoke Failed", error.message, "error");
 
-            await sb.from('profiles').update({ active_devices: updated }).eq('email', email);
-            showCustomAlert("Success", "Device logged out.", "success");
-            renderDeviceList(updated);
-            loadStudents();
-        });
+                showCustomAlert("Success", "Student signed out of all devices.", "success");
+                renderDeviceList([]);
+                loadStudents();
+            }
+        );
     }
+
+    // Pigilan ang magkakapatong na tawag: ang pag-register ng device ay
+    // gumagawa ng UPDATE sa profiles table, na nagpapa-trigger ulit ng
+    // realtime event pabalik dito (setupRealtimeSubscriptions). Kung tatakbo
+    // nang sabay-sabay ang dalawang tawag, pwedeng magbasa sila ng parehong
+    // "lumang" active_devices bago pa magcommit ang isa't isa (race condition).
+    let isRegisteringAdminDevice = false;
 
     // fully working
     async function loadAdminDeviceSettings(email) {
-        const { data } = await sb.from('profiles').select('max_devices, active_devices').eq('email', email).maybeSingle();
+        if (isRegisteringAdminDevice) return;
+
+        const { data, error } = await sb.from('profiles').select('max_devices, active_devices').eq('email', email).maybeSingle();
+        if (error) {
+            console.error('loadAdminDeviceSettings: failed to read profile', error);
+            return;
+        }
         if (!data) return;
 
         const limitInput = document.getElementById('admin-device-limit-input');
@@ -1451,19 +1775,33 @@
         if (limitInput) limitInput.value = currentLimit;
 
         let activeDevices = data.active_devices || [];
-        let currentDeviceId = localStorage.getItem('pia_device_id');
-        if (!currentDeviceId || !currentDeviceId.includes('[')) {
-            currentDeviceId = getDeviceSignature();
-            localStorage.setItem('pia_device_id', currentDeviceId);
-        }
+        const currentDeviceId = getOrCreateDeviceId();
 
         if (!activeDevices.includes(currentDeviceId)) {
-            if (activeDevices.length >= currentLimit) {
-                showDeviceLimitModal(activeDevices, email);
-                return;
-            } else {
-                activeDevices.push(currentDeviceId);
-                await sb.from('profiles').update({ active_devices: activeDevices }).eq('email', email);
+            // Ang huling read-then-write sa device path. Ang
+            // `isRegisteringAdminDevice` na flag ay in-page lang -- wala itong
+            // nakikitang ibang tab, ibang PC, o ang login ng estudyante mismo,
+            // kaya hindi ito tunay na proteksyon laban sa race.
+            //
+            // Ang claim_device() ay gumagamit ng SELECT ... FOR UPDATE, at ito
+            // rin ang nagpapatupad ng limit sa server -- kaya iisa na lang ang
+            // desisyon, hindi dalawang magkahiwalay na kopya ng parehong tuntunin.
+            isRegisteringAdminDevice = true;
+            try {
+                const { data: claimed, error: claimError } = await sb.rpc('claim_device', {
+                    p_device_id: currentDeviceId
+                });
+
+                if (claimError) {
+                    console.error('loadAdminDeviceSettings: claim_device failed', claimError);
+                } else if (claimed && claimed.allowed === false) {
+                    showDeviceLimitModal(claimed.devices || activeDevices, email);
+                    return;
+                } else if (claimed && claimed.devices) {
+                    activeDevices = claimed.devices;
+                }
+            } finally {
+                isRegisteringAdminDevice = false;
             }
         }
         renderAdminDeviceList(activeDevices);
@@ -1489,20 +1827,20 @@
             else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
 
             const isCurrentDevice = (devId === currentDeviceId);
-            const badgeHTML = isCurrentDevice ? `<span class="px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[9px] uppercase tracking-wider font-bold shadow-sm">This Device</span>` : '';
+            const badgeHTML = isCurrentDevice ? `<span class="badge badge-neutral">This Device</span>` : '';
 
             const item = document.createElement('div');
-            item.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-main)] p-3 rounded-xl border border-[var(--border-color)]";
+            item.className = "device-item";
             item.innerHTML = `
-            <div class="space-y-1">
-                <p class="text-xs font-bold text-primary flex items-center flex-wrap gap-2">
-                    <i data-lucide="${iconName}" class="w-3.5 h-3.5 text-accent shrink-0"></i>
+            <div class="device-item-info">
+                <p class="device-item-name">
+                    <i data-lucide="${iconName}" class="icon-xs text-accent"></i>
                     <span>${platform}</span>
                     ${badgeHTML}
                 </p>
-                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${escapeHTML(devId)}</p>
+                <p class="device-item-id truncate">${escapeHTML(devId)}</p>
             </div>
-            <button onclick="revokeDeviceFromLimitModal('${escapeHTML(devId)}', '${escapeHTML(email)}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
+            <button onclick="revokeDeviceFromLimitModal('${escapeJS(devId)}', '${escapeJS(email)}')" class="btn-danger-outline btn-sm">
                 Revoke
             </button>
         `;
@@ -1515,22 +1853,31 @@
 
     // Revokes a device from the device-limit modal, then re-registers the current device and continues loading.
     async function revokeDeviceFromLimitModal(deviceId, email) {
-        const { data: adminProfile } = await sb.from('profiles').select('active_devices, max_devices').eq('email', email).maybeSingle();
-        let updated = (adminProfile?.active_devices || []).filter(id => id !== deviceId);
+        // Dalawang atomic na hakbang sa halip na isang read-filter-write:
+        // (1) palayain ang slot, (2) angkinin ito para sa device na ito.
+        // Ang dating bersyon ay nagsusulat ng buong array nang minsanan, kaya
+        // ang kahit anong login na nangyari sa pagitan ng read at write ay
+        // tahimik na nabubura.
+        const { error: revokeError } = await sb.rpc('admin_revoke_device', {
+            p_email: email, p_device_id: deviceId
+        });
+        if (revokeError) return showCustomAlert("Error", revokeError.message, "error");
 
-        // Register the current device now that a slot is free
-        let currentDeviceId = localStorage.getItem('pia_device_id');
-        if (!currentDeviceId || !currentDeviceId.includes('[')) {
-            currentDeviceId = getDeviceSignature();
-            localStorage.setItem('pia_device_id', currentDeviceId);
+        const currentDeviceId = getOrCreateDeviceId();
+        let updated = [];
+
+        if (deviceId !== currentDeviceId) {
+            const { data: claimed, error: claimError } = await sb.rpc('claim_device', {
+                p_device_id: currentDeviceId
+            });
+            if (claimError) return showCustomAlert("Error", claimError.message, "error");
+            updated = (claimed && claimed.devices) || [];
+        } else {
+            const { data: after } = await sb.from('profiles')
+                .select('active_devices').eq('email', email).maybeSingle();
+            updated = (after && after.active_devices) || [];
         }
 
-        if (deviceId !== currentDeviceId && !updated.includes(currentDeviceId)) {
-            updated.push(currentDeviceId);
-        }
-
-        const { error } = await sb.from('profiles').update({ active_devices: updated }).eq('email', email);
-        if (error) return showCustomAlert("Error", error.message, "error");
         closeModal('device-limit-modal');
         showCustomAlert("Device Revoked", "The session was revoked and this device is now registered.", "success");
         renderAdminDeviceList(updated);
@@ -1556,7 +1903,9 @@
         const input = document.getElementById('admin-device-limit-input');
         const newLimit = parseInt(input.value) || 1;
 
-        await sb.from('profiles').update({ max_devices: newLimit }).eq('email', currentAdminEmail);
+        const { error } = await sb.from('profiles').update({ max_devices: newLimit }).eq('email', currentAdminEmail);
+        if (error) return showCustomAlert("Update Failed", friendlyDbError(error, "Could not update the device limit."), "error");
+
         input.disabled = true;
         input.classList.add('opacity-50');
         document.getElementById('edit-admin-limit-btn').style.display = 'inline-block';
@@ -1571,7 +1920,7 @@
         container.innerHTML = '';
 
         if (!devices || devices.length === 0) {
-            container.innerHTML = `<p class="text-xs text-[var(--text-secondary)]">No active devices found.</p>`;
+            container.innerHTML = `<p class="empty-row">No active devices found.</p>`;
             return;
         }
 
@@ -1587,20 +1936,20 @@
             else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
 
             const isCurrentDevice = (devId === currentDeviceId);
-            const badgeHTML = isCurrentDevice ? `<span class="px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--accent-primary)] text-[9px] uppercase tracking-wider font-bold shadow-sm">This Device</span>` : '';
+            const badgeHTML = isCurrentDevice ? `<span class="badge badge-neutral">This Device</span>` : '';
 
             const item = document.createElement('div');
-            item.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-main)] p-3 rounded-xl border border-[var(--border-color)]";
+            item.className = "device-item";
             item.innerHTML = `
-            <div class="space-y-1">
-                <p class="text-xs font-bold text-primary flex items-center flex-wrap gap-2">
-                    <i data-lucide="${iconName}" class="w-3.5 h-3.5 text-accent shrink-0"></i> 
+            <div class="device-item-info">
+                <p class="device-item-name">
+                    <i data-lucide="${iconName}" class="icon-xs text-accent"></i>
                     <span>${platform}</span>
                     ${badgeHTML}
                 </p>
-                <p class="text-[10px] font-mono text-[var(--text-secondary)] truncate max-w-[200px]">${escapeHTML(devId)}</p>
+                <p class="device-item-id truncate">${escapeHTML(devId)}</p>
             </div>
-            <button onclick="revokeAdminDevice('${escapeHTML(devId)}')" class="w-full sm:w-auto px-4 py-2 rounded-lg btn-danger-outline text-[10px] font-bold uppercase tracking-wider shrink-0">
+            <button onclick="revokeAdminDevice('${escapeJS(devId)}')" class="btn-danger-outline btn-sm">
                 Logout
             </button>
         `;
@@ -1612,10 +1961,14 @@
     // fully working
     async function revokeAdminDevice(deviceId) {
         showCustomConfirm("Logout Device", `Are you sure you want to log out this admin device session?`, async () => {
-            const { data: adminProfile } = await sb.from('profiles').select('active_devices').eq('email', currentAdminEmail).maybeSingle();
-            let updated = (adminProfile?.active_devices || []).filter(id => id !== deviceId);
+            // Atomic na ngayon: dating read-filter-write, na tahimik na
+            // nagpapawalang-bisa sa isang login na nangyari sa pagitan.
+            const { data, error } = await sb.rpc('admin_revoke_device', {
+                p_email: currentAdminEmail, p_device_id: deviceId
+            });
+            if (error) return showCustomAlert("Revoke Failed", error.message, "error");
 
-            await sb.from('profiles').update({ active_devices: updated }).eq('email', currentAdminEmail);
+            const updated = (data && data.devices) || [];
             showCustomAlert("Success", "Admin device logged out.", "success");
             renderAdminDeviceList(updated);
 
@@ -1650,51 +2003,27 @@
     // ==========================================
 
     // fully working
+    // NOTE: 'global_password' ay tinanggal na mula sa settings table (security fix --
+    // dating readable ito ng kahit sino via ang public anon key dahil parehong
+    // table ang binabasa pre-login para sa stage_ocean/stage_char/stage_dash flags).
+    // Random na password na per-student na ang ginagamit ngayon (generateSecurePassword()),
+    // kaya wala nang password value na kailangang i-load dito.
     async function loadSettings() {
         const { data } = await sb.from('settings').select('*');
         if (!data) return;
 
         data.forEach(item => {
-            if (item.key === 'global_password') {
-                const passEl = document.getElementById('global-default-pass');
-                if (passEl) passEl.value = item.value;
-            } else if (item.key.startsWith('stage_')) {
+            if (item.key && item.key.startsWith('stage_')) {
                 const stageKey = item.key.replace('stage_', '');
                 const checkbox = document.getElementById(`toggle-${stageKey}`);
                 const lbl = document.getElementById(`${stageKey}-status-lbl`);
                 if (checkbox && lbl) {
                     checkbox.checked = item.value === true || item.value === 'true';
                     lbl.textContent = checkbox.checked ? "Open" : "Closed";
-                    lbl.className = checkbox.checked ? "text-xs font-bold text-[var(--accent-primary)]" : "text-xs font-bold text-[var(--text-secondary)]";
+                    lbl.className = checkbox.checked ? "stage-status-lbl open" : "stage-status-lbl";
                 }
             }
         });
-    }
-
-    // fully working
-    async function saveGlobalPassword() {
-        const input = document.getElementById('global-default-pass');
-        await sb.from('settings').upsert({ key: 'global_password', value: input.value });
-        input.disabled = true;
-        input.classList.add('opacity-50');
-        document.getElementById('edit-pass-btn').style.display = 'inline-block';
-        document.getElementById('save-pass-btn').style.display = 'none';
-        showCustomAlert("Settings Updated", "Global default password updated!", "success");
-    }
-
-    // fully working
-    function toggleEditPassword() {
-        const input = document.getElementById('global-default-pass');
-        input.disabled = false;
-        input.classList.remove('opacity-50');
-        input.focus();
-        document.getElementById('edit-pass-btn').style.display = 'none';
-        document.getElementById('save-pass-btn').style.display = 'inline-block';
-    }
-
-    // fully working
-    function togglePasswordVisibilityCheckbox() {
-        document.getElementById('global-default-pass').type = document.getElementById('show-pass-checkbox').checked ? 'text' : 'password';
     }
 
     // fully working
@@ -1702,8 +2031,28 @@
         const isOpen = checkbox.checked;
         const lbl = document.getElementById(`${stage}-status-lbl`);
         lbl.textContent = isOpen ? "Open" : "Closed";
-        lbl.className = "text-xs font-bold uppercase tracking-wider " + (isOpen ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]");
-        await sb.from('settings').upsert({ key: `stage_${stage}`, value: isOpen }, { onConflict: 'key' });
+        lbl.className = isOpen ? "stage-status-lbl open" : "stage-status-lbl";
+
+        // Dating direktang `settings` upsert. Ang problema: ang pagsasara ng
+        // stage ay HINDI nagpapaalis ng mga nakapasok na -- dahil ang sarili
+        // nilang current_stage ang nagsisilbing targeted grant, tuloy-tuloy pa
+        // rin silang nakakapasok sa pamamagitan ng direktang URL. Ang RPC ang
+        // nagbabalik sa kanila sa Waiting Room kasabay ng pagsasara.
+        const { data, error } = await sb.rpc('admin_set_stage_open', {
+            p_stage: stage,
+            p_open: isOpen
+        });
+
+        if (error) {
+            checkbox.checked = !isOpen;
+            lbl.textContent = !isOpen ? "Open" : "Closed";
+            lbl.className = !isOpen ? "stage-status-lbl open" : "stage-status-lbl";
+            return showCustomAlert("Stage Control Error", error.message, "error");
+        }
+
+        if (!isOpen && data && data.evicted > 0) {
+            showCustomAlert("Stage Closed", `${data.evicted} student(s) were returned to the Waiting Room.`, "info");
+        }
     }
 
     // fully working
@@ -1721,7 +2070,7 @@
             document.getElementById('target-student-search').value = '';
             document.getElementById('target-student-email-selected').value = '';
             document.getElementById('selected-target-student-lbl').textContent = 'No student selected';
-            document.getElementById('selected-target-student-lbl').className = 'text-[10px] font-mono text-accent';
+            document.getElementById('selected-target-student-lbl').className = 'target-selected-lbl';
             filterTargetStudents();
         }
 
@@ -1732,35 +2081,71 @@
     }
 
     // fully working
+    // DALAWANG BUG DITO DATI:
+    //
+    // (1) Ang hinahanap ay `studentDataCache` -- ang KASALUKUYANG PAHINA lang
+    //     ng roster (50 row), at sinasalamin pa nito ang aktibong group/stage
+    //     filter. Sa 76 na estudyante, ang nasa page 2 ay HINDI kayang i-target
+    //     kahit kailan, at kapag may drilldown na aktibo ay iilan lang ang
+    //     makikita. Direktang query na sa DB ngayon -- hiwalay sa roster.
+    //
+    // (2) `s.full_name.toLowerCase()` ay pumuputok kapag NULL ang full_name,
+    //     at kasama ang buong listahan sa pagkabigo.
+    let targetSearchTimer = null;
+
     function filterTargetStudents() {
-        const query = document.getElementById('target-student-search').value.toLowerCase();
+        clearTimeout(targetSearchTimer);
+        targetSearchTimer = setTimeout(runTargetStudentSearch, 250);
+    }
+
+    async function runTargetStudentSearch() {
         const listContainer = document.getElementById('target-student-list');
-        listContainer.innerHTML = '';
+        if (!listContainer) return;
 
-        const filtered = studentDataCache.filter(s =>
-            s.full_name.toLowerCase().includes(query) ||
-            s.email.toLowerCase().includes(query)
-        );
+        const raw = (document.getElementById('target-student-search').value || '').trim();
+        // Ang koma at parentheses ang mga delimiter ng PostgREST .or() filter --
+        // kung hindi aalisin, sisira sila ng query o magpapalabas ng 400.
+        const query = raw.replace(/[,()]/g, ' ').trim();
 
-        if (filtered.length === 0) {
-            listContainer.innerHTML = '<p class="text-[10px] text-secondary text-center py-2">No student found.</p>';
+        listContainer.innerHTML = '<p class="empty-row">Searching...</p>';
+
+        let q = sb.from('profiles')
+            .select('full_name, email, section')
+            .neq('role', 'admin')
+            .order('full_name', { ascending: true })
+            .limit(50);
+
+        if (query) q = q.or(`full_name.ilike.%${query}%,email.ilike.%${query}%`);
+
+        const { data, error } = await q;
+
+        if (error) {
+            listContainer.innerHTML = `<p class="empty-row">Search failed: ${escapeHTML(error.message)}</p>`;
             return;
         }
 
-        filtered.forEach(student => {
+        listContainer.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            listContainer.innerHTML = '<p class="empty-row">No student found.</p>';
+            return;
+        }
+
+        data.forEach(student => {
             const item = document.createElement('div');
-            item.className = 'flex justify-between items-center p-2 hover:bg-[var(--bg-hover)] cursor-pointer rounded border border-transparent hover:border-[var(--border-color)] transition-colors';
+            item.className = 'target-student-item';
 
             item.onclick = () => {
                 document.getElementById('target-student-email-selected').value = student.email;
-                document.getElementById('selected-target-student-lbl').textContent = student.full_name;
-                document.getElementById('selected-target-student-lbl').className = 'text-[10px] font-mono text-success font-bold';
+                document.getElementById('selected-target-student-lbl').textContent =
+                    student.full_name || student.email;
+                document.getElementById('selected-target-student-lbl').className = 'target-selected-lbl selected';
             };
 
             item.innerHTML = `
-            <div class="overflow-hidden">
-                <p class="text-xs font-bold text-primary truncate">${escapeHTML(student.full_name)}</p>
-                <p class="text-[10px] font-mono text-secondary truncate">${escapeHTML(student.email)}</p>
+            <div class="truncate">
+                <p class="target-student-item-name truncate">${escapeHTML(student.full_name || '(no name)')}</p>
+                <p class="cell-mono-xs truncate">${escapeHTML(student.email)}</p>
             </div>
         `;
             listContainer.appendChild(item);
@@ -1768,47 +2153,63 @@
     }
 
     // fully working
+    // Dati, current_stage lang ang isinusulat nito. Pero sinusuri rin ng route
+    // guard (canEnterStage) ang is_ocean_done at selected_character, kaya ang
+    // grant ay agad na binabawi: ibinabalik ng guard ang estudyante sa waiting
+    // room, at ino-overwrite ng waiting room ang current_stage pabalik sa
+    // "Waiting Room" -- habang nakikita mo namang "success" ang toast.
+    //
+    // Ang RPC na ngayon ang nagre-reset ng TAMANG prerequisite flag bawat
+    // stage, at nag-uulat kung sino ang hindi kayang bigyan (hal. hindi pa
+    // tapos ang OCEAN test) sa halip na tahimik na palitan ang datos nila.
     async function executeTargetedOpen() {
         const stageKey = document.getElementById('target-stage-key').value;
         const mode = document.getElementById('target-mode').value;
         const btn = document.getElementById('grant-access-btn');
 
-        let targetStage = 'Waiting Room';
-        if (stageKey === 'ocean') targetStage = 'OCEAN';
-        if (stageKey === 'char') targetStage = 'Character Selection';
-        if (stageKey === 'dash') targetStage = 'Tutoring Dashboard';
+        const args = { p_stage: stageKey, p_emails: null, p_section: null };
+
+        if (mode === 'section') {
+            const section = document.getElementById('target-section-select').value;
+            // Dating walang check dito: ang blangkong section ay nagre-resulta
+            // sa .eq('section', '') na tumatama sa lahat ng walang section.
+            if (!section) return showCustomAlert("Validation Error", "Please select a section first.", "error");
+            args.p_section = section;
+        } else {
+            const email = document.getElementById('target-student-email-selected').value;
+            if (!email) return showCustomAlert("Validation Error", "Please select a student first.", "error");
+            args.p_emails = [email];
+        }
 
         btn.disabled = true;
         btn.innerHTML = 'Processing...';
 
-        let error = null;
-
-        if (mode === 'section') {
-            const section = document.getElementById('target-section-select').value;
-            const res = await sb.from('profiles').update({ current_stage: targetStage }).eq('section', section);
-            error = res.error;
-        } else {
-            const email = document.getElementById('target-student-email-selected').value;
-            if (!email) {
-                showCustomAlert("Validation Error", "Please select a student first.", "error");
-                btn.disabled = false;
-                btn.innerHTML = 'Grant Access';
-                return;
-            }
-            const res = await sb.from('profiles').update({ current_stage: targetStage }).eq('email', email);
-            error = res.error;
-        }
+        const { data, error } = await sb.rpc('admin_grant_stage', args);
 
         btn.disabled = false;
         btn.innerHTML = 'Grant Access';
 
-        if (error) {
-            showCustomAlert("Error", error.message, "error");
-        } else {
-            closeModal('targeted-modal');
-            showCustomAlert("Access Granted", `Successfully moved target to ${targetStage}.`, "success");
-            loadStudents();
+        if (error) return showCustomAlert("Error", error.message, "error");
+
+        const granted = (data && data.granted) || [];
+        const skipped = (data && data.skipped) || [];
+
+        closeModal('targeted-modal');
+        loadStudents();
+        updateStageCounters();
+
+        if (skipped.length === 0) {
+            showCustomAlert("Access Granted", `${granted.length} student(s) moved to ${stageKey.toUpperCase()}.`, "success");
+            return;
         }
+
+        const lines = skipped.slice(0, 5).map(s => `• ${s.email}: ${s.reason}`).join('\n');
+        const more = skipped.length > 5 ? `\n…at ${skipped.length - 5} pa.` : '';
+        showCustomAlert(
+            granted.length ? "Partially Granted" : "Nothing Granted",
+            `Granted: ${granted.length}\nSkipped: ${skipped.length}\n\n${lines}${more}`,
+            granted.length ? "info" : "error"
+        );
     }
 
 
@@ -1871,35 +2272,26 @@
         }
     }
 
-    // fully working
+    // Security fix: hindi na admin ang nagse-set ng known password (na dating
+    // nire-reuse mula sa isang public-readable setting). Sa halip, magpapadala
+    // ng self-service reset email kung saan ang estudyante/professor mismo ang
+    // magtatakda ng bago at sarili nilang password.
     async function resetPasswordFromMenu(email) {
-        const defaultPass = document.getElementById('global-default-pass')?.value || 'PIA2026!';
-        showCustomConfirm("Reset Password", `Reset password for ${email} to ${defaultPass}?`, async () => {
-            const { error } = await sb.rpc('admin_reset_password', { target_email: email, new_password: defaultPass });
+        showCustomConfirm("Reset Password", `Send a password-reset email to ${email}? They'll set their own new password via the link.`, async () => {
+            const { error } = await sb.auth.resetPasswordForEmail(email, {
+                redirectTo: new URL('../../assets/html/sign-up.html', window.location.href).href
+            });
             if (error) return showCustomAlert("Reset Failed", error.message, "error");
-            showCustomAlert("Success", `Password reset successfully to: ${defaultPass}`, "success");
+            showCustomAlert("Success", `Password-reset email sent to ${email}.`, "success");
         });
     }
 
     // fully working
     async function handleAdminSignOut() {
-        try {
-            const email = localStorage.getItem('pia_user_email');
-            const deviceId = localStorage.getItem('pia_device_id');
-            if (email && typeof sb !== 'undefined') {
-                const { data } = await sb.from('profiles').select('active_devices').eq('email', email).maybeSingle();
-                if (data && data.active_devices) {
-                    const updated = data.active_devices.filter(d => d !== deviceId);
-                    await sb.from('profiles').update({ active_devices: updated }).eq('email', email);
-                }
-            }
-            if (typeof sb !== 'undefined') await sb.auth.signOut();
-        } catch (err) {
-            console.error("Sign out error:", err);
-        }
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.replace('../../index.html');
+        // Ang shared helper ang humahawak ng device release + GLOBAL signOut
+        // (pinapatay ang refresh tokens sa server, hindi lang ang lokal na
+        // kopya) + storage cleanup. Dati, local-scope signOut lang ito.
+        await executeForceLogout();
     }
 
 
@@ -1962,7 +2354,7 @@
     Object.assign(global, {
         switchTab, toggleMobileMenu, handleAdminSignOut, openModal, closeModal,
         toggleStageDrilldown, clearStageDrilldown, setGroupFilter, setSubgroupFilter,
-        toggleEditPassword, saveGlobalPassword, openTargetedModal, executeTargetedOpen,
+        openTargetedModal, executeTargetedOpen,
         toggleEditAdminLimit, saveAdminDeviceLimit, closeStudentProfile, toggleAvatarVisibility,
         closeProfessorProfile, revokeAdminDevice, deleteUserFromMenu,
         sendActivationEmail, sendSectionEmails, resetPasswordFromMenu,
@@ -1973,7 +2365,7 @@
         showCustomAlert, handleAdminPasswordUpdate,
         handleRegisterStudent, handleUpdateStudent, handleRegisterProfessor, toggleActionMenu,
         openStudentProfile, saveBatchScores, showCustomConfirm,
-        saveNewSection, updateStageControl, togglePasswordVisibilityCheckbox, openScoresModal,
+        saveNewSection, updateStageControl, openScoresModal,
         openScoresModalFromDetails, filterTargetStudents, revokeStudentDevice,
         revokeDeviceFromLimitModal, closeCustomAlert, closeCustomConfirm
     });

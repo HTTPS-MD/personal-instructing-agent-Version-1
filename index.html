@@ -5,130 +5,106 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="/assets/css/style.css">
-    <link rel="stylesheet" href="/admin/css/admin-dashboard.css">
+    <link rel="stylesheet" href="/styles/tokens.css">
+    <link rel="stylesheet" href="/styles/base.css">
+    <link rel="stylesheet" href="/styles/components.css">
+    <link rel="stylesheet" href="/styles/pages/home.css">
     <title>Personal Instructing Agent</title>
 </head>
 
-<body class="font-sans overflow-x-hidden text-primary bg-main">
+<body>
 
     <!-- HEADER / NAVBAR -->
-    <header
-        class="w-full px-4 sm:px-8 py-4 flex justify-between items-center border-b border-custom solid-nav sticky top-0 z-50 bg-main">
+    <header class="site-nav">
+        <div class="site-nav-inner">
+            <a href="#" class="site-nav-logo"><img src="/assets/images/logo.png" alt="PIA Logo"></a>
 
-        <!-- Left: Logo -->
-        <div class="flex items-center justify-start">
-            <a href="#" class="flex items-center gap-3">
-                <img src="/assets/images/logo.png" alt="PIA Logo" class="h-10 sm:h-11">
-            </a>
-        </div>
+            <nav class="site-nav-links">
+                <a href="#home" class="admin-nav-btn">Home</a>
+                <a href="#tutor-section" class="admin-nav-btn">Tutors</a>
+                <a href="#core-features" class="admin-nav-btn">Features</a>
+                <a href="#how-it-works" class="admin-nav-btn">Methodology</a>
+                <a href="#faq" class="admin-nav-btn">FAQ</a>
+                <a href="#contact" class="admin-nav-btn">Contact</a>
+            </nav>
 
-        <!-- Center: Navigation Links (Desktop) -->
-        <nav class="hidden md:flex items-center justify-center gap-2">
-            <a href="#home" class="admin-nav-btn">Home</a>
-            <a href="#tutor-section" class="admin-nav-btn">Tutors</a>
-            <a href="#core-features" class="admin-nav-btn">Features</a>
-            <a href="#how-it-works" class="admin-nav-btn">Methodology</a>
-            <a href="#faq" class="admin-nav-btn">FAQ</a>
-            <a href="#contact" class="admin-nav-btn">Contact</a>
-        </nav>
+            <div class="flex-row gap-sm">
+                <!-- Logged Out State -->
+                <div id="logged-out-container" class="hide-mobile">
+                    <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="nav-auth-btn"
+                        class="btn-primary">Sign In</a>
+                </div>
 
-        <!-- Right: Auth Button & Mobile Toggle -->
-        <div class="flex items-center justify-end gap-3">
-            <!-- Logged Out State -->
-            <div id="logged-out-container" class="hidden md:flex items-center h-full">
-                <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="nav-auth-btn"
-                    class="btn-primary px-6 py-2.5 rounded-lg text-xs uppercase tracking-wider font-bold shadow-md text-center">Sign
-                    In</a>
-            </div>
+                <!-- Logged In State (Hover to see dropdown) -->
+                <div id="logged-in-container" class="hidden nav-user-menu">
+                    <button id="nav-user-dropdown" class="nav-user-dropdown-btn">
+                        <span id="nav-user-greeting">Loading...</span>
+                        <i data-lucide="chevron-down" class="icon-sm text-secondary"></i>
+                    </button>
 
-            <!-- Logged In State (Hover to see dropdown) -->
-            <div id="logged-in-container" class="hidden items-center h-full relative group">
-                <button id="nav-user-dropdown"
-                    class="flex items-center gap-2 text-primary hover:text-accent font-medium text-sm tracking-wider transition-colors py-2 bg-transparent border-none">
-                    <span id="nav-user-greeting">Loading...</span>
-                    <i data-lucide="chevron-down" class="w-4 h-4 text-secondary"></i>
-                </button>
-
-                <div id="nav-dropdown-menu" class="absolute right-0 top-full pt-2 w-56 hidden group-hover:block z-50">
-                    <div class="solid-card rounded-xl shadow-2xl border border-custom overflow-hidden p-2 space-y-1">
-                        <div class="px-3.5 py-3 border-b border-custom bg-black/10">
-                            <p class="text-[10px] text-secondary font-mono uppercase tracking-wider mb-0.5">Signed in as
-                            </p>
-                            <p class="text-xs font-mono text-primary break-words whitespace-normal leading-tight"
-                                id="nav-user-email"></p>
+                    <div id="nav-dropdown-menu" class="nav-dropdown-menu">
+                        <div class="solid-card nav-dropdown-card">
+                            <div class="nav-dropdown-header">
+                                <p class="nav-dropdown-header-label">Signed in as</p>
+                                <p class="nav-dropdown-header-email" id="nav-user-email"></p>
+                            </div>
+                            <button onclick="openChangePasswordModal()" class="nav-dropdown-item">
+                                <i data-lucide="key" class="icon-xs text-warning"></i> Change Password
+                            </button>
+                            <button onclick="executeForceLogout()" class="nav-dropdown-item nav-dropdown-item-danger">
+                                <i data-lucide="log-out" class="icon-xs"></i> Sign Out
+                            </button>
                         </div>
-                        <button onclick="openChangePasswordModal()"
-                            class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-secondary hover:bg-[var(--bg-hover)] hover:text-primary transition-colors flex items-center gap-2">
-                            <i data-lucide="key" class="w-3.5 h-3.5 text-warning"></i> Change Password
-                        </button>
-                        <button onclick="executeForceLogout()"
-                            class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-danger hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger-hover)] transition-colors flex items-center gap-2 border-t border-custom">
-                            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Sign Out
-                        </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Mobile Navigation Menu Toggle Button -->
-            <button id="mobile-toggle"
-                class="md:hidden w-12 h-12 rounded-xl btn-icon flex items-center justify-center relative z-50 cursor-pointer">
-                <i data-lucide="menu" class="w-6 h-6 pointer-events-none"></i>
-            </button>
+                <!-- Mobile Navigation Menu Toggle Button -->
+                <button id="mobile-toggle" class="mobile-menu-toggle">
+                    <i data-lucide="menu" class="icon-md"></i>
+                </button>
+            </div>
         </div>
     </header>
 
     <!-- MOBILE MENU BACKDROP -->
-    <div id="menu-backdrop" class="fixed inset-0 z-40 hidden dark-backdrop"></div>
+    <div id="menu-backdrop" class="mobile-menu-backdrop hidden"></div>
 
     <!-- MOBILE NAVIGATION DRAWER -->
-    <div id="mobile-menu"
-        class="fixed top-0 right-0 h-full w-72 solid-sidebar z-50 transform translate-x-full md:hidden flex flex-col justify-between pt-3 px-6 pb-4 bg-main shadow-2xl transition-transform duration-300 ease-in-out pointer-events-none">
+    <div id="mobile-menu" class="mobile-menu">
 
         <!-- Floating Close Box -->
-        <button id="dynamic-close-btn"
-            class="opacity-0 transition-opacity duration-200 absolute top-4 -left-12 w-12 h-12 bg-main border-y border-l border-custom rounded-l-xl flex items-center justify-center shadow-[-5px_0_15px_var(--shadow-heavy)] hover:bg-hover cursor-pointer">
-            <i data-lucide="x" class="w-5 h-5 text-secondary"></i>
+        <button id="dynamic-close-btn" class="mobile-menu-close">
+            <i data-lucide="x" class="icon-md text-secondary"></i>
         </button>
 
-        <div class="flex flex-col justify-between h-full w-full">
-            <div class="border-b border-custom pb-3 pt-2 mt-3">
-                <h3 class="font-extrabold tracking-wide mb-2.5">
-                    <span id="mobile-greeting-prefix"
-                        class="block mb-0.5 text-xs text-secondary uppercase tracking-widest">Welcome,</span>
-                    <span id="mobile-greeting-name" class="block leading-tight text-xl text-accent font-black">Student
-                        Player</span>
-                </h3>
+        <div class="mobile-menu-inner">
+            <div class="mobile-greeting-block">
+                <span id="mobile-greeting-prefix" class="mobile-greeting-prefix">Welcome,</span>
+                <span id="mobile-greeting-name" class="mobile-greeting-name">Student Player</span>
             </div>
 
-            <div class="flex flex-col gap-1 my-auto">
-                <a href="#home" class="mobile-nav-link admin-nav-btn text-left block py-2.5 px-3 rounded-lg">Home</a>
-                <a href="#tutor-section"
-                    class="mobile-nav-link admin-nav-btn text-left block py-2.5 px-3 rounded-lg">Tutors</a>
-                <a href="#core-features"
-                    class="mobile-nav-link admin-nav-btn text-left block py-2.5 px-3 rounded-lg">Features</a>
-                <a href="#how-it-works"
-                    class="mobile-nav-link admin-nav-btn text-left block py-2.5 px-3 rounded-lg">Methodology</a>
-                <a href="#faq" class="mobile-nav-link admin-nav-btn text-left block py-2.5 px-3 rounded-lg">FAQ</a>
-                <a href="#contact"
-                    class="mobile-nav-link admin-nav-btn text-left block py-2.5 px-3 rounded-lg">Contact</a>
+            <div class="mobile-menu-links">
+                <a href="#home" class="mobile-nav-link admin-nav-btn">Home</a>
+                <a href="#tutor-section" class="mobile-nav-link admin-nav-btn">Tutors</a>
+                <a href="#core-features" class="mobile-nav-link admin-nav-btn">Features</a>
+                <a href="#how-it-works" class="mobile-nav-link admin-nav-btn">Methodology</a>
+                <a href="#faq" class="mobile-nav-link admin-nav-btn">FAQ</a>
+                <a href="#contact" class="mobile-nav-link admin-nav-btn">Contact</a>
             </div>
 
-            <div class="border-t border-custom pt-4 pb-2 flex flex-col gap-1.5 shrink-0">
+            <div class="mobile-menu-actions">
                 <button id="mobile-change-pass-btn"
                     onclick="openChangePasswordModal(); document.getElementById('dynamic-close-btn').click();"
-                    class="hidden w-full text-left px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider btn-secondary shadow-md flex items-center justify-center gap-2">
-                    <i data-lucide="key" class="w-4 h-4 text-warning"></i> Change Password
+                    class="btn-secondary btn-block hidden">
+                    <i data-lucide="key" class="icon-sm text-warning"></i> Change Password
                 </button>
 
                 <a href="javascript:void(0)"
                     onclick="openAuthModal('signin'); document.getElementById('dynamic-close-btn').click();"
-                    id="mobile-auth-btn"
-                    class="w-full text-center px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-wider btn-primary shadow-md flex items-center justify-center gap-2">
-                    <i data-lucide="log-in" id="mobile-auth-icon" class="w-4 h-4"></i>
+                    id="mobile-auth-btn" class="btn-primary btn-block">
+                    <i data-lucide="log-in" id="mobile-auth-icon" class="icon-sm"></i>
                     <span id="mobile-auth-text">Sign In</span>
                 </a>
             </div>
@@ -136,157 +112,144 @@
     </div>
 
     <!-- Hero Section -->
-    <main class="relative w-full h-[100vh] flex items-center justify-center overflow-hidden" id="home">
-        <video autoplay muted loop playsinline
-            class="absolute top-1/2 left-1/2 min-w-full min-h-full w-auto h-auto -translate-x-1/2 -translate-y-1/2 object-cover z-0 opacity-80 pointer-events-none">
+    <main class="hero-section" id="home">
+        <video autoplay muted loop playsinline class="hero-video">
             <source src="/assets/videos/AdobeStock_1646385409.mov" type="video/mp4">
             Your browser does not support the video tag.
         </video>
 
-        <div class="absolute inset-0 z-10 bg-gradient-to-b from-black/70 via-black/50 to-main pointer-events-none">
-        </div>
+        <div class="hero-overlay"></div>
 
-        <div class="relative z-20 flex flex-col items-center text-center gap-6 px-6 max-w-4xl mx-auto mt-16 md:mt-0">
-            <h1 class="text-5xl md:text-7xl font-black tracking-tight leading-none text-white drop-shadow-2xl">
+        <div class="hero-content">
+            <h1 class="hero-title">
                 Personal Instructing <span class="text-accent">Agent</span>
             </h1>
-            <p class="text-base md:text-xl text-secondary drop-shadow-md max-w-2xl font-medium leading-relaxed">
+            <p class="hero-desc">
                 Ang iyong AI-powered math tutoring system para sa mga Grade 7 students. Matuto nang mabilis at mas
                 epektibo.
             </p>
-            <div class="flex flex-col sm:flex-row gap-4 mt-6">
-                <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="hero-btn"
-                    class="btn-game-primary px-8 py-4 rounded-xl text-sm flex items-center justify-center gap-3">
+            <div class="hero-actions">
+                <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="hero-btn" class="btn-game-primary">
                     <span>Start Adventure</span>
-                    <i data-lucide="play" class="w-4 h-4 fill-current pointer-events-none"></i>
+                    <i data-lucide="play" class="icon-sm"></i>
                 </a>
-                <a href="#tutor-section" class="btn-secondary px-8 py-4 rounded-xl font-bold transition-all">
-                    Learn More
-                </a>
+                <a href="#tutor-section" class="btn-secondary btn-lg">Learn More</a>
             </div>
         </div>
     </main>
 
     <!-- Meet Your Tutors Section -->
-    <section class="max-w-4xl mx-auto px-6 py-16 md:py-24 min-h-[100dvh] md:min-h-0 flex flex-col justify-center"
-        id="tutor-section">
-        <div class="text-center mb-6 md:mb-16">
-            <h2 class="text-3xl md:text-4xl font-black tracking-tight">Meet your tutors</h2>
+    <section class="content-container tutors-section" id="tutor-section">
+        <div class="tutors-head">
+            <h2 class="section-title">Meet your tutors</h2>
         </div>
-        <div class="flex flex-col md:flex-row gap-4 md:gap-12 items-center mb-8 md:mb-16">
-            <div class="w-48 md:w-1/2 shrink-0">
-                <img id="tutor-img" src="/assets/images/char-1.png" alt="tutor1"
-                    class="w-full aspect-square object-cover rounded-3xl character-glow ">
+        <div class="tutor-showcase">
+            <div class="tutor-image-wrap">
+                <img id="tutor-img" src="/assets/images/char-1.png" alt="tutor1" class="tutor-image character-glow">
             </div>
-            <div class="w-full md:w-1/2 text-center md:text-left">
-                <h3 id="tutor-name" class="text-2xl md:text-4xl font-bold mb-2 md:mb-6">Select a Tutor</h3>
-                <p id="tutor-desc" class="text-secondary text-sm md:text-lg leading-relaxed">
+            <div class="tutor-info">
+                <h3 id="tutor-name" class="tutor-info-name">Select a Tutor</h3>
+                <p id="tutor-desc" class="tutor-info-desc">
                     Pumili ng character sa baba para makita ang kanilang specialty at teaching style.
                 </p>
             </div>
         </div>
-        <div id="tutor-grid" class="flex flex-wrap gap-3 md:gap-4 justify-center md:justify-start"></div>
+        <div id="tutor-grid" class="tutor-grid"></div>
     </section>
 
     <!-- Core Features section -->
-    <section class="max-w-7xl mx-auto px-6 py-16 md:py-24" id="core-features">
-        <h2 class="text-3xl font-black text-center mb-12 tracking-tight">Core Features</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="group relative p-8 solid-card rounded-2xl overflow-hidden">
-                <h3 class="text-xl font-bold mb-4 relative z-10 text-accent">AI-Tutoring</h3>
-                <p class="text-secondary relative z-10">Personalized math lessons na akma sa pacing mo.</p>
+    <section class="page-container features-section" id="core-features">
+        <h2 class="section-title text-center">Core Features</h2>
+        <div class="features-grid">
+            <div class="solid-card card-padded-lg feature-card">
+                <h3 class="feature-card-title">AI-Tutoring</h3>
+                <p class="text-secondary">Personalized math lessons na akma sa pacing mo.</p>
             </div>
-            <div class="group relative p-8 solid-card rounded-2xl overflow-hidden">
-                <h3 class="text-xl font-bold mb-4 relative z-10 text-accent">Real-time Progress</h3>
-                <p class="text-secondary relative z-10">I-track ang iyong improvement araw-araw.</p>
+            <div class="solid-card card-padded-lg feature-card">
+                <h3 class="feature-card-title">Real-time Progress</h3>
+                <p class="text-secondary">I-track ang iyong improvement araw-araw.</p>
             </div>
-            <div class="group relative p-8 solid-card rounded-2xl overflow-hidden">
-                <h3 class="text-xl font-bold mb-4 relative z-10 text-accent">Adaptive Learning</h3>
-                <p class="text-secondary relative z-10">Focus sa mga topics na kailangan mong i-master.</p>
+            <div class="solid-card card-padded-lg feature-card">
+                <h3 class="feature-card-title">Adaptive Learning</h3>
+                <p class="text-secondary">Focus sa mga topics na kailangan mong i-master.</p>
             </div>
         </div>
     </section>
 
     <!-- The Science Behind PIA -->
-    <section id="how-it-works" class="max-w-6xl mx-auto px-6 py-16 md:py-24">
-        <div class="text-center mb-20">
-            <h2 class="text-4xl md:text-5xl font-black mb-4 tracking-tight">How we help you learn</h2>
-            <p class="text-secondary text-lg font-medium">We use proven psychological models to make math easier and
-                more fun.</p>
+    <section id="how-it-works" class="content-container science-section">
+        <div class="science-head">
+            <h2 class="science-title">How we help you learn</h2>
+            <p class="science-subtitle">We use proven psychological models to make math easier and more fun.</p>
         </div>
-        <div class="space-y-32">
-            <div class="flex flex-col md:flex-row items-center gap-16">
-                <div class="w-full md:w-1/2">
-                    <img src="/assets/images/ocean.png" alt="Learning Personality"
-                        class="w-full h-auto rounded-3xl shadow-2xl">
+        <div class="science-rows">
+            <div class="science-row">
+                <div class="science-image-wrap">
+                    <img src="/assets/images/ocean.png" alt="Learning Personality" class="science-image">
                 </div>
-                <div class="w-full md:w-1/2 space-y-6">
-                    <span class="text-accent font-bold tracking-widest uppercase text-sm">Learning Personality</span>
-                    <h3 class="text-4xl font-bold">Understand your unique style</h3>
-                    <p class="text-secondary text-lg leading-relaxed font-light">
+                <div class="science-content">
+                    <span class="eyebrow">Learning Personality</span>
+                    <h3 class="science-content-title">Understand your unique style</h3>
+                    <p class="science-content-desc">
                         Everyone thinks differently! By identifying your personality traits, we match you with an AI
                         tutor that talks and teaches the way you like best.
                     </p>
-                    <button id="ocean-btn" class="text-accent hover-text-primary font-medium text-lg">Take the
-                        Personality Test →</button>
+                    <button id="ocean-btn" class="science-link">Take the Personality Test →</button>
                 </div>
             </div>
-            <div class="flex flex-col md:flex-row-reverse items-center gap-16">
-                <div class="w-full md:w-1/2">
-                    <img src="/assets/images/board.png" alt="Motivation" class="w-full h-auto rounded-3xl shadow-2xl">
+            <div class="science-row science-row-reverse">
+                <div class="science-image-wrap">
+                    <img src="/assets/images/board.png" alt="Motivation" class="science-image">
                 </div>
-                <div class="w-full md:w-1/2 space-y-6">
-                    <span class="text-accent font-bold tracking-widest uppercase text-sm">Student Motivation</span>
-                    <h3 class="text-4xl font-bold">Find your inner drive</h3>
-                    <p class="text-secondary text-lg leading-relaxed font-light">
-                        Learning is easier when you're motivated. We use the SDT framework to help you feel in control,
-                        competent, and excited to solve math problems.
+                <div class="science-content">
+                    <span class="eyebrow">Student Motivation</span>
+                    <h3 class="science-content-title">Find your inner drive</h3>
+                    <p class="science-content-desc">
+                        Learning is easier when you're motivated. We use the SDT framework to help you feel in
+                        control, competent, and excited to solve math problems.
                     </p>
-                    <button id="sdt-btn" class="text-accent hover-text-primary font-medium text-lg">See how it works
-                        →</button>
+                    <button id="sdt-btn" class="science-link">See how it works →</button>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Modal Overlay (Frameworks) -->
-    <div id="modal"
-        class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none px-6 dark-backdrop">
-        <div class="solid-card rounded-[40px] max-w-lg w-full max-h-[80vh] shadow-2xl overflow-hidden flex flex-col transform scale-95"
-            id="modal-content">
-            <div class="p-8 pb-4 flex justify-between items-start">
-                <h2 id="modal-title" class="text-3xl font-semibold"></h2>
-                <button onclick="closeModal()" class="btn-icon p-2 rounded-full flex items-center justify-center -mt-2">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+    <div id="modal" class="modal-overlay">
+        <div class="solid-card modal-content framework-modal-content" id="modal-content">
+            <div class="framework-modal-header">
+                <h2 id="modal-title" class="framework-modal-title"></h2>
+                <button onclick="closeModal()" class="btn-icon">
+                    <i data-lucide="x" class="icon-sm"></i>
                 </button>
             </div>
-            <div class="p-8 pt-0 overflow-y-auto flex-1 scrollbar-hide">
-                <p id="modal-desc" class="text-secondary mb-8 font-light"></p>
-                <div id="modal-list-container" class="space-y-6"></div>
+            <div class="framework-modal-body">
+                <p id="modal-desc" class="text-secondary framework-modal-desc"></p>
+                <div id="modal-list-container" class="framework-modal-list"></div>
             </div>
         </div>
     </div>
 
     <!-- FAQ Section -->
-    <section id="faq" class="max-w-3xl mx-auto px-6 py-16 md:py-24">
-        <h2 class="text-3xl font-black text-center mb-12 tracking-tight">Frequently Asked Questions</h2>
-        <div class="space-y-4">
-            <div class="solid-card rounded-xl overflow-hidden">
-                <button onclick="toggleFaq(this)" class="w-full text-left p-6 flex justify-between items-center">
-                    <span class="font-semibold">What is PIA System?</span>
-                    <span class="text-accent">▼</span>
+    <section id="faq" class="content-container faq-section">
+        <h2 class="section-title text-center">Frequently Asked Questions</h2>
+        <div class="faq-list">
+            <div class="solid-card faq-item">
+                <button onclick="toggleFaq(this)" class="faq-question">
+                    <span class="faq-question-text">What is PIA System?</span>
+                    <span class="faq-icon text-accent">▼</span>
                 </button>
-                <div class="hidden px-6 pb-6 text-secondary">
-                    Ang Personal Instructing Agent (PIA) ay isang AI-powered tool na ginawa para tulungan ang mga Grade
-                    7 students sa kanilang math subjects.
+                <div class="faq-answer">
+                    Ang Personal Instructing Agent (PIA) ay isang AI-powered tool na ginawa para tulungan ang mga
+                    Grade 7 students sa kanilang math subjects.
                 </div>
             </div>
-            <div class="solid-card rounded-xl overflow-hidden">
-                <button onclick="toggleFaq(this)" class="w-full text-left p-6 flex justify-between items-center">
-                    <span class="font-semibold">Paano ako makakapagsimula?</span>
-                    <span class="text-accent">▼</span>
+            <div class="solid-card faq-item">
+                <button onclick="toggleFaq(this)" class="faq-question">
+                    <span class="faq-question-text">Paano ako makakapagsimula?</span>
+                    <span class="faq-icon text-accent">▼</span>
                 </button>
-                <div class="hidden px-6 pb-6 text-secondary">
+                <div class="faq-answer">
                     I-click lang ang "Get Started" button sa ating home page at sundin ang registration steps.
                 </div>
             </div>
@@ -294,47 +257,46 @@
     </section>
 
     <!-- Contact Section -->
-    <section id="contact" class="max-w-4xl mx-auto px-6 py-16 md:py-24">
-        <div class="solid-card p-8 md:p-10 rounded-[32px] flex flex-col md:flex-row items-center justify-between gap-8">
-            <div class="flex-1 text-center md:text-left order-2 md:order-1">
-                <h3 class="text-2xl font-semibold">Need support?</h3>
-                <p class="text-secondary mt-2 mb-8">We're here to help. Reach out to us through any of our official
-                    channels.</p>
-                <div class="flex flex-wrap gap-4 justify-center md:justify-start">
-                    <a href="#" class="btn-primary px-6 py-3 rounded-full font-semibold">Facebook</a>
-                    <a href="#" class="btn-secondary px-6 py-3 rounded-full font-semibold">Email</a>
-                    <a href="#" class="btn-secondary px-6 py-3 rounded-full font-semibold">Discord</a>
+    <section id="contact" class="content-container contact-section">
+        <div class="solid-card card-padded-lg contact-card">
+            <div class="contact-info">
+                <h3 class="contact-title">Need support?</h3>
+                <p class="contact-desc">We're here to help. Reach out to us through any of our official channels.</p>
+                <div class="contact-actions">
+                    <a href="#" class="btn-primary">Facebook</a>
+                    <a href="#" class="btn-secondary">Email</a>
+                    <a href="#" class="btn-secondary">Discord</a>
                 </div>
             </div>
-            <div class="shrink-0 order-1 md:order-2">
-                <img src="/assets/images/contact.png" alt="Support"
-                    class="w-24 h-24 md:w-40 md:h-40 object-cover rounded-2xl">
+            <div class="contact-image-wrap">
+                <img src="/assets/images/contact.png" alt="Support" class="contact-image">
             </div>
         </div>
     </section>
 
     <!-- Footer Section -->
-    <footer class="solid-footer mt-16 md:mt-24">
-        <div class="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+    <footer class="solid-footer site-footer">
+        <div class="page-container footer-grid">
             <div>
-                <img src="/assets/images/logo.png" class="h-12">
-                <p class="text-secondary mt-4">Personal Instructing Agent para sa iyong mas matalinong pag-aaral.</p>
+                <img src="/assets/images/logo.png" class="footer-logo">
+                <p class="text-secondary footer-tagline">Personal Instructing Agent para sa iyong mas matalinong
+                    pag-aaral.</p>
             </div>
             <div>
-                <h3 class="font-bold mb-4">Links</h3>
-                <ul class="text-secondary space-y-2">
+                <h3 class="footer-heading">Links</h3>
+                <ul class="footer-links">
                     <li><a href="#" class="hover-text-accent">About Us</a></li>
                     <li><a href="#" class="hover-text-accent">Contact Support</a></li>
                     <li><a href="#" class="hover-text-accent">Privacy Policy</a></li>
                 </ul>
             </div>
             <div>
-                <h3 class="font-bold mb-4">Contact</h3>
-                <a href="mailto:support@piasystem.com" class="text-accent hover:underline">support@piasystem.com</a>
+                <h3 class="footer-heading">Contact</h3>
+                <a href="mailto:support@piasystem.com" class="footer-email">support@piasystem.com</a>
                 <p class="text-secondary">Manila, Philippines</p>
             </div>
         </div>
-        <div class="border-t border-custom text-center py-6 text-muted text-sm">
+        <div class="footer-bottom">
             &copy; 2026 PIA System. Lahat ng karapatan ay nakalaan.
         </div>
     </footer>
@@ -342,138 +304,109 @@
     <!-- ========================================================= -->
     <!-- UNIFIED SOLID B&W AUTH MODAL (Sign In, Forgot, Set Pass)  -->
     <!-- ========================================================= -->
-    <div id="auth-modal"
-        class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 dark-backdrop px-4">
+    <div id="auth-modal" class="modal-overlay">
 
         <!-- Modal Container -->
-        <div class="relative w-full max-w-md p-8 solid-card transform scale-95 transition-transform duration-300 shadow-2xl"
-            id="auth-box">
+        <div class="solid-card modal-content auth-modal-box" id="auth-box">
 
             <!-- Close Button -->
-            <button id="modal-close-btn" onclick="closeAuthModal()"
-                class="absolute top-5 right-5 btn-icon p-2 rounded-lg hover:scale-110 transition-transform cursor-pointer z-30 flex items-center justify-center">
-                <i data-lucide="x" class="w-5 h-5 pointer-events-none"></i>
+            <button id="modal-close-btn" onclick="closeAuthModal()" class="btn-icon auth-modal-close">
+                <i data-lucide="x" class="icon-sm"></i>
             </button>
 
-
-
             <!-- 1. SIGN IN VIEW -->
-            <div id="view-signin" class="block">
-                <div class="mb-6 text-center">
-                    <img src="/assets/images/logo.png" alt="PIA Logo" class="h-12 mx-auto mb-4">
-                    <h2 class="text-3xl font-extrabold tracking-tight">Sign In</h2>
-                    <p class="text-secondary text-sm mt-1">Enter your credentials to continue</p>
+            <div id="view-signin">
+                <div class="auth-view-header">
+                    <img src="/assets/images/logo.png" alt="PIA Logo" class="auth-view-logo">
+                    <h2 class="auth-view-title">Sign In</h2>
+                    <p class="text-secondary auth-view-subtitle">Enter your credentials to continue</p>
                 </div>
-                <!-- Status box: below header, above form -->
-                <div id="signin-status-box" class="modal-status-box hidden"></div>
-                <form id="modal-login-form" class="space-y-4" novalidate>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">Email
-                            Address</label>
-                        <div class="relative">
-                            <input type="email" id="modal-email" required class="form-input w-full px-4 py-3 pr-10"
+                <div id="signin-status-box" class="status-box hidden"></div>
+                <form id="modal-login-form" class="auth-form" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="modal-email">Email Address</label>
+                        <div class="input-icon-wrap">
+                            <input type="email" id="modal-email" required class="form-input"
                                 placeholder="student@ue.edu.ph">
-                            <button type="button"
-                                class="clear-input-btn absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary hidden">
-                                <i data-lucide="x-circle" class="w-4 h-4"></i>
+                            <button type="button" class="clear-input-btn hidden">
+                                <i data-lucide="x-circle" class="icon-sm"></i>
                             </button>
                         </div>
                         <span class="field-error hidden" id="modal-email-error"></span>
                     </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label
-                                class="block text-xs font-bold uppercase tracking-widest text-primary">Password</label>
+                    <div class="form-group">
+                        <div class="flex-between">
+                            <label class="form-label" for="modal-password">Password</label>
                             <a href="javascript:void(0)" onclick="switchAuthView('forgot-email')"
-                                class="text-xs text-accent hover:underline font-semibold">Forgot?</a>
+                                class="auth-forgot-link">Forgot?</a>
                         </div>
-                        <div class="relative">
-                            <input type="password" id="modal-password" required
-                                class="form-input w-full px-4 py-3 pr-10" placeholder="••••••••">
-                            <button type="button"
-                                class="clear-input-btn absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary hidden">
-                                <i data-lucide="x-circle" class="w-4 h-4"></i>
+                        <div class="input-icon-wrap">
+                            <input type="password" id="modal-password" required class="form-input"
+                                placeholder="••••••••">
+                            <button type="button" class="clear-input-btn hidden">
+                                <i data-lucide="x-circle" class="icon-sm"></i>
                             </button>
                         </div>
                         <span class="field-error hidden" id="modal-password-error"></span>
 
-                        <!-- Show Password Checkbox -->
-                        <div class="flex items-center mt-3 ml-1">
-                            <input type="checkbox" id="show-signin-password" class="form-checkbox h-3.5 w-3.5">
-                            <label for="show-signin-password"
-                                class="ml-2 text-xs text-secondary cursor-pointer select-none">Show password</label>
+                        <div class="form-checkbox-row auth-checkbox-row">
+                            <input type="checkbox" id="show-signin-password" class="form-checkbox">
+                            <label for="show-signin-password" class="form-checkbox-label">Show password</label>
                         </div>
                     </div>
 
-                    <button type="submit" id="modal-signin-btn"
-                        class="btn-primary w-full py-4 mt-2 font-extrabold tracking-widest">SIGN IN</button>
+                    <button type="submit" id="modal-signin-btn" class="btn-primary btn-lg btn-block">SIGN IN</button>
                 </form>
             </div>
 
             <!-- 2. FORGOT PASSWORD VIEW (Enter Email) -->
             <div id="view-forgot-email" class="hidden">
-                <div class="mb-6 text-center relative">
-                    <button onclick="switchAuthView('signin')"
-                        class="absolute top-1 left-0 text-secondary hover:text-primary transition-colors cursor-pointer">
-                        <i data-lucide="arrow-left" class="w-5 h-5 pointer-events-none"></i>
+                <div class="auth-view-header auth-view-header-with-back">
+                    <button onclick="switchAuthView('signin')" class="auth-back-btn">
+                        <i data-lucide="arrow-left" class="icon-sm"></i>
                     </button>
-                    <h2 class="text-2xl font-bold tracking-tight">Reset Password</h2>
-                    <p class="text-secondary text-sm mt-1">We'll send an OTP to your email</p>
+                    <h2 class="auth-view-title">Reset Password</h2>
+                    <p class="text-secondary auth-view-subtitle">We'll send an OTP to your email</p>
                 </div>
-                <!-- Status box: below header, above form -->
-                <div id="forgot-email-status-box" class="modal-status-box hidden"></div>
-                <form id="modal-forgot-form" class="space-y-4" novalidate>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">Email
-                            Address</label>
-                        <div class="relative">
-                            <input type="email" id="forgot-email-input" required
-                                class="form-input w-full px-4 py-3 pr-10" placeholder="student@ue.edu.ph">
-                            <button type="button"
-                                class="clear-input-btn absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary hidden">
-                                <i data-lucide="x-circle" class="w-4 h-4"></i>
+                <div id="forgot-email-status-box" class="status-box hidden"></div>
+                <form id="modal-forgot-form" class="auth-form" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="forgot-email-input">Email Address</label>
+                        <div class="input-icon-wrap">
+                            <input type="email" id="forgot-email-input" required class="form-input"
+                                placeholder="student@ue.edu.ph">
+                            <button type="button" class="clear-input-btn hidden">
+                                <i data-lucide="x-circle" class="icon-sm"></i>
                             </button>
                         </div>
                         <span class="field-error hidden" id="forgot-email-error"></span>
                     </div>
-                    <button type="submit" id="modal-send-otp-btn"
-                        class="btn-primary w-full py-4 mt-2 font-extrabold tracking-widest">SEND OTP</button>
+                    <button type="submit" id="modal-send-otp-btn" class="btn-primary btn-lg btn-block">SEND OTP</button>
                 </form>
             </div>
 
             <!-- 3. FORGOT PASSWORD VIEW (Enter OTP) -->
             <div id="view-forgot-otp" class="hidden">
-                <div class="mb-6 text-center">
-                    <h2 class="text-2xl font-bold tracking-tight">Enter OTP</h2>
-                    <p class="text-secondary text-sm mt-1">Enter the 8-digit code sent to your email.</p>
+                <div class="auth-view-header">
+                    <h2 class="auth-view-title">Enter OTP</h2>
+                    <p class="text-secondary auth-view-subtitle">Enter the 8-digit code sent to your email.</p>
                 </div>
-                <!-- Status box: below header, above form -->
-                <div id="forgot-otp-status-box" class="modal-status-box hidden"></div>
-                <form id="modal-verify-otp-form" class="space-y-4" novalidate>
-                    <div class="grid grid-cols-8 gap-1 w-full" id="modal-otp-boxes">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
-                        <input type="text" inputmode="numeric" pattern="[0-9]*"
-                            class="form-input text-center font-bold text-lg p-0 h-11 w-full" />
+                <div id="forgot-otp-status-box" class="status-box hidden"></div>
+                <form id="modal-verify-otp-form" class="auth-form" novalidate>
+                    <div class="auth-otp-grid" id="modal-otp-boxes">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
                     </div>
-                    <button type="submit" id="modal-verify-btn"
-                        class="btn-primary w-full py-4 mt-2 font-extrabold tracking-widest">VERIFY CODE</button>
+                    <button type="submit" id="modal-verify-btn" class="btn-primary btn-lg btn-block">VERIFY CODE</button>
 
-                    <div class="text-center mt-3">
-                        <button type="button" id="modal-resend-btn" disabled
-                            class="text-xs font-bold text-secondary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <div class="auth-resend-row">
+                        <button type="button" id="modal-resend-btn" disabled class="auth-resend-btn">
                             Resend code in <span id="modal-timer">60</span>s
                         </button>
                     </div>
@@ -482,49 +415,43 @@
 
             <!-- 4. SET PASSWORD VIEW -->
             <div id="view-set-password" class="hidden">
-                <div class="mb-6 text-center">
-                    <img src="/assets/images/logo.png" alt="PIA Logo" class="h-10 mx-auto mb-4" id="setup-logo">
-                    <p id="setup-greeting" class="text-accent font-bold mb-2 hidden"></p>
-                    <h2 class="text-2xl font-bold tracking-tight" id="setup-title">Set Password</h2>
-                    <p class="text-secondary text-sm mt-1" id="setup-desc">Please create a secure password.</p>
+                <div class="auth-view-header">
+                    <img src="/assets/images/logo.png" alt="PIA Logo" class="auth-view-logo" id="setup-logo">
+                    <p id="setup-greeting" class="auth-view-greeting text-accent hidden"></p>
+                    <h2 class="auth-view-title" id="setup-title">Set Password</h2>
+                    <p class="text-secondary auth-view-subtitle" id="setup-desc">Please create a secure password.</p>
                 </div>
-                <!-- Status box: below header, above form -->
-                <div id="set-password-status-box" class="modal-status-box hidden"></div>
-                <form id="modal-set-password-form" class="space-y-4" novalidate>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">New
-                            Password</label>
-                        <div class="relative">
-                            <input type="password" id="modal-new-password" minlength="6" required
-                                class="form-input w-full px-4 py-3 pr-10" placeholder="••••••••">
-                            <button type="button"
-                                class="clear-input-btn absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary hidden">
-                                <i data-lucide="x-circle" class="w-4 h-4"></i>
+                <div id="set-password-status-box" class="status-box hidden"></div>
+                <form id="modal-set-password-form" class="auth-form" novalidate>
+                    <div class="form-group">
+                        <label class="form-label" for="modal-new-password">New Password</label>
+                        <div class="input-icon-wrap">
+                            <input type="password" id="modal-new-password" minlength="6" required class="form-input"
+                                placeholder="••••••••">
+                            <button type="button" class="clear-input-btn hidden">
+                                <i data-lucide="x-circle" class="icon-sm"></i>
                             </button>
                         </div>
                         <span class="field-error hidden" id="modal-new-password-error"></span>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-widest text-primary mb-1.5">Confirm
-                            Password</label>
-                        <div class="relative">
-                            <input type="password" id="modal-confirm-password" minlength="6" required
-                                class="form-input w-full px-4 py-3 pr-10" placeholder="••••••••">
-                            <button type="button"
-                                class="clear-input-btn absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary hidden">
-                                <i data-lucide="x-circle" class="w-4 h-4"></i>
+                    <div class="form-group">
+                        <label class="form-label" for="modal-confirm-password">Confirm Password</label>
+                        <div class="input-icon-wrap">
+                            <input type="password" id="modal-confirm-password" minlength="6" required class="form-input"
+                                placeholder="••••••••">
+                            <button type="button" class="clear-input-btn hidden">
+                                <i data-lucide="x-circle" class="icon-sm"></i>
                             </button>
                         </div>
                         <span class="field-error hidden" id="modal-confirm-password-error"></span>
 
-                        <div class="flex items-center mt-3 ml-1">
-                            <input type="checkbox" id="show-setup-password" class="form-checkbox h-3.5 w-3.5">
-                            <label for="show-setup-password"
-                                class="ml-2 text-xs text-secondary cursor-pointer select-none">Show password</label>
+                        <div class="form-checkbox-row auth-checkbox-row">
+                            <input type="checkbox" id="show-setup-password" class="form-checkbox">
+                            <label for="show-setup-password" class="form-checkbox-label">Show password</label>
                         </div>
                     </div>
-                    <button type="submit" id="modal-save-password-btn"
-                        class="btn-primary w-full py-4 mt-4 font-extrabold tracking-widest">SAVE PASSWORD</button>
+                    <button type="submit" id="modal-save-password-btn" class="btn-primary btn-lg btn-block">SAVE
+                        PASSWORD</button>
                 </form>
             </div>
 

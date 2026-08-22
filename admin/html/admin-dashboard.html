@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- 🚨 STRICT PROTECTED ROUTE GUARD (Bfcache Killer) eto yung sa dev  -->
     <script>
         function enforceAuthGuard() {
             const userEmail = localStorage.getItem('pia_user_email');
@@ -20,294 +19,219 @@
             }
         });
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../../styles/tokens.css">
+    <link rel="stylesheet" href="../../styles/base.css">
+    <link rel="stylesheet" href="../../styles/components.css">
+    <link rel="stylesheet" href="../../styles/pages/admin.css">
     <title>Admin Dashboard - PIA System</title>
 </head>
 
-<body class="min-h-screen flex flex-col relative fade-in bg-main text-primary overflow-x-hidden opacity-0">
+<body class="admin-body fade-in opacity-0">
 
     <!-- GLOBAL ERROR BANNER -->
-    <div id="global-error-banner"
-        class="hidden w-full bg-[var(--color-danger-bg)] text-[var(--color-danger)] p-4 text-center font-medium text-sm border-b border-[var(--color-danger)] z-50">
+    <div id="global-error-banner" class="error-banner hidden">
         <span id="global-error-message"></span>
     </div>
 
     <!-- HEADER / NAVBAR -->
-    <header
-        class="w-full px-4 sm:px-8 py-4 flex justify-between items-center border-b border-custom solid-nav sticky top-0 z-50 bg-main">
-        <div class="flex items-center gap-3 sm:gap-6">
-            <div class="flex items-center gap-3">
-                <img src="../../assets/images/logo.png" alt="PIA Logo" class="h-10 sm:h-11">
-                <span
-                    class="text-[10px] sm:text-xs uppercase tracking-widest font-mono admin-badge hidden xs:inline-block">Admin
-                    Portal</span>
+    <header class="site-nav admin-header">
+        <div class="site-nav-inner">
+            <div class="flex-row gap-sm">
+                <img src="../../assets/images/logo.png" alt="PIA Logo" class="admin-logo">
+                <span class="admin-badge hide-mobile">Admin Portal</span>
             </div>
-            <!-- Navigation Links (Desktop) -->
-            <nav class="hidden md:flex items-center gap-2">
-                <button onclick="switchTab('sections')" id="nav-sections" class="admin-nav-btn active">Sections</button>
-                <button onclick="switchTab('students')" id="nav-students" class="admin-nav-btn">Student Roster</button>
-                <button onclick="switchTab('professors')" id="nav-professors" class="admin-nav-btn">Professors</button>
-                <button onclick="switchTab('controls')" id="nav-controls" class="admin-nav-btn">System Controls</button>
-            </nav>
-        </div>
 
-        <div class="flex items-center gap-3">
-            <!-- DESKTOP ADMIN PROFILE DROPDOWN -->
-            <div class="relative group h-full items-center hidden md:flex">
-                <button
-                    class="flex items-center gap-2 text-primary hover:text-[var(--accent-primary)] font-medium text-sm tracking-wider transition-colors py-2 bg-transparent border-none">
-                    <span id="desktop-admin-greeting">Loading...</span>
-                    <i data-lucide="chevron-down" class="w-4 h-4 text-secondary"></i>
-                </button>
-                <div class="absolute right-0 top-full pt-2 w-64 hidden group-hover:block z-50">
-                    <div class="solid-card rounded-xl shadow-2xl border border-custom overflow-hidden p-2 space-y-1">
-                        <div class="px-3.5 py-3 border-b border-custom bg-black/10">
-                            <p class="text-[10px] text-secondary font-mono uppercase tracking-wider mb-0.5">Signed in as
-                            </p>
-                            <p class="text-xs font-mono text-primary break-words whitespace-normal leading-tight"
-                                id="desktop-admin-email">admin@ue.edu.ph</p>
+            <div class="flex-row gap-sm">
+                <!-- DESKTOP ADMIN PROFILE DROPDOWN -->
+                <div class="nav-user-menu hide-mobile" style="display:flex;">
+                    <button class="nav-user-dropdown-btn">
+                        <span id="desktop-admin-greeting">Loading...</span>
+                        <i data-lucide="chevron-down" class="icon-sm text-secondary"></i>
+                    </button>
+                    <div class="nav-dropdown-menu">
+                        <div class="solid-card nav-dropdown-card">
+                            <div class="nav-dropdown-header">
+                                <p class="nav-dropdown-header-label">Signed in as</p>
+                                <p class="nav-dropdown-header-email" id="desktop-admin-email">admin@ue.edu.ph</p>
+                            </div>
+                            <button onclick="switchTab('settings')" class="nav-dropdown-item">
+                                <i data-lucide="settings" class="icon-xs text-info"></i> Settings
+                            </button>
+                            <button onclick="handleAdminSignOut()" class="nav-dropdown-item nav-dropdown-item-danger">
+                                <i data-lucide="log-out" class="icon-xs"></i> Sign Out
+                            </button>
                         </div>
-                        <button onclick="switchTab('settings')"
-                            class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-secondary hover:bg-[var(--bg-hover)] hover:text-primary transition-colors flex items-center gap-2">
-                            <i data-lucide="settings" class="w-3.5 h-3.5 text-info"></i> Settings
-                        </button>
-                        <button onclick="handleAdminSignOut()"
-                            class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-danger hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger-hover)] transition-colors flex items-center gap-2 border-t border-custom">
-                            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Sign Out
-                        </button>
                     </div>
                 </div>
-            </div>
 
-            <button id="mobile-toggle" class="md:hidden p-2 rounded-lg btn-icon flex items-center justify-center">
-                <i data-lucide="menu" class="w-5 h-5"></i>
-            </button>
+                <button id="mobile-toggle" class="mobile-menu-toggle">
+                    <i data-lucide="menu" class="icon-md"></i>
+                </button>
+            </div>
         </div>
     </header>
 
-    <div id="menu-backdrop" class="fixed inset-0 z-40 hidden dark-backdrop"></div>
+    <div id="menu-backdrop" class="mobile-menu-backdrop hidden"></div>
 
-    <div id="mobile-menu"
-        class="fixed top-0 right-0 h-full w-72 solid-sidebar z-50 transform translate-x-full md:hidden flex flex-col justify-between pt-3 px-6 pb-4 bg-main shadow-2xl transition-transform duration-300 ease-in-out">
-
-        <button id="dynamic-close-btn"
-            class="opacity-0 transition-opacity duration-200 absolute top-4 -left-12 w-12 h-12 bg-main border-y border-l border-custom rounded-l-xl flex items-center justify-center shadow-[-5px_0_15px_var(--shadow-heavy)] hover:bg-hover cursor-pointer">
-            <i data-lucide="x" class="w-5 h-5 text-secondary"></i>
+    <div id="mobile-menu" class="mobile-menu">
+        <button id="dynamic-close-btn" class="mobile-menu-close">
+            <i data-lucide="x" class="icon-md text-secondary"></i>
         </button>
 
-        <div class="flex flex-col justify-start h-full w-full">
-            <div class="border-b border-custom pb-3 pt-2 mt-3">
-                <h3 class="font-extrabold tracking-wide mb-2.5">
-                    <span id="mobile-greeting-prefix" class="block mb-0.5"
-                        style="font-size: var(--font-size-3xl); color: var(--text-primary);"></span>
-                    <span id="mobile-greeting-name" class="block leading-tight"
-                        style="font-size: var(--font-size-4xl); color: var(--accent-primary);"></span>
-                </h3>
+        <div class="mobile-greeting-block">
+            <span id="mobile-greeting-prefix" class="mobile-greeting-prefix"></span>
+            <span id="mobile-greeting-name" class="mobile-greeting-name"></span>
 
-                <div class="bg-black/10 p-3 rounded-xl border border-custom w-full">
-                    <span class="uppercase tracking-widest font-mono text-secondary block mb-0.5"
-                        style="font-size: 9px;">Signed in as</span>
-                    <span id="mobile-admin-email" class="text-primary font-mono break-all leading-tight block w-full"
-                        style="font-size: var(--font-size-xs);">admin@ue.edu.ph</span>
-                </div>
+            <div class="mobile-admin-email-box">
+                <span class="mobile-admin-email-label">Signed in as</span>
+                <span id="mobile-admin-email" class="mobile-admin-email-value">admin@ue.edu.ph</span>
             </div>
         </div>
 
-        <div class="flex flex-col gap-0.5 mt-6">
+        <div class="mobile-menu-links">
             <button id="mob-nav-sections" onclick="switchTab('sections'); toggleMobileMenu();"
-                class="mobile-nav-link admin-nav-btn text-left block"
-                style="font-size: var(--font-size-base);">Sections</button>
+                class="mobile-nav-link admin-nav-btn">Sections</button>
             <button id="mob-nav-students" onclick="switchTab('students'); toggleMobileMenu();"
-                class="mobile-nav-link admin-nav-btn text-left block" style="font-size: var(--font-size-base);">Student
-                Roster</button>
+                class="mobile-nav-link admin-nav-btn">Student Roster</button>
             <button id="mob-nav-professors" onclick="switchTab('professors'); toggleMobileMenu();"
-                class="mobile-nav-link admin-nav-btn text-left block"
-                style="font-size: var(--font-size-base);">Professors</button>
+                class="mobile-nav-link admin-nav-btn">Professors</button>
             <button id="mob-nav-controls" onclick="switchTab('controls'); toggleMobileMenu();"
-                class="mobile-nav-link admin-nav-btn text-left block" style="font-size: var(--font-size-base);">System
-                Controls</button>
+                class="mobile-nav-link admin-nav-btn">System Controls</button>
         </div>
 
-        <div class="mt-auto border-t border-custom pt-3 pb-1 flex flex-col gap-1.5 shrink-0">
-            <button id="mob-nav-settings" onclick="switchTab('settings'); toggleMobileMenu();"
-                class="w-full text-left px-3 py-2 rounded-lg font-bold uppercase tracking-wider text-secondary hover:bg-hover hover:text-primary transition-colors flex items-center gap-2"
-                style="font-size: var(--font-size-sm);">
-                <i data-lucide="settings" class="w-3.5 h-3.5 text-info"></i> Settings
+        <div class="mobile-menu-actions">
+            <button id="mob-nav-settings" onclick="switchTab('settings'); toggleMobileMenu();" class="nav-dropdown-item">
+                <i data-lucide="settings" class="icon-xs text-info"></i> Settings
             </button>
-            <button onclick="handleAdminSignOut()"
-                class="w-full text-left px-3 py-2 rounded-lg font-bold uppercase tracking-wider text-danger hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger-hover)] transition-colors flex items-center gap-2"
-                style="font-size: var(--font-size-sm);">
-                <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Sign Out
+            <button onclick="handleAdminSignOut()" class="nav-dropdown-item nav-dropdown-item-danger">
+                <i data-lucide="log-out" class="icon-xs"></i> Sign Out
             </button>
         </div>
     </div>
 
-    <!-- MAIN CONTENT CONTAINER -->
-    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6 relative z-10">
-
-        <!-- VIEW 1: SECTIONS OVERVIEW -->
-        <div id="view-sections" class="space-y-6 view-section">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div class="flex items-center gap-3">
-                    <i data-lucide="layers" class="w-5 h-5 text-accent"></i>
-                    <h2 class="text-xl font-extrabold text-primary uppercase tracking-wider">SECTIONS</h2>
-                </div>
-                <button onclick="openModal('add-section-modal')"
-                    class="btn-primary px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider flex items-center gap-2 btn-scale-hover w-full sm:w-auto justify-center">
-                    <i data-lucide="plus" class="w-4 h-4"></i> Add Section
+    <div class="admin-shell">
+        <!-- WORKSPACE SIDEBAR (Canvas LMS-style nav rail, desktop only) -->
+        <aside class="admin-sidebar">
+            <div>
+                <p class="admin-sidebar-eyebrow">Workspace</p>
+                <nav class="admin-sidebar-nav">
+                    <button onclick="switchTab('sections')" id="nav-sections" class="admin-nav-btn active">
+                        <i data-lucide="layers" class="icon-sm"></i><span>Sections</span>
+                    </button>
+                    <button onclick="switchTab('students')" id="nav-students" class="admin-nav-btn">
+                        <i data-lucide="users" class="icon-sm"></i><span>Student Roster</span>
+                    </button>
+                    <button onclick="switchTab('professors')" id="nav-professors" class="admin-nav-btn">
+                        <i data-lucide="graduation-cap" class="icon-sm"></i><span>Professors</span>
+                    </button>
+                    <button onclick="switchTab('controls')" id="nav-controls" class="admin-nav-btn">
+                        <i data-lucide="settings-2" class="icon-sm"></i><span>System Controls</span>
+                    </button>
+                </nav>
+            </div>
+            <div class="admin-sidebar-footer">
+                <button onclick="switchTab('settings')" id="nav-settings" class="admin-nav-btn">
+                    <i data-lucide="user-cog" class="icon-sm"></i><span>Settings</span>
                 </button>
             </div>
-            <div id="sections-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </aside>
+
+        <div class="admin-content-wrap">
+            <!-- MAIN CONTENT CONTAINER -->
+            <main class="page-container admin-main">
+
+                <!-- VIEW 1: SECTIONS OVERVIEW -->
+        <div id="view-sections" class="view-section admin-stack">
+            <div class="admin-section-head">
+                <div class="flex-row gap-sm">
+                    <i data-lucide="layers" class="icon-md text-accent"></i>
+                    <h2 class="admin-page-title">SECTIONS</h2>
+                </div>
+                <button onclick="openModal('add-section-modal')" class="btn-primary">
+                    <i data-lucide="plus" class="icon-sm"></i> Add Section
+                </button>
+            </div>
+            <div id="sections-grid" class="admin-grid-3"></div>
         </div>
 
         <!-- VIEW 2: ALL STUDENTS ROSTER -->
-        <div id="view-students" class="space-y-6 view-section" style="display: none;">
+        <div id="view-students" class="view-section admin-stack" style="display: none;">
 
             <!-- TOP SUMMARY CARDS (4 Boxes) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- BOX 1: OCEAN TEST -->
-                <div id="box-ocean" onclick="toggleStageDrilldown('OCEAN')"
-                    class="solid-card p-5 cursor-pointer border border-custom hover:border-accent transition-colors relative overflow-hidden group">
-                    <div
-                        class="absolute inset-0 bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    </div>
-                    <div class="relative z-10">
-                        <h3
-                            class="text-xs text-secondary uppercase tracking-widest font-mono flex justify-between items-center">
-                            OCEAN Test <i data-lucide="brain" class="w-4 h-4 text-accent"></i></h3>
-                        <p id="count-ocean" class="text-3xl font-extrabold text-primary mt-2">0</p>
-                        <p class="text-[10px] text-accent mt-1 uppercase tracking-wider font-bold">Currently Taking</p>
-                    </div>
+            <div class="admin-grid-4">
+                <div id="box-ocean" onclick="toggleStageDrilldown('OCEAN')" class="solid-card card-padded stat-tile stat-tile-accent">
+                    <h3 class="stat-tile-label">OCEAN Test <i data-lucide="brain" class="icon-sm text-accent"></i></h3>
+                    <p id="count-ocean" class="stat-tile-value">0</p>
+                    <p class="stat-tile-sub text-accent">Currently Taking</p>
                 </div>
-
-                <!-- BOX 2: CHARACTER SELECT -->
-                <div id="box-char" onclick="toggleStageDrilldown('Character Selection')"
-                    class="solid-card p-5 cursor-pointer border border-custom hover:border-info transition-colors relative overflow-hidden group">
-                    <div
-                        class="absolute inset-0 bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    </div>
-                    <div class="relative z-10">
-                        <h3
-                            class="text-xs text-secondary uppercase tracking-widest font-mono flex justify-between items-center">
-                            Character Select <i data-lucide="users" class="w-4 h-4 text-info"></i></h3>
-                        <p id="count-char" class="text-3xl font-extrabold text-primary mt-2">0</p>
-                        <p class="text-[10px] text-info mt-1 uppercase tracking-wider font-bold">Currently Choosing</p>
-                    </div>
+                <div id="box-char" onclick="toggleStageDrilldown('Character Selection')" class="solid-card card-padded stat-tile stat-tile-info">
+                    <h3 class="stat-tile-label">Character Select <i data-lucide="users" class="icon-sm text-info"></i></h3>
+                    <p id="count-char" class="stat-tile-value">0</p>
+                    <p class="stat-tile-sub text-info">Currently Choosing</p>
                 </div>
-
-                <!-- BOX 3: TUTORING DASHBOARD -->
-                <div id="box-dash" onclick="toggleStageDrilldown('Tutoring Dashboard')"
-                    class="solid-card p-5 cursor-pointer border border-custom hover:border-warning transition-colors relative overflow-hidden group">
-                    <div
-                        class="absolute inset-0 bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    </div>
-                    <div class="relative z-10">
-                        <h3
-                            class="text-xs text-secondary uppercase tracking-widest font-mono flex justify-between items-center">
-                            Tutoring Dash <i data-lucide="layout-dashboard" class="w-4 h-4 text-warning"></i></h3>
-                        <p id="count-dash" class="text-3xl font-extrabold text-primary mt-2">0</p>
-                        <p class="text-[10px] text-warning mt-1 uppercase tracking-wider font-bold">Browsing</p>
-                    </div>
+                <div id="box-dash" onclick="toggleStageDrilldown('Tutoring Dashboard')" class="solid-card card-padded stat-tile stat-tile-warning">
+                    <h3 class="stat-tile-label">Tutoring Dash <i data-lucide="layout-dashboard" class="icon-sm text-warning"></i></h3>
+                    <p id="count-dash" class="stat-tile-value">0</p>
+                    <p class="stat-tile-sub text-warning">Browsing</p>
                 </div>
-
-                <!-- BOX 4: ACTIVE GAME -->
-                <div id="box-game" onclick="toggleStageDrilldown('Active Game')"
-                    class="solid-card p-5 cursor-pointer border border-custom hover:border-success transition-colors relative overflow-hidden group">
-                    <div
-                        class="absolute inset-0 bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    </div>
-                    <div class="relative z-10">
-                        <h3
-                            class="text-xs text-secondary uppercase tracking-widest font-mono flex justify-between items-center">
-                            Active Game <i data-lucide="gamepad-2" class="w-4 h-4 text-success"></i></h3>
-                        <p id="count-game" class="text-3xl font-extrabold text-primary mt-2">0</p>
-                        <p class="text-[10px] text-success mt-1 uppercase tracking-wider font-bold">Solving Problems</p>
-                    </div>
+                <div id="box-game" onclick="toggleStageDrilldown('Active Game')" class="solid-card card-padded stat-tile stat-tile-success">
+                    <h3 class="stat-tile-label">Active Game <i data-lucide="gamepad-2" class="icon-sm text-success"></i></h3>
+                    <p id="count-game" class="stat-tile-value">0</p>
+                    <p class="stat-tile-sub text-success">Solving Problems</p>
                 </div>
             </div>
 
             <!-- MAIN UNIFIED TABLE CARD -->
-            <div class="solid-card p-4 sm:p-6 transition-all duration-300" id="main-table-container">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <div class="flex-1">
-                        <h2 id="table-view-title"
-                            class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider flex items-center gap-2">
-                            <i data-lucide="users" class="w-5 h-5 text-accent" id="table-view-icon"></i> General Student
-                            Roster
+            <div class="solid-card card-padded" id="main-table-container">
+                <div class="admin-toolbar">
+                    <div class="admin-toolbar-title-wrap">
+                        <h2 id="table-view-title" class="admin-card-title">
+                            <i data-lucide="users" class="icon-sm text-accent" id="table-view-icon"></i> General Student Roster
                         </h2>
-                        <p id="table-view-desc" class="text-xs text-secondary mt-0.5">Click any student row to view
-                            full-screen profile and alignment metrics.</p>
+                        <p id="table-view-desc" class="admin-card-subtitle">Click any student row to view full-screen profile and alignment metrics.</p>
                     </div>
-                    <div class="flex items-center gap-3 w-full md:w-auto">
-                        <button id="btn-clear-drilldown" onclick="clearStageDrilldown()"
-                            class="hidden btn-secondary px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider whitespace-nowrap btn-scale-hover border border-custom">
-                            <i data-lucide="arrow-left" class="w-4 h-4 inline mr-1"></i> Back to Roster
+                    <div class="admin-toolbar-actions">
+                        <button id="btn-clear-drilldown" onclick="clearStageDrilldown()" class="btn-secondary hidden">
+                            <i data-lucide="arrow-left" class="icon-xs"></i> Back to Roster
                         </button>
-                        <div class="relative w-full sm:w-64">
-                            <i data-lucide="search"
-                                class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondary"></i>
-                            <input type="text" id="search-student" oninput="debouncedSearchStudents()"
-                                placeholder="Search student..." class="search-input">
+                        <div class="search-input-wrap">
+                            <i data-lucide="search" class="icon-sm search-input-icon"></i>
+                            <input type="text" id="search-student" oninput="debouncedSearchStudents()" placeholder="Search student..." class="search-input">
                         </div>
-                        <button onclick="openModal('add-student-modal')"
-                            class="btn-primary px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider whitespace-nowrap btn-scale-hover text-center shadow-md">
-                            Pre-Register
-                        </button>
+                        <button onclick="openModal('add-student-modal')" class="btn-primary">Pre-Register</button>
                     </div>
                 </div>
 
                 <!-- NESTED FILTERS (Hidden when in Box Drilldown view) -->
-                <div id="nested-filters-container" class="mb-6 space-y-3 fade-in">
-                    <!-- Primary Filter -->
-                    <div class="flex items-center gap-2 border-b border-custom pb-3 overflow-x-auto custom-scrollbar">
-                        <button onclick="setGroupFilter('all')" id="filter-group-all" class="admin-nav-btn active">All
-                            Students</button>
-                        <button onclick="setGroupFilter('experimental')" id="filter-group-experimental"
-                            class="admin-nav-btn inactive">Experimental Group</button>
-                        <button onclick="setGroupFilter('control')" id="filter-group-control"
-                            class="admin-nav-btn inactive">Control Group</button>
+                <div id="nested-filters-container" class="admin-filters fade-in">
+                    <div class="admin-filter-row">
+                        <button onclick="setGroupFilter('all')" id="filter-group-all" class="admin-nav-btn active">All Students</button>
+                        <button onclick="setGroupFilter('experimental')" id="filter-group-experimental" class="admin-nav-btn inactive">Experimental Group</button>
+                        <button onclick="setGroupFilter('control')" id="filter-group-control" class="admin-nav-btn inactive">Control Group</button>
                     </div>
-                    <!-- Secondary Filter (Only shows when Experimental is active) -->
-                    <div id="secondary-filter-container"
-                        class="hidden flex items-center gap-2 overflow-x-auto custom-scrollbar pt-1">
-                        <button onclick="setSubgroupFilter('all')" id="filter-sub-all"
-                            class="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-hover)] text-accent border border-accent">All
-                            Experimental</button>
-                        <button onclick="setSubgroupFilter('assigned')" id="filter-sub-assigned"
-                            class="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-main)] text-secondary border border-custom hover:text-primary transition-colors">Assigned
-                            Persona</button>
-                        <button onclick="setSubgroupFilter('non-assigned')" id="filter-sub-non-assigned"
-                            class="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-main)] text-secondary border border-custom hover:text-primary transition-colors">Non-Assigned
-                            Persona</button>
-                        <button onclick="setSubgroupFilter('neutral')" id="filter-sub-neutral"
-                            class="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-main)] text-secondary border border-custom hover:text-primary transition-colors">Neutral
-                            Persona</button>
+                    <div id="secondary-filter-container" class="admin-subfilter-row hidden">
+                        <button onclick="setSubgroupFilter('all')" id="filter-sub-all" class="badge badge-pill badge-success">All Experimental</button>
+                        <button onclick="setSubgroupFilter('assigned')" id="filter-sub-assigned" class="badge badge-pill badge-neutral">Assigned Persona</button>
+                        <button onclick="setSubgroupFilter('non-assigned')" id="filter-sub-non-assigned" class="badge badge-pill badge-neutral">Non-Assigned Persona</button>
+                        <button onclick="setSubgroupFilter('neutral')" id="filter-sub-neutral" class="badge badge-pill badge-neutral">Neutral Persona</button>
                     </div>
                 </div>
 
                 <!-- UNIFIED TABLE -->
-                <div class="w-full overflow-x-auto custom-scrollbar pb-12 admin-table-wrapper">
-                    <table class="admin-table w-full table-fixed min-w-[800px]">
-                        <thead id="unified-thead">
-                            <!-- Dynamic Headers injected via JS -->
-                        </thead>
-                        <tbody id="unified-tbody">
-                            <!-- Dynamic Rows injected via JS -->
-                        </tbody>
+                <div class="data-table-wrapper admin-table-wrapper">
+                    <table class="data-table admin-table">
+                        <thead id="unified-thead"></thead>
+                        <tbody id="unified-tbody"></tbody>
                     </table>
-                    <div id="pagination-controls"
-                        class="w-full flex items-center justify-between p-4 border-t border-[var(--border-color)] text-xs text-secondary hidden">
+                    <div id="pagination-controls" class="pagination-bar hidden">
                         <span id="pagination-info">Page 1 of 1</span>
-                        <div class="flex items-center gap-2">
-                            <button id="btn-prev-page"
-                                class="px-3 py-1.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
-                            <button id="btn-next-page"
-                                class="px-3 py-1.5 rounded bg-[var(--bg-main)] border border-[var(--border-color)] hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+                        <div class="flex-row gap-xs">
+                            <button id="btn-prev-page" class="btn-secondary btn-sm">Previous</button>
+                            <button id="btn-next-page" class="btn-secondary btn-sm">Next</button>
                         </div>
                     </div>
                 </div>
@@ -315,376 +239,288 @@
         </div>
 
         <!-- VIEW 3: PROFESSORS ROSTER -->
-        <div id="view-professors" class="space-y-6 view-section" style="display: none;">
-            <div class="solid-card p-4 sm:p-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div id="view-professors" class="view-section admin-stack" style="display: none;">
+            <div class="solid-card card-padded">
+                <div class="admin-toolbar">
                     <div>
-                        <h2 class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider">Faculty Roster
-                        </h2>
-                        <p class="text-xs text-secondary mt-0.5">Manage professor access and assigned sections.</p>
+                        <h2 class="admin-card-title">Faculty Roster</h2>
+                        <p class="admin-card-subtitle">Manage professor access and assigned sections.</p>
                     </div>
-                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                        <div class="relative w-full sm:w-64">
-                            <i data-lucide="search"
-                                class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondary"></i>
-                            <input type="text" id="search-professor" oninput="filterProfessors()"
-                                placeholder="Search Professor..." class="search-input">
+                    <div class="admin-toolbar-actions">
+                        <div class="search-input-wrap">
+                            <i data-lucide="search" class="icon-sm search-input-icon"></i>
+                            <input type="text" id="search-professor" oninput="filterProfessors()" placeholder="Search Professor..." class="search-input">
                         </div>
-                        <button onclick="openModal('add-professor-modal')"
-                            class="btn-primary px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider whitespace-nowrap btn-scale-hover text-center">
-                            Add Professor
-                        </button>
+                        <button onclick="openModal('add-professor-modal')" class="btn-primary">Add Professor</button>
                     </div>
                 </div>
 
-                <div class="hidden md:block w-full overflow-x-auto custom-scrollbar pb-12 admin-table-wrapper">
-                    <table class="admin-table w-full table-fixed">
+                <div class="data-table-wrapper admin-table-wrapper hide-mobile">
+                    <table class="data-table admin-table">
                         <thead>
                             <tr>
-                                <th class="w-[28%]">Professor Name</th>
-                                <th class="w-[30%]">Email Address</th>
-                                <th class="w-[20%]">Department</th>
-                                <th class="w-[12%]">Section</th>
-                                <th class="w-[10%] text-right">Actions</th>
+                                <th>Professor Name</th>
+                                <th>Email Address</th>
+                                <th>Department</th>
+                                <th>Section</th>
+                                <th class="text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="professor-table-body"></tbody>
                     </table>
                 </div>
 
-                <div id="professor-cards-container" class="grid grid-cols-1 gap-4 md:hidden"></div>
+                <div id="professor-cards-container" class="admin-cards-stack hide-desktop"></div>
             </div>
         </div>
 
         <!-- VIEW 4: SYSTEM CONTROLS -->
-        <div id="view-controls" class="space-y-6 view-section" style="display: none;">
+        <div id="view-controls" class="view-section admin-stack" style="display: none;">
 
-            <div class="solid-card p-6 sm:p-8 space-y-4">
+            <div class="solid-card card-padded-lg admin-stack">
                 <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider">System Configurations
-                    </h2>
-                    <p class="text-xs text-secondary mt-0.5">Manage global parameters for student accounts and password
-                        fallback.</p>
+                    <h2 class="admin-card-title">System Configurations</h2>
+                    <p class="admin-card-subtitle">Manage global parameters for student and professor accounts.</p>
                 </div>
-                <div class="max-w-md space-y-2 pt-2">
-                    <label class="block text-xs uppercase tracking-wider text-secondary">Global Default Password</label>
-                    <div class="flex gap-3 items-center">
-                        <input type="password" id="global-default-pass" value="PIA2026!" disabled
-                            class="flex-1 form-input rounded-lg px-4 py-3 h-[44px] text-sm font-mono opacity-50">
-                        <button type="button" id="edit-pass-btn" onclick="toggleEditPassword()"
-                            class="btn-secondary px-6 py-3 h-[44px] rounded-lg text-xs uppercase tracking-wider whitespace-nowrap font-bold flex items-center justify-center">Edit</button>
-                        <button type="button" id="save-pass-btn" onclick="saveGlobalPassword()" style="display: none;"
-                            class="btn-primary px-6 py-3 h-[44px] rounded-lg text-xs uppercase tracking-wider whitespace-nowrap font-bold shadow-md flex items-center justify-center">Save</button>
-                    </div>
-                    <div class="flex items-center gap-2 pt-1">
-                        <input type="checkbox" id="show-pass-checkbox" onchange="togglePasswordVisibilityCheckbox()"
-                            class="w-3.5 h-3.5 form-checkbox rounded">
-                        <label for="show-pass-checkbox" class="text-xs text-secondary cursor-pointer select-none">Show
-                            password</label>
-                    </div>
+                <div class="policy-note-box">
+                    <p class="policy-note-title">
+                        <i data-lucide="shield-check" class="icon-xs"></i> Account Password Policy
+                    </p>
+                    <p class="policy-note-desc">
+                        Bawat bagong account (student/professor) ay binibigyan na ng random, hindi-nahuhulaang
+                        initial password -- hindi na ito nakikita o na-store kahit saan. Gagamitin ng account owner
+                        ang <b>Send Activation Email</b> o <b>Reset Password</b> action para makapagtakda sila ng
+                        sarili nilang password via secure email link.
+                    </p>
                 </div>
             </div>
 
-            <div class="solid-card p-6 sm:p-8 space-y-6">
+            <div class="solid-card card-padded-lg admin-stack-lg">
                 <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider">Experiment Session
-                        Controls</h2>
-                    <p class="text-xs text-secondary mt-0.5">Control stage accessibility globally or grant targeted
-                        access per section/student.</p>
+                    <h2 class="admin-card-title">Experiment Session Controls</h2>
+                    <p class="admin-card-subtitle">Control stage accessibility globally or grant targeted access per section/student.</p>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
+                <div class="admin-grid-3">
                     <!-- STAGE 1: OCEAN -->
-                    <div class="settings-card flex flex-col justify-between space-y-6">
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span
-                                    class="text-[10px] uppercase tracking-widest text-accent font-mono px-2.5 py-1 rounded-md bg-main border border-custom">Stage
-                                    1</span>
-                                <span id="ocean-status-lbl"
-                                    class="text-xs font-bold text-warning uppercase tracking-wider">Closed</span>
+                    <div class="settings-card">
+                        <div class="settings-card-top">
+                            <div class="flex-between">
+                                <span class="stage-tag">Stage 1</span>
+                                <span id="ocean-status-lbl" class="stage-status-lbl">Closed</span>
                             </div>
-                            <h3 class="text-base font-bold text-primary uppercase tracking-wide pt-1">OCEAN Personality
-                                Test</h3>
-                            <p class="text-xs text-secondary leading-relaxed">Allow students to take the Big Five
-                                Inventory questionnaire.</p>
+                            <h3 class="settings-card-title">OCEAN Personality Test</h3>
+                            <p class="settings-card-desc">Allow students to take the Big Five Inventory questionnaire.</p>
                         </div>
-
-                        <div class="space-y-3 pt-4 border-t border-custom">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs uppercase tracking-wider font-bold text-secondary">Global
-                                    Access</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="toggle-ocean"
-                                        onchange="updateStageControl('ocean', this)"
-                                        class="sr-only toggle-switch-input">
+                        <div class="settings-card-bottom">
+                            <div class="flex-between">
+                                <span class="settings-card-label">Global Access</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-ocean" onchange="updateStageControl('ocean', this)" class="toggle-switch-input">
                                     <div class="toggle-switch-bg"></div>
                                 </label>
                             </div>
-
-                            <div class="grid grid-cols-2 gap-2 pt-2">
-                                <button onclick="openTargetedModal('ocean', 'section')"
-                                    class="btn-secondary py-2 px-3 rounded-lg text-[10px] uppercase font-bold tracking-wider truncate">Section
-                                    Override</button>
-                                <button onclick="openTargetedModal('ocean', 'student')"
-                                    class="btn-secondary py-2 px-3 rounded-lg text-[10px] uppercase font-bold tracking-wider truncate">Student
-                                    Override</button>
+                            <div class="settings-card-actions">
+                                <button onclick="openTargetedModal('ocean', 'section')" class="btn-secondary btn-sm">Section Override</button>
+                                <button onclick="openTargetedModal('ocean', 'student')" class="btn-secondary btn-sm">Student Override</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- STAGE 2: CHARACTER SELECTION -->
-                    <div class="settings-card flex flex-col justify-between space-y-6">
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span
-                                    class="text-[10px] uppercase tracking-widest text-accent font-mono px-2.5 py-1 rounded-md bg-main border border-custom">Stage
-                                    2</span>
-                                <span id="char-status-lbl"
-                                    class="text-xs font-bold text-warning uppercase tracking-wider">Closed</span>
+                    <div class="settings-card">
+                        <div class="settings-card-top">
+                            <div class="flex-between">
+                                <span class="stage-tag">Stage 2</span>
+                                <span id="char-status-lbl" class="stage-status-lbl">Closed</span>
                             </div>
-                            <h3 class="text-base font-bold text-primary uppercase tracking-wide pt-1">Character
-                                Selection</h3>
-                            <p class="text-xs text-secondary leading-relaxed">Allow Non-Assigned group to select their
-                                preferred agent persona.</p>
+                            <h3 class="settings-card-title">Character Selection</h3>
+                            <p class="settings-card-desc">Allow Non-Assigned group to select their preferred agent persona.</p>
                         </div>
-
-                        <div class="space-y-3 pt-4 border-t border-custom">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs uppercase tracking-wider font-bold text-secondary">Global
-                                    Access</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="toggle-char" onchange="updateStageControl('char', this)"
-                                        class="sr-only toggle-switch-input">
+                        <div class="settings-card-bottom">
+                            <div class="flex-between">
+                                <span class="settings-card-label">Global Access</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-char" onchange="updateStageControl('char', this)" class="toggle-switch-input">
                                     <div class="toggle-switch-bg"></div>
                                 </label>
                             </div>
-
-                            <div class="grid grid-cols-2 gap-2 pt-2">
-                                <button onclick="openTargetedModal('char', 'section')"
-                                    class="btn-secondary py-2 px-3 rounded-lg text-[10px] uppercase font-bold tracking-wider truncate">Section
-                                    Override</button>
-                                <button onclick="openTargetedModal('char', 'student')"
-                                    class="btn-secondary py-2 px-3 rounded-lg text-[10px] uppercase font-bold tracking-wider truncate">Student
-                                    Override</button>
+                            <div class="settings-card-actions">
+                                <button onclick="openTargetedModal('char', 'section')" class="btn-secondary btn-sm">Section Override</button>
+                                <button onclick="openTargetedModal('char', 'student')" class="btn-secondary btn-sm">Student Override</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- STAGE 3: TUTORING DASHBOARD -->
-                    <div class="settings-card flex flex-col justify-between space-y-6">
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span
-                                    class="text-[10px] uppercase tracking-widest text-accent font-mono px-2.5 py-1 rounded-md bg-main border border-custom">Stage
-                                    3</span>
-                                <span id="dash-status-lbl"
-                                    class="text-xs font-bold text-warning uppercase tracking-wider">Closed</span>
+                    <div class="settings-card">
+                        <div class="settings-card-top">
+                            <div class="flex-between">
+                                <span class="stage-tag">Stage 3</span>
+                                <span id="dash-status-lbl" class="stage-status-lbl">Closed</span>
                             </div>
-                            <h3 class="text-base font-bold text-primary uppercase tracking-wide pt-1">Tutoring Dashboard
-                            </h3>
-                            <p class="text-xs text-secondary leading-relaxed">Allow students to begin math
-                                problem-solving sessions.</p>
+                            <h3 class="settings-card-title">Tutoring Dashboard</h3>
+                            <p class="settings-card-desc">Allow students to begin math problem-solving sessions.</p>
                         </div>
-
-                        <div class="space-y-3 pt-4 border-t border-custom">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs uppercase tracking-wider font-bold text-secondary">Global
-                                    Access</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="toggle-dash" onchange="updateStageControl('dash', this)"
-                                        class="sr-only toggle-switch-input">
+                        <div class="settings-card-bottom">
+                            <div class="flex-between">
+                                <span class="settings-card-label">Global Access</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-dash" onchange="updateStageControl('dash', this)" class="toggle-switch-input">
                                     <div class="toggle-switch-bg"></div>
                                 </label>
                             </div>
-
-                            <div class="grid grid-cols-2 gap-2 pt-2">
-                                <button onclick="openTargetedModal('dash', 'section')"
-                                    class="btn-secondary py-2 px-3 rounded-lg text-[10px] uppercase font-bold tracking-wider truncate">Section
-                                    Override</button>
-                                <button onclick="openTargetedModal('dash', 'student')"
-                                    class="btn-secondary py-2 px-3 rounded-lg text-[10px] uppercase font-bold tracking-wider truncate">Student
-                                    Override</button>
+                            <div class="settings-card-actions">
+                                <button onclick="openTargetedModal('dash', 'section')" class="btn-secondary btn-sm">Section Override</button>
+                                <button onclick="openTargetedModal('dash', 'student')" class="btn-secondary btn-sm">Student Override</button>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
 
         <!-- VIEW 5: SETTINGS -->
-        <div id="view-settings" class="space-y-6 view-section" style="display: none;">
+        <div id="view-settings" class="view-section admin-stack" style="display: none;">
 
             <!-- Account Security Card -->
-            <div class="solid-card p-6 sm:p-8 space-y-4">
-                <h2 class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider">Account Security</h2>
-                <p class="text-xs text-secondary">Update your admin login credentials.</p>
+            <div class="solid-card card-padded-lg admin-stack">
+                <h2 class="admin-card-title">Account Security</h2>
+                <p class="admin-card-subtitle">Update your admin login credentials.</p>
 
-                <form id="admin-password-form" onsubmit="handleAdminPasswordUpdate(event)"
-                    class="max-w-md space-y-4 pt-4">
-                    <div>
-                        <label class="block text-xs uppercase tracking-wider text-secondary mb-1.5">New Password</label>
-                        <input type="password" id="admin-new-password" required minlength="6"
-                            class="w-full form-input rounded-lg px-4 py-3 h-[44px] text-sm font-mono"
-                            placeholder="••••••••">
+                <form id="admin-password-form" onsubmit="handleAdminPasswordUpdate(event)" class="admin-form-narrow">
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <input type="password" id="admin-new-password" required minlength="6" class="form-input" placeholder="••••••••">
                     </div>
-                    <div>
-                        <label class="block text-xs uppercase tracking-wider text-secondary mb-1.5">Confirm
-                            Password</label>
-                        <input type="password" id="admin-confirm-password" required minlength="6"
-                            class="w-full form-input rounded-lg px-4 py-3 h-[44px] text-sm font-mono"
-                            placeholder="••••••••">
+                    <div class="form-group">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" id="admin-confirm-password" required minlength="6" class="form-input" placeholder="••••••••">
                     </div>
-                    <div class="pt-2">
-                        <button type="submit" id="admin-update-pw-btn"
-                            class="btn-primary w-full sm:w-auto px-6 py-3 h-[44px] rounded-lg text-xs font-bold uppercase tracking-wider shadow-md">
-                            Update Password
-                        </button>
-                    </div>
+                    <button type="submit" id="admin-update-pw-btn" class="btn-primary">Update Password</button>
                 </form>
             </div>
 
             <!-- Admin Device Management Card -->
-            <div class="solid-card p-6 sm:p-8 space-y-4">
+            <div class="solid-card card-padded-lg admin-stack">
                 <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-primary uppercase tracking-wider">Admin Device
-                        Management</h2>
-                    <p class="text-xs text-secondary mt-0.5">Set the maximum allowed devices for your admin account and
-                        manage active sessions.</p>
+                    <h2 class="admin-card-title">Admin Device Management</h2>
+                    <p class="admin-card-subtitle">Set the maximum allowed devices for your admin account and manage active sessions.</p>
                 </div>
 
-                <div class="max-w-md space-y-2 pt-2 border-b border-custom pb-6">
-                    <label class="block text-xs uppercase tracking-wider text-secondary">Admin Device Limit</label>
-                    <div class="flex gap-3 items-center">
-                        <input type="number" id="admin-device-limit-input" min="1" max="10" disabled
-                            class="flex-1 form-input rounded-lg px-4 py-3 h-[44px] text-sm font-mono opacity-50">
-                        <button type="button" id="edit-admin-limit-btn" onclick="toggleEditAdminLimit()"
-                            class="btn-secondary px-6 py-3 h-[44px] rounded-lg text-xs uppercase tracking-wider whitespace-nowrap font-bold flex items-center justify-center">Edit</button>
-                        <button type="button" id="save-admin-limit-btn" onclick="saveAdminDeviceLimit()"
-                            style="display: none;"
-                            class="btn-primary px-6 py-3 h-[44px] rounded-lg text-xs uppercase tracking-wider whitespace-nowrap font-bold shadow-md flex items-center justify-center">Save</button>
+                <div class="admin-form-narrow device-limit-row">
+                    <label class="form-label">Admin Device Limit</label>
+                    <div class="flex-row gap-sm">
+                        <input type="number" id="admin-device-limit-input" min="1" max="10" disabled class="form-input">
+                        <button type="button" id="edit-admin-limit-btn" onclick="toggleEditAdminLimit()" class="btn-secondary">Edit</button>
+                        <button type="button" id="save-admin-limit-btn" onclick="saveAdminDeviceLimit()" style="display: none;" class="btn-primary">Save</button>
                     </div>
                 </div>
 
-                <div class="pt-2">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-primary mb-3">Your Active Devices</h3>
-                    <div id="admin-active-devices-list" class="space-y-3">
-                        <!-- JS will inject devices here -->
-                    </div>
+                <div>
+                    <h3 class="admin-subheading">Your Active Devices</h3>
+                    <div id="admin-active-devices-list" class="admin-stack"></div>
                 </div>
             </div>
 
         </div>
-    </main>
+            </main>
+
+            <footer class="admin-footer">
+                PIA SYSTEM // ADMIN CONTROL PANEL
+            </footer>
+        </div>
+    </div>
 
     <!-- FULL-SCREEN STUDENT PROFILE VIEW -->
-    <div id="student-profile-screen" class="fixed inset-0 z-50 bg-main hidden flex-col fade-in overflow-y-auto">
-        <header
-            class="w-full px-4 sm:px-8 py-4 flex justify-between items-center border-b border-custom solid-nav sticky top-0 z-20">
-            <div class="flex items-center gap-4">
-                <button onclick="closeStudentProfile()"
-                    class="btn-secondary px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+    <div id="student-profile-screen" class="profile-overlay hidden">
+        <header class="site-nav profile-overlay-header">
+            <div class="flex-row gap-sm">
+                <button onclick="closeStudentProfile()" class="btn-secondary btn-sm">
+                    <i data-lucide="arrow-left" class="icon-sm"></i> Back
                 </button>
-                <span class="text-xs uppercase tracking-widest text-secondary font-mono hidden md:inline">Student
-                    Profile & Alignment</span>
+                <span class="profile-overlay-label hide-mobile">Student Profile &amp; Alignment</span>
             </div>
-            <button onclick="closeStudentProfile()" class="btn-icon p-2 rounded-full flex items-center justify-center">
-                <i data-lucide="x" class="w-5 h-5"></i>
+            <button onclick="closeStudentProfile()" class="btn-icon">
+                <i data-lucide="x" class="icon-sm"></i>
             </button>
         </header>
 
-        <main
-            class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            <div class="lg:col-span-4 flex flex-col items-center text-center space-y-6">
-                <div id="avatar-container"
-                    class="relative w-48 sm:w-56 h-48 sm:h-56 flex items-center justify-center overflow-hidden admin-avatar-container">
-                    <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="PIA Persona"
-                        class="h-36 sm:h-44 object-contain drop-shadow-2xl">
+        <main class="page-container profile-full-main">
+            <div class="profile-full-side">
+                <div id="avatar-container" class="admin-avatar-container">
+                    <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="PIA Persona" class="admin-avatar-img">
                 </div>
-                <div class="space-y-3 flex flex-col items-center w-full">
-                    <div class="flex items-center gap-3 flex-wrap justify-center">
-                        <span id="profile-persona-badge"
-                            class="px-4 py-1.5 rounded-full badge-custom text-xs font-mono uppercase tracking-widest text-center leading-tight">Openness</span>
-                        <button onclick="toggleAvatarVisibility()" id="toggle-avatar-btn"
-                            class="text-[10px] bg-main border border-custom px-2.5 py-1.5 rounded-lg text-secondary hover-text-primary transition-colors uppercase tracking-wider font-bold">Hide
-                            Image</button>
+                <div class="profile-full-identity">
+                    <div class="flex-row gap-sm flex-wrap">
+                        <span id="profile-persona-badge" class="badge badge-pill badge-success profile-persona-badge">Openness</span>
+                        <button onclick="toggleAvatarVisibility()" id="toggle-avatar-btn" class="badge badge-neutral toggle-avatar-btn">Hide Image</button>
                     </div>
-                    <h3 id="profile-name"
-                        class="text-2xl sm:text-3xl font-extrabold text-primary uppercase tracking-wider">Student Name
-                    </h3>
-                    <p id="profile-email"
-                        class="text-xs sm:text-sm text-secondary font-mono bg-main px-3 py-1 rounded-lg border border-custom break-all">
-                        email@student.ue.edu.ph</p>
+                    <h3 id="profile-name" class="profile-full-name">Student Name</h3>
+                    <p id="profile-email" class="profile-full-email">email@student.ue.edu.ph</p>
                 </div>
             </div>
 
-            <div class="lg:col-span-8 space-y-8">
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
-                    <div class="solid-card p-4 sm:p-5 space-y-1.5">
-                        <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Section</p>
-                        <p id="profile-section" class="font-bold text-primary text-base">Earth</p>
+            <div class="profile-full-body">
+                <div class="admin-grid-4">
+                    <div class="solid-card card-padded profile-info-tile">
+                        <p class="profile-info-label">Section</p>
+                        <p id="profile-section" class="profile-info-value">--</p>
                     </div>
-                    <div class="solid-card p-4 sm:p-5 space-y-1.5">
-                        <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Group Type</p>
-                        <p id="profile-type" class="font-bold text-accent text-base truncate">EXP</p>
+                    <div class="solid-card card-padded profile-info-tile">
+                        <p class="profile-info-label">Group Type</p>
+                        <p id="profile-type" class="profile-info-value text-accent">EXP</p>
                     </div>
-                    <div class="solid-card p-4 sm:p-5 space-y-1.5">
-                        <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Device Limit</p>
-                        <p id="profile-device-limit" class="font-bold text-primary text-base">1</p>
+                    <div class="solid-card card-padded profile-info-tile">
+                        <p class="profile-info-label">Device Limit</p>
+                        <p id="profile-device-limit" class="profile-info-value">1</p>
                     </div>
-                    <div class="solid-card p-4 sm:p-5 space-y-1.5">
-                        <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Status</p>
-                        <p id="profile-status" class="font-bold text-success text-sm mt-1 uppercase tracking-wider">
-                            Active</p>
-                    </div>
-                </div>
-
-                <div class="solid-card p-6 sm:p-8 space-y-6">
-                    <h4 class="text-sm font-extrabold text-primary uppercase tracking-wider flex items-center gap-2">
-                        <i data-lucide="activity" class="w-5 h-5 text-accent"></i> OCEAN Trait Breakdown
-                    </h4>
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                        <div class="admin-stat-box space-y-1">
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Openness</p>
-                            <p id="profile-ocean-o" class="font-mono text-primary text-xl sm:text-2xl font-bold">n/a</p>
-                        </div>
-                        <div class="admin-stat-box space-y-1">
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Conscientious</p>
-                            <p id="profile-ocean-c" class="font-mono text-primary text-xl sm:text-2xl font-bold">n/a</p>
-                        </div>
-                        <div class="admin-stat-box space-y-1">
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Extrovert</p>
-                            <p id="profile-ocean-e" class="font-mono text-primary text-xl sm:text-2xl font-bold">n/a</p>
-                        </div>
-                        <div class="admin-stat-box space-y-1">
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Agreeable</p>
-                            <p id="profile-ocean-a" class="font-mono text-primary text-xl sm:text-2xl font-bold">n/a</p>
-                        </div>
-                        <div class="admin-stat-box space-y-1 col-span-2 sm:col-span-1">
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Neuroticism</p>
-                            <p id="profile-ocean-n" class="font-mono text-primary text-xl sm:text-2xl font-bold">n/a</p>
-                        </div>
+                    <div class="solid-card card-padded profile-info-tile">
+                        <p class="profile-info-label">Status</p>
+                        <p id="profile-status" class="profile-info-value text-accent">Active</p>
                     </div>
                 </div>
 
-                <div class="solid-card p-6 sm:p-8 space-y-6">
-                    <h4 class="text-sm font-extrabold text-primary uppercase tracking-wider flex items-center gap-2">
-                        <i data-lucide="bar-chart-2" class="w-5 h-5 text-accent"></i> Mathematical Performance
+                <div class="solid-card card-padded-lg admin-stack">
+                    <h4 class="profile-section-heading">
+                        <i data-lucide="activity" class="icon-sm text-accent"></i> OCEAN Trait Breakdown
                     </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div class="bg-main p-5 rounded-lg border border-custom space-y-2">
-                            <p class="text-xs uppercase tracking-widest text-secondary font-mono">Pre-Test Baseline</p>
-                            <p id="profile-pre" class="font-mono text-primary text-2xl sm:text-3xl font-bold">n/a</p>
+                    <div class="admin-grid-5">
+                        <div class="admin-stat-box">
+                            <p class="profile-info-label">Openness</p>
+                            <p id="profile-ocean-o" class="admin-stat-value">n/a</p>
                         </div>
-                        <div class="bg-main p-5 rounded-lg border border-custom space-y-2 relative overflow-hidden">
-                            <div class="absolute inset-0 bg-success-light z-0"></div>
-                            <p class="text-xs uppercase tracking-widest text-secondary font-mono relative z-10">
-                                Post-Test Evaluation</p>
-                            <p id="profile-post"
-                                class="font-mono text-accent text-2xl sm:text-3xl font-bold relative z-10">n/a</p>
+                        <div class="admin-stat-box">
+                            <p class="profile-info-label">Conscientious</p>
+                            <p id="profile-ocean-c" class="admin-stat-value">n/a</p>
+                        </div>
+                        <div class="admin-stat-box">
+                            <p class="profile-info-label">Extrovert</p>
+                            <p id="profile-ocean-e" class="admin-stat-value">n/a</p>
+                        </div>
+                        <div class="admin-stat-box">
+                            <p class="profile-info-label">Agreeable</p>
+                            <p id="profile-ocean-a" class="admin-stat-value">n/a</p>
+                        </div>
+                        <div class="admin-stat-box admin-stat-box-wide">
+                            <p class="profile-info-label">Neuroticism</p>
+                            <p id="profile-ocean-n" class="admin-stat-value">n/a</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="solid-card card-padded-lg admin-stack">
+                    <h4 class="profile-section-heading">
+                        <i data-lucide="bar-chart-2" class="icon-sm text-accent"></i> Mathematical Performance
+                    </h4>
+                    <div class="admin-grid-2">
+                        <div class="perf-tile">
+                            <p class="profile-info-label">Pre-Test Baseline</p>
+                            <p id="profile-pre" class="perf-tile-value">n/a</p>
+                        </div>
+                        <div class="perf-tile perf-tile-accent">
+                            <p class="profile-info-label">Post-Test Evaluation</p>
+                            <p id="profile-post" class="perf-tile-value text-accent">n/a</p>
                         </div>
                     </div>
                 </div>
@@ -693,58 +529,51 @@
     </div>
 
     <!-- FULL-SCREEN PROFESSOR PROFILE VIEW -->
-    <div id="professor-profile-screen" class="fixed inset-0 z-50 bg-main hidden flex-col fade-in overflow-y-auto">
-        <header
-            class="w-full px-4 sm:px-8 py-4 flex justify-between items-center border-b border-custom solid-nav sticky top-0 z-20">
-            <div class="flex items-center gap-4">
-                <button onclick="closeProfessorProfile()"
-                    class="btn-secondary px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+    <div id="professor-profile-screen" class="profile-overlay hidden">
+        <header class="site-nav profile-overlay-header">
+            <div class="flex-row gap-sm">
+                <button onclick="closeProfessorProfile()" class="btn-secondary btn-sm">
+                    <i data-lucide="arrow-left" class="icon-sm"></i> Back
                 </button>
-                <span class="text-xs uppercase tracking-widest text-secondary font-mono">Faculty Profile</span>
+                <span class="profile-overlay-label">Faculty Profile</span>
             </div>
-            <button onclick="closeProfessorProfile()"
-                class="btn-icon p-2 rounded-full flex items-center justify-center">
-                <i data-lucide="x" class="w-5 h-5"></i>
+            <button onclick="closeProfessorProfile()" class="btn-icon">
+                <i data-lucide="x" class="icon-sm"></i>
             </button>
         </header>
 
-        <main
-            class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            <div class="lg:col-span-5 flex flex-col items-center text-center space-y-6">
-                <div
-                    class="relative w-40 sm:w-48 h-40 sm:h-48 flex items-center justify-center text-secondary prof-icon-box">
-                    <i data-lucide="shield-alert" class="w-20 sm:w-24 h-20 sm:h-24"></i>
+        <main class="content-container profile-full-main">
+            <div class="profile-full-side">
+                <div class="prof-icon-box">
+                    <i data-lucide="shield-alert" class="icon-xl"></i>
                 </div>
-                <div class="space-y-3 w-full">
-                    <span
-                        class="px-3 py-1.5 rounded-full text-xs font-mono uppercase tracking-widest prof-badge inline-block">Faculty
-                        Admin</span>
-                    <h3 id="prof-profile-name"
-                        class="text-2xl sm:text-3xl font-extrabold text-primary uppercase tracking-wider">Professor Name
-                    </h3>
-                    <p id="prof-profile-email"
-                        class="text-xs sm:text-sm text-secondary font-mono bg-main px-3 py-1 rounded-lg border border-custom inline-block break-all">
-                        email@student.ue.edu.ph</p>
+                <div class="profile-full-identity">
+                    <span class="badge badge-pill badge-info">Faculty Admin</span>
+                    <h3 id="prof-profile-name" class="profile-full-name">Professor Name</h3>
+                    <p id="prof-profile-email" class="profile-full-email">email@student.ue.edu.ph</p>
                 </div>
             </div>
 
-            <div class="lg:col-span-7 space-y-6">
-                <div class="solid-card p-6 sm:p-8 space-y-6">
-                    <h4
-                        class="text-sm font-extrabold text-primary uppercase tracking-wider flex items-center gap-2 border-b border-custom pb-3">
-                        <i data-lucide="briefcase" class="w-5 h-5 text-info"></i> Academic Assignment
+            <div class="profile-full-body">
+                <div class="solid-card card-padded-lg admin-stack">
+                    <h4 class="profile-section-heading profile-section-heading-bordered">
+                        <i data-lucide="briefcase" class="icon-sm text-info"></i> Academic Assignment
                     </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div class="bg-main p-5 rounded-lg border border-custom space-y-2">
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono">Department</p>
-                            <p id="prof-profile-dept" class="font-bold text-primary text-lg">Computer Science</p>
+                    <div class="admin-grid-2">
+                        <div class="perf-tile">
+                            <p class="profile-info-label">Department</p>
+                            <p id="prof-profile-dept" class="perf-tile-value-sm">Computer Science</p>
                         </div>
-                        <div class="bg-main p-5 rounded-lg border border-custom space-y-2 relative overflow-hidden">
-                            <div class="absolute inset-0 bg-info-light z-0"></div>
-                            <p class="text-[10px] uppercase tracking-widest text-secondary font-mono relative z-10">
-                                Handled Section</p>
-                            <p id="prof-profile-section" class="font-bold text-info text-lg relative z-10">Earth</p>
+                        <div class="perf-tile perf-tile-info">
+                            <p class="profile-info-label">Handled Section</p>
+                            <p id="prof-profile-section" class="perf-tile-value-sm text-info">Earth</p>
+                        </div>
+                        <div class="perf-tile">
+                            <p class="profile-info-label">Account Status</p>
+                            <p class="perf-tile-value-sm">
+                                <span id="prof-profile-status-dot" class="status-dot status-dot-offline"></span>
+                                <span id="prof-profile-status">Offline</span>
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -752,108 +581,74 @@
         </main>
     </div>
 
-    <footer
-        class="w-full max-w-7xl mx-auto py-6 px-4 text-center text-[10px] text-secondary uppercase tracking-widest font-mono border-t border-custom mt-auto">
-        PIA SYSTEM // ADMIN CONTROL PANEL
-    </footer>
-
     <!-- TARGETED ACCESS MODAL -->
-    <div id="targeted-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('targeted-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-xl p-6 sm:p-8 space-y-5 modal-content"
-            id="targeted-modal-content">
-            <h3 id="targeted-modal-title"
-                class="text-xl font-extrabold text-primary uppercase tracking-wider text-center">Open Stage Targeted
-            </h3>
+    <div id="targeted-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('targeted-modal')">
+        <div class="solid-card modal-content modal-w-xl" id="targeted-modal-content">
+            <h3 class="modal-title-centered">Open Stage Targeted</h3>
             <input type="hidden" id="target-stage-key">
             <input type="hidden" id="target-mode">
 
-            <div id="target-section-container" class="space-y-2">
-                <label class="block text-xs uppercase tracking-wider text-secondary">Select Section</label>
-                <select id="target-section-select"
-                    class="w-full form-input rounded-lg px-4 py-3 h-[44px] text-sm cursor-pointer"></select>
+            <div id="target-section-container" class="form-group">
+                <label class="form-label">Select Section</label>
+                <select id="target-section-select" class="form-select"></select>
             </div>
 
-            <div id="target-student-container" class="space-y-3 hidden">
-                <div class="flex justify-between items-center">
-                    <label class="block text-xs uppercase tracking-wider text-secondary">Search & Select Student</label>
-                    <span id="selected-target-student-lbl" class="text-[10px] font-mono text-accent">No student
-                        selected</span>
+            <div id="target-student-container" class="form-group hidden">
+                <div class="flex-between">
+                    <label class="form-label">Search &amp; Select Student</label>
+                    <span id="selected-target-student-lbl" class="target-selected-lbl">No student selected</span>
                 </div>
-                <div class="relative w-full">
-                    <i data-lucide="search"
-                        class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-secondary"></i>
-                    <input type="text" id="target-student-search" oninput="filterTargetStudents()"
-                        placeholder="Type student name or email..." class="search-input">
+                <div class="search-input-wrap">
+                    <i data-lucide="search" class="icon-sm search-input-icon"></i>
+                    <input type="text" id="target-student-search" oninput="filterTargetStudents()" placeholder="Type student name or email..." class="search-input">
                 </div>
                 <input type="hidden" id="target-student-email-selected">
-
-                <div class="max-h-52 overflow-y-auto custom-scrollbar space-y-1.5 border border-custom rounded-lg p-2 bg-main"
-                    id="target-student-list"></div>
+                <div id="target-student-list" class="target-student-list"></div>
             </div>
 
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="closeModal('targeted-modal')"
-                    class="btn-secondary flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-wider">Cancel</button>
-                <button type="button" id="grant-access-btn" onclick="executeTargetedOpen()" disabled
-                    class="btn-primary flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-md opacity-50 cursor-not-allowed">Grant
-                    Access</button>
+            <div class="modal-actions">
+                <button type="button" onclick="closeModal('targeted-modal')" class="btn-secondary btn-block">Cancel</button>
+                <button type="button" id="grant-access-btn" onclick="executeTargetedOpen()" disabled class="btn-primary btn-block">Grant Access</button>
             </div>
         </div>
     </div>
 
     <!-- DEVICE MANAGER MODAL -->
-    <div id="device-manager-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('device-manager-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-md p-6 sm:p-8 space-y-6 modal-content"
-            id="device-manager-modal-content">
-            <div class="flex justify-between items-center border-b border-custom pb-4">
+    <div id="device-manager-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('device-manager-modal')">
+        <div class="solid-card modal-content" id="device-manager-modal-content">
+            <div class="modal-header-row">
                 <div>
-                    <h3 class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-primary">Active Devices
-                    </h3>
-                    <p class="text-xs text-secondary mt-0.5 font-mono truncate max-w-[220px] sm:max-w-xs"
-                        id="device-modal-email">email@student.ue.edu.ph</p>
+                    <h3 class="modal-title">Active Devices</h3>
+                    <p id="device-modal-email" class="modal-subtitle">email@student.ue.edu.ph</p>
                 </div>
-                <button onclick="closeModal('device-manager-modal')"
-                    class="btn-icon p-2 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-4 h-4"></i>
+                <button onclick="closeModal('device-manager-modal')" class="btn-icon">
+                    <i data-lucide="x" class="icon-sm"></i>
                 </button>
             </div>
-            <div class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar" id="device-list-container"></div>
-            <div class="pt-2">
-                <button type="button" onclick="closeModal('device-manager-modal')"
-                    class="btn-secondary w-full py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Close</button>
-            </div>
+            <div id="device-list-container" class="modal-scroll-list"></div>
+            <button type="button" onclick="closeModal('device-manager-modal')" class="btn-secondary btn-block">Close</button>
         </div>
     </div>
 
     <!-- SECTION DETAILS MODAL -->
-    <div id="section-details-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('section-details-modal')">
-        </div>
-        <div class="solid-card relative z-10 w-full max-w-5xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto modal-content"
-            id="section-details-modal-content">
-            <div
-                class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-custom pb-4">
+    <div id="section-details-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('section-details-modal')">
+        <div class="solid-card modal-content modal-w-5xl modal-scrollable" id="section-details-modal-content">
+            <div class="modal-header-row">
                 <div>
-                    <h3 id="modal-section-title"
-                        class="text-xl sm:text-2xl font-extrabold uppercase tracking-wider text-primary">Section
-                        Students</h3>
-                    <p class="text-xs text-secondary mt-1">Enrolled students and activation status.</p>
+                    <h3 id="modal-section-title" class="modal-title">Section Students</h3>
+                    <p class="modal-subtitle">Enrolled students and activation status.</p>
                 </div>
-                <div class="flex items-center gap-3 w-full sm:w-auto">
-                    <button onclick="openScoresModalFromDetails()"
-                        class="btn-primary flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider font-bold flex items-center justify-center gap-2 shadow-md">
-                        <i data-lucide="file-text" class="w-4 h-4"></i> Input Scores
+                <div class="flex-row gap-sm">
+                    <button onclick="openScoresModalFromDetails()" class="btn-primary">
+                        <i data-lucide="file-text" class="icon-sm"></i> Input Scores
                     </button>
-                    <button onclick="closeModal('section-details-modal')"
-                        class="btn-icon p-2 rounded-full flex items-center justify-center">
-                        <i data-lucide="x" class="w-5 h-5"></i>
+                    <button onclick="closeModal('section-details-modal')" class="btn-icon">
+                        <i data-lucide="x" class="icon-sm"></i>
                     </button>
                 </div>
             </div>
-            <div class="admin-table-wrapper pb-6 overflow-x-auto w-full custom-scrollbar">
-                <table class="admin-table w-full whitespace-nowrap">
+            <div class="data-table-wrapper admin-table-wrapper">
+                <table class="data-table admin-table">
                     <thead>
                         <tr>
                             <th>Student Name</th>
@@ -870,24 +665,19 @@
     </div>
 
     <!-- SCORES MODAL -->
-    <div id="scores-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('scores-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-4xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto modal-content"
-            id="scores-modal-content">
-            <div class="flex justify-between items-center border-b border-custom pb-4">
+    <div id="scores-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('scores-modal')">
+        <div class="solid-card modal-content modal-w-4xl modal-scrollable" id="scores-modal-content">
+            <div class="modal-header-row">
                 <div>
-                    <h3 id="scores-modal-title"
-                        class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-primary">Input Scores
-                    </h3>
-                    <p class="text-xs text-secondary mt-1">Encode pre-test and post-test scores per student.</p>
+                    <h3 id="scores-modal-title" class="modal-title">Input Scores</h3>
+                    <p class="modal-subtitle">Encode pre-test and post-test scores per student.</p>
                 </div>
-                <button onclick="closeModal('scores-modal')"
-                    class="btn-icon p-2 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+                <button onclick="closeModal('scores-modal')" class="btn-icon">
+                    <i data-lucide="x" class="icon-sm"></i>
                 </button>
             </div>
-            <div class="admin-table-wrapper pb-6 overflow-x-auto w-full custom-scrollbar">
-                <table class="admin-table w-full whitespace-nowrap">
+            <div class="data-table-wrapper admin-table-wrapper">
+                <table class="data-table admin-table">
                     <thead>
                         <tr>
                             <th>Student Name</th>
@@ -899,308 +689,217 @@
                     <tbody id="scores-table-body"></tbody>
                 </table>
             </div>
-            <div class="flex gap-4 pt-4 border-t border-custom">
-                <button type="button" onclick="closeModal('scores-modal')"
-                    class="btn-secondary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Cancel</button>
-                <button type="button" onclick="saveBatchScores()"
-                    class="btn-primary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold shadow-md">Save
-                    Scores</button>
+            <div class="modal-actions modal-actions-bordered">
+                <button type="button" onclick="closeModal('scores-modal')" class="btn-secondary btn-block">Cancel</button>
+                <button type="button" onclick="saveBatchScores()" class="btn-primary btn-block">Save Scores</button>
             </div>
         </div>
     </div>
 
     <!-- ADD SECTION MODAL -->
-    <div id="add-section-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('add-section-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-sm p-6 sm:p-8 space-y-5 modal-content"
-            id="add-section-modal-content">
-            <h3 class="text-xl font-extrabold text-primary uppercase tracking-wider text-center">New Section</h3>
-            <input type="text" id="new-section-name" placeholder="Section Name (e.g. Mars)"
-                class="w-full form-input rounded-lg px-4 py-3 h-[44px] text-sm">
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="closeModal('add-section-modal')"
-                    class="btn-secondary flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-wider">Cancel</button>
-                <button type="button" onclick="saveNewSection()"
-                    class="btn-primary flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-md">Create</button>
+    <div id="add-section-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('add-section-modal')">
+        <div class="solid-card modal-content modal-w-sm" id="add-section-modal-content">
+            <h3 class="modal-title-centered">New Section</h3>
+            <input type="text" id="new-section-name" placeholder="Section Name (e.g. Mars)" class="form-input">
+            <div class="modal-actions">
+                <button type="button" onclick="closeModal('add-section-modal')" class="btn-secondary btn-block">Cancel</button>
+                <button type="button" onclick="saveNewSection()" class="btn-primary btn-block">Create</button>
             </div>
         </div>
     </div>
 
     <!-- ADD STUDENT MODAL -->
-    <div id="add-student-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('add-student-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto modal-content"
-            id="add-student-modal-content">
-            <div class="flex justify-between items-center border-b border-custom pb-4">
-                <h3 class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-primary">Register Student
-                </h3>
-                <button onclick="closeModal('add-student-modal')"
-                    class="btn-icon p-2 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-4 h-4"></i>
+    <div id="add-student-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('add-student-modal')">
+        <div class="solid-card modal-content modal-w-2xl modal-scrollable" id="add-student-modal-content">
+            <div class="modal-header-row">
+                <h3 class="modal-title">Register Student</h3>
+                <button onclick="closeModal('add-student-modal')" class="btn-icon">
+                    <i data-lucide="x" class="icon-sm"></i>
                 </button>
             </div>
-            <form id="add-student-form" onsubmit="handleRegisterStudent(event)" class="space-y-5">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Student
-                        Name</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <input type="text" id="add-first-name" required placeholder="First Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                        <input type="text" id="add-middle-name" placeholder="Middle Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                        <input type="text" id="add-last-name" required placeholder="Last Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+            <form id="add-student-form" onsubmit="handleRegisterStudent(event)" class="admin-form">
+                <div class="form-group">
+                    <label class="form-label">Student Name</label>
+                    <div class="admin-grid-3-form">
+                        <input type="text" id="add-first-name" required placeholder="First Name" class="form-input">
+                        <input type="text" id="add-middle-name" placeholder="Middle Name" class="form-input">
+                        <input type="text" id="add-last-name" required placeholder="Last Name" class="form-input">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Email
-                        Address</label>
-                    <input type="email" id="student-email" required placeholder="maria@student.ue.edu.ph"
-                        class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="student-email" required placeholder="maria@student.ue.edu.ph" class="form-input">
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label
-                            class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Section</label>
-                        <select id="student-section"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm cursor-pointer"></select>
+                <div class="admin-grid-2-form">
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <select id="student-section" class="form-select"></select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Pre-Test
-                            Score</label>
-                        <input type="number" step="0.1" id="student-pretest" placeholder="e.g. 75.0"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm font-mono">
+                    <div class="form-group">
+                        <label class="form-label">Pre-Test Score</label>
+                        <input type="number" step="0.1" id="student-pretest" placeholder="e.g. 75.0" class="form-input">
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Group
-                            Type</label>
-                        <select id="student-type"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm cursor-pointer">
+                <div class="admin-grid-2-form">
+                    <div class="form-group">
+                        <label class="form-label">Group Type</label>
+                        <select id="student-type" class="form-select">
                             <option value="assigned">EXP (Assigned Agent)</option>
                             <option value="non-assigned">EXP (Free Choice Agent)</option>
                             <option value="neutral">EXP (Neutral Agent)</option>
                             <option value="control">CTRL (Traditional Setup)</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Device
-                            Limit</label>
-                        <input type="number" id="student-device-limit" value="1" min="1" max="5" required
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm font-mono">
+                    <div class="form-group">
+                        <label class="form-label">Device Limit</label>
+                        <input type="number" id="student-device-limit" value="1" min="1" max="5" required class="form-input">
                     </div>
                 </div>
-                <div class="flex items-center gap-3 pt-2 bg-main p-3 rounded-lg border border-custom">
-                    <input type="checkbox" id="student-consent" required class="w-4 h-4 form-checkbox rounded">
-                    <label for="student-consent"
-                        class="text-xs text-success cursor-pointer select-none font-medium">Parental Consent
-                        Received</label>
+                <div class="consent-row">
+                    <input type="checkbox" id="student-consent" required class="form-checkbox">
+                    <label for="student-consent" class="consent-label">Parental Consent Received</label>
                 </div>
-                <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="closeModal('add-student-modal')"
-                        class="btn-secondary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Cancel</button>
-                    <button type="submit"
-                        class="btn-primary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold shadow-md">Register</button>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('add-student-modal')" class="btn-secondary btn-block">Cancel</button>
+                    <button type="submit" class="btn-primary btn-block">Register</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- EDIT STUDENT MODAL -->
-    <div id="edit-student-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('edit-student-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto modal-content"
-            id="edit-student-modal-content">
-            <div class="flex justify-between items-center border-b border-custom pb-4">
-                <h3 class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-primary">Edit Student Details
-                </h3>
-                <button onclick="closeModal('edit-student-modal')"
-                    class="btn-icon p-2 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-4 h-4"></i>
+    <div id="edit-student-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('edit-student-modal')">
+        <div class="solid-card modal-content modal-w-2xl modal-scrollable" id="edit-student-modal-content">
+            <div class="modal-header-row">
+                <h3 class="modal-title">Edit Student Details</h3>
+                <button onclick="closeModal('edit-student-modal')" class="btn-icon">
+                    <i data-lucide="x" class="icon-sm"></i>
                 </button>
             </div>
-            <form id="edit-student-form" onsubmit="handleUpdateStudent(event)" class="space-y-5">
+            <form id="edit-student-form" onsubmit="handleUpdateStudent(event)" class="admin-form">
                 <input type="hidden" id="edit-student-original-email">
-
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Student
-                        Name</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <input type="text" id="edit-first-name" required placeholder="First Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                        <input type="text" id="edit-middle-name" placeholder="Middle Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
-                        <input type="text" id="edit-last-name" required placeholder="Last Name"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+                <div class="form-group">
+                    <label class="form-label">Student Name</label>
+                    <div class="admin-grid-3-form">
+                        <input type="text" id="edit-first-name" required placeholder="First Name" class="form-input">
+                        <input type="text" id="edit-middle-name" placeholder="Middle Name" class="form-input">
+                        <input type="text" id="edit-last-name" required placeholder="Last Name" class="form-input">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Email
-                        Address</label>
-                    <input type="email" id="edit-student-email-input" required
-                        class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="edit-student-email-input" required class="form-input">
                 </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label
-                            class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Section</label>
-                        <select id="edit-student-section"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm cursor-pointer"></select>
+                <div class="admin-grid-2-form">
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <select id="edit-student-section" class="form-select"></select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Pre-Test
-                            Score</label>
-                        <input type="number" step="0.1" id="edit-student-pretest"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm font-mono">
+                    <div class="form-group">
+                        <label class="form-label">Pre-Test Score</label>
+                        <input type="number" step="0.1" id="edit-student-pretest" class="form-input">
                     </div>
                 </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Group
-                            Type</label>
-                        <select id="edit-student-type"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm cursor-pointer">
+                <div class="admin-grid-2-form">
+                    <div class="form-group">
+                        <label class="form-label">Group Type</label>
+                        <select id="edit-student-type" class="form-select">
                             <option value="assigned">EXP (Assigned Agent)</option>
                             <option value="non-assigned">EXP (Free Choice Agent)</option>
                             <option value="neutral">EXP (Neutral Agent)</option>
                             <option value="control">CTRL (Traditional Setup)</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Device
-                            Limit</label>
-                        <input type="number" id="edit-student-device-limit" min="1" max="5" required
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm font-mono">
+                    <div class="form-group">
+                        <label class="form-label">Device Limit</label>
+                        <input type="number" id="edit-student-device-limit" min="1" max="5" required class="form-input">
                     </div>
                 </div>
-
-                <div class="flex items-center gap-3 pt-2 bg-main p-3 rounded-lg border border-custom">
-                    <input type="checkbox" id="edit-student-consent" class="w-4 h-4 form-checkbox rounded" checked>
-                    <label for="edit-student-consent"
-                        class="text-xs text-success cursor-pointer select-none font-medium">Parental Consent
-                        Received</label>
+                <div class="consent-row">
+                    <input type="checkbox" id="edit-student-consent" class="form-checkbox" checked>
+                    <label for="edit-student-consent" class="consent-label">Parental Consent Received</label>
                 </div>
-
-                <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="closeModal('edit-student-modal')"
-                        class="btn-secondary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Cancel</button>
-                    <button type="submit"
-                        class="btn-primary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Save
-                        Changes</button>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('edit-student-modal')" class="btn-secondary btn-block">Cancel</button>
+                    <button type="submit" class="btn-primary btn-block">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- ADD PROFESSOR MODAL -->
-    <div id="add-professor-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeModal('add-professor-modal')"></div>
-        <div class="solid-card relative z-10 w-full max-w-md p-6 sm:p-8 space-y-6 modal-content"
-            id="add-professor-modal-content">
-            <div class="flex justify-between items-center border-b border-custom pb-4">
-                <h3 class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-primary">Add Professor</h3>
-                <button onclick="closeModal('add-professor-modal')"
-                    class="btn-icon p-2 rounded-full flex items-center justify-center">
-                    <i data-lucide="x" class="w-4 h-4"></i>
+    <div id="add-professor-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('add-professor-modal')">
+        <div class="solid-card modal-content" id="add-professor-modal-content">
+            <div class="modal-header-row">
+                <h3 class="modal-title">Add Professor</h3>
+                <button onclick="closeModal('add-professor-modal')" class="btn-icon">
+                    <i data-lucide="x" class="icon-sm"></i>
                 </button>
             </div>
-            <form id="add-professor-form" onsubmit="handleRegisterProfessor(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Full
-                        Name</label>
-                    <input type="text" id="prof-name" required placeholder="e.g. Dr. Maria Santos"
-                        class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+            <form id="add-professor-form" onsubmit="handleRegisterProfessor(event)" class="admin-form">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="prof-name" required placeholder="e.g. Dr. Maria Santos" class="form-input">
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Email
-                        Address</label>
-                    <input type="email" id="prof-email" required placeholder="maria@ue.edu.ph"
-                        class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="prof-email" required placeholder="maria@ue.edu.ph" class="form-input">
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label
-                            class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Department</label>
-                        <input type="text" id="prof-dept" required placeholder="Computer Science"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm">
+                <div class="admin-grid-2-form">
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input type="text" id="prof-dept" required placeholder="Computer Science" class="form-input">
                     </div>
-                    <div>
-                        <label
-                            class="block text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">Section</label>
-                        <select id="prof-section"
-                            class="w-full form-input rounded-lg px-4 py-2.5 h-[44px] text-sm"></select>
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <select id="prof-section" class="form-select"></select>
                     </div>
                 </div>
-                <div class="flex gap-3 pt-4">
-                    <button type="button" onclick="closeModal('add-professor-modal')"
-                        class="btn-secondary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Cancel</button>
-                    <button type="submit"
-                        class="btn-primary flex-1 py-3 rounded-lg uppercase tracking-wider text-xs font-bold">Register</button>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal('add-professor-modal')" class="btn-secondary btn-block">Cancel</button>
+                    <button type="submit" class="btn-primary btn-block">Register</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- DEVICE LIMIT FORCED REVOKE MODAL -->
-    <div id="device-limit-modal" class="fixed inset-0 flex items-center justify-center modal-overlay p-4"
-        style="z-index: 99997;">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm"></div>
-        <div class="solid-card relative z-10 w-full max-w-md p-6 space-y-5 modal-content"
-            id="device-limit-modal-content">
-            <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <i data-lucide="shield-alert" class="w-6 h-6 text-danger"></i>
-                <h3 class="text-base font-extrabold text-primary uppercase tracking-wider">Device Limit Reached</h3>
+    <!-- DEVICE LIMIT FORCED REVOKE MODAL (no backdrop dismiss -- forced action) -->
+    <div id="device-limit-modal" class="modal-overlay" style="z-index: 99997;">
+        <div class="solid-card modal-content" id="device-limit-modal-content">
+            <div class="modal-icon-header">
+                <i data-lucide="shield-alert" class="icon-md text-danger"></i>
+                <h3 class="modal-title">Device Limit Reached</h3>
             </div>
-            <p class="text-sm text-secondary leading-relaxed">
-                You have reached your admin device limit. Please revoke an older session below to continue on this
-                device.
+            <p class="modal-body-text">
+                You have reached your admin device limit. Please revoke an older session below to continue on this device.
             </p>
-            <div id="device-limit-list" class="space-y-3 max-h-60 overflow-y-auto">
-                <!-- JS will inject device items here -->
-            </div>
+            <div id="device-limit-list" class="modal-scroll-list"></div>
         </div>
     </div>
 
     <!-- 🚨 TOP-LEVEL PRIORITY POPUPS 🚨 -->
-    <!-- Inilagay sa pinakadulo ng DOM bago mag scripts para siguradong laging lilitaw sa ibabaw ng lahat! -->
-
-    <div id="custom-confirm" class="fixed inset-0 flex items-center justify-center modal-overlay p-4"
-        style="z-index: 99998;">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeCustomConfirm()"></div>
-        <div class="solid-card relative z-10 w-full max-w-sm p-6 space-y-5 modal-content" id="custom-confirm-content">
-            <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <i data-lucide="alert-triangle" class="w-6 h-6 text-warning"></i>
-                <h3 class="text-base font-extrabold text-primary uppercase tracking-wider" id="confirm-title">Confirm
-                    Action</h3>
+    <div id="custom-confirm" class="modal-overlay" style="z-index: 99998;" onclick="if(event.target===this) closeCustomConfirm()">
+        <div class="solid-card modal-content modal-w-sm" id="custom-confirm-content">
+            <div class="modal-icon-header">
+                <i data-lucide="alert-triangle" class="icon-md text-warning"></i>
+                <h3 class="modal-title" id="confirm-title">Confirm Action</h3>
             </div>
-            <p class="text-sm text-secondary leading-relaxed" id="confirm-message"></p>
-            <div class="flex gap-3 pt-2">
-                <button onclick="closeCustomConfirm()"
-                    class="btn-secondary flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-wider">Cancel</button>
-                <button id="confirm-yes-btn"
-                    class="btn-primary flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-md">Proceed</button>
+            <p class="modal-body-text" id="confirm-message"></p>
+            <div class="modal-actions">
+                <button onclick="closeCustomConfirm()" class="btn-secondary btn-block">Cancel</button>
+                <button id="confirm-yes-btn" class="btn-primary btn-block">Proceed</button>
             </div>
         </div>
     </div>
 
-    <div id="custom-alert" class="fixed inset-0 flex items-center justify-center modal-overlay p-4"
-        style="z-index: 99999;">
-        <div class="absolute inset-0 dark-backdrop backdrop-blur-sm" onclick="closeCustomAlert()"></div>
-        <div class="solid-card relative z-10 w-full max-w-sm p-6 space-y-5 modal-content" id="custom-alert-content">
-            <div class="flex items-center gap-3 border-b border-custom pb-3">
-                <div id="alert-icon-container"><i data-lucide="info" class="w-6 h-6 text-accent" id="alert-icon"></i>
-                </div>
-                <h3 class="text-base font-extrabold text-primary uppercase tracking-wider" id="alert-title">Notification
-                </h3>
+    <div id="custom-alert" class="modal-overlay" style="z-index: 99999;" onclick="if(event.target===this) closeCustomAlert()">
+        <div class="solid-card modal-content modal-w-sm" id="custom-alert-content">
+            <div class="modal-icon-header">
+                <div id="alert-icon-container"><i data-lucide="info" class="icon-md text-accent" id="alert-icon"></i></div>
+                <h3 class="modal-title" id="alert-title">Notification</h3>
             </div>
-            <p class="text-sm text-secondary leading-relaxed" id="alert-message"></p>
-            <div class="pt-2">
-                <button onclick="closeCustomAlert()"
-                    class="btn-primary w-full py-3 rounded-lg text-xs font-bold uppercase tracking-wider">Understood</button>
-            </div>
+            <p class="modal-body-text" id="alert-message"></p>
+            <button onclick="closeCustomAlert()" class="btn-primary btn-block">Understood</button>
         </div>
     </div>
 

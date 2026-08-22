@@ -1,0 +1,109 @@
+/* ==========================================================================
+   PIA DESIGN TOKENS
+   Negative Polarity (Dark Mode) + Green Accents -- ang layunin ng dark+green
+   palette ay bawasan ang "math anxiety": mababang glare, walang mapupulang
+   babala maliban sa totoong error states, at green bilang "positive/progress"
+   signal sa buong system (tama = green, level up = green glow).
+   ========================================================================== */
+
+:root {
+    /* --- Surface & Text --- */
+    --bg-main: #05050a;
+    --bg-card: #0d0d15;
+    --bg-hover: #161622;
+    --bg-elevated: #14141f;
+    --text-primary: #f5f7fa;
+    --text-secondary: #99a3b3;
+    --text-faint: #5b6472;
+
+    /* --- Accent (Green) --- */
+    --accent-primary: #10b981;
+    --accent-hover: #34d399;
+    --accent-soft-bg: rgba(16, 185, 129, 0.1);
+    --accent-soft-border: rgba(16, 185, 129, 0.3);
+
+    --border-color: #1e1e2f;
+    --border-accent: #10b981;
+
+    /* --- Glass surfaces (premium SaaS card treatment) --- */
+    --glass-bg: rgba(16, 18, 26, 0.6);
+    --glass-bg-elevated: rgba(20, 22, 32, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-hover: rgba(16, 185, 129, 0.35);
+    --glass-highlight: rgba(255, 255, 255, 0.04);
+    --glass-blur: 20px;
+    --glass-blur-lg: 32px;
+
+    /* --- Elevation / glow shadows --- */
+    --shadow-elevated: 0 24px 60px -20px rgba(0, 0, 0, 0.65), 0 1px 0 0 rgba(255, 255, 255, 0.03) inset;
+    --shadow-glow-xs: 0 0 0 1px rgba(16, 185, 129, 0.12);
+    --shadow-glow-sm: 0 4px 24px -6px rgba(16, 185, 129, 0.18);
+    --shadow-glow-md: 0 8px 40px -8px rgba(16, 185, 129, 0.28);
+    --shadow-glow-lg: 0 0 48px -4px rgba(16, 185, 129, 0.4);
+
+    /* --- Status Colors --- */
+    --color-success: #10b981;
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-success-border: rgba(16, 185, 129, 0.3);
+
+    --color-warning: #f59e0b;
+    --color-warning-bg: rgba(245, 158, 11, 0.1);
+    --color-warning-border: rgba(245, 158, 11, 0.3);
+
+    --color-danger: #ef4444;
+    --color-danger-hover: #dc2828;
+    --color-danger-bg: rgba(239, 68, 68, 0.1);
+    --color-danger-bg-hover: rgba(239, 68, 68, 0.2);
+    --color-danger-border: rgba(239, 68, 68, 0.3);
+
+    --color-info: #3b82f6;
+    --color-info-bg: rgba(59, 130, 246, 0.1);
+    --color-info-border: rgba(59, 130, 246, 0.3);
+
+    --color-neutral: #64748b;
+    --color-smooth: #10b981;
+
+    /* --- Overlays --- */
+    --overlay-start: rgba(5, 5, 10, 0.85);
+    --overlay-end: rgba(5, 5, 10, 0.98);
+    --backdrop-bg: rgba(5, 5, 10, 0.9);
+
+    /* --- Scrollbars --- */
+    --scroll-track: #05050a;
+    --scroll-thumb: #1e1e2f;
+    --scroll-thumb-hover: #10b981;
+
+    /* --- Motion & Shape --- */
+    --transition-speed: 0.25s;
+    --transition-spring: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-xl: 1.75rem;
+    --radius-2xl: 2.25rem;
+    --shadow-card: 0 4px 20px rgba(16, 185, 129, 0.1);
+    --shadow-soft: var(--shadow-elevated);
+
+    /* --- Typography ---
+       Plus Jakarta Sans (UI/body) + Sora (display headings) replace the old
+       gamified Rajdhani/Orbitron pairing for a premium SaaS/EdTech read.
+       JetBrains Mono stays for data, stats and technical labels. */
+    --font-primary: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+    --font-secondary: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* --- Spacing scale (para sa mga bagong semantic component) --- */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+
+    /* --- Layout --- */
+    --page-max-width: 1280px;
+    --content-max-width: 1024px;
+}

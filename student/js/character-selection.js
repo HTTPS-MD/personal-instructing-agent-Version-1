@@ -6,27 +6,16 @@ let isLockedIn = false;
 
 
 // STRICT GATEKEEPER CHECK ON LOAD
+// Dating stage_char + selected_character lang ang tinitingnan dito -- walang
+// session, walang is_ocean_done, walang group_type. Kaya kayang mag-type lang
+// ng URL ang kahit sinong naka-login para pumili ng character nang hindi
+// dumaan sa OCEAN test. Nasa enforceStudentStage('char') na ang buong chain.
+let verifiedEmail = null;
+
 async function enforceStageLock() {
-    if (!supabaseClient) return;
-    const currentUserEmail = localStorage.getItem('pia_user_email');
-
-    if (!currentUserEmail) {
-        window.location.href = 'sign-in.html';
-        return;
-    }
-
-    // Check if the character selection stage is open
-    const { data: setting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_char').maybeSingle();
-    if (!setting || (setting.value !== true && setting.value !== 'true')) {
-        window.location.href = 'waiting-room.html'; // Kick to waiting room if closed
-        return;
-    }
-
-    // Check if the student has already selected a character
-    const { data: profile } = await supabaseClient.from('profiles').select('selected_character').eq('email', currentUserEmail).maybeSingle();
-    if (profile && profile.selected_character) {
-        window.location.href = 'waiting-room.html'; // They already locked in, send to wait for dashboard
-    }
+    const profile = await enforceStudentStage('char');
+    if (!profile) return;
+    verifiedEmail = profile.email;
 }
 
 // Run check immediately
@@ -50,11 +39,19 @@ function previewCharacter(element) {
     const role = element.getAttribute('data-role');
     const desc = element.getAttribute('data-desc');
     const imgPath = element.getAttribute('data-img');
+    const style = element.getAttribute('data-style');
+    const pace = element.getAttribute('data-pace');
+    const best = element.getAttribute('data-best');
 
     document.getElementById('preview-role').textContent = role;
     document.getElementById('preview-name').textContent = name;
     document.getElementById('preview-desc').textContent = desc;
     document.getElementById('preview-bg-img').src = imgPath;
+
+    document.getElementById('preview-style').textContent = style;
+    document.getElementById('preview-pace').textContent = pace;
+    document.getElementById('preview-best').textContent = best;
+    document.getElementById('preview-characteristics').classList.remove('hidden');
 
     const lockBtn = document.getElementById('lock-in-btn');
     lockBtn.disabled = false;
@@ -66,15 +63,8 @@ function openConfirmModal() {
     const modal = document.getElementById('confirm-modal');
     const content = document.getElementById('modal-content');
 
-    modal.classList.remove('hidden');
-    modal.classList.add('modal-active'); // I-enable ang pointer-events
+    modal.classList.add('modal-active');
     content.classList.add('modal-content-active');
-
-    setTimeout(() => {
-        modal.classList.remove('opacity-0');
-        content.classList.remove('scale-95');
-        content.classList.add('scale-100');
-    }, 10);
 }
 
 function closeConfirmModal() {
@@ -83,35 +73,21 @@ function closeConfirmModal() {
 
     modal.classList.remove('modal-active');
     content.classList.remove('modal-content-active');
-    modal.classList.add('opacity-0');
-    content.classList.remove('scale-100');
-    content.classList.add('scale-95');
-
-    setTimeout(() => {
-        modal.classList.add('hidden');
-    }, 300);
 }
 
 async function finalLockIn() {
     if (!selectedChar) return;
+    if (!verifiedEmail) return; // hindi pa kumpirmado ng guard ang session
 
-    if (supabaseClient) {
-        const currentUserEmail = localStorage.getItem('pia_user_email');
+    // Session-verified email, hindi na ang spoofable na localStorage value.
+    const { error } = await supabaseClient
+        .from('profiles')
+        .update({ selected_character: selectedChar })
+        .eq('email', verifiedEmail);
 
-        if (currentUserEmail) {
-            await supabaseClient
-                .from('profiles')
-                .update({ selected_character: selectedChar })
-                .eq('email', currentUserEmail);
-        } else {
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (user) {
-                await supabaseClient
-                    .from('profiles')
-                    .update({ selected_character: selectedChar })
-                    .eq('id', user.id);
-            }
-        }
+    if (error) {
+        alert("Could not save your selection: " + error.message);
+        return;
     }
 
     localStorage.setItem('selected_character', selectedChar);
@@ -128,15 +104,7 @@ async function finalLockIn() {
     document.getElementById('lock-in-btn').style.display = 'none';
 
     // Suriin kung bukas na ang dashboard stage
-    let isDashboardOpen = false;
-    if (supabaseClient) {
-        const { data: setting } = await supabaseClient.from('settings').select('value').eq('key', 'stage_dash').maybeSingle();
-        if (setting && (setting.value === true || setting.value === 'true')) {
-            isDashboardOpen = true;
-        }
-    }
-
-    if (isDashboardOpen) {
+    if (await isStageOpen('stage_dash')) {
         // Kung nakabukas na, saka lang lalabas ang continue button
         document.getElementById('continue-btn').style.display = 'block';
     } else {
@@ -151,8 +119,7 @@ function goToDashboard() {
 
 // Realtime listener para sa Character Selection
 if (supabaseClient) {
-    supabaseClient
-        .channel('realtime-char-lock')
+    registerChannel('realtime-char-lock', (ch) => ch
         .on(
             'postgres_changes',
             {
@@ -168,5 +135,5 @@ if (supabaseClient) {
                 }
             }
         )
-        .subscribe();
+        .subscribe());
 }

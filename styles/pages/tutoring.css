@@ -1,0 +1,328 @@
+/* --- Tutoring Dashboard (Math Engine) --- */
+.tutoring-main {
+    padding-top: 7rem;
+    padding-bottom: 4rem;
+}
+
+.tutoring-progress-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 640px) {
+    .tutoring-progress-bar {
+        flex-direction: row;
+        align-items: center;
+    }
+}
+
+.tutoring-progress-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.tutoring-progress-count {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.tutoring-progress-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.tutoring-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .tutoring-layout {
+        grid-template-columns: 220px 1fr;
+    }
+}
+
+/* --- Agent panel (Kaliwa: Avatar + Speech Bubble) --- */
+.tutoring-agent-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+    height: fit-content;
+}
+
+.agent-avatar-wrap {
+    position: relative;
+    width: 7rem;
+    height: 7rem;
+    border-radius: 50%;
+    padding: 0.35rem;
+    border: 3px solid var(--trait-color, var(--accent-primary));
+    box-shadow: 0 0 24px -4px var(--trait-color, var(--accent-primary));
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.agent-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+}
+
+/* --- 6 trait "expressions" (persona ring color) --- */
+.agent-trait-open { --trait-color: #a78bfa; }
+.agent-trait-conscientious { --trait-color: #60a5fa; }
+.agent-trait-extravert { --trait-color: #fb923c; }
+.agent-trait-agreeable { --trait-color: #f472b6; }
+.agent-trait-calm { --trait-color: #2dd4bf; }
+.agent-trait-neutral { --trait-color: #10b981; }
+
+.agent-expression-badge {
+    position: absolute;
+    bottom: -0.15rem;
+    right: -0.15rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--trait-color, var(--accent-primary));
+    color: #05050a;
+    border: 2px solid var(--bg-card);
+}
+
+.agent-expression-badge.agent-expression-pulse {
+    animation: agentExpressionPulse 0.5s ease;
+}
+
+@keyframes agentExpressionPulse {
+    0% { transform: scale(0.6); opacity: 0.4; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* --- Problem panel (Gitna) --- */
+.tutoring-problem-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.tutoring-instruction {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.tutoring-expression {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+}
+
+.tutoring-input-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+    .tutoring-input-row {
+        flex-direction: row;
+    }
+}
+
+.tutoring-answer-input {
+    flex: 1;
+    font-size: 1.1rem;
+    font-family: var(--font-mono);
+    height: 3.25rem;
+}
+
+.tutoring-hint-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* --- Session Summary --- */
+.tutoring-summary {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.tutoring-summary-emoji {
+    font-size: 3.5rem;
+}
+
+.tutoring-summary-title {
+    font-size: 1.75rem;
+    color: var(--text-primary);
+}
+
+.tutoring-summary-stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    max-width: 32rem;
+    width: 100%;
+}
+
+@media (min-width: 640px) {
+    .tutoring-summary-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.tutoring-summary-value {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+
+.tutoring-summary-label {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.tutoring-summary-medals {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* --- Progress / Stats / Feedback / Hints / Medals --- */
+.progress-track {
+    width: 100%;
+    height: 0.5rem;
+    border-radius: 999px;
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.progress-track-fill {
+    height: 100%;
+    background-color: var(--accent-primary);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.stat-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.85rem;
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    min-width: 4.5rem;
+}
+
+.stat-chip-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+
+.stat-chip-value {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--accent-primary);
+    font-family: var(--font-mono);
+}
+
+.agent-speech-bubble {
+    position: relative;
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+    min-height: 3rem;
+}
+
+.feedback-panel {
+    padding: 0.85rem 1.1rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.feedback-correct {
+    background-color: var(--color-success-bg);
+    border: 1px solid var(--color-success-border);
+    color: var(--accent-primary);
+}
+
+.feedback-incorrect {
+    background-color: var(--color-danger-bg);
+    border: 1px solid var(--color-danger-border);
+    color: var(--color-danger);
+}
+
+.hint-panel {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-lg);
+    background-color: var(--color-info-bg);
+    border: 1px solid var(--color-info-border);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.hint-line strong {
+    color: var(--color-info);
+}
+
+.medal {
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.medal-silver {
+    background-color: rgba(148, 163, 184, 0.15);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    color: #cbd5e1;
+}
+
+.medal-gold {
+    background-color: var(--color-warning-bg);
+    border: 1px solid var(--color-warning-border);
+    color: var(--color-warning);
+}
+
+.medal-placeholder {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
