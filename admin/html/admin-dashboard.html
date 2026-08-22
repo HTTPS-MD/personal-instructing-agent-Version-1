@@ -104,7 +104,8 @@
         </div>
 
         <div class="mobile-menu-actions">
-            <button id="mob-nav-settings" onclick="switchTab('settings'); toggleMobileMenu();" class="nav-dropdown-item">
+            <button id="mob-nav-settings" onclick="switchTab('settings'); toggleMobileMenu();"
+                class="nav-dropdown-item">
                 <i data-lucide="settings" class="icon-xs text-info"></i> Settings
             </button>
             <button onclick="handleAdminSignOut()" class="nav-dropdown-item nav-dropdown-item-danger">
@@ -145,285 +146,331 @@
             <main class="page-container admin-main">
 
                 <!-- VIEW 1: SECTIONS OVERVIEW -->
-        <div id="view-sections" class="view-section admin-stack">
-            <div class="admin-section-head">
-                <div class="flex-row gap-sm">
-                    <i data-lucide="layers" class="icon-md text-accent"></i>
-                    <h2 class="admin-page-title">SECTIONS</h2>
-                </div>
-                <button onclick="openModal('add-section-modal')" class="btn-primary">
-                    <i data-lucide="plus" class="icon-sm"></i> Add Section
-                </button>
-            </div>
-            <div id="sections-grid" class="admin-grid-3"></div>
-        </div>
-
-        <!-- VIEW 2: ALL STUDENTS ROSTER -->
-        <div id="view-students" class="view-section admin-stack" style="display: none;">
-
-            <!-- TOP SUMMARY CARDS (4 Boxes) -->
-            <div class="admin-grid-4">
-                <div id="box-ocean" onclick="toggleStageDrilldown('OCEAN')" class="solid-card card-padded stat-tile stat-tile-accent">
-                    <h3 class="stat-tile-label">OCEAN Test <i data-lucide="brain" class="icon-sm text-accent"></i></h3>
-                    <p id="count-ocean" class="stat-tile-value">0</p>
-                    <p class="stat-tile-sub text-accent">Currently Taking</p>
-                </div>
-                <div id="box-char" onclick="toggleStageDrilldown('Character Selection')" class="solid-card card-padded stat-tile stat-tile-info">
-                    <h3 class="stat-tile-label">Character Select <i data-lucide="users" class="icon-sm text-info"></i></h3>
-                    <p id="count-char" class="stat-tile-value">0</p>
-                    <p class="stat-tile-sub text-info">Currently Choosing</p>
-                </div>
-                <div id="box-dash" onclick="toggleStageDrilldown('Tutoring Dashboard')" class="solid-card card-padded stat-tile stat-tile-warning">
-                    <h3 class="stat-tile-label">Tutoring Dash <i data-lucide="layout-dashboard" class="icon-sm text-warning"></i></h3>
-                    <p id="count-dash" class="stat-tile-value">0</p>
-                    <p class="stat-tile-sub text-warning">Browsing</p>
-                </div>
-                <div id="box-game" onclick="toggleStageDrilldown('Active Game')" class="solid-card card-padded stat-tile stat-tile-success">
-                    <h3 class="stat-tile-label">Active Game <i data-lucide="gamepad-2" class="icon-sm text-success"></i></h3>
-                    <p id="count-game" class="stat-tile-value">0</p>
-                    <p class="stat-tile-sub text-success">Solving Problems</p>
-                </div>
-            </div>
-
-            <!-- MAIN UNIFIED TABLE CARD -->
-            <div class="solid-card card-padded" id="main-table-container">
-                <div class="admin-toolbar">
-                    <div class="admin-toolbar-title-wrap">
-                        <h2 id="table-view-title" class="admin-card-title">
-                            <i data-lucide="users" class="icon-sm text-accent" id="table-view-icon"></i> General Student Roster
-                        </h2>
-                        <p id="table-view-desc" class="admin-card-subtitle">Click any student row to view full-screen profile and alignment metrics.</p>
-                    </div>
-                    <div class="admin-toolbar-actions">
-                        <button id="btn-clear-drilldown" onclick="clearStageDrilldown()" class="btn-secondary hidden">
-                            <i data-lucide="arrow-left" class="icon-xs"></i> Back to Roster
+                <div id="view-sections" class="view-section admin-stack">
+                    <div class="admin-section-head">
+                        <div class="flex-row gap-sm">
+                            <i data-lucide="layers" class="icon-md text-accent"></i>
+                            <h2 class="admin-page-title">SECTIONS</h2>
+                        </div>
+                        <button onclick="openModal('add-section-modal')" class="btn-primary">
+                            <i data-lucide="plus" class="icon-sm"></i> Add Section
                         </button>
-                        <div class="search-input-wrap">
-                            <i data-lucide="search" class="icon-sm search-input-icon"></i>
-                            <input type="text" id="search-student" oninput="debouncedSearchStudents()" placeholder="Search student..." class="search-input">
+                    </div>
+                    <div id="sections-grid" class="admin-grid-3"></div>
+                </div>
+
+                <!-- VIEW 2: ALL STUDENTS ROSTER -->
+                <div id="view-students" class="view-section admin-stack" style="display: none;">
+
+                    <!-- TOP SUMMARY CARDS (4 Boxes) -->
+                    <div class="admin-grid-4">
+                        <div id="box-ocean" onclick="toggleStageDrilldown('OCEAN')"
+                            class="solid-card card-padded stat-tile stat-tile-accent">
+                            <h3 class="stat-tile-label">OCEAN Test <i data-lucide="brain"
+                                    class="icon-sm text-accent"></i></h3>
+                            <p id="count-ocean" class="stat-tile-value">0</p>
+                            <p class="stat-tile-sub text-accent">Currently Taking</p>
                         </div>
-                        <button onclick="openModal('add-student-modal')" class="btn-primary">Pre-Register</button>
-                    </div>
-                </div>
-
-                <!-- NESTED FILTERS (Hidden when in Box Drilldown view) -->
-                <div id="nested-filters-container" class="admin-filters fade-in">
-                    <div class="admin-filter-row">
-                        <button onclick="setGroupFilter('all')" id="filter-group-all" class="admin-nav-btn active">All Students</button>
-                        <button onclick="setGroupFilter('experimental')" id="filter-group-experimental" class="admin-nav-btn inactive">Experimental Group</button>
-                        <button onclick="setGroupFilter('control')" id="filter-group-control" class="admin-nav-btn inactive">Control Group</button>
-                    </div>
-                    <div id="secondary-filter-container" class="admin-subfilter-row hidden">
-                        <button onclick="setSubgroupFilter('all')" id="filter-sub-all" class="badge badge-pill badge-success">All Experimental</button>
-                        <button onclick="setSubgroupFilter('assigned')" id="filter-sub-assigned" class="badge badge-pill badge-neutral">Assigned Persona</button>
-                        <button onclick="setSubgroupFilter('non-assigned')" id="filter-sub-non-assigned" class="badge badge-pill badge-neutral">Non-Assigned Persona</button>
-                        <button onclick="setSubgroupFilter('neutral')" id="filter-sub-neutral" class="badge badge-pill badge-neutral">Neutral Persona</button>
-                    </div>
-                </div>
-
-                <!-- UNIFIED TABLE -->
-                <div class="data-table-wrapper admin-table-wrapper">
-                    <table class="data-table admin-table">
-                        <thead id="unified-thead"></thead>
-                        <tbody id="unified-tbody"></tbody>
-                    </table>
-                    <div id="pagination-controls" class="pagination-bar hidden">
-                        <span id="pagination-info">Page 1 of 1</span>
-                        <div class="flex-row gap-xs">
-                            <button id="btn-prev-page" class="btn-secondary btn-sm">Previous</button>
-                            <button id="btn-next-page" class="btn-secondary btn-sm">Next</button>
+                        <div id="box-char" onclick="toggleStageDrilldown('Character Selection')"
+                            class="solid-card card-padded stat-tile stat-tile-info">
+                            <h3 class="stat-tile-label">Character Select <i data-lucide="users"
+                                    class="icon-sm text-info"></i></h3>
+                            <p id="count-char" class="stat-tile-value">0</p>
+                            <p class="stat-tile-sub text-info">Currently Choosing</p>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- VIEW 3: PROFESSORS ROSTER -->
-        <div id="view-professors" class="view-section admin-stack" style="display: none;">
-            <div class="solid-card card-padded">
-                <div class="admin-toolbar">
-                    <div>
-                        <h2 class="admin-card-title">Faculty Roster</h2>
-                        <p class="admin-card-subtitle">Manage professor access and assigned sections.</p>
-                    </div>
-                    <div class="admin-toolbar-actions">
-                        <div class="search-input-wrap">
-                            <i data-lucide="search" class="icon-sm search-input-icon"></i>
-                            <input type="text" id="search-professor" oninput="filterProfessors()" placeholder="Search Professor..." class="search-input">
+                        <div id="box-dash" onclick="toggleStageDrilldown('Tutoring Dashboard')"
+                            class="solid-card card-padded stat-tile stat-tile-warning">
+                            <h3 class="stat-tile-label">Tutoring Dash <i data-lucide="layout-dashboard"
+                                    class="icon-sm text-warning"></i></h3>
+                            <p id="count-dash" class="stat-tile-value">0</p>
+                            <p class="stat-tile-sub text-warning">Browsing</p>
                         </div>
-                        <button onclick="openModal('add-professor-modal')" class="btn-primary">Add Professor</button>
-                    </div>
-                </div>
-
-                <div class="data-table-wrapper admin-table-wrapper hide-mobile">
-                    <table class="data-table admin-table">
-                        <thead>
-                            <tr>
-                                <th>Professor Name</th>
-                                <th>Email Address</th>
-                                <th>Department</th>
-                                <th>Section</th>
-                                <th class="text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="professor-table-body"></tbody>
-                    </table>
-                </div>
-
-                <div id="professor-cards-container" class="admin-cards-stack hide-desktop"></div>
-            </div>
-        </div>
-
-        <!-- VIEW 4: SYSTEM CONTROLS -->
-        <div id="view-controls" class="view-section admin-stack" style="display: none;">
-
-            <div class="solid-card card-padded-lg admin-stack">
-                <div>
-                    <h2 class="admin-card-title">System Configurations</h2>
-                    <p class="admin-card-subtitle">Manage global parameters for student and professor accounts.</p>
-                </div>
-                <div class="policy-note-box">
-                    <p class="policy-note-title">
-                        <i data-lucide="shield-check" class="icon-xs"></i> Account Password Policy
-                    </p>
-                    <p class="policy-note-desc">
-                        Bawat bagong account (student/professor) ay binibigyan na ng random, hindi-nahuhulaang
-                        initial password -- hindi na ito nakikita o na-store kahit saan. Gagamitin ng account owner
-                        ang <b>Send Activation Email</b> o <b>Reset Password</b> action para makapagtakda sila ng
-                        sarili nilang password via secure email link.
-                    </p>
-                </div>
-            </div>
-
-            <div class="solid-card card-padded-lg admin-stack-lg">
-                <div>
-                    <h2 class="admin-card-title">Experiment Session Controls</h2>
-                    <p class="admin-card-subtitle">Control stage accessibility globally or grant targeted access per section/student.</p>
-                </div>
-
-                <div class="admin-grid-3">
-                    <!-- STAGE 1: OCEAN -->
-                    <div class="settings-card">
-                        <div class="settings-card-top">
-                            <div class="flex-between">
-                                <span class="stage-tag">Stage 1</span>
-                                <span id="ocean-status-lbl" class="stage-status-lbl">Closed</span>
-                            </div>
-                            <h3 class="settings-card-title">OCEAN Personality Test</h3>
-                            <p class="settings-card-desc">Allow students to take the Big Five Inventory questionnaire.</p>
-                        </div>
-                        <div class="settings-card-bottom">
-                            <div class="flex-between">
-                                <span class="settings-card-label">Global Access</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="toggle-ocean" onchange="updateStageControl('ocean', this)" class="toggle-switch-input">
-                                    <div class="toggle-switch-bg"></div>
-                                </label>
-                            </div>
-                            <div class="settings-card-actions">
-                                <button onclick="openTargetedModal('ocean', 'section')" class="btn-secondary btn-sm">Section Override</button>
-                                <button onclick="openTargetedModal('ocean', 'student')" class="btn-secondary btn-sm">Student Override</button>
-                            </div>
+                        <div id="box-game" onclick="toggleStageDrilldown('Active Game')"
+                            class="solid-card card-padded stat-tile stat-tile-success">
+                            <h3 class="stat-tile-label">Active Game <i data-lucide="gamepad-2"
+                                    class="icon-sm text-success"></i></h3>
+                            <p id="count-game" class="stat-tile-value">0</p>
+                            <p class="stat-tile-sub text-success">Solving Problems</p>
                         </div>
                     </div>
 
-                    <!-- STAGE 2: CHARACTER SELECTION -->
-                    <div class="settings-card">
-                        <div class="settings-card-top">
-                            <div class="flex-between">
-                                <span class="stage-tag">Stage 2</span>
-                                <span id="char-status-lbl" class="stage-status-lbl">Closed</span>
+                    <!-- MAIN UNIFIED TABLE CARD -->
+                    <div class="solid-card card-padded" id="main-table-container">
+                        <div class="admin-toolbar">
+                            <div class="admin-toolbar-title-wrap">
+                                <h2 id="table-view-title" class="admin-card-title">
+                                    <i data-lucide="users" class="icon-sm text-accent" id="table-view-icon"></i> General
+                                    Student Roster
+                                </h2>
+                                <p id="table-view-desc" class="admin-card-subtitle">Click any student row to view
+                                    full-screen profile and alignment metrics.</p>
                             </div>
-                            <h3 class="settings-card-title">Character Selection</h3>
-                            <p class="settings-card-desc">Allow Non-Assigned group to select their preferred agent persona.</p>
+                            <div class="admin-toolbar-actions">
+                                <button id="btn-clear-drilldown" onclick="clearStageDrilldown()"
+                                    class="btn-secondary hidden">
+                                    <i data-lucide="arrow-left" class="icon-xs"></i> Back to Roster
+                                </button>
+                                <div class="search-input-wrap">
+                                    <i data-lucide="search" class="icon-sm search-input-icon"></i>
+                                    <input type="text" id="search-student" oninput="debouncedSearchStudents()"
+                                        placeholder="Search student..." class="search-input">
+                                </div>
+                                <button onclick="openModal('add-student-modal')"
+                                    class="btn-primary">Pre-Register</button>
+                            </div>
                         </div>
-                        <div class="settings-card-bottom">
-                            <div class="flex-between">
-                                <span class="settings-card-label">Global Access</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="toggle-char" onchange="updateStageControl('char', this)" class="toggle-switch-input">
-                                    <div class="toggle-switch-bg"></div>
-                                </label>
-                            </div>
-                            <div class="settings-card-actions">
-                                <button onclick="openTargetedModal('char', 'section')" class="btn-secondary btn-sm">Section Override</button>
-                                <button onclick="openTargetedModal('char', 'student')" class="btn-secondary btn-sm">Student Override</button>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- STAGE 3: TUTORING DASHBOARD -->
-                    <div class="settings-card">
-                        <div class="settings-card-top">
-                            <div class="flex-between">
-                                <span class="stage-tag">Stage 3</span>
-                                <span id="dash-status-lbl" class="stage-status-lbl">Closed</span>
+                        <!-- NESTED FILTERS (Hidden when in Box Drilldown view) -->
+                        <div id="nested-filters-container" class="admin-filters fade-in">
+                            <div class="admin-filter-row">
+                                <button onclick="setGroupFilter('all')" id="filter-group-all"
+                                    class="admin-nav-btn active">All Students</button>
+                                <button onclick="setGroupFilter('experimental')" id="filter-group-experimental"
+                                    class="admin-nav-btn inactive">Experimental Group</button>
+                                <button onclick="setGroupFilter('control')" id="filter-group-control"
+                                    class="admin-nav-btn inactive">Control Group</button>
                             </div>
-                            <h3 class="settings-card-title">Tutoring Dashboard</h3>
-                            <p class="settings-card-desc">Allow students to begin math problem-solving sessions.</p>
+                            <div id="secondary-filter-container" class="admin-subfilter-row hidden">
+                                <button onclick="setSubgroupFilter('all')" id="filter-sub-all"
+                                    class="badge badge-pill badge-success">All Experimental</button>
+                                <button onclick="setSubgroupFilter('assigned')" id="filter-sub-assigned"
+                                    class="badge badge-pill badge-neutral">Assigned Persona</button>
+                                <button onclick="setSubgroupFilter('non-assigned')" id="filter-sub-non-assigned"
+                                    class="badge badge-pill badge-neutral">Non-Assigned Persona</button>
+                                <button onclick="setSubgroupFilter('neutral')" id="filter-sub-neutral"
+                                    class="badge badge-pill badge-neutral">Neutral Persona</button>
+                            </div>
                         </div>
-                        <div class="settings-card-bottom">
-                            <div class="flex-between">
-                                <span class="settings-card-label">Global Access</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="toggle-dash" onchange="updateStageControl('dash', this)" class="toggle-switch-input">
-                                    <div class="toggle-switch-bg"></div>
-                                </label>
-                            </div>
-                            <div class="settings-card-actions">
-                                <button onclick="openTargetedModal('dash', 'section')" class="btn-secondary btn-sm">Section Override</button>
-                                <button onclick="openTargetedModal('dash', 'student')" class="btn-secondary btn-sm">Student Override</button>
+
+                        <!-- UNIFIED TABLE -->
+                        <div class="data-table-wrapper admin-table-wrapper">
+                            <table class="data-table admin-table">
+                                <thead id="unified-thead"></thead>
+                                <tbody id="unified-tbody"></tbody>
+                            </table>
+                            <div id="pagination-controls" class="pagination-bar hidden">
+                                <span id="pagination-info">Page 1 of 1</span>
+                                <div class="flex-row gap-xs">
+                                    <button id="btn-prev-page" class="btn-secondary btn-sm">Previous</button>
+                                    <button id="btn-next-page" class="btn-secondary btn-sm">Next</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- VIEW 5: SETTINGS -->
-        <div id="view-settings" class="view-section admin-stack" style="display: none;">
+                <!-- VIEW 3: PROFESSORS ROSTER -->
+                <div id="view-professors" class="view-section admin-stack" style="display: none;">
+                    <div class="solid-card card-padded">
+                        <div class="admin-toolbar">
+                            <div>
+                                <h2 class="admin-card-title">Faculty Roster</h2>
+                                <p class="admin-card-subtitle">Manage professor access and assigned sections.</p>
+                            </div>
+                            <div class="admin-toolbar-actions">
+                                <div class="search-input-wrap">
+                                    <i data-lucide="search" class="icon-sm search-input-icon"></i>
+                                    <input type="text" id="search-professor" oninput="filterProfessors()"
+                                        placeholder="Search Professor..." class="search-input">
+                                </div>
+                                <button onclick="openModal('add-professor-modal')" class="btn-primary">Add
+                                    Professor</button>
+                            </div>
+                        </div>
 
-            <!-- Account Security Card -->
-            <div class="solid-card card-padded-lg admin-stack">
-                <h2 class="admin-card-title">Account Security</h2>
-                <p class="admin-card-subtitle">Update your admin login credentials.</p>
+                        <div class="data-table-wrapper admin-table-wrapper hide-mobile">
+                            <table class="data-table admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Professor Name</th>
+                                        <th>Email Address</th>
+                                        <th>Department</th>
+                                        <th>Section</th>
+                                        <th class="text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="professor-table-body"></tbody>
+                            </table>
+                        </div>
 
-                <form id="admin-password-form" onsubmit="handleAdminPasswordUpdate(event)" class="admin-form-narrow">
-                    <div class="form-group">
-                        <label class="form-label">New Password</label>
-                        <input type="password" id="admin-new-password" required minlength="6" class="form-input" placeholder="••••••••">
+                        <div id="professor-cards-container" class="admin-cards-stack hide-desktop"></div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Confirm Password</label>
-                        <input type="password" id="admin-confirm-password" required minlength="6" class="form-input" placeholder="••••••••">
-                    </div>
-                    <button type="submit" id="admin-update-pw-btn" class="btn-primary">Update Password</button>
-                </form>
-            </div>
-
-            <!-- Admin Device Management Card -->
-            <div class="solid-card card-padded-lg admin-stack">
-                <div>
-                    <h2 class="admin-card-title">Admin Device Management</h2>
-                    <p class="admin-card-subtitle">Set the maximum allowed devices for your admin account and manage active sessions.</p>
                 </div>
 
-                <div class="admin-form-narrow device-limit-row">
-                    <label class="form-label">Admin Device Limit</label>
-                    <div class="flex-row gap-sm">
-                        <input type="number" id="admin-device-limit-input" min="1" max="10" disabled class="form-input">
-                        <button type="button" id="edit-admin-limit-btn" onclick="toggleEditAdminLimit()" class="btn-secondary">Edit</button>
-                        <button type="button" id="save-admin-limit-btn" onclick="saveAdminDeviceLimit()" style="display: none;" class="btn-primary">Save</button>
+                <!-- VIEW 4: SYSTEM CONTROLS -->
+                <div id="view-controls" class="view-section admin-stack" style="display: none;">
+
+                    <div class="solid-card card-padded-lg admin-stack">
+                        <div>
+                            <h2 class="admin-card-title">System Configurations</h2>
+                            <p class="admin-card-subtitle">Manage global parameters for student and professor accounts.
+                            </p>
+                        </div>
+                        <div class="policy-note-box">
+                            <p class="policy-note-title">
+                                <i data-lucide="shield-check" class="icon-xs"></i> Account Password Policy
+                            </p>
+                            <p class="policy-note-desc">
+                                Bawat bagong account (student/professor) ay binibigyan na ng random, hindi-nahuhulaang
+                                initial password -- hindi na ito nakikita o na-store kahit saan. Gagamitin ng account
+                                owner
+                                ang <b>Send Activation Email</b> o <b>Reset Password</b> action para makapagtakda sila
+                                ng
+                                sarili nilang password via secure email link.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="solid-card card-padded-lg admin-stack-lg">
+                        <div>
+                            <h2 class="admin-card-title">Experiment Session Controls</h2>
+                            <p class="admin-card-subtitle">Control stage accessibility globally or grant targeted access
+                                per section/student.</p>
+                        </div>
+
+                        <div class="admin-grid-3">
+                            <!-- STAGE 1: OCEAN -->
+                            <div class="settings-card">
+                                <div class="settings-card-top">
+                                    <div class="flex-between">
+                                        <span class="stage-tag">Stage 1</span>
+                                        <span id="ocean-status-lbl" class="stage-status-lbl">Closed</span>
+                                    </div>
+                                    <h3 class="settings-card-title">OCEAN Personality Test</h3>
+                                    <p class="settings-card-desc">Allow students to take the Big Five Inventory
+                                        questionnaire.</p>
+                                </div>
+                                <div class="settings-card-bottom">
+                                    <div class="flex-between">
+                                        <span class="settings-card-label">Global Access</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="toggle-ocean"
+                                                onchange="updateStageControl('ocean', this)"
+                                                class="toggle-switch-input">
+                                            <div class="toggle-switch-bg"></div>
+                                        </label>
+                                    </div>
+                                    <div class="settings-card-actions">
+                                        <button onclick="openTargetedModal('ocean', 'section')"
+                                            class="btn-secondary btn-sm">Section Override</button>
+                                        <button onclick="openTargetedModal('ocean', 'student')"
+                                            class="btn-secondary btn-sm">Student Override</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STAGE 2: CHARACTER SELECTION -->
+                            <div class="settings-card">
+                                <div class="settings-card-top">
+                                    <div class="flex-between">
+                                        <span class="stage-tag">Stage 2</span>
+                                        <span id="char-status-lbl" class="stage-status-lbl">Closed</span>
+                                    </div>
+                                    <h3 class="settings-card-title">Character Selection</h3>
+                                    <p class="settings-card-desc">Allow Non-Assigned group to select their preferred
+                                        agent persona.</p>
+                                </div>
+                                <div class="settings-card-bottom">
+                                    <div class="flex-between">
+                                        <span class="settings-card-label">Global Access</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="toggle-char"
+                                                onchange="updateStageControl('char', this)" class="toggle-switch-input">
+                                            <div class="toggle-switch-bg"></div>
+                                        </label>
+                                    </div>
+                                    <div class="settings-card-actions">
+                                        <button onclick="openTargetedModal('char', 'section')"
+                                            class="btn-secondary btn-sm">Section Override</button>
+                                        <button onclick="openTargetedModal('char', 'student')"
+                                            class="btn-secondary btn-sm">Student Override</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- STAGE 3: TUTORING DASHBOARD -->
+                            <div class="settings-card">
+                                <div class="settings-card-top">
+                                    <div class="flex-between">
+                                        <span class="stage-tag">Stage 3</span>
+                                        <span id="dash-status-lbl" class="stage-status-lbl">Closed</span>
+                                    </div>
+                                    <h3 class="settings-card-title">Tutoring Dashboard</h3>
+                                    <p class="settings-card-desc">Allow students to begin math problem-solving sessions.
+                                    </p>
+                                </div>
+                                <div class="settings-card-bottom">
+                                    <div class="flex-between">
+                                        <span class="settings-card-label">Global Access</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="toggle-dash"
+                                                onchange="updateStageControl('dash', this)" class="toggle-switch-input">
+                                            <div class="toggle-switch-bg"></div>
+                                        </label>
+                                    </div>
+                                    <div class="settings-card-actions">
+                                        <button onclick="openTargetedModal('dash', 'section')"
+                                            class="btn-secondary btn-sm">Section Override</button>
+                                        <button onclick="openTargetedModal('dash', 'student')"
+                                            class="btn-secondary btn-sm">Student Override</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <h3 class="admin-subheading">Your Active Devices</h3>
-                    <div id="admin-active-devices-list" class="admin-stack"></div>
-                </div>
-            </div>
+                <!-- VIEW 5: SETTINGS -->
+                <div id="view-settings" class="view-section admin-stack" style="display: none;">
 
-        </div>
+                    <!-- Account Security Card -->
+                    <div class="solid-card card-padded-lg admin-stack">
+                        <h2 class="admin-card-title">Account Security</h2>
+                        <p class="admin-card-subtitle">Update your admin login credentials.</p>
+
+                        <form id="admin-password-form" onsubmit="handleAdminPasswordUpdate(event)"
+                            class="admin-form-narrow">
+                            <div class="form-group">
+                                <label class="form-label">New Password</label>
+                                <input type="password" id="admin-new-password" required minlength="6" class="form-input"
+                                    placeholder="••••••••">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Confirm Password</label>
+                                <input type="password" id="admin-confirm-password" required minlength="6"
+                                    class="form-input" placeholder="••••••••">
+                            </div>
+                            <button type="submit" id="admin-update-pw-btn" class="btn-primary">Update Password</button>
+                        </form>
+                    </div>
+
+                    <!-- Admin Device Management Card -->
+                    <div class="solid-card card-padded-lg admin-stack">
+                        <div>
+                            <h2 class="admin-card-title">Admin Device Management</h2>
+                            <p class="admin-card-subtitle">Set the maximum allowed devices for your admin account and
+                                manage active sessions.</p>
+                        </div>
+
+                        <div class="admin-form-narrow device-limit-row">
+                            <label class="form-label">Admin Device Limit</label>
+                            <div class="flex-row gap-sm">
+                                <input type="number" id="admin-device-limit-input" min="1" max="10" disabled
+                                    class="form-input">
+                                <button type="button" id="edit-admin-limit-btn" onclick="toggleEditAdminLimit()"
+                                    class="btn-secondary">Edit</button>
+                                <button type="button" id="save-admin-limit-btn" onclick="saveAdminDeviceLimit()"
+                                    style="display: none;" class="btn-primary">Save</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="admin-subheading">Your Active Devices</h3>
+                            <div id="admin-active-devices-list" class="admin-stack"></div>
+                        </div>
+                    </div>
+
+                </div>
             </main>
 
             <footer class="admin-footer">
@@ -449,12 +496,15 @@
         <main class="page-container profile-full-main">
             <div class="profile-full-side">
                 <div id="avatar-container" class="admin-avatar-container">
-                    <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="PIA Persona" class="admin-avatar-img">
+                    <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="PIA Persona"
+                        class="admin-avatar-img">
                 </div>
                 <div class="profile-full-identity">
                     <div class="flex-row gap-sm flex-wrap">
-                        <span id="profile-persona-badge" class="badge badge-pill badge-success profile-persona-badge">Openness</span>
-                        <button onclick="toggleAvatarVisibility()" id="toggle-avatar-btn" class="badge badge-neutral toggle-avatar-btn">Hide Image</button>
+                        <span id="profile-persona-badge"
+                            class="badge badge-pill badge-success profile-persona-badge">Openness</span>
+                        <button onclick="toggleAvatarVisibility()" id="toggle-avatar-btn"
+                            class="badge badge-neutral toggle-avatar-btn">Hide Image</button>
                     </div>
                     <h3 id="profile-name" class="profile-full-name">Student Name</h3>
                     <p id="profile-email" class="profile-full-email">email@student.ue.edu.ph</p>
@@ -600,21 +650,25 @@
                 </div>
                 <div class="search-input-wrap">
                     <i data-lucide="search" class="icon-sm search-input-icon"></i>
-                    <input type="text" id="target-student-search" oninput="filterTargetStudents()" placeholder="Type student name or email..." class="search-input">
+                    <input type="text" id="target-student-search" oninput="filterTargetStudents()"
+                        placeholder="Type student name or email..." class="search-input">
                 </div>
                 <input type="hidden" id="target-student-email-selected">
                 <div id="target-student-list" class="target-student-list"></div>
             </div>
 
             <div class="modal-actions">
-                <button type="button" onclick="closeModal('targeted-modal')" class="btn-secondary btn-block">Cancel</button>
-                <button type="button" id="grant-access-btn" onclick="executeTargetedOpen()" disabled class="btn-primary btn-block">Grant Access</button>
+                <button type="button" onclick="closeModal('targeted-modal')"
+                    class="btn-secondary btn-block">Cancel</button>
+                <button type="button" id="grant-access-btn" onclick="executeTargetedOpen()" disabled
+                    class="btn-primary btn-block">Grant Access</button>
             </div>
         </div>
     </div>
 
     <!-- DEVICE MANAGER MODAL -->
-    <div id="device-manager-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('device-manager-modal')">
+    <div id="device-manager-modal" class="modal-overlay"
+        onclick="if(event.target===this) closeModal('device-manager-modal')">
         <div class="solid-card modal-content" id="device-manager-modal-content">
             <div class="modal-header-row">
                 <div>
@@ -626,12 +680,14 @@
                 </button>
             </div>
             <div id="device-list-container" class="modal-scroll-list"></div>
-            <button type="button" onclick="closeModal('device-manager-modal')" class="btn-secondary btn-block">Close</button>
+            <button type="button" onclick="closeModal('device-manager-modal')"
+                class="btn-secondary btn-block">Close</button>
         </div>
     </div>
 
     <!-- SECTION DETAILS MODAL -->
-    <div id="section-details-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('section-details-modal')">
+    <div id="section-details-modal" class="modal-overlay"
+        onclick="if(event.target===this) closeModal('section-details-modal')">
         <div class="solid-card modal-content modal-w-5xl modal-scrollable" id="section-details-modal-content">
             <div class="modal-header-row">
                 <div>
@@ -690,7 +746,8 @@
                 </table>
             </div>
             <div class="modal-actions modal-actions-bordered">
-                <button type="button" onclick="closeModal('scores-modal')" class="btn-secondary btn-block">Cancel</button>
+                <button type="button" onclick="closeModal('scores-modal')"
+                    class="btn-secondary btn-block">Cancel</button>
                 <button type="button" onclick="saveBatchScores()" class="btn-primary btn-block">Save Scores</button>
             </div>
         </div>
@@ -702,7 +759,8 @@
             <h3 class="modal-title-centered">New Section</h3>
             <input type="text" id="new-section-name" placeholder="Section Name (e.g. Mars)" class="form-input">
             <div class="modal-actions">
-                <button type="button" onclick="closeModal('add-section-modal')" class="btn-secondary btn-block">Cancel</button>
+                <button type="button" onclick="closeModal('add-section-modal')"
+                    class="btn-secondary btn-block">Cancel</button>
                 <button type="button" onclick="saveNewSection()" class="btn-primary btn-block">Create</button>
             </div>
         </div>
@@ -728,7 +786,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email Address</label>
-                    <input type="email" id="student-email" required placeholder="maria@student.ue.edu.ph" class="form-input">
+                    <input type="email" id="student-email" required placeholder="maria@student.ue.edu.ph"
+                        class="form-input">
                 </div>
                 <div class="admin-grid-2-form">
                     <div class="form-group">
@@ -752,7 +811,8 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Device Limit</label>
-                        <input type="number" id="student-device-limit" value="1" min="1" max="5" required class="form-input">
+                        <input type="number" id="student-device-limit" value="1" min="1" max="5" required
+                            class="form-input">
                     </div>
                 </div>
                 <div class="consent-row">
@@ -760,7 +820,8 @@
                     <label for="student-consent" class="consent-label">Parental Consent Received</label>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" onclick="closeModal('add-student-modal')" class="btn-secondary btn-block">Cancel</button>
+                    <button type="button" onclick="closeModal('add-student-modal')"
+                        class="btn-secondary btn-block">Cancel</button>
                     <button type="submit" class="btn-primary btn-block">Register</button>
                 </div>
             </form>
@@ -768,7 +829,8 @@
     </div>
 
     <!-- EDIT STUDENT MODAL -->
-    <div id="edit-student-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('edit-student-modal')">
+    <div id="edit-student-modal" class="modal-overlay"
+        onclick="if(event.target===this) closeModal('edit-student-modal')">
         <div class="solid-card modal-content modal-w-2xl modal-scrollable" id="edit-student-modal-content">
             <div class="modal-header-row">
                 <h3 class="modal-title">Edit Student Details</h3>
@@ -820,7 +882,8 @@
                     <label for="edit-student-consent" class="consent-label">Parental Consent Received</label>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" onclick="closeModal('edit-student-modal')" class="btn-secondary btn-block">Cancel</button>
+                    <button type="button" onclick="closeModal('edit-student-modal')"
+                        class="btn-secondary btn-block">Cancel</button>
                     <button type="submit" class="btn-primary btn-block">Save Changes</button>
                 </div>
             </form>
@@ -828,7 +891,8 @@
     </div>
 
     <!-- ADD PROFESSOR MODAL -->
-    <div id="add-professor-modal" class="modal-overlay" onclick="if(event.target===this) closeModal('add-professor-modal')">
+    <div id="add-professor-modal" class="modal-overlay"
+        onclick="if(event.target===this) closeModal('add-professor-modal')">
         <div class="solid-card modal-content" id="add-professor-modal-content">
             <div class="modal-header-row">
                 <h3 class="modal-title">Add Professor</h3>
@@ -856,7 +920,8 @@
                     </div>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" onclick="closeModal('add-professor-modal')" class="btn-secondary btn-block">Cancel</button>
+                    <button type="button" onclick="closeModal('add-professor-modal')"
+                        class="btn-secondary btn-block">Cancel</button>
                     <button type="submit" class="btn-primary btn-block">Register</button>
                 </div>
             </form>
@@ -871,14 +936,16 @@
                 <h3 class="modal-title">Device Limit Reached</h3>
             </div>
             <p class="modal-body-text">
-                You have reached your admin device limit. Please revoke an older session below to continue on this device.
+                You have reached your admin device limit. Please revoke an older session below to continue on this
+                device.
             </p>
             <div id="device-limit-list" class="modal-scroll-list"></div>
         </div>
     </div>
 
     <!-- 🚨 TOP-LEVEL PRIORITY POPUPS 🚨 -->
-    <div id="custom-confirm" class="modal-overlay" style="z-index: 99998;" onclick="if(event.target===this) closeCustomConfirm()">
+    <div id="custom-confirm" class="modal-overlay" style="z-index: 99998;"
+        onclick="if(event.target===this) closeCustomConfirm()">
         <div class="solid-card modal-content modal-w-sm" id="custom-confirm-content">
             <div class="modal-icon-header">
                 <i data-lucide="alert-triangle" class="icon-md text-warning"></i>
@@ -892,10 +959,12 @@
         </div>
     </div>
 
-    <div id="custom-alert" class="modal-overlay" style="z-index: 99999;" onclick="if(event.target===this) closeCustomAlert()">
+    <div id="custom-alert" class="modal-overlay" style="z-index: 99999;"
+        onclick="if(event.target===this) closeCustomAlert()">
         <div class="solid-card modal-content modal-w-sm" id="custom-alert-content">
             <div class="modal-icon-header">
-                <div id="alert-icon-container"><i data-lucide="info" class="icon-md text-accent" id="alert-icon"></i></div>
+                <div id="alert-icon-container"><i data-lucide="info" class="icon-md text-accent" id="alert-icon"></i>
+                </div>
                 <h3 class="modal-title" id="alert-title">Notification</h3>
             </div>
             <p class="modal-body-text" id="alert-message"></p>
