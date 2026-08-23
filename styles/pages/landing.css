@@ -65,6 +65,13 @@
 
 .site > *:not(.ambient) { position: relative; z-index: 1; }
 
+/* The one horizontal rhythm for the page: a centred column with a fluid
+   gutter that never lets content touch the viewport edge.
+
+   CAREFUL: anything that also wears .shell must set vertical padding with
+   `padding-top` / `padding-bottom` LONGHAND. A `padding:` shorthand on the
+   same element has equal specificity, wins on source order, and silently
+   resets this gutter to zero. */
 .shell {
     width: 100%;
     max-width: 1180px;
@@ -170,7 +177,10 @@
     grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
     align-items: center;
     gap: clamp(32px, 6vw, 72px);
-    padding: clamp(48px, 9vh, 104px) 0 var(--band);
+    /* LONGHAND, deliberately. A `padding` shorthand here would reset the
+       horizontal padding .shell provides — see the note on .shell. */
+    padding-top: clamp(48px, 9vh, 104px);
+    padding-bottom: var(--band);
 }
 
 .eyebrow-pill {
@@ -304,7 +314,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--band) 0;
+    padding-top: var(--band);
+    padding-bottom: var(--band);
     text-align: center;
 }
 
@@ -528,7 +539,7 @@
 }
 
 .cta-panel {
-    padding: clamp(44px, 8vh, 88px) clamp(24px, 5vw, 64px);
+    padding: clamp(44px, 8vh, 88px) clamp(20px, 4vw, 64px);
     border-radius: var(--r-xl);
     background: var(--bg-surface);
     box-shadow: var(--shadow-card);
@@ -661,7 +672,13 @@
     /* The pinned stage becomes a normal block: two sticky columns cannot both
        be read on a narrow screen, and pinning here would trap the steps. */
     .sequence { grid-template-columns: minmax(0, 1fr); }
-    .seq-stage { position: static; max-width: 520px; margin: 0 auto clamp(28px, 5vh, 48px); }
+
+    /* `relative`, NOT `static`. The stage has to stop sticking here, but it is
+       also the containing block for its absolutely-positioned .stage-layer
+       children — `static` removes it as a containing block, so the layers
+       escaped to the viewport and rendered full-bleed across the page.
+       `relative` unpins it while keeping that anchor intact. */
+    .seq-stage { position: relative; max-width: 520px; margin: 0 auto clamp(28px, 5vh, 48px); }
     .seq-step { min-height: 0; opacity: 1; }        /* all steps legible when unpinned */
     .seq-step + .seq-step { margin-top: var(--sp-6); }
 
