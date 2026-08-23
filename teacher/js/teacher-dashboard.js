@@ -70,6 +70,8 @@
     /* ============================================ 2. MODALS + TOAST ==== */
 
     var openLayers = [];
+    /* Matches --z-overlay in global.css; see the stacking ladder there. */
+    var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
     var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -91,6 +93,13 @@
         if (!openLayers.length) { lastFocused = document.activeElement; lockScroll(); }
         o.classList.add('is-mounted');
         openLayers.push(o);
+        
+        /* Raise this layer above every layer already open. All overlays share
+           one base z-index in CSS, so without this the winner is decided by DOM
+           source order — which is how an open drawer ended up covering a
+           confirmation dialog it had itself triggered. z-index does not affect
+           layout, so this costs nothing in CLS. */
+        o.style.zIndex = String(Z_OVERLAY_BASE + openLayers.length);
         void o.offsetWidth;
         o.classList.add('is-open');
         var f = o.querySelector('button, input, select, textarea');
@@ -102,6 +111,7 @@
         o = o || openLayers[openLayers.length - 1];
         if (!o) { return; }
         o.classList.remove('is-open');
+        o.style.zIndex = '';
         openLayers = openLayers.filter(function (l) { return l !== o; });
         setTimeout(function () {
             o.classList.remove('is-mounted');

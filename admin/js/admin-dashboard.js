@@ -303,6 +303,8 @@
     /* ---- 3.4 Modal manager ---- */
 
     var openLayers = [];
+    /* Matches --z-overlay in global.css; see the stacking ladder there. */
+    var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
     var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -329,6 +331,12 @@
 
         overlay.classList.add('is-mounted');
         openLayers.push(overlay);
+        /* Raise this layer above every layer already open. All overlays share
+           one base z-index in CSS, so without this the winner is decided by
+           DOM source order — which is how an open drawer ended up covering a
+           confirmation dialog it had itself triggered. Setting z-index does
+           not affect layout, so this costs nothing in CLS. */
+        overlay.style.zIndex = String(Z_OVERLAY_BASE + openLayers.length);
 
         /* Mount, force a style flush, then animate. Synchronous, unlike
            requestAnimationFrame, which is throttled in background tabs. */
@@ -345,6 +353,7 @@
         if (!overlay) { return; }
 
         overlay.classList.remove('is-open');
+        overlay.style.zIndex = '';
         openLayers = openLayers.filter(function (layer) { return layer !== overlay; });
 
         setTimeout(function () {
@@ -1023,13 +1032,17 @@
             '<th class="col-right col-w-actions">Actions</th></tr>'
     };
 
+    /* Edit only. Deleting a participant destroys collected responses, so it
+       lives one deliberate step away — inside the profile drawer, where the
+       admin has the student's name, section and progress in front of them.
+       A trash icon sitting inches from a row you click to open that drawer is
+       an accident waiting to happen, and it duplicated an action that was
+       already there. */
     function rosterActions(email) {
         return '' +
             '<td class="col-right"><span class="row-actions">' +
             '<button class="btn-icon" title="Edit participant" data-row-act="edit" data-email="' + esc(email) + '">' +
             icon('pencil', 'icon-sm') + '</button>' +
-            '<button class="btn-icon" title="Delete participant" data-row-act="delete" data-email="' + esc(email) + '">' +
-            icon('trash', 'icon-sm') + '</button>' +
             '</span></td>';
     }
 
@@ -1189,11 +1202,8 @@
             var actionBtn = event.target.closest('[data-row-act]');
             if (actionBtn) {
                 event.stopPropagation();
-                var email = actionBtn.getAttribute('data-email');
                 if (actionBtn.getAttribute('data-row-act') === 'edit') {
-                    openEditStudent(email);
-                } else {
-                    deleteStudent(email);
+                    openEditStudent(actionBtn.getAttribute('data-email'));
                 }
                 return;
             }

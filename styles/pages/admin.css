@@ -43,7 +43,8 @@
 .table tbody tr.is-clickable { cursor: pointer; }
 
 .col-right { text-align: right; }
-.col-w-actions { width: 116px; }
+/* One 36px button plus the cell's padding. Was 116px, sized for two. */
+.col-w-actions { width: 72px; }
 
 .cell-user { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .cell-user-text { min-width: 0; }
@@ -317,7 +318,7 @@ body[data-boot="pending"] .toast-stack { visibility: hidden; }
 .boot-veil {
     position: fixed;
     inset: 0;
-    z-index: 400;
+    z-index: var(--z-boot);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -351,7 +352,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     top: 0;
     left: 0;
     right: 0;
-    z-index: 350;
+    z-index: var(--z-banner);
     display: flex;
     align-items: center;
     justify-content: center;

@@ -34,7 +34,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 60;                       /* above the topbar (30), below modals (100) */
+    z-index: var(--z-rail);            /* see the stacking ladder in global.css */
     display: flex;
     flex-direction: column;
     width: var(--rail-w);
@@ -280,7 +280,7 @@
 .topbar {
     position: sticky;
     top: 0;
-    z-index: 30;
+    z-index: var(--z-sticky);
     display: flex;
     align-items: center;
     gap: var(--sp-4);
@@ -342,6 +342,17 @@
     color: var(--text-muted);
 }
 
+/* The connection label cycles through Connecting… / Live / Reconnecting… /
+   Offline. Each is a different width, so the pill was resizing when the
+   realtime channel subscribed and nudging every control to its right — a
+   small but real layout shift a couple of seconds after load. Reserving the
+   widest state fixes the pill's size for every state. */
+#live-label {
+    display: inline-block;
+    min-width: 11ch;
+    text-align: center;
+}
+
 .dot {
     width: 7px;
     height: 7px;
@@ -399,7 +410,7 @@
 .scrim {
     position: fixed;
     inset: 0;
-    z-index: 39;
+    z-index: var(--z-scrim);
     display: none;
     background: rgba(7, 10, 8, 0.62);
     opacity: 0;

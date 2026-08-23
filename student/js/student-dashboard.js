@@ -100,6 +100,8 @@
     /* Identical mechanics to the admin console and the landing page. */
 
     var openLayers = [];
+    /* Matches --z-overlay in global.css; see the stacking ladder there. */
+    var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
     var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -123,6 +125,13 @@
 
         overlay.classList.add('is-mounted');
         openLayers.push(overlay);
+        
+        /* Raise this layer above every layer already open. All overlays share
+           one base z-index in CSS, so without this the winner is decided by DOM
+           source order — which is how an open drawer ended up covering a
+           confirmation dialog it had itself triggered. z-index does not affect
+           layout, so this costs nothing in CLS. */
+        overlay.style.zIndex = String(Z_OVERLAY_BASE + openLayers.length);
         void overlay.offsetWidth;
         overlay.classList.add('is-open');
 
@@ -136,6 +145,7 @@
         if (!overlay) { return; }
 
         overlay.classList.remove('is-open');
+        overlay.style.zIndex = '';
         openLayers = openLayers.filter(function (l) { return l !== overlay; });
 
         setTimeout(function () {

@@ -236,7 +236,7 @@ body[data-boot="pending"] .toast-stack { visibility: hidden; }
 .boot-veil {
     position: fixed;
     inset: 0;
-    z-index: 400;
+    z-index: var(--z-boot);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -256,7 +256,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     top: 0;
     left: 0;
     right: 0;
-    z-index: 350;
+    z-index: var(--z-banner);
     display: flex;
     align-items: center;
     justify-content: center;

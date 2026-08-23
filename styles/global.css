@@ -121,6 +121,23 @@ a { color: inherit; text-decoration: none; }
     --bg-chip-hover: #2A312D;
     --track: #2A312D;                /* scrollbar thumb, inert progress fill */
 
+    /* --- Stacking ladder ---
+       Every layer in the app, in one place and in order. Nothing should
+       invent its own z-index: if a new layer is needed, it goes here.
+
+       Note the overlay rule below: ALL modals and drawers share one base,
+       and the modal manager raises each one as it opens, so the last thing
+       opened is always on top. Ordering by source position instead is what
+       let an open drawer sit above a confirmation dialog it had triggered. */
+    --z-page: 1;
+    --z-sticky: 30;          /* topbars, page headers */
+    --z-scrim: 39;           /* mobile nav backdrop */
+    --z-rail: 60;            /* sidebar / nav rail */
+    --z-overlay: 100;        /* modals + drawers (JS increments per layer) */
+    --z-toast: 300;          /* always visible, even over a dialog */
+    --z-banner: 350;         /* global error banner */
+    --z-boot: 400;           /* boot gate — covers everything */
+
     /* --- Radii --- */
     --r-xs: 6px;
     --r-sm: 8px;
@@ -639,7 +656,9 @@ button.stat.is-active { background: var(--accent-soft); }
 .overlay {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    /* Base only. openModal() raises each layer above the one before it, so
+       a dialog opened FROM a drawer always lands on top of it. */
+    z-index: var(--z-overlay);
     display: none;
     align-items: center;
     justify-content: center;
@@ -860,7 +879,7 @@ button.stat.is-active { background: var(--accent-soft); }
     position: fixed;
     right: var(--sp-6);
     bottom: var(--sp-6);
-    z-index: 300;
+    z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
