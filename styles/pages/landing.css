@@ -1,89 +1,149 @@
 /* ============================================================================
-   PIA SYSTEM — LANDING v2
-   Public marketing + sign-in surface. REQUIRES styles/global.css.
-   Same house rules: no borders, no blue, fixed control heights, ≤200ms
-   colour-only transitions.
+   PIA SYSTEM — LANDING
+   Cinematic scroll narrative. REQUIRES styles/global.css.
+
+   THE THREE RULES THIS FILE IS BUILT AROUND
+   ---------------------------------------------------------------------------
+   1. Zero CLS, by construction. Every reveal animates ONLY `opacity` and
+      `transform`. Neither participates in layout, so an element's box is
+      identical before, during and after its animation — the page is fully
+      laid out on first paint and never re-flows. Anything whose size is not
+      known up front (the sticky visual) reserves it with `aspect-ratio`.
+
+   2. Compositor-only motion. `opacity` and `transform` are the two properties
+      a browser can animate on the GPU without touching layout or paint. No
+      reveal here touches width, height, margin, top or filter, so scrolling
+      stays on the fast path.
+
+   3. Fluid, not stepped. Type and spacing scale with `clamp()` against the
+      viewport, so there is no width at which the composition breaks — the
+      breakpoints below only change grid structure, never font sizes.
    ==========================================================================*/
 
-/* ---------------------------------------------------------------- 1. SHELL */
-.site {
-    min-height: 100vh;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
+/* -------------------------------------------------- 0. FONT-SWAP GUARD ---
+   The webfont loads async; when it swaps in, differing metrics reflow every
+   heading and register as layout shift. This fallback is Arial re-mapped to
+   Plus Jakarta Sans's metrics, so the swap is near-invisible and contributes
+   no CLS. It sits between the webfont and the generic stack. */
+@font-face {
+    font-family: 'Jakarta Metrics Fallback';
+    src: local('Arial');
+    size-adjust: 104%;
+    ascent-override: 96%;
+    descent-override: 23%;
+    line-gap-override: 0%;
 }
 
-/* The ambient wash. Two very soft radial pools of accent light sit behind
-   everything, which is what keeps a borderless dark page from reading flat.
-   Fixed and non-interactive, so it never affects layout or hit-testing. */
+:root {
+    --font: 'Plus Jakarta Sans', 'Jakarta Metrics Fallback', 'Inter',
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    /* One rhythm for the whole narrative. */
+    --band: clamp(88px, 13vh, 160px);      /* vertical air between acts */
+    --gutter: clamp(20px, 5vw, 48px);
+}
+
+/* ------------------------------------------------------------- 1. SHELL */
+.site { position: relative; }
+
+/* Scroll-linked motion is opt-in. Everything degrades to a static, fully
+   legible page for anyone who asks for less movement. */
+@media (prefers-reduced-motion: reduce) {
+    [data-reveal] { opacity: 1 !important; transform: none !important; }
+    .hero-visual { transform: none !important; }
+}
+
 .ambient {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
     background:
-        radial-gradient(60rem 40rem at 12% -10%, rgba(5, 196, 107, 0.075), transparent 60%),
-        radial-gradient(48rem 36rem at 92% 8%, rgba(79, 168, 147, 0.055), transparent 62%);
+        radial-gradient(64rem 44rem at 12% -12%, rgba(5, 196, 107, 0.085), transparent 62%),
+        radial-gradient(52rem 38rem at 92% 10%, rgba(79, 168, 147, 0.05), transparent 64%);
 }
 
 .site > *:not(.ambient) { position: relative; z-index: 1; }
 
 .shell {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1180px;
     margin: 0 auto;
-    padding: 0 var(--sp-6);
+    padding: 0 var(--gutter);
 }
 
-/* ------------------------------------------------------------- 2. TOP NAV */
+.shell-narrow { max-width: 880px; }
+
+/* ---------------------------------------------------------- 2. REVEALS ---
+   The single animation primitive. An element starts shifted down and a touch
+   small, then settles. Because both are transforms, the element's layout box
+   never changes — the reserved space is correct from first paint. */
+[data-reveal] {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.985);
+    transition:
+        opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--d, 0ms);
+    will-change: opacity, transform;
+}
+
+[data-reveal].is-in { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+
+/* Dropped once the element has settled, so the page is not left holding
+   dozens of promoted compositor layers. */
+[data-reveal].is-done { will-change: auto; }
+
+/* --------------------------------------------------------------- 3. NAV */
 .site-nav {
     position: sticky;
     top: 0;
     z-index: 40;
-    height: var(--topbar-h);
+    height: 64px;
     display: flex;
     align-items: center;
-    background: rgba(15, 19, 17, 0.82);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+}
+
+/* The bar's fill lives on a pseudo-element so becoming "stuck" fades ONE
+   opacity rather than transitioning background-color and box-shadow. This is
+   the only state change that fires mid-scroll, so it is the one that most
+   needs to stay on the compositor. */
+.site-nav::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(15, 19, 17, 0.84);
     box-shadow: var(--shadow-under);
+    opacity: 0;
+    transition: opacity 260ms ease;
+    pointer-events: none;
 }
 
-.site-nav-inner {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-4);
-    width: 100%;
-}
+.site-nav.is-stuck::before { opacity: 1; }
 
-.logo {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    flex: 0 0 auto;
-}
+.site-nav-inner { display: flex; align-items: center; gap: var(--sp-4); width: 100%; }
+
+.logo { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
 
 .logo-mark {
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
     border-radius: var(--r-md);
     background: var(--accent);
     color: var(--on-accent);
     display: grid;
     place-items: center;
     font-weight: 800;
-    font-size: 13px;
+    font-size: 12px;
 }
 
-.logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.logo-text { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; }
 
-.nav-links {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-left: auto;
-}
+.nav-links { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
 
 .nav-link {
     height: var(--control-h);
@@ -99,14 +159,18 @@
 
 .nav-link:hover { background: var(--bg-chip); color: var(--text); }
 
-/* ----------------------------------------------------------------- 3. HERO */
+/* Zero-height sentinel. An IntersectionObserver watches it instead of a
+   scroll listener, so the nav's state costs nothing per frame. */
+.nav-sentinel { position: absolute; top: 0; left: 0; width: 100%; height: 1px; pointer-events: none; }
+
+/* -------------------------------------------------------------- 4. HERO */
 .hero {
-    padding: var(--sp-9) 0 var(--sp-9);
+    min-height: calc(100svh - 64px);
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: var(--sp-9);
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
     align-items: center;
-    min-height: calc(100vh - var(--topbar-h));
+    gap: clamp(32px, 6vw, 72px);
+    padding: clamp(48px, 9vh, 104px) 0 var(--band);
 }
 
 .eyebrow-pill {
@@ -115,87 +179,68 @@
     gap: var(--sp-2);
     height: 30px;
     padding: 0 var(--sp-3);
-    margin-bottom: var(--sp-5);
+    margin-bottom: clamp(20px, 3vh, 28px);
     border-radius: var(--r-pill);
     background: var(--accent-soft);
     color: var(--accent);
     font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.02em;
 }
 
+/* The page's loudest voice. Tight tracking and a 1.02 line-height are what
+   make large type read as designed rather than merely big. */
+/* Scaled against the COLUMN, not the viewport. At 7.2vw the headline was
+   82px inside a 565px column — seven wrapped lines where three were written,
+   which pushed the call to action below the fold. A hero whose primary action
+   needs scrolling to reach is not a hero. */
 .hero-title {
-    font-size: clamp(34px, 5.2vw, 58px);
-    line-height: 1.06;
+    font-size: clamp(34px, 4.9vw, 60px);
+    line-height: 1.02;
     font-weight: 800;
-    letter-spacing: -0.035em;
-    margin-bottom: var(--sp-5);
-    /* Balanced wrapping keeps the headline from leaving one orphan word on
-       the last line as the viewport changes. */
+    letter-spacing: -0.042em;
     text-wrap: balance;
+    margin-bottom: clamp(20px, 3vh, 28px);
 }
 
 .hero-title .accent { color: var(--accent); }
 
+/* Each line of the headline lifts a beat after the one above it. */
+.line { display: block; }
+
 .hero-lede {
-    font-size: clamp(15px, 1.6vw, 17.5px);
+    font-size: clamp(15.5px, 1.55vw, 18.5px);
     line-height: 1.65;
     color: var(--text-muted);
-    max-width: 54ch;
-    margin-bottom: var(--sp-7);
+    max-width: 52ch;
+    margin-bottom: clamp(28px, 4vh, 40px);
 }
 
-.hero-cta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-7);
-}
+.hero-cta { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.hero-cta .btn { height: 50px; padding: 0 var(--sp-6); font-size: 14.5px; font-weight: 700; }
 
-.hero-cta .btn { height: 48px; padding: 0 var(--sp-6); font-size: 14px; }
-
-.hero-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-6);
-}
-
-.meta-item { min-width: 96px; }
-.meta-value {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-}
-.meta-label {
-    margin-top: 2px;
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
-/* ---- 3.1 Hero panel: an abstract of the tutoring session ---- */
-.hero-panel {
-    padding: var(--sp-5);
+/* ---- 4.1 Hero visual ----
+   aspect-ratio reserves the box before anything inside renders, so the hero
+   is at its final height on first paint. */
+.hero-visual {
+    position: relative;
+    aspect-ratio: 5 / 4.6;
+    width: 100%;
     border-radius: var(--r-xl);
     background: var(--bg-surface);
     box-shadow: var(--shadow-card);
+    padding: clamp(16px, 2.2vw, 22px);
+    overflow: hidden;
+    will-change: transform;
 }
 
-.panel-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    height: 28px;
-    margin-bottom: var(--sp-4);
-}
-
-.panel-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--track); }
-.panel-title { margin-left: var(--sp-2); font-size: 12px; color: var(--text-faint); }
+.panel-bar { display: flex; align-items: center; gap: var(--sp-2); height: 26px; margin-bottom: var(--sp-3); }
+.panel-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--track); }
+.panel-title { margin-left: var(--sp-2); font-size: 11.5px; color: var(--text-faint); }
 
 .chat-line {
     display: flex;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
+    padding: clamp(10px, 1.4vw, 14px) clamp(12px, 1.6vw, 16px);
     border-radius: var(--r-md);
     background: var(--bg-field);
 }
@@ -204,75 +249,226 @@
 .chat-line.is-agent { background: var(--accent-soft); }
 
 .chat-who {
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
     border-radius: var(--r-sm);
     background: var(--bg-chip);
     display: grid;
     place-items: center;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
 }
 
 .chat-line.is-agent .chat-who { background: var(--accent); color: var(--on-accent); }
-.chat-body { min-width: 0; font-size: 13px; line-height: 1.55; padding-top: 5px; }
+.chat-body { min-width: 0; font-size: clamp(12px, 1.05vw, 13.5px); line-height: 1.55; padding-top: 4px; }
 .chat-body strong { color: var(--accent); font-weight: 600; }
 
-.panel-foot {
+/* ---- 4.2 Scroll cue ---- */
+.scroll-cue {
+    position: absolute;
+    left: 50%;
+    bottom: clamp(20px, 4vh, 40px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    transform: translateX(-50%);
+    transition: opacity 400ms ease;
+}
+
+.cue-rail { width: 1px; height: 34px; background: linear-gradient(var(--track), transparent); position: relative; overflow: hidden; }
+
+.cue-rail::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform: translate3d(0, -100%, 0);
+    animation: cue 2.4s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+@keyframes cue {
+    0% { transform: translate3d(0, -100%, 0); }
+    60%, 100% { transform: translate3d(0, 100%, 0); }
+}
+
+/* ------------------------------------------------------- 5. STATEMENTS ---
+   Apple's signature beat: one sentence, enormous, alone on the screen. */
+.statement {
+    min-height: clamp(320px, 56vh, 560px);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    margin-top: var(--sp-4);
-    padding-top: var(--sp-4);
-}
-
-.trait-mini { flex: 1 1 auto; }
-.trait-mini + .trait-mini { margin-left: var(--sp-4); }
-.trait-mini-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-}
-
-/* -------------------------------------------------------------- 4. SECTIONS */
-.section { padding: var(--sp-9) 0; }
-
-.section-head {
-    max-width: 62ch;
-    margin: 0 auto var(--sp-7);
+    justify-content: center;
+    padding: var(--band) 0;
     text-align: center;
 }
 
-.section-title {
-    font-size: clamp(24px, 3.2vw, 34px);
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
+.statement-text {
+    font-size: clamp(28px, 4.6vw, 56px);
+    line-height: 1.12;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    max-width: 20ch;
     text-wrap: balance;
 }
 
-.section-lede {
-    margin-top: var(--sp-3);
-    font-size: 15px;
+.statement-text .dim { color: var(--text-muted); }
+.statement-sub {
+    margin: clamp(18px, 2.6vh, 26px) auto 0;
+    max-width: 56ch;
+    font-size: clamp(14.5px, 1.4vw, 17px);
     line-height: 1.65;
     color: var(--text-muted);
 }
 
-.feature-grid {
+/* --------------------------------------------------- 6. STICKY SEQUENCE ---
+   The visual pins while the steps scroll past it. The pane never changes
+   size — only which of its stacked layers is opaque — so pinning and
+   swapping cost no layout at all. */
+.sequence {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-4);
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: clamp(32px, 6vw, 80px);
+    align-items: start;
+    padding-bottom: var(--band);
 }
+
+.seq-head { margin-bottom: clamp(32px, 6vh, 64px); }
+
+.seq-title {
+    font-size: clamp(28px, 4vw, 46px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    text-wrap: balance;
+}
+
+.seq-lede { margin-top: var(--sp-4); font-size: clamp(14.5px, 1.35vw, 16.5px); line-height: 1.65; color: var(--text-muted); }
+
+.seq-steps { display: flex; flex-direction: column; }
+
+/* Each step owns enough scroll distance to hold the stage on its own. */
+.seq-step {
+    min-height: clamp(280px, 62vh, 480px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--sp-6) 0;
+}
+
+.seq-num {
+    width: 34px;
+    height: 34px;
+    margin-bottom: var(--sp-4);
+    border-radius: var(--r-sm);
+    background: var(--bg-chip);
+    color: var(--text-muted);
+    display: grid;
+    place-items: center;
+    font-size: 12.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    transition: background-color 400ms ease, color 400ms ease;
+}
+
+.seq-step.is-active .seq-num { background: var(--accent); color: var(--on-accent); }
+
+.seq-step-title {
+    font-size: clamp(21px, 2.5vw, 30px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    margin-bottom: var(--sp-3);
+}
+
+.seq-step-text {
+    font-size: clamp(14px, 1.3vw, 16px);
+    line-height: 1.7;
+    color: var(--text-muted);
+    max-width: 46ch;
+}
+
+/* Inactive steps recede. Opacity only — they keep their full box, so the
+   scroll distance is constant whatever is active. */
+.seq-step { opacity: 0.32; transition: opacity 450ms ease; }
+.seq-step.is-active { opacity: 1; }
+
+/* ---- 6.1 The pinned stage ---- */
+.seq-stage {
+    position: sticky;
+    top: calc(50vh - min(26vh, 240px));
+    aspect-ratio: 1 / 1;          /* reserved before any layer paints */
+    width: 100%;
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+
+.stage-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--sp-3);
+    padding: clamp(20px, 3vw, 36px);
+    opacity: 0;
+    transform: scale(1.03);
+    transition: opacity 520ms cubic-bezier(0.16, 1, 0.3, 1), transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+
+.stage-layer.is-shown { opacity: 1; transform: scale(1); pointer-events: auto; }
+
+.stage-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.stage-eq {
+    font-size: clamp(26px, 4vw, 44px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.stage-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 52px;
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    font-size: clamp(12.5px, 1.15vw, 14px);
+}
+
+.stage-row.is-accent { background: var(--accent-soft); color: var(--accent); }
+.stage-row .pip { width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%; background: var(--bg-chip); }
+.stage-row.is-accent .pip { background: var(--accent); }
+
+.stage-meter { margin-top: var(--sp-2); }
+.stage-meter-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; }
+
+/* ------------------------------------------------------- 7. FEATURES --- */
+.features { padding-bottom: var(--band); }
+
+.feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
 
 .feature {
     display: flex;
     flex-direction: column;
-    min-height: 232px;
-    padding: var(--sp-6);
+    min-height: 244px;
+    padding: clamp(22px, 2.6vw, 32px);
     border-radius: var(--r-lg);
     background: var(--bg-surface);
     box-shadow: var(--shadow-card);
@@ -282,10 +478,10 @@
 .feature:hover { background: var(--bg-surface-hover); }
 
 .feature-glyph {
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
-    margin-bottom: var(--sp-4);
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    margin-bottom: var(--sp-5);
     border-radius: var(--r-md);
     display: grid;
     place-items: center;
@@ -296,65 +492,63 @@
 .feature-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
 .feature-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
 
-.feature-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: var(--sp-2); }
-.feature-text { font-size: 13.5px; line-height: 1.65; color: var(--text-muted); }
+.feature-title { font-size: clamp(16px, 1.5vw, 19px); font-weight: 700; letter-spacing: -0.015em; margin-bottom: var(--sp-3); }
+.feature-text { font-size: clamp(13px, 1.2vw, 14.5px); line-height: 1.7; color: var(--text-muted); }
 
-/* ---- 4.1 Steps ---- */
-.steps {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--sp-4);
-}
+/* ---------------------------------------------------------- 8. NUMBERS ---
+   Counting digits would reflow a proportional font. Tabular figures plus a
+   reserved `ch` width means the value can change every frame at a fixed box. */
+.numbers { padding-bottom: var(--band); }
 
-.step {
-    min-height: 176px;
-    padding: var(--sp-5);
-    border-radius: var(--r-lg);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-}
+.number-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 4vw, 48px); }
 
-.step-num {
-    width: 30px;
-    height: 30px;
-    margin-bottom: var(--sp-4);
-    border-radius: var(--r-sm);
-    background: var(--bg-chip);
-    color: var(--accent);
-    display: grid;
-    place-items: center;
-    font-size: 12px;
+.number-item { text-align: center; }
+
+.number-value {
+    display: block;
+    min-width: 4ch;
+    font-size: clamp(40px, 6.4vw, 76px);
     font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
+    color: var(--accent);
 }
 
-.step-title { font-size: 14.5px; font-weight: 700; margin-bottom: var(--sp-2); }
-.step-text { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+.number-label {
+    margin-top: clamp(10px, 1.6vh, 16px);
+    font-size: clamp(12.5px, 1.15vw, 14px);
+    line-height: 1.5;
+    color: var(--text-muted);
+}
 
-/* ---- 4.2 Closing call to action ---- */
+/* ------------------------------------------------------------- 9. CTA --- */
+.cta {
+    padding-bottom: var(--band);
+}
+
 .cta-panel {
-    padding: var(--sp-9) var(--sp-7);
+    padding: clamp(44px, 8vh, 88px) clamp(24px, 5vw, 64px);
     border-radius: var(--r-xl);
     background: var(--bg-surface);
     box-shadow: var(--shadow-card);
     text-align: center;
 }
 
-.cta-actions {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-    margin-top: var(--sp-6);
+.cta-title {
+    font-size: clamp(26px, 4vw, 46px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    text-wrap: balance;
 }
 
-.cta-actions .btn { height: 46px; padding: 0 var(--sp-6); }
+.cta-lede { margin: var(--sp-4) auto 0; max-width: 54ch; font-size: clamp(14px, 1.35vw, 16.5px); line-height: 1.65; color: var(--text-muted); }
+.cta-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--sp-3); margin-top: clamp(26px, 4vh, 40px); }
+.cta-actions .btn { height: 48px; padding: 0 var(--sp-6); }
 
-/* ---------------------------------------------------------------- 5. FOOTER */
-.site-foot {
-    margin-top: auto;
-    padding: var(--sp-7) 0 var(--sp-8);
-}
+/* ---------------------------------------------------------- 10. FOOTER --- */
+.site-foot { padding: var(--sp-7) 0 var(--sp-8); }
 
 .foot-inner {
     display: flex;
@@ -365,7 +559,6 @@
     font-size: 12.5px;
     color: var(--text-faint);
 }
-
 /* ------------------------------------------------- 6. AUTH MODAL EXTRAS ---
    The dialog mechanics come from global.css untouched — 18px radius, the
    close button nested in flow 21px from the edge, reserved .field-msg slots.
@@ -452,34 +645,35 @@
 
 .otp-box:focus { background: #0E1310; box-shadow: 0 0 0 3px var(--accent-soft); }
 
-/* ------------------------------------------------------------ 7. RESPONSIVE */
+/* ------------------------------------------------------- 11. RESPONSIVE ---
+   Structure only. Type and spacing already scale continuously via clamp(),
+   so these rules never change a font size — they only restack grids. */
 @media (max-width: 1024px) {
     .hero {
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--sp-7);
-        padding: var(--sp-8) 0;
         min-height: 0;
+        gap: clamp(28px, 5vh, 48px);
+        padding-bottom: var(--band);
     }
+
+    .hero-visual { max-width: 560px; }
+
+    /* The pinned stage becomes a normal block: two sticky columns cannot both
+       be read on a narrow screen, and pinning here would trap the steps. */
+    .sequence { grid-template-columns: minmax(0, 1fr); }
+    .seq-stage { position: static; max-width: 520px; margin: 0 auto clamp(28px, 5vh, 48px); }
+    .seq-step { min-height: 0; opacity: 1; }        /* all steps legible when unpinned */
+    .seq-step + .seq-step { margin-top: var(--sp-6); }
+
     .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .scroll-cue { display: none; }
 }
 
 @media (max-width: 720px) {
-    .shell { padding: 0 var(--sp-4); }
-    .section { padding: var(--sp-8) 0; }
-    .feature-grid, .steps { grid-template-columns: minmax(0, 1fr); }
+    .feature-grid { grid-template-columns: minmax(0, 1fr); }
     .feature { min-height: 0; }
-    .step { min-height: 0; }
-    .cta-panel { padding: var(--sp-7) var(--sp-5); }
+    .number-grid { grid-template-columns: minmax(0, 1fr); gap: clamp(28px, 6vh, 44px); }
     .nav-link.hide-sm { display: none; }
-    .hero-cta .btn { flex: 1 1 100%; }
+    .hero-cta .btn, .cta-actions .btn { flex: 1 1 100%; }
     .foot-inner { justify-content: center; text-align: center; }
-}
-
-/* At 375px the OTP row is the tightest thing on the page: six 48px cells plus
-   five 8px gaps needs 328px, which fits inside the 375 − 2×16 padding. Below
-   that the cells shrink rather than wrap. */
-@media (max-width: 380px) {
-    .otp-box { width: 44px; flex-basis: 44px; height: 50px; font-size: 18px; }
-    .hero-meta { gap: var(--sp-4); }
 }
