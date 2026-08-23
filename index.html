@@ -1,23 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
-    <meta name="description"
-        content="PIA — a Personal Instructing Agent that adapts its teaching persona to each Grade 7 learner's personality profile.">
+    <meta name="color-scheme" content="dark light">
+    <meta name="description" content="PIA — an AI maths tutor that adapts to how each Grade 7 student learns.">
     <title>PIA — Personal Instructing Agent</title>
+
+    <!-- Applied before first paint so a light-mode visitor never sees a dark
+         flash. Inline deliberately: an external file would arrive too late. -->
+    <script>
+        (function () {
+            var t = 'dark';
+            try {
+                var saved = localStorage.getItem('pia_theme');
+                if (saved === 'light' || saved === 'dark') { t = saved; }
+                else if (window.matchMedia('(prefers-color-scheme: light)').matches) { t = 'light'; }
+            } catch (e) { /* private mode — fall through to dark */ }
+            document.documentElement.setAttribute('data-theme', t);
+            /* Reveal targets start invisible. Gate that on JS being alive,
+               or a script failure would leave the page permanently blank.
+               Runs pre-paint, so there is no flash. */
+            document.documentElement.classList.add('js');
+        })();
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- preconnect before the stylesheet request so the font handshake starts
-         immediately; the metrics-matched fallback in landing.css absorbs the
-         swap so it costs no layout shift. -->
+    <!-- <model-viewer> is a custom element: until this module executes the tag
+         is unknown to the browser and would lay out as an inline element.
+         landing.css gives it explicit block dimensions up front so that gap
+         cannot produce a layout shift. -->
+    <script type="module"
+        src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/pages/landing.css">
@@ -25,346 +46,278 @@
 
 <body>
 
-    <!-- ===================================================== ICON SPRITE -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
             <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
             <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
             <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
-            <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5.2a3 3 0 0 0-5.6-1.4A2.9 2.9 0 0 0 4 9.4a3 3 0 0 0 .6 5.3A3 3 0 0 0 9 19.4a3 3 0 0 0 3-2.6Z"/><path d="M12 5.2a3 3 0 0 1 5.6-1.4A2.9 2.9 0 0 1 20 9.4a3 3 0 0 1-.6 5.3A3 3 0 0 1 15 19.4a3 3 0 0 1-3-2.6Z"/></symbol>
-            <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.4l-1.9-5.6L4.5 10.9 10.1 9 12 3.5Z"/><path d="M18.5 15.5 19.3 18l2.2.8-2.2.8-.8 2.4-.8-2.4-2.2-.8 2.2-.8.8-2.5Z"/></symbol>
-            <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.4 3 7.7 7 9 4-1.3 7-4.6 7-9V6l-7-3Z"/><path d="m9.2 12 2 2 3.6-3.8"/></symbol>
-            <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></symbol>
+            <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.4l-1.9-5.6L4.5 10.9 10.1 9 12 3.5Z"/></symbol>
+            <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.8" cy="10" r="1.6"/><path d="m4 17 5-4.6 3.4 3 3-2.4L20 17"/></symbol>
             <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.6 7.2 8.4 5.8 8.4-5.8"/></symbol>
             <symbol id="i-key" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10.2" rx="2.5"/><path d="M7.8 10V7.6a4.2 4.2 0 0 1 8.4 0V10"/><circle cx="12" cy="15.2" r="1.2" fill="currentColor" stroke="none"/></symbol>
-            <symbol id="i-login" viewBox="0 0 24 24"><path d="M14.5 3H19a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4.5"/><path d="m8 16.5 4.5-4.5L8 7.5"/><path d="M12.5 12H3"/></symbol>
-            <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.8" cy="10" r="1.6"/><path d="m4 17 5-4.6 3.4 3 3-2.4L20 17"/></symbol>
-            <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4"/><path d="m10 6-6 6 6 6"/></symbol>
+            <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></symbol>
+            <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+            <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+            <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+            <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3 4 7.2v9.6L12 21l8-4.2V7.2L12 3Z"/><path d="m4 7.2 8 4.3 8-4.3M12 11.5V21"/></symbol>
+            <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></symbol>
+            <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z"/></symbol>
         </defs>
     </svg>
 
     <div class="site">
-        <div class="ambient" aria-hidden="true"></div>
         <span class="nav-sentinel" id="nav-sentinel" aria-hidden="true"></span>
 
-        <!-- ======================================================= NAV -->
         <header class="site-nav" id="site-nav">
             <div class="shell site-nav-inner">
-                <a class="logo" href="#top">
-                    <span class="logo-mark" aria-hidden="true">PIA</span>
-                    <span class="logo-text">PIA System</span>
+                <a class="brand" href="#top">
+                    <span class="brand-mark" aria-hidden="true">P</span>
+                    <span class="brand-name">PIA System</span>
                 </a>
 
                 <nav class="nav-links" aria-label="Primary">
                     <a class="nav-link hide-sm" href="#how">How it works</a>
-                    <a class="nav-link hide-sm" href="#study">The study</a>
-                    <button class="btn btn-primary" data-auth-open="signin">
-                        <svg class="icon"><use href="#i-login"></use></svg>
-                        Sign in
+                    <a class="nav-link hide-sm" href="#study">Why it works</a>
+                    <button type="button" class="theme-toggle" id="theme-toggle"
+                        aria-label="Switch between light and dark mode">
+                        <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+                        <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
                     </button>
+                    <button type="button" class="btn btn-primary" data-auth-open="signin">Sign in</button>
                 </nav>
             </div>
         </header>
 
         <main id="top">
 
-            <!-- ==================================================== HERO -->
-            <section class="shell hero">
-                <div>
-                    <span class="eyebrow-pill" data-reveal>
-                        <svg class="icon icon-sm"><use href="#i-spark"></use></svg>
-                        Grade 7 Mathematics
-                    </span>
+            <!-- ======================================= STAGE 1: THE BUDDY -->
+            <!-- Full viewport height. 50/50 on desktop, stacked on mobile with
+                 the character on top. -->
+            <section class="shell hero" aria-labelledby="hero-title">
+                <div class="hero-split">
 
-                    <h1 class="hero-title">
-                        <span class="line" data-reveal style="--d:60ms">Maths that</span>
-                        <span class="line" data-reveal style="--d:150ms">finally <span class="accent">clicks</span>.</span>
-                    </h1>
+                    <!-- LEFT: greeting, description, switcher, auth.
+                         No card — everything sits straight on the page. -->
+                    <div class="hero-info">
+                        <p class="hero-eyebrow" aria-hidden="true">Your tutor</p>
 
-                    <p class="hero-lede" data-reveal style="--d:260ms">
-                        PIA is a tutor that learns how you learn. It spots where you got lost,
-                        explains it a different way, and stays with you until it makes sense.
-                        No rushing. No red marks. No feeling behind.
-                    </p>
+                        <h1 class="hero-greeting" id="hero-title">
+                            Hi! I'm your new AI study buddy.
+                            <span class="hero-greeting-accent">Let's make maths fun.</span>
+                        </h1>
 
-                    <div class="hero-cta" data-reveal style="--d:340ms">
-                        <button class="btn btn-primary" data-auth-open="signin">
-                            Sign in to your account
-                            <svg class="icon"><use href="#i-arrow-right"></use></svg>
-                        </button>
-                        <button class="btn btn-secondary" data-auth-open="activate">
-                            Activate my account
-                        </button>
+                        <p class="hero-character-name" id="char-name" aria-live="polite">Calm Kai</p>
+
+                        <p class="hero-character-desc" id="char-desc">
+                            Kai takes it one step at a time and never rushes you. Ask for a
+                            hint as often as you like — there is no timer and nothing here
+                            counts towards a grade.
+                        </p>
+
+                        <div class="hero-actions">
+                            <div class="hero-switcher" role="group" aria-label="Choose a character">
+                                <button type="button" class="switch-arrow" id="char-prev" aria-label="Previous character">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-chev-left"></use></svg>
+                                </button>
+
+                                <div class="switch-dots" id="char-dots">
+                                    <button type="button" class="switch-dot" data-char="0" aria-current="true" aria-label="Character 1 of 3"></button>
+                                    <button type="button" class="switch-dot" data-char="1" aria-current="false" aria-label="Character 2 of 3"></button>
+                                    <button type="button" class="switch-dot" data-char="2" aria-current="false" aria-label="Character 3 of 3"></button>
+                                </div>
+
+                                <button type="button" class="switch-arrow" id="char-next" aria-label="Next character">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-chev-right"></use></svg>
+                                </button>
+                            </div>
+
+                            <div class="hero-auth">
+                                <button type="button" class="btn btn-secondary" data-auth-open="signin">Log in</button>
+                                <button type="button" class="btn btn-primary" data-auth-open="activate">Sign up</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: the 3D element. No container — the only thing behind
+                         it is a radial pool of primary light. -->
+                    <div class="hero-visual">
+                        <span class="hero-glow" aria-hidden="true"></span>
+
+                        <!-- THE CLS CONTRACT. Width is fluid, the ratio is locked,
+                             so this box is already its final size before the model
+                             mounts and the layout cannot move.
+
+                             disable-zoom is deliberate: camera-controls otherwise
+                             eats the mouse wheel, so scrolling with the cursor over
+                             the model zooms it instead of scrolling the page.
+                             Drag-to-rotate is unaffected. -->
+                        <figure class="hero-figure" id="hero-figure">
+                            <model-viewer
+                                id="hero-model"
+                                src="assets/models/low-poly-laptop/source/Laptop.glb"
+                                alt="A low-poly 3D laptop, rotating slowly. Drag to look around it."
+                                camera-controls
+                                disable-zoom
+                                auto-rotate
+                                auto-rotate-delay="600"
+                                rotation-per-second="18deg"
+                                interaction-prompt="none"
+                                shadow-intensity="0.6"
+                                environment-image="neutral"
+                                loading="eager"
+                                reveal="auto"
+                                touch-action="pan-y">
+
+                                <!-- The skeleton IS the poster: model-viewer shows this
+                                     slot until the model is ready, then swaps it in
+                                     place. Same box, same ratio — nothing moves. -->
+                                <div class="hero-skeleton" slot="poster" role="status" aria-live="polite">
+                                    <span class="hero-skeleton-glyph" aria-hidden="true">
+                                        <svg class="icon icon-lg"><use href="#i-cube"></use></svg>
+                                    </span>
+                                    <span class="hero-skeleton-label">Loading 3D model…</span>
+                                    <span class="hero-skeleton-spec">3 : 4 &nbsp;·&nbsp; drag to rotate</span>
+                                </div>
+
+                            </model-viewer>
+
+                            <!-- Failure state. model-viewer has no "error" slot, so this
+                                 is a sibling in the same box, hidden until the element
+                                 fires its error event. Same inset, same ratio, so a
+                                 failed load cannot shift anything. -->
+                            <div class="hero-fallback" id="hero-fallback" role="alert" hidden>
+                                <span class="hero-skeleton-glyph" aria-hidden="true">
+                                    <svg class="icon icon-lg"><use href="#i-cube"></use></svg>
+                                </span>
+                                <span class="hero-skeleton-label">3D preview unavailable</span>
+                                <span class="hero-skeleton-spec">Your browser could not load it</span>
+                            </div>
+                        </figure>
                     </div>
                 </div>
 
-                <div class="hero-visual" id="hero-visual" data-reveal style="--d:220ms" aria-hidden="true">
-                    <div class="panel-bar">
-                        <span class="panel-dot"></span><span class="panel-dot"></span><span class="panel-dot"></span>
-                        <span class="panel-title">A real session</span>
-                    </div>
-                    <div class="chat-line">
-                        <span class="chat-who">MS</span>
-                        <p class="chat-body">I keep getting the fractions one wrong and I don't know why.</p>
-                    </div>
-                    <div class="chat-line is-agent">
-                        <span class="chat-who">PIA</span>
-                        <p class="chat-body">Let's slow down and take it one step at a time. You had
-                            <strong>2/3 + 1/4</strong> — before we add, what has to be true about the
-                            two denominators?</p>
-                    </div>
-                    <div class="chat-line">
-                        <span class="chat-who">MS</span>
-                        <p class="chat-body">They have to be the same?</p>
-                    </div>
-                    <div class="chat-line is-agent">
-                        <span class="chat-who">PIA</span>
-                        <p class="chat-body">Exactly that. You already knew it — let's find the smallest
-                            number both 3 and 4 divide into.</p>
-                    </div>
-                </div>
-
-                <span class="scroll-cue" id="scroll-cue" aria-hidden="true">
-                    <span class="cue-rail"></span>
-                    Scroll
+                <!-- Inert scroll affordance: the second stage is below the fold and
+                     nothing else hints that there is more. -->
+                <span class="hero-scroll-cue" aria-hidden="true">
+                    <svg class="icon" focusable="false"><use href="#i-chev-down"></use></svg>
                 </span>
             </section>
 
-            <!-- ============================================= STATEMENT 1 -->
-            <section class="shell statement">
-                <div>
-                    <h2 class="statement-text" data-reveal>
-                        Two students. Same wrong answer. <span class="dim">Two completely different reasons.</span>
+            <!-- ==================================== STAGE 2: THE SCROLL REVEAL -->
+            <!-- Sits above the hero in the paint order, so the glow behind the 3D
+                 element can never bleed over this type. -->
+            <section class="reveal-stage" aria-labelledby="reveal-title">
+                <div class="shell reveal-stage-inner">
+                    <h2 class="reveal-mark" id="reveal-title" data-reveal>
+                        <span class="reveal-mark-lead">Welcome to</span>
+                        <span class="reveal-mark-word">PIA</span>
                     </h2>
-                    <p class="statement-sub" data-reveal style="--d:120ms">
-                        One rushed. One never understood step two. Most tutoring treats them the same.
-                        PIA doesn't.
+                    <p class="reveal-sub" data-reveal style="--d:140ms">
+                        Your own maths tutor. Pick the one that fits you.
                     </p>
                 </div>
             </section>
 
-            <!-- ============================================ HERO SHOWCASE -->
-            <section class="shell showcase">
-                <figure class="media media-hero" data-reveal>
-                        <div class="media-inner">
-                            <span class="media-glyph"><svg class="icon icon-lg"><use href="#i-image"></use></svg></span>
-                            <span class="media-label">Product Image Placeholder</span>
-                            <span class="media-spec">16 : 9 &nbsp;·&nbsp; full width</span>
-                        </div>
-                    </figure>
-            </section>
-
-            <!-- ========================================== STICKY SEQUENCE -->
-            <section class="shell" id="how">
-                <div class="seq-head shell-narrow" style="margin-left:0">
-                    <h2 class="seq-title" data-reveal>How it works</h2>
-                    <p class="seq-lede" data-reveal style="--d:100ms">
-                        Ten minutes to set up. Then a tutor that already knows how to reach you.
+            <!-- ================================================ HOW IT WORKS -->
+            <section class="shell section-tight" id="how" aria-labelledby="how-title">
+                <div class="section-head">
+                    <h2 class="section-title" id="how-title" data-reveal>Three steps to start</h2>
+                    <p class="section-sub" data-reveal style="--d:80ms">
+                        Ten minutes to set up, once.
                     </p>
                 </div>
 
-                <div class="sequence">
-                    <div class="seq-stage" id="seq-stage" aria-hidden="true">
-                        <div class="stage-layer is-shown" data-layer="0">
-                            <p class="stage-kicker">First · A few questions</p>
-                            <p class="stage-eq">No wrong answers</p>
-                            <div class="stage-row"><span class="pip"></span>I like to plan ahead</div>
-                            <div class="stage-row is-accent"><span class="pip"></span>That sounds like me</div>
-                            <div class="stage-row"><span class="pip"></span>Not really me</div>
-                        </div>
+                <ol class="grid-auto">
+                    <li class="panel step" data-reveal>
+                        <span class="step-num" aria-hidden="true">1</span>
+                        <h3 class="card-title">Answer a few questions</h3>
+                        <p class="card-text">No right answers, and nothing that counts towards a grade.</p>
+                    </li>
+                    <li class="panel step" data-reveal style="--d:110ms">
+                        <span class="step-num" aria-hidden="true">2</span>
+                        <h3 class="card-title">Meet your tutor</h3>
+                        <p class="card-text">You're matched to the teaching style that suits you.</p>
+                    </li>
+                    <li class="panel step" data-reveal style="--d:220ms">
+                        <span class="step-num" aria-hidden="true">3</span>
+                        <h3 class="card-title">Start solving</h3>
+                        <p class="card-text">Hints whenever you want them. Never a timer.</p>
+                    </li>
+                </ol>
+            </section>
 
-                        <div class="stage-layer" data-layer="1">
-                            <p class="stage-kicker">Then · Meet your tutor</p>
-                            <p class="stage-eq">Six to choose from</p>
-                            <div class="stage-row is-accent"><span class="pip"></span>Calm and reassuring</div>
-                            <div class="stage-row"><span class="pip"></span>Quick and energetic</div>
-                            <div class="stage-row"><span class="pip"></span>Step by step</div>
-                        </div>
+            <!-- ================================================== FEATURES -->
+            <section class="shell section-tight" id="study" aria-labelledby="study-title">
+                <div class="section-head">
+                    <h2 class="section-title" id="study-title" data-reveal>Why it works</h2>
+                </div>
 
-                        <div class="stage-layer" data-layer="2">
-                            <p class="stage-kicker">Now · Work together</p>
-                            <p class="stage-eq">2x + 5 = 17</p>
-                            <div class="stage-row"><span class="pip"></span>Stuck? Ask for a nudge</div>
-                            <div class="stage-row is-accent"><span class="pip"></span>Got it — nice work</div>
-                        </div>
-
-                        <div class="stage-layer" data-layer="3">
-                            <p class="stage-kicker">See it add up</p>
-                            <p class="stage-eq">+18 points</p>
-                            <div class="stage-meter">
-                                <span class="stage-meter-label"><span>Where you started</span><span>58</span></span>
-                                <span class="bar"><span class="bar-fill f-muted" style="width:58%"></span></span>
+                <div class="grid-auto">
+                    <article class="panel" data-reveal>
+                        <figure class="media media-wide" style="margin-block-end:var(--sp-5)">
+                            <div class="media-inner">
+                                <span class="media-glyph"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-image"></use></svg></span>
+                                <figcaption class="media-label">Product image</figcaption>
+                                <span class="media-spec">16 : 10</span>
                             </div>
-                            <div class="stage-meter">
-                                <span class="stage-meter-label"><span>Where you are now</span><span>76</span></span>
-                                <span class="bar"><span class="bar-fill" style="width:76%"></span></span>
+                        </figure>
+                        <h3 class="card-title">Explains, then re-explains</h3>
+                        <p class="card-text">If the first way doesn't land, there's a second and a third.</p>
+                    </article>
+
+                    <article class="panel" data-reveal style="--d:110ms">
+                        <figure class="media media-wide" style="margin-block-end:var(--sp-5)">
+                            <div class="media-inner">
+                                <span class="media-glyph"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-image"></use></svg></span>
+                                <figcaption class="media-label">Product image</figcaption>
+                                <span class="media-spec">16 : 10</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="seq-steps" id="seq-steps">
-                        <article class="seq-step" data-step="0">
-                            <span class="seq-num">1</span>
-                            <h3 class="seq-step-title">It gets to know you first</h3>
-                            <p class="seq-step-text">Before a single sum, a few questions about how you like
-                                to work. Ten minutes, no right answers, and nothing that counts towards a
-                                grade.</p>
-                        </article>
-
-                        <article class="seq-step" data-step="1">
-                            <span class="seq-num">2</span>
-                            <h3 class="seq-step-title">You get a tutor that fits</h3>
-                            <p class="seq-step-text">Patient and steady, or quick and energetic. Six teaching
-                                styles, and you're matched to the one that actually suits you.</p>
-                        </article>
-
-                        <article class="seq-step" data-step="2">
-                            <span class="seq-num">3</span>
-                            <h3 class="seq-step-title">It teaches. It doesn't test.</h3>
-                            <p class="seq-step-text">Ask for a hint whenever you want one. Get a wrong answer
-                                and you get a question back, not a red cross and silence.</p>
-                        </article>
-
-                        <article class="seq-step" data-step="3">
-                            <span class="seq-num">4</span>
-                            <h3 class="seq-step-title">You watch yourself improve</h3>
-                            <p class="seq-step-text">Every session builds on the last, and the problems get
-                                harder only when you're ready for them.</p>
-                        </article>
-                    </div>
-                </div>
-            </section>
-
-            <!-- =============================================== SPLIT ONE -->
-            <section class="shell split">
-                <div class="split-text">
-                    <span class="split-kicker" data-reveal>Never stuck</span>
-                    <h2 class="split-title" data-reveal style="--d:80ms">A hint the moment you want one.</h2>
-                    <p data-reveal style="--d:140ms">
-                        Being stuck is the worst part of homework. PIA gives you a nudge, not the
-                        answer — just enough to get the next step moving on your own.
-                    </p>
-                    <ul class="split-list" data-reveal style="--d:200ms">
-                        <li><svg class="icon"><use href="#i-check"></use></svg>Hints when you ask, not when you fail</li>
-                        <li><svg class="icon"><use href="#i-check"></use></svg>Two tries on every problem</li>
-                        <li><svg class="icon"><use href="#i-check"></use></svg>The full working, once you're done</li>
-                    </ul>
-                </div>
-                <figure class="media media-tall" data-reveal>
-                        <div class="media-inner">
-                            <span class="media-glyph"><svg class="icon icon-lg"><use href="#i-image"></use></svg></span>
-                            <span class="media-label">Product Image Placeholder</span>
-                            <span class="media-spec">4 : 5 &nbsp;·&nbsp; portrait</span>
-                        </div>
-                    </figure>
-            </section>
-
-            <!-- =============================================== SPLIT TWO -->
-            <section class="shell split is-flipped">
-                <div class="split-text">
-                    <span class="split-kicker" data-reveal>Never rushed</span>
-                    <h2 class="split-title" data-reveal style="--d:80ms">It moves at your speed, not the class's.</h2>
-                    <p data-reveal style="--d:140ms">
-                        Get three right in a row and it steps up. Struggle, and it stays put and
-                        tries another way in. Nobody is waiting for you and nobody is leaving you
-                        behind.
-                    </p>
-                    <ul class="split-list" data-reveal style="--d:200ms">
-                        <li><svg class="icon"><use href="#i-check"></use></svg>Difficulty that follows your streak</li>
-                        <li><svg class="icon"><use href="#i-check"></use></svg>Pick up exactly where you left off</li>
-                        <li><svg class="icon"><use href="#i-check"></use></svg>No timer, ever</li>
-                    </ul>
-                </div>
-                <figure class="media media-tall" data-reveal>
-                        <div class="media-inner">
-                            <span class="media-glyph"><svg class="icon icon-lg"><use href="#i-image"></use></svg></span>
-                            <span class="media-label">Product Image Placeholder</span>
-                            <span class="media-spec">4 : 5 &nbsp;·&nbsp; portrait</span>
-                        </div>
-                    </figure>
-            </section>
-
-            <!-- ================================================ FEATURES -->
-            <section class="shell features" id="study">
-                <div class="seq-head" style="text-align:center;max-width:58ch;margin-left:auto;margin-right:auto">
-                    <h2 class="seq-title" data-reveal>Built to be kind to learners</h2>
-                    <p class="seq-lede" data-reveal style="--d:100ms">
-                        The small things that make the difference between trying again and giving up.
-                    </p>
-                </div>
-
-                <div class="feature-grid">
-                    <article class="feature" data-reveal>
-                        <span class="feature-glyph"><svg class="icon icon-lg"><use href="#i-brain"></use></svg></span>
-                        <h3 class="feature-title">Explains, then re-explains</h3>
-                        <p class="feature-text">If the first way doesn't land, there's a second and a third.
-                            The goal is that you understand it, not that you got it first time.</p>
+                        </figure>
+                        <h3 class="card-title">Moves at your speed</h3>
+                        <p class="card-text">Difficulty follows your streak, not the class timetable.</p>
                     </article>
 
-                    <article class="feature" data-reveal style="--d:110ms">
-                        <span class="feature-glyph g-teal"><svg class="icon icon-lg"><use href="#i-spark"></use></svg></span>
-                        <h3 class="feature-title">Encouraging, not fake</h3>
-                        <p class="feature-text">Your tutor notices real progress and says so. It won't
-                            celebrate a wrong answer just to keep you happy.</p>
-                    </article>
-
-                    <article class="feature" data-reveal style="--d:220ms">
-                        <span class="feature-glyph g-amber"><svg class="icon icon-lg"><use href="#i-shield"></use></svg></span>
-                        <h3 class="feature-title">Private by default</h3>
-                        <p class="feature-text">How you answer is between you and your tutor. Classmates
-                            never see it, and none of it affects your grade.</p>
+                    <article class="panel" data-reveal style="--d:220ms">
+                        <figure class="media media-wide" style="margin-block-end:var(--sp-5)">
+                            <div class="media-inner">
+                                <span class="media-glyph"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-image"></use></svg></span>
+                                <figcaption class="media-label">Product image</figcaption>
+                                <span class="media-spec">16 : 10</span>
+                            </div>
+                        </figure>
+                        <h3 class="card-title">Private by default</h3>
+                        <p class="card-text">Your answers stay between you and your tutor.</p>
                     </article>
                 </div>
             </section>
 
-            <!-- ================================================= NUMBERS -->
-            <section class="shell numbers">
-                <div class="number-grid">
-                    <div class="number-item" data-reveal>
-                        <span class="number-value" data-count="6">0</span>
-                        <span class="number-label">Teaching styles to be matched with</span>
+            <!-- =================================================== FIGURES -->
+            <section class="shell section-tight" aria-label="At a glance">
+                <div class="figure-grid">
+                    <div data-reveal>
+                        <span class="figure-value" data-count="6">0</span>
+                        <span class="figure-label">Teaching styles</span>
                     </div>
-                    <div class="number-item" data-reveal style="--d:110ms">
-                        <span class="number-value" data-count="10">0</span>
-                        <span class="number-label">Minutes to set up, once</span>
+                    <div data-reveal style="--d:110ms">
+                        <span class="figure-value" data-count="10">0</span>
+                        <span class="figure-label">Minutes to set up</span>
                     </div>
-                    <div class="number-item" data-reveal style="--d:220ms">
-                        <span class="number-value" data-count="0">0</span>
-                        <span class="number-label">Times you'll be told to hurry up</span>
+                    <div data-reveal style="--d:220ms">
+                        <span class="figure-value" data-count="0">0</span>
+                        <span class="figure-label">Times you'll be rushed</span>
                     </div>
                 </div>
             </section>
 
-            <!-- ============================================= SPLIT THREE -->
-            <section class="shell split">
-                <div class="split-text">
-                    <span class="split-kicker" data-reveal>For teachers</span>
-                    <h2 class="split-title" data-reveal style="--d:80ms">See who needs you, before they say so.</h2>
-                    <p data-reveal style="--d:140ms">
-                        A live view of your section: who's working, who's gone quiet, and who's
-                        been struggling on the same idea for twenty minutes. Walk over to the right
-                        desk at the right time.
-                    </p>
-                </div>
-                <figure class="media media-wide" data-reveal>
-                        <div class="media-inner">
-                            <span class="media-glyph"><svg class="icon icon-lg"><use href="#i-image"></use></svg></span>
-                            <span class="media-label">Product Image Placeholder</span>
-                            <span class="media-spec">16 : 10 &nbsp;·&nbsp; landscape</span>
-                        </div>
-                    </figure>
-            </section>
-
-            <!-- ===================================================== CTA -->
-            <section class="shell cta">
-                <div class="cta-panel" data-reveal>
-                    <h2 class="cta-title">Your tutor is waiting.</h2>
-                    <p class="cta-lede">Sign in with your school email, or grab a fresh activation link
-                        if yours has expired.</p>
+            <!-- ======================================================= CTA -->
+            <section class="shell section-tight" aria-labelledby="cta-title">
+                <div class="panel cta" data-reveal>
+                    <h2 class="section-title" id="cta-title">Ready when you are</h2>
+                    <p class="section-sub">Sign in with your school email, or request a new activation link.</p>
                     <div class="cta-actions">
-                        <button class="btn btn-primary" data-auth-open="signin">Sign in</button>
-                        <button class="btn btn-secondary" data-auth-open="activate">Resend my activation link</button>
+                        <button type="button" class="btn btn-primary btn-lg" data-auth-open="signin">Sign in</button>
+                        <button type="button" class="btn btn-secondary btn-lg" data-auth-open="activate">Activate my account</button>
                     </div>
                 </div>
             </section>
@@ -373,7 +326,7 @@
         <footer class="site-foot">
             <div class="shell foot-inner">
                 <span>PIA System · Personal Instructing Agent</span>
-                <span>University of the East · Undergraduate thesis research build</span>
+                <span>University of the East</span>
             </div>
         </footer>
     </div>

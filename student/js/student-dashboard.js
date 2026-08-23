@@ -243,14 +243,17 @@
         if (!button) { return function () {}; }
         var html = button.innerHTML;
         var width = button.getBoundingClientRect().width;
-        button.style.minWidth = Math.ceil(width) + 'px';
+        /* width, not min-width: min-width is only a floor, so a longer busy
+           label ("Signing in…" vs "Sign in") still grew the button and
+           nudged its neighbours. Pinning width locks it both ways. */
+        button.style.width = Math.ceil(width) + 'px';
         button.disabled = true;
         button.textContent = label || 'Checking…';
 
         return function release() {
             button.innerHTML = html;
             button.disabled = false;
-            button.style.minWidth = '';
+            button.style.width = '';
         };
     }
 

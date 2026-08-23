@@ -208,8 +208,10 @@
 }
 
 .agent-portrait {
-    width: 128px;
-    height: 128px;
+    /* Fluid: fixed px here overflowed the card below ~360px. */
+    width: clamp(6rem, 26vw, 8rem);
+    aspect-ratio: 1;
+    height: auto;
     margin: 0 auto var(--sp-4);
     border-radius: var(--r-lg);
     background: var(--bg-field);
@@ -340,7 +342,7 @@
 }
 
 .answer-input::placeholder { color: var(--text-faint); font-weight: 500; font-size: 17px; }
-.answer-input:focus { background: #0E1310; box-shadow: 0 0 0 3px var(--accent-soft); }
+.answer-input:focus { background: var(--bg-inset-focus); box-shadow: 0 0 0 3px var(--accent-soft); }
 .answer-input:disabled { color: var(--text-muted); }
 
 .btn-answer {
@@ -404,14 +406,14 @@
 .hint-line {
     padding: var(--sp-3) var(--sp-4);
     border-radius: var(--r-md);
-    background: var(--support-amber-soft);
+    background: var(--warning-soft);
     color: var(--text);
     font-size: 13.5px;
     line-height: 1.6;
 }
 
 .hint-line + .hint-line { margin-top: var(--sp-2); }
-.hint-line b { color: var(--support-amber); }
+.hint-line b { color: var(--warning); }
 
 .hint-actions {
     display: flex;
@@ -433,8 +435,9 @@
 }
 
 .agent-panel .agent-portrait {
-    width: 104px;
-    height: 104px;
+    width: clamp(5rem, 22vw, 6.5rem);
+    aspect-ratio: 1;
+    height: auto;
     margin-bottom: var(--sp-3);
 }
 

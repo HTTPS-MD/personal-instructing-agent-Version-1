@@ -84,101 +84,11 @@
        of its stacked layers is opaque. A narrow horizontal band across the
        middle of the viewport acts as the playhead: whichever step is crossing
        it owns the stage. */
-    function initSequence() {
-        var steps = $$('#seq-steps .seq-step');
-        var layers = $$('#seq-stage .stage-layer');
-        if (!steps.length || !layers.length) { return; }
-
-        var pinnedQuery = window.matchMedia('(min-width: 1025px)');
-        var io = null;
-
-        function activate(index) {
-            steps.forEach(function (s, i) { s.classList.toggle('is-active', i === index); });
-            layers.forEach(function (l, i) { l.classList.toggle('is-shown', i === index); });
-        }
-
-        function teardown() {
-            if (io) { io.disconnect(); io = null; }
-        }
-
-        /* Unpinned (narrow or reduced-motion): every step reads at full
-           strength and the stage rests on its first layer. */
-        function showAll() {
-            teardown();
-            steps.forEach(function (s) { s.classList.add('is-active'); });
-            layers.forEach(function (l, i) { l.classList.toggle('is-shown', i === 0); });
-        }
-
-        /* Pinned: a narrow band across the middle of the viewport is the
-           playhead — whichever step is crossing it owns the stage. */
-        function startPlayhead() {
-            teardown();
-            activate(0);
-
-            io = new IntersectionObserver(function (entries) {
-                entries.forEach(function (entry) {
-                    if (!entry.isIntersecting) { return; }
-                    var idx = Number(entry.target.getAttribute('data-step'));
-                    if (!Number.isNaN(idx)) { activate(idx); }
-                });
-            }, { rootMargin: '-48% 0px -48% 0px', threshold: 0 });
-
-            steps.forEach(function (s) { io.observe(s); });
-        }
-
-        function apply() {
-            if (reduceMotion || !('IntersectionObserver' in window) || !pinnedQuery.matches) {
-                showAll();
-            } else {
-                startPlayhead();
-            }
-        }
-
-        apply();
-
-        /* The mode was previously decided once at boot, which stranded anyone
-           who rotated a tablet or resized a window in the wrong layout — the
-           CSS had unpinned the stage while the playhead was still driving it,
-           or vice versa. Re-evaluated whenever the breakpoint is crossed. */
-        if (pinnedQuery.addEventListener) {
-            pinnedQuery.addEventListener('change', apply);
-        } else if (pinnedQuery.addListener) {
-            pinnedQuery.addListener(apply);           /* Safari < 14 */
-        }
-    }
-
     /* ============================================ 4. HERO PARALLAX ===== */
 
     /* The only scroll-linked effect. scrollY is read inside rAF rather than in
        the listener, so a fast wheel cannot force a layout flush per event; the
        listener does nothing but set a flag. */
-    function initParallax() {
-        var visual = $('#hero-visual');
-        var cue = $('#scroll-cue');
-        if (!visual || reduceMotion) { return; }
-
-        var ticking = false;
-
-        function frame() {
-            ticking = false;
-            var y = window.scrollY || window.pageYOffset;
-
-            /* Stop doing work entirely once the hero is off screen. */
-            if (y > window.innerHeight * 1.2) { return; }
-
-            visual.style.transform = 'translate3d(0,' + (y * -0.06).toFixed(2) + 'px,0)';
-            if (cue) { cue.style.opacity = String(Math.max(0, 1 - y / 220)); }
-        }
-
-        window.addEventListener('scroll', function () {
-            if (ticking) { return; }
-            ticking = true;
-            requestAnimationFrame(frame);
-        }, { passive: true });
-
-        frame();
-    }
-
     /* ============================================ 5. COUNTERS ========== */
 
     /* Counts up when the number scrolls into view. The value's box is fixed by
@@ -220,11 +130,135 @@
 
     /* ============================================ 6. BOOT ============== */
 
+    /* ============================================ 3. THEME =========== */
+
+    /* Three states, deliberately: an explicit choice stored in localStorage
+       always wins; with no choice stored the page follows the operating
+       system. The inline script in <head> applies the stored value before
+       first paint, so there is never a flash of the wrong theme. */
+    function initTheme() {
+        var toggle = $('#theme-toggle');
+        if (!toggle) { return; }
+
+        function current() {
+            /* The inline boot script always stamps an explicit value, so this
+               is a straight read rather than a guess. */
+            return document.documentElement.getAttribute('data-theme') || 'dark';
+        }
+
+        toggle.addEventListener('click', function () {
+            var next = current() === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('pia_theme', next); } catch (e) { /* ignore */ }
+            toggle.setAttribute('aria-pressed', String(next === 'dark'));
+        });
+
+        toggle.setAttribute('aria-pressed', String(current() === 'dark'));
+    }
+
+    /* ============================================ 4. CHARACTER SWITCHER ==
+       Pure presentation for now: it moves the selection and announces the
+       name. When the 3D model arrives, swap the body of showCharacter() for
+       whatever loads it — the layout is already locked by the figure's
+       aspect-ratio, so nothing here can shift. */
+    function initSwitcher() {
+        var dots = $$('.switch-dot');
+        var name = $('#char-name');
+        var prev = $('#char-prev');
+        var next = $('#char-next');
+        if (!dots.length || !name) { return; }
+
+        /* Placeholder copy. Kept to a similar length on purpose: the
+           description block reserves three lines, so swapping characters
+           does not move the buttons underneath it. */
+        var CHARACTERS = [
+            {
+                name: 'Calm Kai',
+                desc: 'Kai takes it one step at a time and never rushes you. Ask for a ' +
+                      'hint as often as you like — there is no timer and nothing here ' +
+                      'counts towards a grade.'
+            },
+            {
+                name: 'Zippy Theo',
+                desc: 'Theo moves quickly and keeps things short. Expect brisk questions, ' +
+                      'quick checks and a nudge onwards the moment a topic clicks into ' +
+                      'place for you.'
+            },
+            {
+                name: 'Kind Amy',
+                desc: 'Amy explains the why before the how, and will happily go back over ' +
+                      'anything twice. Nothing is a silly question and no answer is ever ' +
+                      'marked wrong.'
+            }
+        ];
+
+        var desc = $('#char-desc');
+        var index = 0;
+
+        function showCharacter(i) {
+            index = (i + dots.length) % dots.length;
+            dots.forEach(function (d, n) { d.setAttribute('aria-current', String(n === index)); });
+            var c = CHARACTERS[index] || { name: '', desc: '' };
+            name.textContent = c.name;
+            if (desc) { desc.textContent = c.desc; }
+        }
+
+        dots.forEach(function (d) {
+            d.addEventListener('click', function () { showCharacter(Number(d.getAttribute('data-char'))); });
+        });
+        if (prev) { prev.addEventListener('click', function () { showCharacter(index - 1); }); }
+        if (next) { next.addEventListener('click', function () { showCharacter(index + 1); }); }
+
+        /* Arrow keys move the selection when focus is inside the group. */
+        var group = $('.hero-switcher');
+        if (group) {
+            group.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowLeft') { e.preventDefault(); showCharacter(index - 1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); showCharacter(index + 1); }
+            });
+        }
+
+        showCharacter(0);
+    }
+
+    /* ============================================ 5. 3D MODEL =========
+       auto-rotate is continuous motion, so it has to answer to the same
+       reduced-motion preference as everything else on the page. The attribute
+       is removed rather than paused, so no animation frame is scheduled at
+       all. */
+    function initModel() {
+        var mv = $('#hero-model');
+        if (!mv) { return; }
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            mv.removeAttribute('auto-rotate');
+        }
+
+        /* model-viewer has no "error" slot, so the fallback is a sibling we
+           reveal by hand. Without this a 404 on the .glb leaves the poster
+           up forever and the hero reads as permanently loading. */
+        var fallback = $('#hero-fallback');
+
+        mv.addEventListener('error', function (e) {
+            console.error('3D model failed to load:', mv.getAttribute('src'), e.detail || e);
+            if (!fallback) { return; }
+            fallback.hidden = false;
+            /* Keep the box; just stop the dead viewer showing through. */
+            mv.style.visibility = 'hidden';
+        });
+
+        mv.addEventListener('load', function () {
+            if (fallback) { fallback.hidden = true; }
+            mv.style.visibility = '';
+        });
+    }
+
     function boot() {
+        initTheme();
+        initModel();
+        initSwitcher();
         initReveals();
         initNav();
-        initSequence();
-        initParallax();
         initCounters();
     }
 

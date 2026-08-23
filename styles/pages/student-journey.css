@@ -141,7 +141,7 @@ body.opacity-0 { opacity: 0; }
 }
 
 .stage-node.is-done { color: var(--text-muted); }
-.stage-node.is-done .pip { background: var(--support-teal); }
+.stage-node.is-done .pip { background: var(--warning); }
 .stage-node.is-current { color: var(--accent); }
 .stage-node.is-current .pip { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
@@ -212,7 +212,7 @@ body.opacity-0 { opacity: 0; }
     text-align: left;
 }
 
-.wait-note .icon { flex: 0 0 18px; color: var(--support-teal); margin-top: 1px; }
+.wait-note .icon { flex: 0 0 18px; color: var(--warning); margin-top: 1px; }
 .wait-note p { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
 
 /* =================================================== 4. OCEAN TEST ===== */
@@ -238,7 +238,7 @@ body.opacity-0 { opacity: 0; }
     color: var(--accent);
 }
 
-.gate-glyph.is-locked { background: var(--support-amber-soft); color: var(--support-amber); }
+.gate-glyph.is-locked { background: var(--warning-soft); color: var(--warning); }
 
 .gate-title {
     font-size: clamp(23px, 3.2vw, 30px);
@@ -536,8 +536,9 @@ body.opacity-0 { opacity: 0; }
 }
 
 .preview-portrait {
-    width: 132px;
-    height: 132px;
+    width: clamp(6rem, 28vw, 8.25rem);
+    aspect-ratio: 1;
+    height: auto;
     margin: 0 auto var(--sp-4);
     border-radius: var(--r-lg);
     background: var(--bg-field);
@@ -662,9 +663,7 @@ body.opacity-0 { opacity: 0; }
 .preview-portrait[data-mono] img { display: none; }
 
 /* Distinct tint per persona so they remain tellable apart at a glance. */
-.persona-card[data-character="pia-open"] .persona-thumb[data-mono]::after           { color: var(--accent); }
-.persona-card[data-character="pia-conscientious"] .persona-thumb[data-mono]::after  { color: var(--support-teal); }
-.persona-card[data-character="pia-extravert"] .persona-thumb[data-mono]::after      { color: var(--support-amber); }
-.persona-card[data-character="pia-agreeable"] .persona-thumb[data-mono]::after      { color: #C89BE0; }
-.persona-card[data-character="pia-calm"] .persona-thumb[data-mono]::after           { color: #7FB5D5; }
-.persona-card[data-character="pia-neutral"] .persona-thumb[data-mono]::after        { color: var(--text-muted); }
+/* Personas are told apart by their NAME, not by colour — relying on hue alone
+   to distinguish six options fails for colour-blind users anyway. The monogram
+   uses the accent, and the selected card carries the tint. */
+.persona-thumb[data-mono]::after { color: var(--accent); }

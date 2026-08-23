@@ -51,6 +51,12 @@ table { border-collapse: collapse; border-spacing: 0; width: 100%; }
 
 a { color: inherit; text-decoration: none; }
 
+/* Display face for headings and anything that reads as a title. */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+}
+
 :focus { outline: none; }
 
 :focus-visible {
@@ -60,83 +66,108 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* --------------------------------------------------------------- 2. TOKENS */
+/* ============================================================================
+   COLOUR SYSTEM
+   ---------------------------------------------------------------------------
+   The four specified variables are canonical and hold their exact values:
+
+       --bg-dark        #0F172A     deep navy, dark-mode ground
+       --bg-light       #F8FAFC     crisp off-white, light-mode ground
+       --color-primary  #22C55E     every primary action, active state, highlight
+       --color-danger   #EF4444     errors and destructive actions ONLY
+       --text-main                  = --bg-light in dark, --bg-dark in light
+
+   Everything else in the file is either a neutral derived from those grounds
+   or an alias, so there is exactly one place to change a colour.
+
+   ONE ACCESSIBILITY ADDITION, and the reason for it.
+   #22C55E behind white text measures 2.28:1, and as TEXT on the light ground
+   it measures 2.18:1 — both fail AA. As a FILL it is fine in either theme
+   provided the label is navy (7.83:1), which is how every button here uses it.
+   So the spec value is kept untouched for fills, and a darker shade of the
+   same hue (--color-primary-ink) is used only where the green becomes text.
+   That is not a new colour in the palette; it is the same green at a legible
+   weight. The identical reasoning applies to --color-danger-ink.
+   ==========================================================================*/
 :root {
-    /* ======================= GRAPHITE-GREEN PALETTE =======================
-       Every neutral is mixed off a green hue (~150°) at very low saturation,
-       so the greys read warm-charcoal rather than blue-slate. Nothing here is
-       pure black — the darkest value still carries light, which is what keeps
-       the surface reading as a material instead of a void.
-       ==================================================================== */
+    /* --- The specified palette, verbatim --- */
+    --bg-dark: #0F172A;
+    --bg-light: #F8FAFC;
+    --color-primary: #22C55E;
+    --color-danger: #EF4444;
 
-    /* --- Surfaces --- */
-    --bg-body: #0F1311;          /* deep charcoal, faint green cast */
-    --bg-surface: #171B19;       /* cards sit ABOVE the page, not outlined on it */
-    --bg-field: #0C100E;         /* inputs sit BELOW the surface — inset, not raised */
+    /* --- Dark mode is the default --- */
+    --text-main: var(--bg-light);
 
-    /* Elevated variants: menus, hover rows, toasts, tooltips. */
-    --bg-surface-hi: #1C211E;
-    --bg-surface-hover: #1E2320;
+    /* Green/red as TEXT need no darkening on the navy ground: 7.83 and 4.74. */
+    --color-primary-ink: var(--color-primary);
+    --color-danger-ink: var(--color-danger);
 
-    /* --- Accent --- */
-    --accent: #05C46B;
-    --accent-strong: #04AE5F;
-    --accent-soft: rgba(5, 196, 107, 0.12);
-    --accent-line: rgba(5, 196, 107, 0.30);
-    --on-accent: #04170D;
+    /* Labels sitting ON a primary/danger fill. */
+    --on-primary: var(--bg-dark);          /* 7.83:1 */
+    --on-danger: var(--bg-light);          /* 4.87:1 */
 
-    --danger: #FF4757;
-    --danger-strong: #F03A4A;
-    --danger-soft: rgba(255, 71, 87, 0.12);
-    --danger-line: rgba(255, 71, 87, 0.30);
-
-    /* Two support hues, used ONLY to tell statuses apart in badges, stage
-       pills and funnel bars — never for actions. Both are pulled toward the
-       warm/green side of the wheel so no blue enters the interface. */
-    --support-teal: #4FA893;
-    --support-teal-soft: rgba(79, 168, 147, 0.13);
-    --support-teal-line: rgba(79, 168, 147, 0.28);
-    --support-amber: #E3A65C;
-    --support-amber-soft: rgba(227, 166, 92, 0.13);
-    --support-amber-line: rgba(227, 166, 92, 0.28);
+    /* --- Neutrals, derived from the navy ground --- */
+    --bg-body: var(--bg-dark);
+    --bg-surface: #1B2537;
+    --bg-field: #0B1120;
+    --bg-surface-hi: #223047;
+    --bg-surface-hover: #223046;
+    --bg-chip: #263449;
+    --bg-chip-hover: #2E3E56;
+    --bg-inset-focus: #0D1426;
+    --track: #334155;
+    --track-hover: #475569;
 
     /* --- Text --- */
-    --text: #EDEDED;             /* crisp off-white, never pure #FFF */
-    --text-muted: #8C9691;       /* muted gray-green */
-    --text-faint: #69726D;
+    --text: var(--text-main);
+    --text-muted: #94A3B8;                 /* 7.6:1 on the navy ground */
+    --text-faint: #64748B;                 /* 4.0:1 — labels and decoration */
+    --text-on-solid: var(--bg-light);
 
-    /* --- NO LINES ---
-       There are no border tokens, because there are no borders. Nothing in
-       this interface is separated by a drawn line: depth comes from the
-       surface ramp below, from shadow, and from spacing.
+    /* --- Aliases, so every existing consumer keeps working --- */
+    --accent: var(--color-primary);
+    --accent-strong: #16A34A;
+    --accent-soft: rgba(34, 197, 94, 0.14);
+    --accent-line: rgba(34, 197, 94, 0.32);
+    --on-accent: var(--on-primary);
 
-       The ramp, darkest to lightest:
-           --bg-field    inset wells   (inputs, tiles, lists — BELOW a card)
-           --bg-body     the page
-           --bg-surface  cards         (ABOVE the page)
-           --bg-chip     small solids  (badges, avatars, toggles — ON a card)
-           --bg-surface-hi  trays and menus
-       Each step is a few percent of luminance, which is enough to read as a
-       distinct plane without ever resolving into an edge. */
-    --bg-chip: #232926;
-    --bg-chip-hover: #2A312D;
-    --track: #2A312D;                /* scrollbar thumb, inert progress fill */
+    --danger: var(--color-danger);
+    --danger-strong: #DC2626;
+    --danger-soft: rgba(239, 68, 68, 0.14);
+    --danger-line: rgba(239, 68, 68, 0.32);
 
-    /* --- Stacking ladder ---
-       Every layer in the app, in one place and in order. Nothing should
-       invent its own z-index: if a new layer is needed, it goes here.
+    /* Amber, kept strictly for "needs attention" states. */
+    --warning: #F59E0B;
+    --warning-soft: rgba(245, 158, 11, 0.14);
+    --warning-line: rgba(245, 158, 11, 0.30);
+    --on-warning: var(--bg-dark);
 
-       Note the overlay rule below: ALL modals and drawers share one base,
-       and the modal manager raises each one as it opens, so the last thing
-       opened is always on top. Ordering by source position instead is what
-       let an open drawer sit above a confirmation dialog it had triggered. */
+    /* Translucent surface for glass panels. */
+    --glass: rgba(27, 37, 55, 0.72);
+    --glass-edge: rgba(248, 250, 252, 0.06);
+
+    /* --- Elevation --- */
+    --shadow-edge: 8px 0 24px -20px rgba(2, 6, 23, 0.9);
+    --shadow-under: 0 10px 20px -18px rgba(2, 6, 23, 0.9);
+    --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.4);
+    --shadow-card: 0 1px 2px rgba(2, 6, 23, 0.3), 0 10px 28px -18px rgba(2, 6, 23, 0.7);
+    --shadow-md: 0 8px 24px rgba(2, 6, 23, 0.45);
+    --shadow-lg: 0 24px 64px rgba(2, 6, 23, 0.65);
+    --glow-primary: 0 0 60px -12px rgba(34, 197, 94, 0.55);
+
+    color-scheme: dark;
+
+    /* --- Stacking ladder --- */
+    --z-behind: 0;           /* depth typography, sits under the centrepiece */
     --z-page: 1;
-    --z-sticky: 30;          /* topbars, page headers */
-    --z-scrim: 39;           /* mobile nav backdrop */
-    --z-rail: 60;            /* sidebar / nav rail */
+    --z-sticky: 30;
+    --z-scrim: 39;
+    --z-rail: 60;
     --z-overlay: 100;        /* modals + drawers (JS increments per layer) */
-    --z-toast: 300;          /* always visible, even over a dialog */
-    --z-banner: 350;         /* global error banner */
-    --z-boot: 400;           /* boot gate — covers everything */
+    --z-toast: 300;
+    --z-banner: 350;
+    --z-boot: 400;
 
     /* --- Radii --- */
     --r-xs: 6px;
@@ -144,6 +175,7 @@ a { color: inherit; text-decoration: none; }
     --r-md: 10px;
     --r-lg: 14px;
     --r-xl: 18px;
+    --r-2xl: 28px;
     --r-pill: 999px;
 
     /* --- Spacing scale (4px base) --- */
@@ -156,12 +188,15 @@ a { color: inherit; text-decoration: none; }
     --sp-7: 32px;
     --sp-8: 40px;
     --sp-9: 48px;
+    --sp-10: 64px;
 
-    /* --- Fixed dimensions: the backbone of a non-shifting layout --- */
+    /* --- Control sizing. Fixed on purpose: a control whose height depends on
+           its content is the main cause of layout shift. Layout containers
+           stay fluid; controls do not. --- */
     --rail-w: 76px;
     --rail-w-open: 264px;
     --rail-pad: 8px;
-    --rail-icon: calc(var(--rail-w) - (var(--rail-pad) * 2));   /* 60px */
+    --rail-icon: calc(var(--rail-w) - (var(--rail-pad) * 2));
     --topbar-h: 64px;
     --control-h: 38px;
     --control-h-lg: 42px;
@@ -169,34 +204,86 @@ a { color: inherit; text-decoration: none; }
     --row-h: 56px;
     --icon-btn: 36px;
 
-    /* --- Elevation ---
-       This is the ONLY separator in the system. --shadow-card pairs a tight
-       contact shadow with a wide, very soft ambient one, so a card lifts off
-       the page without anything being drawn around it. --shadow-edge gives a
-       fixed panel (rail, topbar) a directional falloff instead of a rule. */
-    --shadow-edge: 8px 0 24px -20px rgba(0, 0, 0, 0.9);
-    --shadow-under: 0 10px 20px -18px rgba(0, 0, 0, 0.9);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 28px -18px rgba(0, 0, 0, 0.55);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38);
-    --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.58);
+    /* --- Motion --- */
+    /* Bare easing curve. The --t-* tokens below are transition SHORTHANDS
+       (duration + curve), so they cannot be dropped into an animation's
+       easing slot — var(--ease) is the one to use there. */
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* --- Motion: capped at 200ms, no bounce curves --- */
     --t-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
     --t-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --t-layout: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 
     /* --- Typography --- */
-    --font: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont,
-        'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-display: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font: var(--font-body);            /* alias for existing consumers */
 
-    /* Scrollbar compensation, measured by JS when a modal locks the body. */
     --scrollbar-w: 0px;
+}
+
+/* ------------------------------------------------------------ LIGHT THEME --
+   Only colour roles change. Sizing, spacing, radii, motion and the stacking
+   ladder are theme-independent and are not repeated. */
+:root[data-theme="light"] {
+    --text-main: var(--bg-dark);
+
+    /* The green FILL stays the specified value — navy-on-green is 7.83:1 even
+       on a light page. Only the green-as-TEXT case needs the deeper shade. */
+    --color-primary-ink: #15803D;          /* 4.79:1 on --bg-light */
+    --color-danger-ink: #DC2626;           /* 4.62:1 on --bg-light */
+    --on-primary: var(--bg-dark);
+    --on-danger: var(--bg-light);
+
+    --bg-body: var(--bg-light);
+    --bg-surface: #FFFFFF;
+    --bg-field: #F1F5F9;
+    --bg-surface-hi: #FFFFFF;
+    --bg-surface-hover: #F1F5F9;
+    --bg-chip: #E2E8F0;
+    --bg-chip-hover: #CBD5E1;
+    --bg-inset-focus: #FFFFFF;
+    --track: #CBD5E1;
+    --track-hover: #94A3B8;
+
+    --text: var(--text-main);
+    --text-muted: #475569;                 /* 7.5:1 on the light ground */
+    --text-faint: #64748B;                 /* 4.8:1 */
+    --text-on-solid: var(--bg-light);
+
+    --accent: var(--color-primary);
+    --accent-strong: #16A34A;
+    --accent-soft: rgba(34, 197, 94, 0.16);
+    --accent-line: rgba(21, 128, 61, 0.30);
+    --on-accent: var(--on-primary);
+
+    --danger: var(--color-danger);
+    --danger-strong: #DC2626;
+    --danger-soft: rgba(239, 68, 68, 0.12);
+    --danger-line: rgba(220, 38, 38, 0.28);
+
+    --warning: #B45309;
+    --warning-soft: rgba(180, 83, 9, 0.12);
+    --warning-line: rgba(180, 83, 9, 0.28);
+    --on-warning: var(--bg-light);
+
+    --glass: rgba(255, 255, 255, 0.72);
+    --glass-edge: rgba(15, 23, 42, 0.06);
+
+    --shadow-edge: 8px 0 24px -20px rgba(15, 23, 42, 0.28);
+    --shadow-under: 0 10px 20px -18px rgba(15, 23, 42, 0.30);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 28px -18px rgba(15, 23, 42, 0.20);
+    --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.12);
+    --shadow-lg: 0 24px 64px rgba(15, 23, 42, 0.22);
+    --glow-primary: 0 0 60px -12px rgba(34, 197, 94, 0.4);
+
+    color-scheme: light;
 }
 
 /* ----------------------------------------------------------------- 3. BASE */
 body {
-    font-family: var(--font);
+    font-family: var(--font-body);
     font-size: 14px;
     line-height: 1.5;
     color: var(--text);
@@ -256,7 +343,7 @@ body {
     border-radius: var(--r-pill);
     background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background-color: #3A423E; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--track-hover); background-clip: content-box; }
 
 /* --------------------------------------------------------------- 5. BUTTONS */
 .btn {
@@ -280,21 +367,23 @@ body {
 
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+.btn-primary:active:not(:disabled) { background: var(--accent-strong); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22); }
 
 /* Secondary buttons are a raised chip, not an outline. */
 .btn-secondary {
     background: var(--bg-chip);
     color: var(--text);
 }
-.btn-secondary:hover:not(:disabled) {
-    background: var(--bg-chip-hover);
-}
+.btn-secondary:hover:not(:disabled) { background: var(--bg-chip-hover); }
+.btn-secondary:active:not(:disabled) { background: var(--bg-chip-hover); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.16); }
 
 .btn-ghost { color: var(--text-muted); }
 .btn-ghost:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text); }
+.btn-ghost:active:not(:disabled) { background: var(--bg-chip); }
 
-.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger { background: var(--danger); color: var(--on-danger); }
 .btn-danger:hover:not(:disabled) { background: var(--danger-strong); }
+.btn-danger:active:not(:disabled) { background: var(--danger-strong); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22); }
 
 .btn-danger-soft {
     background: var(--danger-soft);
@@ -318,6 +407,8 @@ body {
     transition: background-color var(--t-base), color var(--t-base);
 }
 .btn-icon:hover { background: var(--bg-surface-hover); color: var(--text); }
+.btn-icon:active { background: var(--bg-chip); }
+.btn-icon:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-icon.is-bordered { background: var(--bg-chip); }
 .btn-icon.is-bordered:hover { }
 
@@ -359,7 +450,7 @@ body {
 .input:focus,
 .select:focus,
 .textarea:focus {
-    background: #0E1310;
+    background: var(--bg-inset-focus);
     box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
@@ -568,8 +659,7 @@ button.stat.is-active { background: var(--accent-soft); }
 
 .stat-glyph .icon { width: 15px; height: 15px; }
 .stat-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
-.stat-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
-.stat-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+.stat-glyph.g-warn { background: var(--warning-soft); color: var(--warning); }
 .stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
 
 .stat-value {
@@ -604,8 +694,7 @@ button.stat.is-active { background: var(--accent-soft); }
     transition: width var(--t-layout);
 }
 
-.bar-fill.f-teal { background: var(--support-teal); }
-.bar-fill.f-amber { background: var(--support-amber); }
+.bar-fill.f-warn { background: var(--warning); }
 .bar-fill.f-muted { background: var(--track); }
 
 /* -------------------------------------------------------- 8. BADGES / PILLS */
@@ -625,8 +714,8 @@ button.stat.is-active { background: var(--accent-soft); }
 
 .badge-accent { background: var(--accent-soft); color: var(--accent); }
 .badge-danger { background: var(--danger-soft); color: var(--danger); }
-.badge-teal { background: var(--support-teal-soft); color: var(--support-teal); }
-.badge-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+/* Amber is the ONLY additional hue, and only for "needs attention". */
+.badge-warn { background: var(--warning-soft); color: var(--warning); }
 
 /* Segmented filter control */
 .segment {
@@ -883,8 +972,7 @@ button.stat.is-active { background: var(--accent-soft); }
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    width: 340px;
-    max-width: calc(100vw - var(--sp-8));
+    width: min(340px, calc(100vw - var(--sp-8)));
     pointer-events: none;
 }
 

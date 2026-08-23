@@ -42,8 +42,8 @@
     border-radius: var(--r-lg);
     display: grid;
     place-items: center;
-    background: var(--support-amber-soft);
-    color: var(--support-amber);
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
 .error-code {

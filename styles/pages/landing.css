@@ -1,30 +1,28 @@
 /* ============================================================================
    PIA SYSTEM — LANDING
-   Cinematic scroll narrative. REQUIRES styles/global.css.
+   REQUIRES styles/global.css.
 
-   THE THREE RULES THIS FILE IS BUILT AROUND
-   ---------------------------------------------------------------------------
-   1. Zero CLS, by construction. Every reveal animates ONLY `opacity` and
-      `transform`. Neither participates in layout, so an element's box is
-      identical before, during and after its animation — the page is fully
-      laid out on first paint and never re-flows. Anything whose size is not
-      known up front (the sticky visual) reserves it with `aspect-ratio`.
+   COLOUR: nothing is defined here. Every colour is a variable from
+   global.css, so the light/dark toggle works with no per-page work and there
+   is not a single raw hex value in this file. The palette is exactly:
+   surface tones, text tones, green accent, and red/amber for semantics.
 
-   2. Compositor-only motion. `opacity` and `transform` are the two properties
-      a browser can animate on the GPU without touching layout or paint. No
-      reveal here touches width, height, margin, top or filter, so scrolling
-      stays on the fast path.
-
-   3. Fluid, not stepped. Type and spacing scale with `clamp()` against the
-      viewport, so there is no width at which the composition breaks — the
-      breakpoints below only change grid structure, never font sizes.
+   SIZING: no fixed layout dimensions. Sections size to their content, type
+   scales with clamp(), and the only fixed values are control heights and
+   locked aspect-ratios — both of which exist to PREVENT layout shift.
    ==========================================================================*/
 
-/* -------------------------------------------------- 0. FONT-SWAP GUARD ---
-   The webfont loads async; when it swaps in, differing metrics reflow every
-   heading and register as layout shift. This fallback is Arial re-mapped to
-   Plus Jakarta Sans's metrics, so the swap is near-invisible and contributes
-   no CLS. It sits between the webfont and the generic stack. */
+/* --------------------------------------------------- 1. PAGE RHYTHM ---- */
+:root {
+    /* Spacing rhythm for this page, derived from the global scale. */
+    --band: clamp(var(--sp-9), 9vh, 7rem);
+    --gutter: clamp(var(--sp-5), 5vw, var(--sp-9));
+
+    --font: 'Plus Jakarta Sans', 'Jakarta Metrics Fallback', 'Inter',
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Metrics-matched fallback so the webfont swap costs no layout shift. */
 @font-face {
     font-family: 'Jakarta Metrics Fallback';
     src: local('Arial');
@@ -34,766 +32,789 @@
     line-gap-override: 0%;
 }
 
-:root {
-    --font: 'Plus Jakarta Sans', 'Jakarta Metrics Fallback', 'Inter',
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+body { background: var(--bg-body); color: var(--text); }
 
-    /* One rhythm for the whole narrative. */
-    --band: clamp(88px, 13vh, 160px);      /* vertical air between acts */
-    --gutter: clamp(20px, 5vw, 48px);
+/* Theme changes are colour-only, so switching can never shift the layout. */
+body,
+.site-nav::before,
+.panel, .media, .btn, .step, .theme-toggle {
+    transition: background-color var(--t-layout), color var(--t-layout),
+                box-shadow var(--t-layout);
 }
 
-/* ------------------------------------------------------------- 1. SHELL */
+@media (prefers-reduced-motion: reduce) {
+    .js [data-reveal] { opacity: 1 !important; transform: none !important; }
+    * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}
+
+/* ------------------------------------------------------- 2. CONTAINERS - */
 .site { position: relative; }
 
-/* Scroll-linked motion is opt-in. Everything degrades to a static, fully
-   legible page for anyone who asks for less movement. */
-@media (prefers-reduced-motion: reduce) {
-    [data-reveal] { opacity: 1 !important; transform: none !important; }
-    .hero-visual { transform: none !important; }
-}
-
-.ambient {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background:
-        radial-gradient(64rem 44rem at 12% -12%, rgba(5, 196, 107, 0.085), transparent 62%),
-        radial-gradient(52rem 38rem at 92% 10%, rgba(79, 168, 147, 0.05), transparent 64%);
-}
-
-.site > *:not(.ambient) { position: relative; z-index: 1; }
-
-/* The one horizontal rhythm for the page: a centred column with a fluid
-   gutter that never lets content touch the viewport edge.
-
-   CAREFUL: anything that also wears .shell must set vertical padding with
-   `padding-top` / `padding-bottom` LONGHAND. A `padding:` shorthand on the
-   same element has equal specificity, wins on source order, and silently
-   resets this gutter to zero. */
+/* The single horizontal rhythm. Anything that also wears .shell must set
+   vertical padding with LONGHAND, or its shorthand will silently reset this
+   gutter to zero. */
 .shell {
     width: 100%;
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 0 var(--gutter);
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
 }
 
-.shell-narrow { max-width: 880px; }
+.section { padding-block: var(--band); }
+.section-tight { padding-block-end: var(--band); }
 
-/* ---------------------------------------------------------- 2. REVEALS ---
-   The single animation primitive. An element starts shifted down and a touch
-   small, then settles. Because both are transforms, the element's layout box
-   never changes — the reserved space is correct from first paint. */
-[data-reveal] {
-    opacity: 0;
-    transform: translate3d(0, 22px, 0) scale(0.985);
-    transition:
-        opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
-        transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: var(--d, 0ms);
-    will-change: opacity, transform;
-}
-
-[data-reveal].is-in { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-
-/* Dropped once the element has settled, so the page is not left holding
-   dozens of promoted compositor layers. */
-[data-reveal].is-done { will-change: auto; }
-
-/* --------------------------------------------------------------- 3. NAV */
+/* ------------------------------------------------------------ 3. NAV --- */
 .site-nav {
     position: sticky;
     top: 0;
     z-index: var(--z-sticky);
-    height: 64px;
+    min-height: var(--topbar-h);
     display: flex;
     align-items: center;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
 }
 
-/* The bar's fill lives on a pseudo-element so becoming "stuck" fades ONE
-   opacity rather than transitioning background-color and box-shadow. This is
-   the only state change that fires mid-scroll, so it is the one that most
-   needs to stay on the compositor. */
+/* Opacity-only, so becoming "stuck" mid-scroll stays on the compositor. */
 .site-nav::before {
     content: "";
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: rgba(15, 19, 17, 0.84);
+    background: var(--bg-body);
     box-shadow: var(--shadow-under);
     opacity: 0;
-    transition: opacity 260ms ease;
-    pointer-events: none;
+    transition: opacity var(--t-layout);
 }
 
 .site-nav.is-stuck::before { opacity: 1; }
 
-.site-nav-inner { display: flex; align-items: center; gap: var(--sp-4); width: 100%; }
+.site-nav-inner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    width: 100%;
+}
 
-.logo { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex: 0 0 auto;
+    border-radius: var(--r-md);
+}
 
-.logo-mark {
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
+.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.brand-mark {
+    width: var(--icon-btn);
+    height: var(--icon-btn);
+    flex: 0 0 var(--icon-btn);
     border-radius: var(--r-md);
     background: var(--accent);
     color: var(--on-accent);
     display: grid;
     place-items: center;
+    font-size: 0.8125rem;
     font-weight: 800;
-    font-size: 12px;
 }
 
-.logo-text { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; }
+.brand-name { font-size: 0.9375rem; font-weight: 700; letter-spacing: -0.01em; }
 
-.nav-links { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.nav-links {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-inline-start: auto;
+}
 
 .nav-link {
-    height: var(--control-h);
-    padding: 0 var(--sp-3);
-    border-radius: var(--r-md);
     display: inline-flex;
     align-items: center;
-    font-size: 13.5px;
+    height: var(--control-h);
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-md);
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-muted);
     transition: background-color var(--t-base), color var(--t-base);
 }
 
 .nav-link:hover { background: var(--bg-chip); color: var(--text); }
+.nav-link:active { background: var(--bg-chip-hover); }
+.nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Zero-height sentinel. An IntersectionObserver watches it instead of a
-   scroll listener, so the nav's state costs nothing per frame. */
-.nav-sentinel { position: absolute; top: 0; left: 0; width: 100%; height: 1px; pointer-events: none; }
-
-/* -------------------------------------------------------------- 4. HERO */
-.hero {
-    min-height: calc(100svh - 64px);
-    display: grid;
-    grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
-    align-items: center;
-    gap: clamp(32px, 6vw, 72px);
-    /* LONGHAND, deliberately. A `padding` shorthand here would reset the
-       horizontal padding .shell provides — see the note on .shell. */
-    padding-top: clamp(48px, 9vh, 104px);
-    padding-bottom: var(--band);
-}
-
-.eyebrow-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    height: 30px;
-    padding: 0 var(--sp-3);
-    margin-bottom: clamp(20px, 3vh, 28px);
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 12px;
-    font-weight: 700;
-}
-
-/* The page's loudest voice. Tight tracking and a 1.02 line-height are what
-   make large type read as designed rather than merely big. */
-/* Scaled against the COLUMN, not the viewport. At 7.2vw the headline was
-   82px inside a 565px column — seven wrapped lines where three were written,
-   which pushed the call to action below the fold. A hero whose primary action
-   needs scrolling to reach is not a hero. */
-.hero-title {
-    font-size: clamp(34px, 4.9vw, 60px);
-    line-height: 1.02;
-    font-weight: 800;
-    letter-spacing: -0.042em;
-    text-wrap: balance;
-    margin-bottom: clamp(20px, 3vh, 28px);
-}
-
-.hero-title .accent { color: var(--accent); }
-
-/* Each line of the headline lifts a beat after the one above it. */
-.line { display: block; }
-
-.hero-lede {
-    font-size: clamp(15.5px, 1.55vw, 18.5px);
-    line-height: 1.65;
-    color: var(--text-muted);
-    max-width: 52ch;
-    margin-bottom: clamp(28px, 4vh, 40px);
-}
-
-.hero-cta { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
-.hero-cta .btn { height: 50px; padding: 0 var(--sp-6); font-size: 14.5px; font-weight: 700; }
-
-/* ---- 4.1 Hero visual ----
-   aspect-ratio reserves the box before anything inside renders, so the hero
-   is at its final height on first paint. */
-.hero-visual {
-    position: relative;
-    aspect-ratio: 5 / 4.6;
-    width: 100%;
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-    padding: clamp(16px, 2.2vw, 22px);
-    overflow: hidden;
-    will-change: transform;
-}
-
-.panel-bar { display: flex; align-items: center; gap: var(--sp-2); height: 26px; margin-bottom: var(--sp-3); }
-.panel-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--track); }
-.panel-title { margin-left: var(--sp-2); font-size: 11.5px; color: var(--text-faint); }
-
-.chat-line {
-    display: flex;
-    gap: var(--sp-3);
-    padding: clamp(10px, 1.4vw, 14px) clamp(12px, 1.6vw, 16px);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-}
-
-.chat-line + .chat-line { margin-top: var(--sp-2); }
-.chat-line.is-agent { background: var(--accent-soft); }
-
-.chat-who {
-    flex: 0 0 28px;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--r-sm);
-    background: var(--bg-chip);
+/* ---- 3.1 Theme toggle: fixed box, so flipping themes changes only colour */
+.theme-toggle {
+    width: var(--icon-btn);
+    height: var(--icon-btn);
+    flex: 0 0 var(--icon-btn);
     display: grid;
     place-items: center;
-    font-size: 10.5px;
-    font-weight: 700;
+    border-radius: var(--r-md);
+    background: var(--bg-chip);
+    color: var(--text-muted);
+    transition: background-color var(--t-base), color var(--t-base);
 }
 
-.chat-line.is-agent .chat-who { background: var(--accent); color: var(--on-accent); }
-.chat-body { min-width: 0; font-size: clamp(12px, 1.05vw, 13.5px); line-height: 1.55; padding-top: 4px; }
-.chat-body strong { color: var(--accent); font-weight: 600; }
+.theme-toggle:hover { background: var(--bg-chip-hover); color: var(--text); }
+.theme-toggle:active { background: var(--bg-chip-hover); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle .icon-moon { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 
-/* ---- 4.2 Scroll cue ---- */
-.scroll-cue {
-    position: absolute;
-    left: 50%;
-    bottom: clamp(20px, 4vh, 40px);
+/* ------------------------------------------------------------ 4. HERO -- */
+/* STAGE 1 — "Meet your buddy". A full-viewport panel:
+
+       .hero-info     greeting, description, switcher + auth  (LEFT)
+       .hero-visual   radial glow + <model-viewer>            (RIGHT)
+
+   Height comes from the viewport, with the figure's locked aspect-ratio as
+   the floor — so the box is correct at first paint, before the model or even
+   its script exists. */
+.hero {
+    /* svh, not vh: on mobile browsers vh is the height with the URL bar
+       HIDDEN, so a 100vh hero is taller than the visible viewport on load
+       and the content sits partly under the chrome. svh is the small
+       (chrome-visible) height, which is the one that always fits. The vh
+       line is the fallback for engines without svh. */
+    min-height: calc(100vh - var(--topbar-h));
+    min-height: calc(100svh - var(--topbar-h));
+
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    transform: translateX(-50%);
-    transition: opacity 400ms ease;
-}
-
-.cue-rail { width: 1px; height: 34px; background: linear-gradient(var(--track), transparent); position: relative; overflow: hidden; }
-
-.cue-rail::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--accent);
-    transform: translate3d(0, -100%, 0);
-    animation: cue 2.4s cubic-bezier(0.6, 0, 0.4, 1) infinite;
-}
-
-@keyframes cue {
-    0% { transform: translate3d(0, -100%, 0); }
-    60%, 100% { transform: translate3d(0, 100%, 0); }
-}
-
-/* --------------------------------------------------- 4.3 MEDIA SLOTS ---
-   Drop-in containers for real artwork. Two rules make them safe:
-
-   1. ZERO CLS. Every slot declares an `aspect-ratio`, so the browser knows
-      its exact height at first paint — before any image exists. Swapping the
-      placeholder for a real <img> changes nothing about the layout, because
-      the box was never sized by its contents.
-
-   2. NO BORDERS. The brief suggested "subtle borders or frosted glass"; this
-      system has no borders anywhere, so the edge is drawn the way every other
-      surface here is drawn — a lighter fill lifted by shadow, with a frosted
-      backdrop and a soft interior sheen. Consistent with the rest of the app
-      rather than an exception to it.
-
-   Usage:  <figure class="media media-wide" data-label="Product Image">
-   Replace: put an <img> or <video> inside; it fills the slot via object-fit
-   and the placeholder chrome hides itself automatically. */
-.media {
+    justify-content: center;
     position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 10;              /* the CLS guarantee */
-    border-radius: var(--r-xl);
-    overflow: hidden;
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 46%),
-        var(--bg-surface);
-    box-shadow: var(--shadow-card);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    display: grid;
-    place-items: center;
-    isolation: isolate;
+    padding-block: clamp(var(--sp-6), 5vh, var(--sp-9));
 }
 
-.media-wide { aspect-ratio: 16 / 10; }
-.media-hero { aspect-ratio: 16 / 9; }
-.media-square { aspect-ratio: 1 / 1; }
-.media-tall { aspect-ratio: 4 / 5; }
-
-/* A slow diagonal sheen so an empty slot still reads as a designed surface
-   rather than a missing asset. Transform-only, so it costs nothing. */
-.media::before {
-    content: "";
+/* The scroll cue. Absolutely positioned, so it adds no height and cannot
+   push the split off-centre or shift anything. */
+.hero-scroll-cue {
     position: absolute;
-    inset: -40%;
-    z-index: 0;
-    background: linear-gradient(115deg, transparent 42%, rgba(5, 196, 107, 0.07) 50%, transparent 58%);
-    transform: translate3d(-18%, 0, 0);
-    animation: media-sheen 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    inset-block-end: var(--sp-5);
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    /* Hidden by default. The stacked mobile column runs the full height of
+       the hero, so a centred cue lands ON the Sign up button — measured at a
+       23x38px overlap. Only the two-column layout has slack for it. */
+    display: none;
+    place-items: center;
+    width: var(--control-h);
+    height: var(--control-h);
+    border-radius: var(--r-pill);
+    color: var(--text-faint);
     pointer-events: none;
+    animation: heroCue 2.6s var(--ease) infinite;
 }
 
-@keyframes media-sheen {
-    0%, 100% { transform: translate3d(-18%, 0, 0); }
-    50% { transform: translate3d(18%, 0, 0); }
+@keyframes heroCue {
+    0%, 100% { transform: translateY(0); opacity: 0.5; }
+    50%      { transform: translateY(0.375rem); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .media::before { animation: none; }
+    .hero-scroll-cue { animation: none; opacity: 0.6; }
 }
 
-.media-inner {
+/* Shown only where the split is side-by-side AND the viewport is tall enough
+   to leave clear space beneath the content. */
+@media (min-width: 60rem) and (min-height: 40rem) {
+    .hero-scroll-cue { display: grid; }
+}
+
+/* ---- 4.1 The greeting ----
+   This is the page's <h1>: the first thing said, above the fold. The massive
+   "Welcome to PIA" in stage 2 is an <h2> — one h1 per document — but it
+   carries the display styling regardless of its level. */
+.hero-greeting {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 4.2vw, 3rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    text-wrap: balance;
+}
+
+.hero-greeting-accent {
+    display: block;
+    color: var(--accent);
+}
+
+/* ---- 4.2 The split ----
+   Mobile-first: one column. The 50/50 grid is opt-in at the wide breakpoint,
+   so narrow screens never pay for a rule they have to undo. */
+.hero-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(var(--sp-6), 5vh, var(--sp-8));
+    align-items: center;
+}
+
+@media (min-width: 60rem) {
+    .hero-split {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: clamp(var(--sp-7), 4vw, var(--sp-9));
+    }
+}
+
+/* ---- 4.3 Left column: character info + auth ----
+   Deliberately NO surface — no background, no border, no shadow. The text
+   and the buttons sit straight on the page. */
+.hero-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-4);
+    text-align: center;
+    /* On mobile the 3D goes above this block: seeing the character first,
+       then reading about it, is the natural order for a chooser. */
+    order: 1;
+}
+
+@media (min-width: 60rem) {
+    .hero-info { align-items: flex-start; text-align: start; }
+}
+
+.hero-eyebrow {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+/* Reserved single line: the name changes as characters are switched, and a
+   fixed min-height keeps the column from resizing when it does. */
+.hero-character-name {
+    margin: 0;
+    min-height: 1.15em;
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+/* Three lines are reserved, so swapping descriptions of similar length does
+   not move the buttons underneath. */
+.hero-character-desc {
+    margin: 0;
+    max-width: 42ch;
+    min-height: calc(3 * 1.65em);
+    font-size: clamp(1rem, 1.5vw, 1.0625rem);
+    line-height: 1.65;
+    color: var(--text-muted);
+}
+
+/* Switcher and auth buttons share one row, wrapping rather than crushing. */
+.hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    margin-block-start: var(--sp-2);
+}
+
+@media (min-width: 60rem) {
+    .hero-actions { justify-content: flex-start; }
+}
+
+.hero-switcher {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex: 0 0 auto;
+}
+
+.hero-auth {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    flex: 0 0 auto;
+}
+
+.switch-arrow {
+    width: var(--control-h-lg);
+    height: var(--control-h-lg);
+    flex: 0 0 var(--control-h-lg);
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+    color: var(--text);
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.switch-arrow:hover:not(:disabled) { background: var(--bg-chip-hover); }
+.switch-arrow:active:not(:disabled) { background: var(--bg-chip-hover); box-shadow: inset 0 2px 4px color-mix(in srgb, var(--bg-dark) 30%, transparent); }
+.switch-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Dots are real buttons, not divs — each selects a character. */
+.switch-dots { display: flex; align-items: center; gap: var(--sp-2); }
+
+.switch-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    flex: 0 0 0.625rem;
+    padding: 0;
+    border-radius: var(--r-pill);
+    background: var(--track);
+    transition: background-color var(--t-base), box-shadow var(--t-base);
+}
+
+.switch-dot:hover { background: var(--track-hover); }
+.switch-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.switch-dot[aria-current="true"] { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* ---- 4.4 Right column: the 3D element ----
+   The column is only a positioning context for two layers: the glow behind,
+   the figure in front. It has no surface of its own. */
+.hero-visual {
     position: relative;
+    isolation: isolate;              /* a self-contained stacking context */
+    display: grid;
+    place-items: center;
+    width: 100%;
+    order: 0;                        /* above the info on mobile */
+
+    /* Single source of truth for the centrepiece. The figure uses it and the
+       glow is derived from it, so the two can never drift apart at any
+       breakpoint. Mobile-first: the smaller value is the default, because a
+       3:4 box at full column width swallows a phone screen whole. */
+    --figure-w: min(72%, 17rem);
+}
+
+@media (min-width: 60rem) {
+    .hero-visual {
+        order: 1;                    /* right-hand column on desktop */
+        --figure-w: min(88%, 26rem);
+    }
+}
+
+/* A soft pool of primary light, and nothing else — no box, no border, no
+   card. color-mix() derives every stop from --color-primary, so the glow
+   follows the palette token instead of repeating a literal colour. The flat
+   fallback on the line above covers engines without color-mix(). */
+.hero-glow {
+    position: absolute;
+    z-index: 0;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    translate: -50% -50%;
+    width: calc(var(--figure-w) * 1.3);
+    aspect-ratio: 1;
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    background: radial-gradient(circle at 50% 45%,
+        color-mix(in srgb, var(--color-primary) 40%, transparent) 0%,
+        color-mix(in srgb, var(--color-primary) 20%, transparent) 38%,
+        color-mix(in srgb, var(--color-primary) 6%, transparent) 62%,
+        transparent 78%);
+    filter: blur(8px);
+    pointer-events: none;
+}
+
+/* THE CLS CONTRACT: fluid width, locked ratio. No background and no
+   overflow clipping — the model is meant to sit on the glow, not in a box. */
+.hero-figure {
+    position: relative;
+    z-index: 1;
+    width: var(--figure-w);
+    aspect-ratio: 3 / 4;
+    margin: 0;
+    display: grid;
+    place-items: center;
+}
+
+.hero-figure > canvas,
+.hero-figure > img,
+.hero-figure > video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* A still image or canvas retires the placeholder; model-viewer manages its
+   own poster slot, so it is deliberately not in this list. */
+.hero-figure:has(> canvas) .hero-skeleton:not([slot]),
+.hero-figure:has(> img) .hero-skeleton:not([slot]),
+.hero-figure:has(> video) .hero-skeleton:not([slot]) { display: none; }
+
+/* ---- 4.4a <model-viewer> ----
+   Sized here rather than by attribute for two reasons: the element is a
+   custom tag that lays out as INLINE until its module executes — which would
+   shift the page on a slow connection — and its default size is 300x150,
+   which would ignore the figure's ratio entirely. Explicit block dimensions
+   close both gaps before the script arrives. */
+.hero-figure > model-viewer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    /* Transparent, so the glow behind it shows through in both themes. */
+    background-color: transparent;
+    --poster-color: transparent;
+    --progress-bar-color: var(--color-primary);
+    --progress-mask: transparent;
+}
+
+/* No focus ring on the viewer. camera-controls makes the element focusable,
+   which paints the UA's default highlight over the model. The real controls
+   (arrows, dots, buttons) keep their rings, so keyboard focus is still
+   visible everywhere it carries meaning. */
+.hero-figure > model-viewer:focus,
+.hero-figure > model-viewer:focus-visible,
+.hero-figure > model-viewer:focus-within,
+.hero-figure > model-viewer:active {
+    outline: none;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* The poster fills the viewer, so the skeleton occupies exactly the box the
+   model will occupy — the swap is in place, with no blank frame. */
+.hero-figure > model-viewer > [slot="poster"] { position: absolute; inset: 0; }
+
+/* ---- 4.5 Loading and failure states ----
+   Both sit in the same box at the same inset, and neither carries a surface
+   — they read as part of the glow rather than as a card on top of it. */
+.hero-fallback[hidden] { display: none; }
+
+.hero-skeleton,
+.hero-fallback {
+    position: absolute;
+    inset: 0;
     z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: var(--sp-3);
     padding: var(--sp-5);
     text-align: center;
+    background: transparent;
 }
 
-.media-glyph {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--r-lg);
+.hero-skeleton { animation: heroPulse 2.4s var(--ease) infinite; }
+
+@keyframes heroPulse {
+    0%, 100% { opacity: 0.62; }
+    50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-skeleton { animation: none; opacity: 0.85; }
+}
+
+.hero-skeleton-glyph {
     display: grid;
     place-items: center;
-    background: var(--bg-chip);
-    color: var(--text-faint);
-}
-
-.media-label {
-    font-size: clamp(12px, 1.15vw, 13.5px);
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--text-muted);
-}
-
-/* Shows the slot's intended proportion, so whoever supplies the asset knows
-   what to export without reading the CSS. */
-.media-spec {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Real media fills the slot and retires the placeholder chrome. */
-.media > img,
-.media > video {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.media:has(> img) .media-inner,
-.media:has(> video) .media-inner,
-.media:has(> img)::before,
-.media:has(> video)::before { display: none; }
-
-/* --------------------------------------------------- 4.4 SPLIT BANDS ---
-   Alternating text/media rows. `grid-auto-flow: dense` is deliberately NOT
-   used — the source order is the reading order, and the `is-flipped`
-   modifier reorders visually on desktop only, so a screen reader and a
-   narrow viewport both get text before its illustration. */
-.split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: clamp(28px, 5vw, 72px);
-    align-items: center;
-    padding-bottom: var(--band);
-}
-
-.split-text { max-width: 46ch; }
-
-.split-kicker {
-    display: inline-flex;
-    align-items: center;
-    height: 26px;
-    padding: 0 var(--sp-3);
-    margin-bottom: var(--sp-4);
+    width: var(--control-h-lg);
+    height: var(--control-h-lg);
     border-radius: var(--r-pill);
     background: var(--accent-soft);
     color: var(--accent);
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
 }
 
-.split-title {
-    font-size: clamp(26px, 3.6vw, 42px);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.12;
-    margin-bottom: var(--sp-4);
-    text-wrap: balance;
-}
-
-.split-text p {
-    font-size: clamp(14.5px, 1.35vw, 17px);
-    line-height: 1.7;
+.hero-skeleton-label {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--text-muted);
 }
 
-.split-list { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
-
-.split-list li {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    font-size: clamp(13.5px, 1.25vw, 15px);
-    line-height: 1.6;
-    color: var(--text-muted);
-    list-style: none;
-}
-
-.split-list .icon { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; color: var(--accent); }
-
-@media (min-width: 1025px) {
-    .split.is-flipped .split-text { order: 2; }
-    .split.is-flipped .media { order: 1; }
-}
-
-@media (max-width: 1024px) {
-    .split { grid-template-columns: minmax(0, 1fr); }
-    .split-text { max-width: none; }
-}
-
-.showcase { padding-bottom: var(--band); }
-
-/* ------------------------------------------------------- 5. STATEMENTS ---
-   Apple's signature beat: one sentence, enormous, alone on the screen. */
-.statement {
-    min-height: clamp(320px, 56vh, 560px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-top: var(--band);
-    padding-bottom: var(--band);
-    text-align: center;
-}
-
-.statement-text {
-    font-size: clamp(28px, 4.6vw, 56px);
-    line-height: 1.12;
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    max-width: 20ch;
-    text-wrap: balance;
-}
-
-.statement-text .dim { color: var(--text-muted); }
-.statement-sub {
-    margin: clamp(18px, 2.6vh, 26px) auto 0;
-    max-width: 56ch;
-    font-size: clamp(14.5px, 1.4vw, 17px);
-    line-height: 1.65;
-    color: var(--text-muted);
-}
-
-/* --------------------------------------------------- 6. STICKY SEQUENCE ---
-   The visual pins while the steps scroll past it. The pane never changes
-   size — only which of its stacked layers is opaque — so pinning and
-   swapping cost no layout at all. */
-.sequence {
-    display: grid;
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-    gap: clamp(32px, 6vw, 80px);
-    align-items: start;
-    padding-bottom: var(--band);
-}
-
-.seq-head { margin-bottom: clamp(32px, 6vh, 64px); }
-
-.seq-title {
-    font-size: clamp(28px, 4vw, 46px);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.1;
-    text-wrap: balance;
-}
-
-.seq-lede { margin-top: var(--sp-4); font-size: clamp(14.5px, 1.35vw, 16.5px); line-height: 1.65; color: var(--text-muted); }
-
-.seq-steps { display: flex; flex-direction: column; }
-
-/* Each step owns enough scroll distance to hold the stage on its own. */
-.seq-step {
-    min-height: clamp(280px, 62vh, 480px);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: var(--sp-6) 0;
-}
-
-.seq-num {
-    width: 34px;
-    height: 34px;
-    margin-bottom: var(--sp-4);
-    border-radius: var(--r-sm);
-    background: var(--bg-chip);
-    color: var(--text-muted);
-    display: grid;
-    place-items: center;
-    font-size: 12.5px;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    transition: background-color 400ms ease, color 400ms ease;
-}
-
-.seq-step.is-active .seq-num { background: var(--accent); color: var(--on-accent); }
-
-.seq-step-title {
-    font-size: clamp(21px, 2.5vw, 30px);
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
-    margin-bottom: var(--sp-3);
-}
-
-.seq-step-text {
-    font-size: clamp(14px, 1.3vw, 16px);
-    line-height: 1.7;
-    color: var(--text-muted);
-    max-width: 46ch;
-}
-
-/* Inactive steps recede. Opacity only — they keep their full box, so the
-   scroll distance is constant whatever is active. */
-.seq-step { opacity: 0.32; transition: opacity 450ms ease; }
-.seq-step.is-active { opacity: 1; }
-
-/* ---- 6.1 The pinned stage ---- */
-.seq-stage {
-    position: sticky;
-    top: calc(50vh - min(26vh, 240px));
-    aspect-ratio: 1 / 1;          /* reserved before any layer paints */
-    width: 100%;
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-}
-
-.stage-layer {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: var(--sp-3);
-    padding: clamp(20px, 3vw, 36px);
-    opacity: 0;
-    transform: scale(1.03);
-    transition: opacity 520ms cubic-bezier(0.16, 1, 0.3, 1), transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: none;
-}
-
-.stage-layer.is-shown { opacity: 1; transform: scale(1); pointer-events: auto; }
-
-.stage-kicker {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+.hero-skeleton-spec {
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-faint);
 }
 
-.stage-eq {
-    font-size: clamp(26px, 4vw, 44px);
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
+/* -------------------------------------------- 4.6 STAGE 2: THE REVEAL -- */
+/* Sits directly below the 100vh hero. `position: relative` plus a page-level
+   z-index puts this whole section ABOVE the hero in paint order, so the
+   blurred glow behind the 3D element cannot bleed over this type as the user
+   scrolls past. */
+.reveal-stage {
+    position: relative;
+    z-index: var(--z-page);
+    /* Generous, so the jump out of a full-height hero has room to breathe
+       rather than landing straight on the type. */
+    padding-block: clamp(var(--sp-9), 16vh, 11rem);
+    background: var(--bg-body);
 }
 
-.stage-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-height: 52px;
-    padding: 0 var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-    font-size: clamp(12.5px, 1.15vw, 14px);
-}
-
-.stage-row.is-accent { background: var(--accent-soft); color: var(--accent); }
-.stage-row .pip { width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%; background: var(--bg-chip); }
-.stage-row.is-accent .pip { background: var(--accent); }
-
-.stage-meter { margin-top: var(--sp-2); }
-.stage-meter-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; }
-
-/* ------------------------------------------------------- 7. FEATURES --- */
-.features { padding-bottom: var(--band); }
-
-.feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
-
-.feature {
+.reveal-stage-inner {
     display: flex;
     flex-direction: column;
-    min-height: 244px;
-    padding: clamp(22px, 2.6vw, 32px);
-    border-radius: var(--r-lg);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-    transition: background-color var(--t-base);
-}
-
-.feature:hover { background: var(--bg-surface-hover); }
-
-.feature-glyph {
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
-    margin-bottom: var(--sp-5);
-    border-radius: var(--r-md);
-    display: grid;
-    place-items: center;
-    background: var(--accent-soft);
-    color: var(--accent);
-}
-
-.feature-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
-.feature-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
-
-.feature-title { font-size: clamp(16px, 1.5vw, 19px); font-weight: 700; letter-spacing: -0.015em; margin-bottom: var(--sp-3); }
-.feature-text { font-size: clamp(13px, 1.2vw, 14.5px); line-height: 1.7; color: var(--text-muted); }
-
-/* ---------------------------------------------------------- 8. NUMBERS ---
-   Counting digits would reflow a proportional font. Tabular figures plus a
-   reserved `ch` width means the value can change every frame at a fixed box. */
-.numbers { padding-bottom: var(--band); }
-
-.number-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 4vw, 48px); }
-
-.number-item { text-align: center; }
-
-.number-value {
-    display: block;
-    min-width: 4ch;
-    font-size: clamp(40px, 6.4vw, 76px);
-    font-weight: 800;
-    letter-spacing: -0.045em;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-}
-
-.number-label {
-    margin-top: clamp(10px, 1.6vh, 16px);
-    font-size: clamp(12.5px, 1.15vw, 14px);
-    line-height: 1.5;
-    color: var(--text-muted);
-}
-
-/* ------------------------------------------------------------- 9. CTA --- */
-.cta {
-    padding-bottom: var(--band);
-}
-
-.cta-panel {
-    padding: clamp(44px, 8vh, 88px) clamp(20px, 4vw, 64px);
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
+    align-items: center;
+    gap: var(--sp-4);
     text-align: center;
 }
 
-.cta-title {
-    font-size: clamp(26px, 4vw, 46px);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.1;
+.reveal-mark {
+    margin: 0;
+    font-family: var(--font-display);
+    line-height: 0.92;
     text-wrap: balance;
 }
 
-.cta-lede { margin: var(--sp-4) auto 0; max-width: 54ch; font-size: clamp(14px, 1.35vw, 16.5px); line-height: 1.65; color: var(--text-muted); }
-.cta-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--sp-3); margin-top: clamp(26px, 4vh, 40px); }
-.cta-actions .btn { height: 48px; padding: 0 var(--sp-6); }
+.reveal-mark-lead {
+    display: block;
+    font-size: clamp(1.125rem, 3.2vw, 2rem);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
 
-/* ---------------------------------------------------------- 10. FOOTER --- */
-.site-foot { padding: var(--sp-7) 0 var(--sp-8); }
+.reveal-mark-word {
+    display: block;
+    font-size: clamp(4.5rem, 18vw, 12rem);
+    font-weight: 800;
+    letter-spacing: -0.055em;
+    color: var(--text);
+}
+
+.reveal-sub {
+    margin: 0;
+    max-width: 44ch;
+    font-size: clamp(1rem, 1.6vw, 1.1875rem);
+    color: var(--text-muted);
+    text-wrap: balance;
+}
+
+/* ------------------------------------------------------- 5. SURFACES --- */
+/* One reusable surface. Cards, panels and steps all use it — no near-
+   duplicate classes. */
+.panel {
+    background: var(--bg-surface);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-card);
+    padding: clamp(var(--sp-5), 3vw, var(--sp-7));
+}
+
+.panel-flush { padding: 0; overflow: hidden; }
+
+/* ------------------------------------------------- 6. MEDIA SLOTS ------ */
+/* Aspect-ratio is the CLS guarantee: the box is known before any image
+   exists, so dropping artwork in changes nothing about the layout. */
+.media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--r-xl);
+    background: var(--bg-field);
+    box-shadow: var(--shadow-card);
+}
+
+.media-wide { aspect-ratio: 16 / 10; }
+.media-tall { aspect-ratio: 4 / 5; }
+.media-round { border-radius: var(--r-pill); }
+
+.media-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-5);
+    text-align: center;
+    color: var(--text-faint);
+}
+
+.media-glyph {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--r-lg);
+    display: grid;
+    place-items: center;
+    background: var(--bg-chip);
+    color: var(--text-muted);
+}
+
+.media-label { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
+.media-spec { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* Real artwork fills the slot and retires the placeholder chrome. */
+.media > img,
+.media > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.media:has(> img) .media-inner,
+.media:has(> video) .media-inner { display: none; }
+
+/* ------------------------------------------------------- 7. SECTIONS --- */
+.section-head {
+    max-width: 34ch;
+    margin-inline: auto;
+    margin-block-end: clamp(var(--sp-7), 5vh, var(--sp-9));
+    text-align: center;
+}
+
+.section-title {
+    font-size: clamp(1.625rem, 3.6vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+    text-wrap: balance;
+}
+
+.section-sub {
+    margin-block-start: var(--sp-3);
+    font-size: clamp(0.9375rem, 1.3vw, 1.0625rem);
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+/* One responsive grid primitive, reused by cards and steps alike. */
+.grid-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: clamp(var(--sp-4), 2.5vw, var(--sp-6));
+}
+
+.card-title { font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; margin-block-end: var(--sp-2); }
+.card-text { font-size: 0.9375rem; line-height: 1.65; color: var(--text-muted); }
+
+.step { text-align: center; }
+
+.step-num {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-inline: auto;
+    margin-block-end: var(--sp-4);
+    border-radius: var(--r-pill);
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 1rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- 7.1 Figures ---- */
+.figure-grid { display: grid; gap: clamp(var(--sp-5), 4vw, var(--sp-8)); text-align: center; }
+
+@media (min-width: 45rem) {
+    .figure-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.figure-value {
+    display: block;
+    min-width: 3ch;                  /* counting digits never resize the box */
+    font-size: clamp(2.25rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+}
+
+.figure-label { margin-block-start: var(--sp-3); font-size: 0.9375rem; color: var(--text-muted); }
+
+/* ---- 7.2 Closing call to action ---- */
+.cta { text-align: center; }
+.cta-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-block-start: clamp(var(--sp-6), 4vh, var(--sp-7));
+}
+
+/* --------------------------------------------------------- 8. FOOTER --- */
+.site-foot { padding-block: var(--sp-7) var(--sp-8); }
 
 .foot-inner {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    font-size: 12.5px;
+    justify-content: center;
+    gap: var(--sp-3);
+    font-size: 0.8125rem;
     color: var(--text-faint);
+    text-align: center;
 }
-/* ------------------------------------------------- 6. AUTH MODAL EXTRAS ---
-   The dialog mechanics come from global.css untouched — 18px radius, the
-   close button nested in flow 21px from the edge, reserved .field-msg slots.
-   Only the auth-specific pieces live here. */
+
+/* -------------------------------------------------------- 9. REVEALS --- */
+/* Opacity and transform only — neither participates in layout, so the page
+   is fully laid out at first paint and animating cannot shift it. */
+/* The hidden state is scoped to .js — set pre-paint by the inline head
+   script. Without that gate a script failure would leave every reveal target
+   permanently at opacity 0, i.e. a blank page. */
+.js [data-reveal] {
+    opacity: 0;
+    transform: translate3d(0, var(--reveal-y, 1.25rem), 0);
+    transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--d, 0ms);
+    will-change: opacity, transform;
+}
+
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+.js [data-reveal].is-done { will-change: auto; }
+
+/* Stage 2 gets a longer throw and a slower curve than the small in-page
+   reveals — it is the moment the section is built around. Neither property
+   participates in layout, so the travel cannot shift anything. */
+.js .reveal-mark {
+    --reveal-y: 50px;
+    transition-duration: 900ms;
+}
+
+.js .reveal-sub { --reveal-y: 28px; transition-duration: 760ms; }
+
+.nav-sentinel { position: absolute; inset-block-start: 0; inset-inline: 0; block-size: 1px; pointer-events: none; }
+
+/* ------------------------------- 10. AUTH DIALOG SUPPORT --------------- */
+/* The dialogs themselves come from global.css. Only the auth-specific bits
+   live here, and they exist to keep error UI from moving anything. */
 
 .auth-intro {
     display: flex;
     gap: var(--sp-3);
     padding: var(--sp-4);
-    margin-bottom: var(--sp-5);
+    margin-block-end: var(--sp-4);
     border-radius: var(--r-md);
     background: var(--bg-field);
 }
 
-.auth-intro .icon { flex: 0 0 18px; color: var(--accent); margin-top: 1px; }
-.auth-intro-text { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }
+.auth-intro .icon { flex: 0 0 1.125rem; color: var(--accent); margin-block-start: 1px; }
+.auth-intro-text { font-size: 0.8125rem; line-height: 1.6; color: var(--text-muted); }
 
-/* A status line that is always present in the DOM at a reserved height, so a
-   server error appearing cannot push the form's buttons down the screen. */
+/* Present in the DOM at a fixed height from first paint. A server error
+   appearing changes colour and text only — never the dialog's size. */
 .auth-status {
     display: flex;
     align-items: flex-start;
     gap: var(--sp-2);
-    /* 36px is one rendered line of this type at these widths — measured, not
-       guessed. A 34px reserve was 1px short and let the dialog grow by 1px
-       when a server error appeared. */
-    min-height: 36px;
-    margin-top: var(--sp-2);
-    margin-bottom: 0;
+    min-height: 2.25rem;
+    margin-block-start: var(--sp-2);
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-sm);
-    font-size: 12.5px;
-    line-height: 1.5;
+    font-size: 0.8125rem;
+    line-height: 1.45;
     background: transparent;
     color: transparent;
     transition: background-color var(--t-base), color var(--t-base);
 }
 
-.auth-status .icon { width: 15px; height: 15px; flex: 0 0 15px; margin-top: 2px; opacity: 0; }
+.auth-status .icon { width: 0.9375rem; height: 0.9375rem; flex: 0 0 0.9375rem; margin-block-start: 2px; opacity: 0; }
 .auth-status.is-error { background: var(--danger-soft); color: var(--danger); }
 .auth-status.is-ok { background: var(--accent-soft); color: var(--accent); }
 .auth-status.is-error .icon,
@@ -803,83 +824,51 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--sp-3);
     flex-wrap: wrap;
-    margin-top: var(--sp-3);
-    font-size: 12.5px;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-3);
+    font-size: 0.8125rem;
     color: var(--text-muted);
 }
 
 .link-btn {
-    color: var(--accent);
-    font-size: 12.5px;
-    font-weight: 600;
     padding: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--accent);
+    border-radius: var(--r-xs);
     transition: color var(--t-base);
 }
 
 .link-btn:hover { color: var(--accent-strong); text-decoration: underline; }
+.link-btn:active { color: var(--accent-strong); }
+.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* One-time-code boxes: fixed 48×54 cells, so typing never resizes the row. */
-.otp-row {
-    display: flex;
-    gap: var(--sp-2);
-    justify-content: center;
-}
-
-.otp-box {
-    border: 0;
-    width: 48px;
-    height: 54px;
-    flex: 0 0 48px;
-    padding: 0;
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-    color: var(--text);
-    font-size: 20px;
-    font-weight: 700;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    transition: background-color var(--t-base), box-shadow var(--t-base);
-}
-
-.otp-box:focus { background: #0E1310; box-shadow: 0 0 0 3px var(--accent-soft); }
-
-/* ------------------------------------------------------- 11. RESPONSIVE ---
-   Structure only. Type and spacing already scale continuously via clamp(),
-   so these rules never change a font size — they only restack grids. */
-@media (max-width: 1024px) {
-    .hero {
-        grid-template-columns: minmax(0, 1fr);
-        min-height: 0;
-        gap: clamp(28px, 5vh, 48px);
-        padding-bottom: var(--band);
-    }
-
-    .hero-visual { max-width: 560px; }
-
-    /* The pinned stage becomes a normal block: two sticky columns cannot both
-       be read on a narrow screen, and pinning here would trap the steps. */
-    .sequence { grid-template-columns: minmax(0, 1fr); }
-
-    /* `relative`, NOT `static`. The stage has to stop sticking here, but it is
-       also the containing block for its absolutely-positioned .stage-layer
-       children — `static` removes it as a containing block, so the layers
-       escaped to the viewport and rendered full-bleed across the page.
-       `relative` unpins it while keeping that anchor intact. */
-    .seq-stage { position: relative; max-width: 520px; margin: 0 auto clamp(28px, 5vh, 48px); }
-    .seq-step { min-height: 0; opacity: 1; }        /* all steps legible when unpinned */
-    .seq-step + .seq-step { margin-top: var(--sp-6); }
-
-    .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .scroll-cue { display: none; }
-}
-
-@media (max-width: 720px) {
-    .feature-grid { grid-template-columns: minmax(0, 1fr); }
-    .feature { min-height: 0; }
-    .number-grid { grid-template-columns: minmax(0, 1fr); gap: clamp(28px, 6vh, 44px); }
+/* ------------------------------------------------------ 11. RESPONSIVE - */
+/* Type and spacing already scale continuously with clamp(); these rules only
+   restack, and use min-width so the page is authored mobile-first. */
+@media (max-width: 45rem) {
     .nav-link.hide-sm { display: none; }
-    .hero-cta .btn, .cta-actions .btn { flex: 1 1 100%; }
-    .foot-inner { justify-content: center; text-align: center; }
+    .cta-actions .btn { flex: 1 1 100%; }
+
+    /* Switcher on its own line, then the two auth buttons side by side across
+       the full width, so the tap targets stay generous at narrow widths.
+       The explicit width is needed because .hero-info centres its children,
+       which would otherwise shrink this row to its content. */
+    .hero-actions { flex-direction: column; align-items: stretch; width: 100%; }
+    .hero-switcher { justify-content: center; }
+    .hero-auth { justify-content: center; }
+    .hero-auth .btn { flex: 1 1 0; }
+
+    /* Stage 1 is meant to be read without scrolling. At the default rhythm
+       the stacked column runs ~115px past a 375x812 screen, putting the auth
+       buttons below the fold — the one thing that must stay visible. These
+       trims pull it back inside. Every one of them is spacing or type scale:
+       the figure keeps its locked ratio, so none of this can cause a shift. */
+    .hero { padding-block: var(--sp-5); }
+    .hero-split { gap: var(--sp-5); }
+    .hero-info { gap: var(--sp-3); }
+    .hero-visual { --figure-w: min(62%, 13.5rem); }
+    .hero-greeting { font-size: clamp(1.5rem, 6.4vw, 1.875rem); }
+    .hero-character-desc { line-height: 1.55; min-height: calc(3 * 1.55em); }
 }

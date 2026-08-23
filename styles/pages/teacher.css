@@ -49,7 +49,9 @@
 .cell-mail { display: block; font-size: 11.5px; line-height: 16px; color: var(--text-muted); }
 
 .empty-cell {
-    height: 200px;
+    /* min-height, not height: the message wraps on narrow screens and the
+       cell must be free to grow rather than clip it. */
+    min-height: 12.5rem;
     text-align: center;
     color: var(--text-muted);
     font-size: 13.5px;
@@ -74,10 +76,10 @@
 }
 
 .status-badge-online { background: var(--accent-soft); color: var(--accent); }
-.status-badge-inactive { background: var(--support-amber-soft); color: var(--support-amber); }
+.status-badge-inactive { background: var(--warning-soft); color: var(--warning); }
 .status-badge-offline { background: var(--bg-chip); color: var(--text-muted); }
 
-.learning-smooth { background: var(--support-teal-soft); color: var(--support-teal); }
+.learning-smooth { background: var(--warning-soft); color: var(--warning); }
 .learning-struggling { background: var(--danger-soft); color: var(--danger); }
 
 .learning-badge .icon { width: 13px; height: 13px; }
@@ -91,7 +93,7 @@
 }
 
 .status-dot-online { background: var(--accent); }
-.status-dot-inactive { background: var(--support-amber); }
+.status-dot-inactive { background: var(--warning); }
 .status-dot-offline { background: var(--track); }
 
 /* Only the live state pulses, so a scanning eye is drawn to who is actually
@@ -165,9 +167,9 @@ button.stat.is-active { background: var(--accent-soft); }
 
 .stat-glyph .icon { width: 15px; height: 15px; }
 .stat-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
-.stat-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+.stat-glyph.g-warn { background: var(--warning-soft); color: var(--warning); }
 .stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
-.stat-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
+.stat-glyph.g-muted { background: var(--warning-soft); color: var(--warning); }
 
 .stat-value {
     font-size: 30px;
@@ -264,7 +266,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     min-height: 44px;
     padding: var(--sp-2) var(--sp-5);
     background: var(--danger);
-    color: #fff;
+    color: var(--text-on-solid);
     font-size: 12.5px;
     font-weight: 600;
     text-align: center;

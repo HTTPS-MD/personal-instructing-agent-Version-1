@@ -362,7 +362,7 @@
 }
 
 .dot-live { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.dot-warn { background: var(--support-amber); box-shadow: 0 0 0 3px var(--support-amber-soft); }
+.dot-warn { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-soft); }
 .dot-off { background: var(--text-faint); }
 
 .main {

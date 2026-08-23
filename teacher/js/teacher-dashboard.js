@@ -165,13 +165,13 @@
     function setBusy(button, label) {
         if (!button) { return function () {}; }
         var html = button.innerHTML, w = button.getBoundingClientRect().width;
-        button.style.minWidth = Math.ceil(w) + 'px';
+        button.style.width = Math.ceil(w) + 'px';
         button.disabled = true;
         button.textContent = label || 'Working…';
         return function () {
             button.innerHTML = html;
             button.disabled = false;
-            button.style.minWidth = '';
+            button.style.width = '';
         };
     }
 

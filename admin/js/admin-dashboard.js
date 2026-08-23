@@ -165,16 +165,16 @@
     /* ============================================ 2. APPLICATION STATE == */
 
     var STAGE_META = {
-        'OCEAN': { label: 'OCEAN test', badge: 'badge-amber', fill: 'f-amber' },
-        'Character Selection': { label: 'Character select', badge: 'badge-teal', fill: 'f-teal' },
+        'OCEAN': { label: 'OCEAN test', badge: 'badge-warn', fill: 'f-warn' },
+        'Character Selection': { label: 'Character select', badge: 'badge', fill: 'f-muted' },
         'Tutoring Dashboard': { label: 'Tutoring dashboard', badge: '', fill: 'f-muted' },
         'Active Game': { label: 'Active session', badge: 'badge-accent', fill: '' }
     };
 
     var CONDITIONS = {
         'assigned': { short: 'EXP · Assigned', badge: 'badge-accent', family: 'experimental' },
-        'non-assigned': { short: 'EXP · Free choice', badge: 'badge-teal', family: 'experimental' },
-        'neutral': { short: 'EXP · Neutral', badge: 'badge-amber', family: 'experimental' },
+        'non-assigned': { short: 'EXP · Free choice', badge: 'badge', family: 'experimental' },
+        'neutral': { short: 'EXP · Neutral', badge: 'badge-warn', family: 'experimental' },
         'control': { short: 'CTRL · Traditional', badge: '', family: 'control' }
     };
 
@@ -522,7 +522,7 @@
         var originalHTML = button.innerHTML;
         var originalWidth = button.getBoundingClientRect().width;
 
-        button.style.minWidth = Math.ceil(originalWidth) + 'px';
+        button.style.width = Math.ceil(originalWidth) + 'px';
         button.classList.add('is-busy');
         button.disabled = true;
         button.innerHTML = esc(busyLabel || 'Working…');
@@ -531,7 +531,7 @@
             button.innerHTML = originalHTML;
             button.classList.remove('is-busy');
             button.disabled = false;
-            button.style.minWidth = '';
+            button.style.width = '';
         };
     }
 
@@ -1066,7 +1066,7 @@
                     '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
                     '<td>' + userCell(s) + '</td>' +
                     '<td class="tnum muted">Question ' + toInt(s.current_problem, 1) + '</td>' +
-                    '<td><span class="badge badge-teal">' + esc(s.current_difficulty || 'Normal') + '</span></td>' +
+                    '<td><span class="badge badge">' + esc(s.current_difficulty || 'Normal') + '</span></td>' +
                     '<td class="tnum muted">' + toInt(s.hints_used, 0) + '</td>' +
                     '<td class="tnum muted">' + toInt(s.consecutive_correct, 0) + '</td>' +
                     '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>' +
@@ -1093,7 +1093,7 @@
             var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
             var used = (s.active_devices || []).length;
             var limit = toInt(s.max_devices, 1);
-            var deviceTone = used >= limit && used > 0 ? 'badge-amber' : '';
+            var deviceTone = used >= limit && used > 0 ? 'badge-warn' : '';
 
             return '' +
                 '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
