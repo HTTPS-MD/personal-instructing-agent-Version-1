@@ -690,12 +690,31 @@ button.stat.is-active { background: var(--accent-soft); }
 .modal-head {
     display: flex;
     align-items: flex-start;
-    gap: var(--sp-4);
+    flex-wrap: wrap;                 /* action buttons drop to their own row */
+    gap: var(--sp-3) var(--sp-4);
     flex: 0 0 auto;
     padding: var(--sp-5) var(--sp-5) var(--sp-4) var(--sp-6);
 }
 
-.modal-head-text { flex: 1 1 auto; min-width: 0; padding-top: 2px; }
+/* A flex-basis, not `auto`. With `flex: 1 1 auto` plus `min-width: 0` the
+   title was free to shrink all the way to zero — which is exactly what it did
+   when it shared a row with action buttons, leaving the text overflowing a 0px
+   box and rendering underneath them. It now refuses to go below 200px, and the
+   row wraps instead of crushing. */
+.modal-head-text { flex: 1 1 200px; min-width: 0; padding-top: 2px; order: 1; }
+
+/* Actions living in the HEAD, deliberately NOT .modal-foot-actions: the footer
+   variant is allowed to stretch its buttons edge-to-edge on mobile, which is
+   wrong for a group sharing a row with a title. */
+.modal-head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex: 0 0 auto;
+    order: 2;
+}
+
+.modal-head > .modal-close { order: 3; }
 
 .modal-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
 .modal-sub { margin-top: var(--sp-1); font-size: 12.5px; color: var(--text-muted); }
@@ -743,6 +762,22 @@ button.stat.is-active { background: var(--accent-soft); }
 .modal-foot-split { justify-content: space-between; }
 .modal-foot-note { font-size: 11.5px; color: var(--text-muted); }
 .modal-foot-actions { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+
+/* Narrow screens: the title and the close button keep the first row to
+   themselves, and any head actions take a full row beneath, splitting the
+   width evenly.
+
+   This lives in global.css, beside the component it governs, rather than in a
+   page stylesheet — the modal is defined here, so its responsive behaviour
+   belongs here too. Previously every mobile modal rule sat in shell.css, which
+   only the admin and teacher consoles load, so the same markup behaved
+   differently depending on which page it appeared on. */
+@media (max-width: 768px) {
+    .modal-head { gap: var(--sp-3); }
+    .modal-head > .modal-close { order: 2; margin-left: auto; }
+    .modal-head-actions { order: 3; flex: 1 0 100%; }
+    .modal-head-actions .btn { flex: 1 1 auto; min-width: 0; }
+}
 
 /* Centred confirmation layout */
 .modal-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--sp-3); padding: var(--sp-2) 0; }

@@ -1010,7 +1010,15 @@
                     <h2 class="modal-title" id="section-details-title">Section</h2>
                     <p class="modal-sub" id="section-details-sub">Enrolled students and activation status.</p>
                 </div>
-                <div class="modal-foot-actions">
+                <!-- Close is a DIRECT child of .modal-head, as in every other dialog,
+                     so its nested corner geometry is preserved. The two actions use
+                     .modal-head-actions rather than borrowing .modal-foot-actions:
+                     the footer variant stretches its buttons on mobile, which was
+                     crushing this title to zero width. -->
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+                <div class="modal-head-actions">
                     <button class="btn btn-secondary" id="section-broadcast-btn">
                         <svg class="icon"><use href="#i-send"></use></svg>
                         Email roster
@@ -1018,9 +1026,6 @@
                     <button class="btn btn-primary" id="section-scores-btn">
                         <svg class="icon"><use href="#i-file"></use></svg>
                         Input scores
-                    </button>
-                    <button class="modal-close" data-modal-close aria-label="Close dialog">
-                        <svg class="icon"><use href="#i-x"></use></svg>
                     </button>
                 </div>
             </header>
