@@ -307,6 +307,191 @@
     60%, 100% { transform: translate3d(0, 100%, 0); }
 }
 
+/* --------------------------------------------------- 4.3 MEDIA SLOTS ---
+   Drop-in containers for real artwork. Two rules make them safe:
+
+   1. ZERO CLS. Every slot declares an `aspect-ratio`, so the browser knows
+      its exact height at first paint — before any image exists. Swapping the
+      placeholder for a real <img> changes nothing about the layout, because
+      the box was never sized by its contents.
+
+   2. NO BORDERS. The brief suggested "subtle borders or frosted glass"; this
+      system has no borders anywhere, so the edge is drawn the way every other
+      surface here is drawn — a lighter fill lifted by shadow, with a frosted
+      backdrop and a soft interior sheen. Consistent with the rest of the app
+      rather than an exception to it.
+
+   Usage:  <figure class="media media-wide" data-label="Product Image">
+   Replace: put an <img> or <video> inside; it fills the slot via object-fit
+   and the placeholder chrome hides itself automatically. */
+.media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;              /* the CLS guarantee */
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 46%),
+        var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    display: grid;
+    place-items: center;
+    isolation: isolate;
+}
+
+.media-wide { aspect-ratio: 16 / 10; }
+.media-hero { aspect-ratio: 16 / 9; }
+.media-square { aspect-ratio: 1 / 1; }
+.media-tall { aspect-ratio: 4 / 5; }
+
+/* A slow diagonal sheen so an empty slot still reads as a designed surface
+   rather than a missing asset. Transform-only, so it costs nothing. */
+.media::before {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    z-index: 0;
+    background: linear-gradient(115deg, transparent 42%, rgba(5, 196, 107, 0.07) 50%, transparent 58%);
+    transform: translate3d(-18%, 0, 0);
+    animation: media-sheen 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    pointer-events: none;
+}
+
+@keyframes media-sheen {
+    0%, 100% { transform: translate3d(-18%, 0, 0); }
+    50% { transform: translate3d(18%, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .media::before { animation: none; }
+}
+
+.media-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-5);
+    text-align: center;
+}
+
+.media-glyph {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--r-lg);
+    display: grid;
+    place-items: center;
+    background: var(--bg-chip);
+    color: var(--text-faint);
+}
+
+.media-label {
+    font-size: clamp(12px, 1.15vw, 13.5px);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+
+/* Shows the slot's intended proportion, so whoever supplies the asset knows
+   what to export without reading the CSS. */
+.media-spec {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Real media fills the slot and retires the placeholder chrome. */
+.media > img,
+.media > video {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.media:has(> img) .media-inner,
+.media:has(> video) .media-inner,
+.media:has(> img)::before,
+.media:has(> video)::before { display: none; }
+
+/* --------------------------------------------------- 4.4 SPLIT BANDS ---
+   Alternating text/media rows. `grid-auto-flow: dense` is deliberately NOT
+   used — the source order is the reading order, and the `is-flipped`
+   modifier reorders visually on desktop only, so a screen reader and a
+   narrow viewport both get text before its illustration. */
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(28px, 5vw, 72px);
+    align-items: center;
+    padding-bottom: var(--band);
+}
+
+.split-text { max-width: 46ch; }
+
+.split-kicker {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 var(--sp-3);
+    margin-bottom: var(--sp-4);
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.split-title {
+    font-size: clamp(26px, 3.6vw, 42px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+    margin-bottom: var(--sp-4);
+    text-wrap: balance;
+}
+
+.split-text p {
+    font-size: clamp(14.5px, 1.35vw, 17px);
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+.split-list { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.split-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    font-size: clamp(13.5px, 1.25vw, 15px);
+    line-height: 1.6;
+    color: var(--text-muted);
+    list-style: none;
+}
+
+.split-list .icon { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; color: var(--accent); }
+
+@media (min-width: 1025px) {
+    .split.is-flipped .split-text { order: 2; }
+    .split.is-flipped .media { order: 1; }
+}
+
+@media (max-width: 1024px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .split-text { max-width: none; }
+}
+
+.showcase { padding-bottom: var(--band); }
+
 /* ------------------------------------------------------- 5. STATEMENTS ---
    Apple's signature beat: one sentence, enormous, alone on the screen. */
 .statement {
@@ -593,8 +778,12 @@
     display: flex;
     align-items: flex-start;
     gap: var(--sp-2);
-    min-height: 40px;
-    margin-bottom: var(--sp-4);
+    /* 36px is one rendered line of this type at these widths — measured, not
+       guessed. A 34px reserve was 1px short and let the dialog grow by 1px
+       when a server error appeared. */
+    min-height: 36px;
+    margin-top: var(--sp-2);
+    margin-bottom: 0;
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-sm);
     font-size: 12.5px;
@@ -616,7 +805,7 @@
     justify-content: space-between;
     gap: var(--sp-3);
     flex-wrap: wrap;
-    margin-top: var(--sp-4);
+    margin-top: var(--sp-3);
     font-size: 12.5px;
     color: var(--text-muted);
 }

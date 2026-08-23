@@ -109,8 +109,12 @@
     display: flex;
     align-items: flex-start;
     gap: var(--sp-2);
-    min-height: 42px;
-    margin-bottom: var(--sp-4);
+    /* 36px is one rendered line of this type at these widths — measured, not
+       guessed. A 34px reserve was 1px short and let the dialog grow by 1px
+       when a server error appeared. */
+    min-height: 36px;
+    margin-top: var(--sp-2);
+    margin-bottom: 0;
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-sm);
     font-size: 12.5px;
