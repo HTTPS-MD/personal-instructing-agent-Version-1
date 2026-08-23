@@ -4,136 +4,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
-         Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
-         tumutugma sa totoong Supabase Auth session. Nakatago ang body
-         (opacity-0) hangga't hindi pa kumpirmado ang session. -->
-    <script>
-        (function () {
-            var hasToken = false;
-            try {
-                for (var i = 0; i < localStorage.length; i++) {
-                    if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { hasToken = true; break; }
-                }
-            } catch (e) { /* storage blocked -- hayaan ang async guard ang bahala */ }
-            if (!hasToken) window.location.replace('../../index.html');
-        })();
-    </script>
+    <meta name="color-scheme" content="dark">
+    <title>Personality Questionnaire — PIA</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
-    <link rel="stylesheet" href="../../styles/pages/student.css">
-    <title>OCEAN Test - PIA System</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/pages/student-journey.css">
 </head>
 
+<!-- enforceStudentStage('ocean') removes `opacity-0` after verifying the
+     session and the prerequisite chain on the server. -->
 <body class="opacity-0">
 
-    <nav class="site-nav">
-        <div class="site-nav-inner">
-            <a href="../../index.html" class="site-nav-logo"><img src="../../assets/images/logo.png"
-                    alt="PIA Logo"></a>
-            <div class="flex-row gap-md">
-                <span class="site-nav-label hide-mobile">OCEAN Personality Assessment</span>
-                <a href="../../index.html" class="btn btn-secondary btn-sm">
-                    <i data-lucide="home" class="icon-sm"></i> Home
-                </a>
-            </div>
-        </div>
-    </nav>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+            <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.4 3 7.7 7 9 4-1.3 7-4.6 7-9V6l-7-3Z"/><path d="m9.2 12 2 2 3.6-3.8"/></symbol>
+            <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10.2" rx="2.5"/><path d="M7.8 10V7.6a4.2 4.2 0 0 1 8.4 0V10"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5.2a3 3 0 0 0-5.6-1.4A2.9 2.9 0 0 0 4 9.4a3 3 0 0 0 .6 5.3A3 3 0 0 0 9 19.4a3 3 0 0 0 3-2.6Z"/><path d="M12 5.2a3 3 0 0 1 5.6-1.4A2.9 2.9 0 0 1 20 9.4a3 3 0 0 1-.6 5.3A3 3 0 0 1 15 19.4a3 3 0 0 1-3-2.6Z"/></symbol>
+            <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+            <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
+        </defs>
+    </svg>
 
-    <div id="gatekeeper-screen" class="gatekeeper-screen">
-        <p class="eyebrow pulse-text">Checking access permissions...</p>
-    </div>
+    <div class="journey">
+        <div class="journey-ambient" aria-hidden="true"></div>
 
-    <main id="test-container" class="content-container ocean-test-main hidden">
-        <div class="ocean-test-layout">
-
-            <!-- LEFT: the question -->
-            <div class="ocean-question-col">
-                <div class="flex-between ocean-question-header">
-                    <h1 id="question-counter" class="ocean-question-count">Question 1 of 50</h1>
-                    <span id="progress-lbl" class="ocean-progress-label">0% Completed</span>
-                </div>
-
-                <div class="solid-card card-padded-lg ocean-question-card">
-                    <p id="question-text" class="ocean-question-text">Loading question...</p>
-
-                    <div class="ocean-answer-list" id="ocean-answer-list">
-                        <button type="button" data-score="1" class="ocean-answer-btn">1. Disagree</button>
-                        <button type="button" data-score="2" class="ocean-answer-btn">2. Slightly disagree</button>
-                        <button type="button" data-score="3" class="ocean-answer-btn">3. Neutral</button>
-                        <button type="button" data-score="4" class="ocean-answer-btn">4. Slightly agree</button>
-                        <button type="button" data-score="5" class="ocean-answer-btn">5. Agree</button>
+        <header class="journey-bar">
+            <div class="journey-shell journey-bar-inner">
+                <div class="journey-brand">
+                    <span class="journey-mark" aria-hidden="true">PIA</span>
+                    <div class="stage-rail hide-sm" aria-label="Your progress through the study">
+                        <span class="stage-node is-done"><span class="pip"></span>Waiting</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node is-current"><span class="pip"></span>Test</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node"><span class="pip"></span>Tutor</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node"><span class="pip"></span>Practice</span>
                     </div>
                 </div>
 
-                <div class="ocean-nav-row">
-                    <button type="button" id="btn-prev" class="btn-secondary">
-                        <i data-lucide="chevron-left" class="icon-sm"></i> Previous
-                    </button>
-                    <span id="answered-tally" class="ocean-tally">0 of 50 answered</span>
-                    <button type="button" id="btn-next" class="btn-secondary">
-                        Next <i data-lucide="chevron-right" class="icon-sm"></i>
+                <div class="journey-bar-right">
+                    <button class="btn btn-secondary" id="signout-btn">
+                        <svg class="icon"><use href="#i-logout"></use></svg>
+                        Sign out
                     </button>
                 </div>
             </div>
+        </header>
 
-            <!-- RIGHT: question navigator -->
-            <aside class="ocean-nav-panel solid-card card-padded">
-                <div class="qnav-head">
-                    <h2 class="qnav-title">Question Navigator</h2>
-                    <span id="qnav-count" class="qnav-count">0/50</span>
+        <main class="journey-main">
+            <div class="journey-shell">
+
+                <!-- Consent / locked screen. ocean-test.js replaces the contents
+                     of this element, so it is left empty here. -->
+                <div id="gatekeeper-screen"></div>
+
+                <!-- The test itself. Hidden until consent is given or saved
+                     progress is restored. -->
+                <div id="test-container" class="hidden">
+                    <div class="test-wrap">
+                        <div>
+                            <div class="test-progress">
+                                <div class="test-progress-top">
+                                    <span id="progress-lbl">0% Completed</span>
+                                    <b id="answered-tally">0 of 50 answered</b>
+                                </div>
+                                <div class="bar"><div class="bar-fill" id="ocean-progress-fill" style="width:0%"></div></div>
+                            </div>
+
+                            <div class="question-card">
+                                <p class="question-counter" id="question-counter">Question 1 of 50</p>
+                                <p class="question-text" id="question-text">—</p>
+
+                                <!-- One delegated listener reads data-score. -->
+                                <div class="answer-list" id="ocean-answer-list">
+                                    <button type="button" class="ocean-answer-btn" data-score="1">
+                                        <span class="dial" aria-hidden="true"></span>Very inaccurate
+                                    </button>
+                                    <button type="button" class="ocean-answer-btn" data-score="2">
+                                        <span class="dial" aria-hidden="true"></span>Moderately inaccurate
+                                    </button>
+                                    <button type="button" class="ocean-answer-btn" data-score="3">
+                                        <span class="dial" aria-hidden="true"></span>Neither accurate nor inaccurate
+                                    </button>
+                                    <button type="button" class="ocean-answer-btn" data-score="4">
+                                        <span class="dial" aria-hidden="true"></span>Moderately accurate
+                                    </button>
+                                    <button type="button" class="ocean-answer-btn" data-score="5">
+                                        <span class="dial" aria-hidden="true"></span>Very accurate
+                                    </button>
+                                </div>
+
+                                <div class="test-nav">
+                                    <button type="button" class="btn btn-secondary" id="btn-prev">
+                                        <svg class="icon"><use href="#i-chev-left"></use></svg>
+                                        Back
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="btn-submit-ocean" disabled>
+                                        <svg class="icon"><use href="#i-check"></use></svg>
+                                        Submit
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="btn-next">
+                                        Next
+                                        <svg class="icon"><use href="#i-chev-right"></use></svg>
+                                    </button>
+                                </div>
+
+                                <p class="submit-hint" id="submit-hint">50 questions left.</p>
+                            </div>
+                        </div>
+
+                        <!-- Free navigation across all 50 items. -->
+                        <aside class="qnav">
+                            <div class="qnav-head">
+                                <span class="qnav-title">All questions</span>
+                                <span class="qnav-count" id="qnav-count">0/50</span>
+                            </div>
+                            <div class="qgrid" id="question-grid"></div>
+                            <div class="qnav-legend">
+                                <span class="legend-row"><span class="legend-chip c-now"></span>You are here</span>
+                                <span class="legend-row"><span class="legend-chip c-done"></span>Answered</span>
+                                <span class="legend-row"><span class="legend-chip c-todo"></span>Not yet answered</span>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ================================================== MODAL · QUIT ---
+         Shown when a student tries to navigate away mid-test. The controller
+         toggles `modal-active` / `modal-content-active`; student-journey.css
+         maps those onto the standard dialog states. -->
+    <div class="overlay" id="quit-modal" role="dialog" aria-modal="true" aria-hidden="true"
+        aria-labelledby="quit-heading">
+        <div class="modal modal-sm" id="quit-modal-content">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="quit-heading">Leave the questionnaire?</h2>
+                    <p class="modal-sub">Your answers so far are saved.</p>
+                </div>
+            </header>
+
+            <div class="modal-body">
+                <div class="modal-hero">
+                    <span class="modal-hero-glyph">
+                        <svg class="icon icon-lg"><use href="#i-alert"></use></svg>
+                    </span>
+                    <p class="modal-hero-title">You're not finished yet</p>
+                    <p class="modal-hero-text">
+                        If you leave now you can come back and carry on from the same question.
+                        Nothing you've answered will be lost.
+                    </p>
                 </div>
 
-                <div id="question-grid" class="qgrid" role="group" aria-label="Jump to question"></div>
-
-                <div class="qnav-legend">
-                    <span class="qnav-legend-item"><i class="qnav-dot qnav-dot-answered"></i> Answered</span>
-                    <span class="qnav-legend-item"><i class="qnav-dot qnav-dot-current"></i> Current</span>
-                    <span class="qnav-legend-item"><i class="qnav-dot qnav-dot-empty"></i> Unanswered</span>
-                </div>
-
-                <button type="button" id="btn-submit-ocean" class="btn-primary btn-block" disabled>
-                    Submit Assessment
-                </button>
-                <p id="submit-hint" class="qnav-hint">Answer all 50 questions to submit.</p>
-            </aside>
-
-        </div>
-    </main>
-
-    <!-- QUIT CONFIRMATION -- replaces the native confirm() box -->
-    <div id="quit-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-modal="true"
-         aria-labelledby="quit-modal-title">
-        <div class="solid-card card-padded modal-content" id="quit-modal-content">
-            <div class="quit-modal-icon"><i data-lucide="log-out" class="icon-md"></i></div>
-
-            <h3 id="quit-modal-title" class="quit-modal-title">Are you sure you want to quit?</h3>
-            <p class="quit-modal-desc">You can come back here anytime&mdash;your progress is saved.</p>
-
-            <div class="quit-modal-progress">
-                <div class="quit-progress-head">
-                    <span class="quit-progress-label">Your progress</span>
-                    <span id="quit-progress-count" class="quit-progress-count">0 of 50</span>
-                </div>
-                <div class="quit-progress-track">
-                    <div id="quit-progress-fill" class="quit-progress-fill"></div>
+                <div style="margin-top:20px">
+                    <div class="quit-progress-row">
+                        <span>Answered so far</span>
+                        <b id="quit-progress-count">0 of 50</b>
+                    </div>
+                    <div class="bar"><div class="bar-fill" id="quit-progress-fill" style="width:0%"></div></div>
                 </div>
             </div>
 
-            <div class="quit-modal-actions">
-                <button type="button" id="quit-modal-stay" class="btn-primary btn-block">Continue the test</button>
-                <button type="button" id="quit-modal-leave" class="btn-secondary btn-block">Quit for now</button>
-            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" id="quit-modal-leave">Quit for now</button>
+                <button class="btn btn-primary" id="quit-modal-stay">Keep going</button>
+            </footer>
         </div>
     </div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/ocean-test.js"></script>
     <script>
-        lucide.createIcons();
+        document.getElementById('signout-btn').addEventListener('click', function () {
+            if (typeof executeForceLogout === 'function') { executeForceLogout(); }
+        });
     </script>
 </body>
 

@@ -4,35 +4,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 - Page Not Found</title>
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
+    <meta name="color-scheme" content="dark">
+    <meta name="robots" content="noindex">
+    <title>Page Not Found — PIA</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/error.css">
 </head>
 
-<body class="error-page-body">
+<body>
 
-    <div class="solid-card card-padded-lg error-card">
-        <div class="error-code-block">
-            <span class="error-code">404</span>
-            <span class="badge badge-pill badge-danger">Error / Not Found</span>
-        </div>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m15.2 8.8-1.9 4.5-4.5 1.9 1.9-4.5 4.5-1.9Z"/></symbol>
+            <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4"/><path d="m10 6-6 6 6 6"/></symbol>
+        </defs>
+    </svg>
 
-        <div class="error-message-block">
-            <h1 class="error-title">Page Not Found</h1>
-            <p class="text-secondary error-desc">
-                The page you are looking for might have been removed, had its name changed, or is temporarily
-                unavailable.
+    <div class="error-page">
+        <div class="error-ambient" aria-hidden="true"></div>
+
+        <main class="error-card">
+            <div class="error-glyph">
+                <svg class="icon icon-lg"><use href="#i-compass"></use></svg>
+            </div>
+
+            <p class="error-code">Error 404</p>
+            <h1 class="error-title">We can't find that page</h1>
+            <p class="error-lede">
+                The link may be out of date, or the page may have moved. Nothing is
+                wrong with your account — head back and carry on from there.
             </p>
-        </div>
 
-        <div class="error-actions">
-            <a href="/" class="btn btn-primary btn-block">Back to Home</a>
-            <button onclick="history.back()" class="btn btn-secondary btn-block">Go Back</button>
-        </div>
+            <div class="error-actions">
+                <a class="btn btn-primary" href="../../index.html">
+                    <svg class="icon"><use href="#i-arrow-left"></use></svg>
+                    Back to sign in
+                </a>
+            </div>
+        </main>
     </div>
-
 </body>
 
 </html>

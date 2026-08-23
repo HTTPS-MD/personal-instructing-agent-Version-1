@@ -4,67 +4,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
-         Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
-         tumutugma sa totoong Supabase Auth session. Nakatago ang body
-         (opacity-0) hangga't hindi pa kumpirmado ang session. -->
-    <script>
-        (function () {
-            var hasToken = false;
-            try {
-                for (var i = 0; i < localStorage.length; i++) {
-                    if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { hasToken = true; break; }
-                }
-            } catch (e) { /* storage blocked -- hayaan ang async guard ang bahala */ }
-            if (!hasToken) window.location.replace('../../index.html');
-        })();
-    </script>
+    <meta name="color-scheme" content="dark">
+    <title>Waiting Room — PIA</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
-    <link rel="stylesheet" href="../../styles/pages/student.css">
-    <title>Waiting Room - PIA System</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/pages/student-journey.css">
 </head>
 
-<body class="waiting-page opacity-0">
+<!-- requireStudentSession() removes `opacity-0` once the session is verified. -->
+<body class="opacity-0">
 
-    <div class="waiting-split">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.1 1.9"/></symbol>
+            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
+        </defs>
+    </svg>
 
-        <div class="waiting-illustration">
-            <img src="/assets/images/ocean.png" alt="Waiting Illustration" class="waiting-bg">
-            <div class="waiting-gradient"></div>
-        </div>
+    <div class="journey">
+        <div class="journey-ambient" aria-hidden="true"></div>
 
-        <div class="waiting-content">
-            <div class="waiting-inner">
-
-                <div class="waiting-spinner-box">
-                    <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+        <header class="journey-bar">
+            <div class="journey-shell journey-bar-inner">
+                <div class="journey-brand">
+                    <span class="journey-mark" aria-hidden="true">PIA</span>
+                    <!-- Four stages, always visible, so a waiting student can see
+                         both where they are and what is still to come. -->
+                    <div class="stage-rail hide-sm" aria-label="Your progress through the study">
+                        <span class="stage-node is-current"><span class="pip"></span>Waiting</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node"><span class="pip"></span>Test</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node"><span class="pip"></span>Tutor</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node"><span class="pip"></span>Practice</span>
+                    </div>
                 </div>
 
-                <div class="waiting-text-block">
-                    <h1 id="waiting-title" class="waiting-title">Waiting for Instructor</h1>
-                    <p id="waiting-desc" class="text-secondary waiting-desc">
-                        The next session is currently closed. You will be automatically redirected the moment your
-                        instructor opens it. Please stay on this page.
-                    </p>
+                <div class="journey-bar-right">
+                    <button class="btn btn-secondary" id="signout-btn">
+                        <svg class="icon"><use href="#i-logout"></use></svg>
+                        Sign out
+                    </button>
                 </div>
-
-                <div class="waiting-actions">
-                    <a href="../../index.html" class="btn btn-secondary btn-lg btn-block">Back to Homepage</a>
-                </div>
-
             </div>
-        </div>
+        </header>
 
+        <main class="journey-main">
+            <div class="journey-shell">
+                <div class="wait-card">
+                    <div class="wait-orb" aria-hidden="true">
+                        <svg class="icon"><use href="#i-clock"></use></svg>
+                    </div>
+
+                    <!-- waiting-room.js swaps both of these between three stage
+                         variants. Their heights are reserved in the stylesheet
+                         so the note and button below never move. -->
+                    <h1 class="wait-title" id="waiting-title">Waiting for your teacher</h1>
+                    <p class="wait-desc" id="waiting-desc">
+                        This stage isn't open yet. Keep this page open — it will move you
+                        forward automatically the moment your teacher starts it.
+                    </p>
+
+                    <div class="wait-note">
+                        <svg class="icon"><use href="#i-info"></use></svg>
+                        <p>You don't need to refresh or do anything. If you close this page,
+                            just sign in again and you'll come right back here.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/waiting-room.js"></script>
+    <script>
+        // The only control on the page. On a shared lab PC an abandoned session
+        // means the next student's answers land in this student's row.
+        document.getElementById('signout-btn').addEventListener('click', function () {
+            if (typeof executeForceLogout === 'function') { executeForceLogout(); }
+        });
+    </script>
 </body>
 
 </html>

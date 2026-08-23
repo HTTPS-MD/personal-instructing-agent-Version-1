@@ -4,465 +4,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="description"
+        content="PIA — a Personal Instructing Agent that adapts its teaching persona to each Grade 7 learner's personality profile.">
+    <title>PIA — Personal Instructing Agent</title>
 
-    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="/styles/tokens.css">
-    <link rel="stylesheet" href="/styles/base.css">
-    <link rel="stylesheet" href="/styles/components.css">
-    <link rel="stylesheet" href="/styles/pages/home.css">
-    <title>Personal Instructing Agent</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="styles/global.css">
+    <link rel="stylesheet" href="styles/pages/landing.css">
 </head>
 
 <body>
 
-    <!-- HEADER / NAVBAR -->
-    <header class="site-nav">
-        <div class="site-nav-inner">
-            <a href="#" class="site-nav-logo"><img src="/assets/images/logo.png" alt="PIA Logo"></a>
+    <!-- ===================================================== ICON SPRITE -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5.2a3 3 0 0 0-5.6-1.4A2.9 2.9 0 0 0 4 9.4a3 3 0 0 0 .6 5.3A3 3 0 0 0 9 19.4a3 3 0 0 0 3-2.6Z"/><path d="M12 5.2a3 3 0 0 1 5.6-1.4A2.9 2.9 0 0 1 20 9.4a3 3 0 0 1-.6 5.3A3 3 0 0 1 15 19.4a3 3 0 0 1-3-2.6Z"/></symbol>
+            <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.4l-1.9-5.6L4.5 10.9 10.1 9 12 3.5Z"/><path d="M18.5 15.5 19.3 18l2.2.8-2.2.8-.8 2.4-.8-2.4-2.2-.8 2.2-.8.8-2.5Z"/></symbol>
+            <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.4 3 7.7 7 9 4-1.3 7-4.6 7-9V6l-7-3Z"/><path d="m9.2 12 2 2 3.6-3.8"/></symbol>
+            <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></symbol>
+            <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.6 7.2 8.4 5.8 8.4-5.8"/></symbol>
+            <symbol id="i-key" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10.2" rx="2.5"/><path d="M7.8 10V7.6a4.2 4.2 0 0 1 8.4 0V10"/><circle cx="12" cy="15.2" r="1.2" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-login" viewBox="0 0 24 24"><path d="M14.5 3H19a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4.5"/><path d="m8 16.5 4.5-4.5L8 7.5"/><path d="M12.5 12H3"/></symbol>
+            <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4"/><path d="m10 6-6 6 6 6"/></symbol>
+        </defs>
+    </svg>
 
-            <nav class="site-nav-links">
-                <a href="#home" class="admin-nav-btn">Home</a>
-                <a href="#tutor-section" class="admin-nav-btn">Tutors</a>
-                <a href="#core-features" class="admin-nav-btn">Features</a>
-                <a href="#how-it-works" class="admin-nav-btn">Methodology</a>
-                <a href="#faq" class="admin-nav-btn">FAQ</a>
-                <a href="#contact" class="admin-nav-btn">Contact</a>
-            </nav>
+    <div class="site">
+        <div class="ambient" aria-hidden="true"></div>
 
-            <div class="flex-row gap-sm">
-                <!-- Logged Out State -->
-                <div id="logged-out-container" class="hide-mobile">
-                    <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="nav-auth-btn"
-                        class="btn-primary">Sign In</a>
-                </div>
-
-                <!-- Logged In State (Hover to see dropdown) -->
-                <div id="logged-in-container" class="hidden nav-user-menu">
-                    <button id="nav-user-dropdown" class="nav-user-dropdown-btn">
-                        <span id="nav-user-greeting">Loading...</span>
-                        <i data-lucide="chevron-down" class="icon-sm text-secondary"></i>
-                    </button>
-
-                    <div id="nav-dropdown-menu" class="nav-dropdown-menu">
-                        <div class="solid-card nav-dropdown-card">
-                            <div class="nav-dropdown-header">
-                                <p class="nav-dropdown-header-label">Signed in as</p>
-                                <p class="nav-dropdown-header-email" id="nav-user-email"></p>
-                            </div>
-                            <button onclick="openChangePasswordModal()" class="nav-dropdown-item">
-                                <i data-lucide="key" class="icon-xs text-warning"></i> Change Password
-                            </button>
-                            <button onclick="executeForceLogout()" class="nav-dropdown-item nav-dropdown-item-danger">
-                                <i data-lucide="log-out" class="icon-xs"></i> Sign Out
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Mobile Navigation Menu Toggle Button -->
-                <button id="mobile-toggle" class="mobile-menu-toggle">
-                    <i data-lucide="menu" class="icon-md"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- MOBILE MENU BACKDROP -->
-    <div id="menu-backdrop" class="mobile-menu-backdrop hidden"></div>
-
-    <!-- MOBILE NAVIGATION DRAWER -->
-    <div id="mobile-menu" class="mobile-menu">
-
-        <!-- Floating Close Box -->
-        <button id="dynamic-close-btn" class="mobile-menu-close">
-            <i data-lucide="x" class="icon-md text-secondary"></i>
-        </button>
-
-        <div class="mobile-menu-inner">
-            <div class="mobile-greeting-block">
-                <span id="mobile-greeting-prefix" class="mobile-greeting-prefix">Welcome,</span>
-                <span id="mobile-greeting-name" class="mobile-greeting-name">Student Player</span>
-            </div>
-
-            <div class="mobile-menu-links">
-                <a href="#home" class="mobile-nav-link admin-nav-btn">Home</a>
-                <a href="#tutor-section" class="mobile-nav-link admin-nav-btn">Tutors</a>
-                <a href="#core-features" class="mobile-nav-link admin-nav-btn">Features</a>
-                <a href="#how-it-works" class="mobile-nav-link admin-nav-btn">Methodology</a>
-                <a href="#faq" class="mobile-nav-link admin-nav-btn">FAQ</a>
-                <a href="#contact" class="mobile-nav-link admin-nav-btn">Contact</a>
-            </div>
-
-            <div class="mobile-menu-actions">
-                <button id="mobile-change-pass-btn"
-                    onclick="openChangePasswordModal(); document.getElementById('dynamic-close-btn').click();"
-                    class="btn-secondary btn-block hidden">
-                    <i data-lucide="key" class="icon-sm text-warning"></i> Change Password
-                </button>
-
-                <a href="javascript:void(0)"
-                    onclick="openAuthModal('signin'); document.getElementById('dynamic-close-btn').click();"
-                    id="mobile-auth-btn" class="btn-primary btn-block">
-                    <i data-lucide="log-in" id="mobile-auth-icon" class="icon-sm"></i>
-                    <span id="mobile-auth-text">Sign In</span>
+        <!-- ======================================================= NAV -->
+        <header class="site-nav">
+            <div class="shell site-nav-inner">
+                <a class="logo" href="#top">
+                    <span class="logo-mark" aria-hidden="true">PIA</span>
+                    <span class="logo-text">PIA System</span>
                 </a>
-            </div>
-        </div>
-    </div>
 
-    <!-- Hero Section -->
-    <main class="hero-section" id="home">
-        <video autoplay muted loop playsinline class="hero-video">
-            <source src="/assets/videos/AdobeStock_1646385409.mov" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
-
-        <div class="hero-overlay"></div>
-
-        <div class="hero-content">
-            <h1 class="hero-title">
-                Personal Instructing <span class="text-accent">Agent</span>
-            </h1>
-            <p class="hero-desc">
-                Ang iyong AI-powered math tutoring system para sa mga Grade 7 students. Matuto nang mabilis at mas
-                epektibo.
-            </p>
-            <div class="hero-actions">
-                <a href="javascript:void(0)" onclick="openAuthModal('signin')" id="hero-btn" class="btn-game-primary">
-                    <span>Start Adventure</span>
-                    <i data-lucide="play" class="icon-sm"></i>
-                </a>
-                <a href="#tutor-section" class="btn-secondary btn-lg">Learn More</a>
-            </div>
-        </div>
-    </main>
-
-    <!-- Meet Your Tutors Section -->
-    <section class="content-container tutors-section" id="tutor-section">
-        <div class="tutors-head">
-            <h2 class="section-title">Meet your tutors</h2>
-        </div>
-        <div class="tutor-showcase">
-            <div class="tutor-image-wrap">
-                <img id="tutor-img" src="/assets/images/char-1.png" alt="tutor1" class="tutor-image character-glow">
-            </div>
-            <div class="tutor-info">
-                <h3 id="tutor-name" class="tutor-info-name">Select a Tutor</h3>
-                <p id="tutor-desc" class="tutor-info-desc">
-                    Pumili ng character sa baba para makita ang kanilang specialty at teaching style.
-                </p>
-            </div>
-        </div>
-        <div id="tutor-grid" class="tutor-grid"></div>
-    </section>
-
-    <!-- Core Features section -->
-    <section class="page-container features-section" id="core-features">
-        <h2 class="section-title text-center">Core Features</h2>
-        <div class="features-grid">
-            <div class="solid-card card-padded-lg feature-card">
-                <h3 class="feature-card-title">AI-Tutoring</h3>
-                <p class="text-secondary">Personalized math lessons na akma sa pacing mo.</p>
-            </div>
-            <div class="solid-card card-padded-lg feature-card">
-                <h3 class="feature-card-title">Real-time Progress</h3>
-                <p class="text-secondary">I-track ang iyong improvement araw-araw.</p>
-            </div>
-            <div class="solid-card card-padded-lg feature-card">
-                <h3 class="feature-card-title">Adaptive Learning</h3>
-                <p class="text-secondary">Focus sa mga topics na kailangan mong i-master.</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- The Science Behind PIA -->
-    <section id="how-it-works" class="content-container science-section">
-        <div class="science-head">
-            <h2 class="science-title">How we help you learn</h2>
-            <p class="science-subtitle">We use proven psychological models to make math easier and more fun.</p>
-        </div>
-        <div class="science-rows">
-            <div class="science-row">
-                <div class="science-image-wrap">
-                    <img src="/assets/images/ocean.png" alt="Learning Personality" class="science-image">
-                </div>
-                <div class="science-content">
-                    <span class="eyebrow">Learning Personality</span>
-                    <h3 class="science-content-title">Understand your unique style</h3>
-                    <p class="science-content-desc">
-                        Everyone thinks differently! By identifying your personality traits, we match you with an AI
-                        tutor that talks and teaches the way you like best.
-                    </p>
-                    <button id="ocean-btn" class="science-link">Take the Personality Test →</button>
-                </div>
-            </div>
-            <div class="science-row science-row-reverse">
-                <div class="science-image-wrap">
-                    <img src="/assets/images/board.png" alt="Motivation" class="science-image">
-                </div>
-                <div class="science-content">
-                    <span class="eyebrow">Student Motivation</span>
-                    <h3 class="science-content-title">Find your inner drive</h3>
-                    <p class="science-content-desc">
-                        Learning is easier when you're motivated. We use the SDT framework to help you feel in
-                        control, competent, and excited to solve math problems.
-                    </p>
-                    <button id="sdt-btn" class="science-link">See how it works →</button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Modal Overlay (Frameworks) -->
-    <div id="modal" class="modal-overlay">
-        <div class="solid-card modal-content framework-modal-content" id="modal-content">
-            <div class="framework-modal-header">
-                <h2 id="modal-title" class="framework-modal-title"></h2>
-                <button onclick="closeModal()" class="btn-icon">
-                    <i data-lucide="x" class="icon-sm"></i>
-                </button>
-            </div>
-            <div class="framework-modal-body">
-                <p id="modal-desc" class="text-secondary framework-modal-desc"></p>
-                <div id="modal-list-container" class="framework-modal-list"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- FAQ Section -->
-    <section id="faq" class="content-container faq-section">
-        <h2 class="section-title text-center">Frequently Asked Questions</h2>
-        <div class="faq-list">
-            <div class="solid-card faq-item">
-                <button onclick="toggleFaq(this)" class="faq-question">
-                    <span class="faq-question-text">What is PIA System?</span>
-                    <span class="faq-icon text-accent">▼</span>
-                </button>
-                <div class="faq-answer">
-                    Ang Personal Instructing Agent (PIA) ay isang AI-powered tool na ginawa para tulungan ang mga
-                    Grade 7 students sa kanilang math subjects.
-                </div>
-            </div>
-            <div class="solid-card faq-item">
-                <button onclick="toggleFaq(this)" class="faq-question">
-                    <span class="faq-question-text">Paano ako makakapagsimula?</span>
-                    <span class="faq-icon text-accent">▼</span>
-                </button>
-                <div class="faq-answer">
-                    I-click lang ang "Get Started" button sa ating home page at sundin ang registration steps.
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact Section -->
-    <section id="contact" class="content-container contact-section">
-        <div class="solid-card card-padded-lg contact-card">
-            <div class="contact-info">
-                <h3 class="contact-title">Need support?</h3>
-                <p class="contact-desc">We're here to help. Reach out to us through any of our official channels.</p>
-                <div class="contact-actions">
-                    <a href="#" class="btn-primary">Facebook</a>
-                    <a href="#" class="btn-secondary">Email</a>
-                    <a href="#" class="btn-secondary">Discord</a>
-                </div>
-            </div>
-            <div class="contact-image-wrap">
-                <img src="/assets/images/contact.png" alt="Support" class="contact-image">
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer Section -->
-    <footer class="solid-footer site-footer">
-        <div class="page-container footer-grid">
-            <div>
-                <img src="/assets/images/logo.png" class="footer-logo">
-                <p class="text-secondary footer-tagline">Personal Instructing Agent para sa iyong mas matalinong
-                    pag-aaral.</p>
-            </div>
-            <div>
-                <h3 class="footer-heading">Links</h3>
-                <ul class="footer-links">
-                    <li><a href="#" class="hover-text-accent">About Us</a></li>
-                    <li><a href="#" class="hover-text-accent">Contact Support</a></li>
-                    <li><a href="#" class="hover-text-accent">Privacy Policy</a></li>
-                </ul>
-            </div>
-            <div>
-                <h3 class="footer-heading">Contact</h3>
-                <a href="mailto:support@piasystem.com" class="footer-email">support@piasystem.com</a>
-                <p class="text-secondary">Manila, Philippines</p>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            &copy; 2026 PIA System. Lahat ng karapatan ay nakalaan.
-        </div>
-    </footer>
-
-    <!-- ========================================================= -->
-    <!-- UNIFIED SOLID B&W AUTH MODAL (Sign In, Forgot, Set Pass)  -->
-    <!-- ========================================================= -->
-    <div id="auth-modal" class="modal-overlay">
-
-        <!-- Modal Container -->
-        <div class="solid-card modal-content auth-modal-box" id="auth-box">
-
-            <!-- Close Button -->
-            <button id="modal-close-btn" onclick="closeAuthModal()" class="btn-icon auth-modal-close">
-                <i data-lucide="x" class="icon-sm"></i>
-            </button>
-
-            <!-- 1. SIGN IN VIEW -->
-            <div id="view-signin">
-                <div class="auth-view-header">
-                    <img src="/assets/images/logo.png" alt="PIA Logo" class="auth-view-logo">
-                    <h2 class="auth-view-title">Sign In</h2>
-                    <p class="text-secondary auth-view-subtitle">Enter your credentials to continue</p>
-                </div>
-                <div id="signin-status-box" class="status-box hidden"></div>
-                <form id="modal-login-form" class="auth-form" novalidate>
-                    <div class="form-group">
-                        <label class="form-label" for="modal-email">Email Address</label>
-                        <div class="input-icon-wrap">
-                            <input type="email" id="modal-email" required class="form-input"
-                                placeholder="student@ue.edu.ph">
-                            <button type="button" class="clear-input-btn hidden">
-                                <i data-lucide="x-circle" class="icon-sm"></i>
-                            </button>
-                        </div>
-                        <span class="field-error hidden" id="modal-email-error"></span>
-                    </div>
-                    <div class="form-group">
-                        <div class="flex-between">
-                            <label class="form-label" for="modal-password">Password</label>
-                            <a href="javascript:void(0)" onclick="switchAuthView('forgot-email')"
-                                class="auth-forgot-link">Forgot?</a>
-                        </div>
-                        <div class="input-icon-wrap">
-                            <input type="password" id="modal-password" required class="form-input"
-                                placeholder="••••••••">
-                            <button type="button" class="clear-input-btn hidden">
-                                <i data-lucide="x-circle" class="icon-sm"></i>
-                            </button>
-                        </div>
-                        <span class="field-error hidden" id="modal-password-error"></span>
-
-                        <div class="form-checkbox-row auth-checkbox-row">
-                            <input type="checkbox" id="show-signin-password" class="form-checkbox">
-                            <label for="show-signin-password" class="form-checkbox-label">Show password</label>
-                        </div>
-                    </div>
-
-                    <button type="submit" id="modal-signin-btn" class="btn-primary btn-lg btn-block">SIGN IN</button>
-                </form>
-            </div>
-
-            <!-- 2. FORGOT PASSWORD VIEW (Enter Email) -->
-            <div id="view-forgot-email" class="hidden">
-                <div class="auth-view-header auth-view-header-with-back">
-                    <button onclick="switchAuthView('signin')" class="auth-back-btn">
-                        <i data-lucide="arrow-left" class="icon-sm"></i>
+                <nav class="nav-links" aria-label="Primary">
+                    <a class="nav-link hide-sm" href="#how">How it works</a>
+                    <a class="nav-link hide-sm" href="#study">The study</a>
+                    <button class="btn btn-primary" data-auth-open="signin">
+                        <svg class="icon"><use href="#i-login"></use></svg>
+                        Sign in
                     </button>
-                    <h2 class="auth-view-title">Reset Password</h2>
-                    <p class="text-secondary auth-view-subtitle">We'll send an OTP to your email</p>
-                </div>
-                <div id="forgot-email-status-box" class="status-box hidden"></div>
-                <form id="modal-forgot-form" class="auth-form" novalidate>
-                    <div class="form-group">
-                        <label class="form-label" for="forgot-email-input">Email Address</label>
-                        <div class="input-icon-wrap">
-                            <input type="email" id="forgot-email-input" required class="form-input"
-                                placeholder="student@ue.edu.ph">
-                            <button type="button" class="clear-input-btn hidden">
-                                <i data-lucide="x-circle" class="icon-sm"></i>
-                            </button>
-                        </div>
-                        <span class="field-error hidden" id="forgot-email-error"></span>
-                    </div>
-                    <button type="submit" id="modal-send-otp-btn" class="btn-primary btn-lg btn-block">SEND OTP</button>
-                </form>
+                </nav>
             </div>
+        </header>
 
-            <!-- 3. FORGOT PASSWORD VIEW (Enter OTP) -->
-            <div id="view-forgot-otp" class="hidden">
-                <div class="auth-view-header">
-                    <h2 class="auth-view-title">Enter OTP</h2>
-                    <p class="text-secondary auth-view-subtitle">Enter the 8-digit code sent to your email.</p>
-                </div>
-                <div id="forgot-otp-status-box" class="status-box hidden"></div>
-                <form id="modal-verify-otp-form" class="auth-form" novalidate>
-                    <div class="auth-otp-grid" id="modal-otp-boxes">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-input auth-otp-input">
-                    </div>
-                    <button type="submit" id="modal-verify-btn" class="btn-primary btn-lg btn-block">VERIFY CODE</button>
+        <main id="top">
 
-                    <div class="auth-resend-row">
-                        <button type="button" id="modal-resend-btn" disabled class="auth-resend-btn">
-                            Resend code in <span id="modal-timer">60</span>s
+            <!-- ==================================================== HERO -->
+            <section class="shell hero">
+                <div>
+                    <span class="eyebrow-pill">
+                        <svg class="icon icon-sm"><use href="#i-spark"></use></svg>
+                        Grade 7 Mathematics · Research Build
+                    </span>
+
+                    <h1 class="hero-title">
+                        A tutor that adapts to <span class="accent">who the learner is</span>, not just what they got wrong.
+                    </h1>
+
+                    <p class="hero-lede">
+                        PIA is a Personal Instructing Agent for Grade 7 mathematics. It profiles each student
+                        against the Big Five personality inventory, then matches a teaching persona to that
+                        profile — pacing, tone and hinting all shift to suit the learner in front of it.
+                    </p>
+
+                    <div class="hero-cta">
+                        <button class="btn btn-primary" data-auth-open="signin">
+                            Sign in to your account
+                            <svg class="icon"><use href="#i-arrow-right"></use></svg>
+                        </button>
+                        <button class="btn btn-secondary" data-auth-open="activate">
+                            Activate my account
                         </button>
                     </div>
-                </form>
-            </div>
 
-            <!-- 4. SET PASSWORD VIEW -->
-            <div id="view-set-password" class="hidden">
-                <div class="auth-view-header">
-                    <img src="/assets/images/logo.png" alt="PIA Logo" class="auth-view-logo" id="setup-logo">
-                    <p id="setup-greeting" class="auth-view-greeting text-accent hidden"></p>
-                    <h2 class="auth-view-title" id="setup-title">Set Password</h2>
-                    <p class="text-secondary auth-view-subtitle" id="setup-desc">Please create a secure password.</p>
+                    <div class="hero-meta">
+                        <div class="meta-item">
+                            <p class="meta-value">5</p>
+                            <p class="meta-label">Personality traits profiled</p>
+                        </div>
+                        <div class="meta-item">
+                            <p class="meta-value">4</p>
+                            <p class="meta-label">Study conditions compared</p>
+                        </div>
+                        <div class="meta-item">
+                            <p class="meta-value">1:1</p>
+                            <p class="meta-label">Agent per learner</p>
+                        </div>
+                    </div>
                 </div>
-                <div id="set-password-status-box" class="status-box hidden"></div>
-                <form id="modal-set-password-form" class="auth-form" novalidate>
-                    <div class="form-group">
-                        <label class="form-label" for="modal-new-password">New Password</label>
-                        <div class="input-icon-wrap">
-                            <input type="password" id="modal-new-password" minlength="6" required class="form-input"
-                                placeholder="••••••••">
-                            <button type="button" class="clear-input-btn hidden">
-                                <i data-lucide="x-circle" class="icon-sm"></i>
-                            </button>
-                        </div>
-                        <span class="field-error hidden" id="modal-new-password-error"></span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="modal-confirm-password">Confirm Password</label>
-                        <div class="input-icon-wrap">
-                            <input type="password" id="modal-confirm-password" minlength="6" required class="form-input"
-                                placeholder="••••••••">
-                            <button type="button" class="clear-input-btn hidden">
-                                <i data-lucide="x-circle" class="icon-sm"></i>
-                            </button>
-                        </div>
-                        <span class="field-error hidden" id="modal-confirm-password-error"></span>
 
-                        <div class="form-checkbox-row auth-checkbox-row">
-                            <input type="checkbox" id="show-setup-password" class="form-checkbox">
-                            <label for="show-setup-password" class="form-checkbox-label">Show password</label>
+                <!-- An abstract of a live session rather than a screenshot, so
+                     nothing here can go stale as the product changes. -->
+                <div class="hero-panel" aria-hidden="true">
+                    <div class="panel-bar">
+                        <span class="panel-dot"></span>
+                        <span class="panel-dot"></span>
+                        <span class="panel-dot"></span>
+                        <span class="panel-title">Tutoring session · Section Earth</span>
+                    </div>
+
+                    <div class="chat-line">
+                        <span class="chat-who">MS</span>
+                        <p class="chat-body">I keep getting the fractions one wrong and I don't know why.</p>
+                    </div>
+
+                    <div class="chat-line is-agent">
+                        <span class="chat-who">PIA</span>
+                        <p class="chat-body">Let's slow down and take it one step at a time. You had
+                            <strong>2/3 + 1/4</strong> — before we add, what has to be true about the two
+                            denominators?</p>
+                    </div>
+
+                    <div class="chat-line">
+                        <span class="chat-who">MS</span>
+                        <p class="chat-body">They have to be the same?</p>
+                    </div>
+
+                    <div class="chat-line is-agent">
+                        <span class="chat-who">PIA</span>
+                        <p class="chat-body">Exactly that. You already knew it — let's find the smallest
+                            number both 3 and 4 divide into.</p>
+                    </div>
+
+                    <div class="panel-foot">
+                        <div class="trait-mini">
+                            <div class="trait-mini-label"><span>Conscientiousness</span><span>78%</span></div>
+                            <div class="bar"><div class="bar-fill" style="width:78%"></div></div>
+                        </div>
+                        <div class="trait-mini">
+                            <div class="trait-mini-label"><span>Neuroticism</span><span>61%</span></div>
+                            <div class="bar"><div class="bar-fill f-amber" style="width:61%"></div></div>
                         </div>
                     </div>
-                    <button type="submit" id="modal-save-password-btn" class="btn-primary btn-lg btn-block">SAVE
-                        PASSWORD</button>
+                </div>
+            </section>
+
+            <!-- ================================================ FEATURES -->
+            <section class="shell section" id="how">
+                <div class="section-head">
+                    <h2 class="section-title">One learner, one profile, one matched agent</h2>
+                    <p class="section-lede">
+                        Every participant is measured before they are taught, and the agent they meet is
+                        chosen by that measurement rather than by chance.
+                    </p>
+                </div>
+
+                <div class="feature-grid">
+                    <article class="feature">
+                        <span class="feature-glyph"><svg class="icon icon-lg"><use href="#i-brain"></use></svg></span>
+                        <h3 class="feature-title">Personality-first profiling</h3>
+                        <p class="feature-text">
+                            Students complete the Big Five Inventory before any tutoring begins. Scoring runs
+                            server-side, so the profile that drives the session cannot be edited from the
+                            browser.
+                        </p>
+                    </article>
+
+                    <article class="feature">
+                        <span class="feature-glyph g-teal"><svg class="icon icon-lg"><use href="#i-spark"></use></svg></span>
+                        <h3 class="feature-title">Personas that actually differ</h3>
+                        <p class="feature-text">
+                            Each agent persona changes how a problem is scaffolded — how early a hint arrives,
+                            how much encouragement carries it, how quickly difficulty climbs after a streak.
+                        </p>
+                    </article>
+
+                    <article class="feature">
+                        <span class="feature-glyph g-amber"><svg class="icon icon-lg"><use href="#i-shield"></use></svg></span>
+                        <h3 class="feature-title">Built for clean data</h3>
+                        <p class="feature-text">
+                            Stage gates, device limits and consent tracking are enforced in the database, not
+                            the interface — so a session that shouldn't have happened simply cannot.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- =================================================== STEPS -->
+            <section class="shell section" id="study">
+                <div class="section-head">
+                    <h2 class="section-title">How a session runs</h2>
+                    <p class="section-lede">
+                        Four stages, opened one at a time by the research team so the whole cohort moves
+                        together.
+                    </p>
+                </div>
+
+                <div class="steps">
+                    <article class="step">
+                        <span class="step-num">1</span>
+                        <h3 class="step-title">Personality inventory</h3>
+                        <p class="step-text">A 50-item Big Five questionnaire establishes the learner's trait profile.</p>
+                    </article>
+                    <article class="step">
+                        <span class="step-num">2</span>
+                        <h3 class="step-title">Agent assignment</h3>
+                        <p class="step-text">A persona is matched to the profile — or chosen freely, depending on the condition.</p>
+                    </article>
+                    <article class="step">
+                        <span class="step-num">3</span>
+                        <h3 class="step-title">Guided practice</h3>
+                        <p class="step-text">The agent works through Grade 7 problems, adapting hints and difficulty live.</p>
+                    </article>
+                    <article class="step">
+                        <span class="step-num">4</span>
+                        <h3 class="step-title">Post-test</h3>
+                        <p class="step-text">Results are compared against the pre-test baseline for every condition.</p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ===================================================== CTA -->
+            <section class="shell section">
+                <div class="cta-panel">
+                    <h2 class="section-title">Already enrolled in the study?</h2>
+                    <p class="section-lede" style="margin-left:auto;margin-right:auto;max-width:56ch">
+                        Accounts are created by the research team. Use the activation link sent to your school
+                        email to set your password, then sign in here.
+                    </p>
+                    <div class="cta-actions">
+                        <button class="btn btn-primary" data-auth-open="signin">Sign in</button>
+                        <button class="btn btn-secondary" data-auth-open="activate">Resend my activation link</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-foot">
+            <div class="shell foot-inner">
+                <span>PIA System · Personal Instructing Agent</span>
+                <span>University of the East · Undergraduate thesis research build</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- =====================================================================
+         MODAL · SIGN IN
+         Mechanics are inherited from global.css unchanged: 18px dialog
+         radius, the 36×36 close button sitting IN FLOW 21px from the edge
+         (outside the corner arc, so it can never clip), and a reserved
+         .field-msg slot under every input plus a fixed-height .auth-status
+         row — errors appear without moving a single control.
+         ===================================================================== -->
+    <div class="overlay" id="modal-signin" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="signin-title">Sign in</h2>
+                    <p class="modal-sub">Use the school email address your account was created with.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <p class="auth-status" id="signin-status" role="status">
+                    <svg class="icon"><use href="#i-alert"></use></svg>
+                    <span data-status-text></span>
+                </p>
+
+                <form id="signin-form" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label class="label" for="si-email">School email</label>
+                            <input class="input" type="email" id="si-email" autocomplete="username"
+                                placeholder="maria.santos@student.ue.edu.ph">
+                            <p class="field-msg" data-msg-for="si-email"></p>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="si-password">Password</label>
+                            <input class="input" type="password" id="si-password" autocomplete="current-password"
+                                placeholder="••••••••">
+                            <p class="field-msg" data-msg-for="si-password"></p>
+                        </div>
+                    </div>
+
+                    <div class="auth-alt">
+                        <button type="button" class="link-btn" data-auth-open="forgot">Forgot password?</button>
+                        <button type="button" class="link-btn" data-auth-open="activate">Need to activate?</button>
+                    </div>
                 </form>
             </div>
 
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button class="btn btn-primary" type="submit" form="signin-form" id="si-submit">Sign in</button>
+            </footer>
         </div>
     </div>
 
-    <script src="/assets/js/function.js"></script>
-    <script src="/assets/js/index.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
+    <!-- ============================================= MODAL · ACTIVATION -->
+    <div class="overlay" id="modal-activate" role="dialog" aria-modal="true" aria-labelledby="activate-title">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="activate-title">Activate your account</h2>
+                    <p class="modal-sub">We'll email you a one-time link to set your password.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <div class="auth-intro">
+                    <svg class="icon"><use href="#i-info"></use></svg>
+                    <p class="auth-intro-text">
+                        Accounts are created by the research team — there is no public sign-up. If your email
+                        isn't on the roster yet, contact your teacher or the study administrator.
+                    </p>
+                </div>
+
+                <p class="auth-status" id="activate-status" role="status">
+                    <svg class="icon"><use href="#i-alert"></use></svg>
+                    <span data-status-text></span>
+                </p>
+
+                <form id="activate-form" novalidate>
+                    <div class="field">
+                        <label class="label" for="ac-email">School email</label>
+                        <input class="input" type="email" id="ac-email" autocomplete="username"
+                            placeholder="maria.santos@student.ue.edu.ph">
+                        <p class="field-msg" data-msg-for="ac-email"></p>
+                    </div>
+                </form>
+            </div>
+
+            <footer class="modal-foot modal-foot-split">
+                <button type="button" class="link-btn" data-auth-open="signin">Back to sign in</button>
+                <div class="modal-foot-actions">
+                    <button class="btn btn-primary" type="submit" form="activate-form" id="ac-submit">
+                        <svg class="icon"><use href="#i-mail"></use></svg>
+                        Send link
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================ MODAL · RESET PASSWORD -->
+    <div class="overlay" id="modal-forgot" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="forgot-title">Reset your password</h2>
+                    <p class="modal-sub">We'll email a secure link where you can choose a new one.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <p class="auth-status" id="forgot-status" role="status">
+                    <svg class="icon"><use href="#i-alert"></use></svg>
+                    <span data-status-text></span>
+                </p>
+
+                <form id="forgot-form" novalidate>
+                    <div class="field">
+                        <label class="label" for="fp-email">School email</label>
+                        <input class="input" type="email" id="fp-email" autocomplete="username"
+                            placeholder="maria.santos@student.ue.edu.ph">
+                        <p class="field-msg" data-msg-for="fp-email"></p>
+                    </div>
+                </form>
+            </div>
+
+            <footer class="modal-foot modal-foot-split">
+                <button type="button" class="link-btn" data-auth-open="signin">Back to sign in</button>
+                <div class="modal-foot-actions">
+                    <button class="btn btn-primary" type="submit" form="forgot-form" id="fp-submit">
+                        <svg class="icon"><use href="#i-key"></use></svg>
+                        Send reset link
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
+
+    <script src="assets/js/function.js"></script>
+    <script src="assets/js/auth.js"></script>
 </body>
 
 </html>

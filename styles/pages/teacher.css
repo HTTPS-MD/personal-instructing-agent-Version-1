@@ -1,512 +1,354 @@
-/* ==========================================================================
-   TEACHER DASHBOARD
-   ========================================================================== */
-.dashboard-wrapper {
-    background-color: var(--bg-main);
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    transition: opacity 0.3s ease;
-}
+/* ============================================================================
+   PIA SYSTEM — TEACHER CONSOLE
+   REQUIRES styles/global.css (reset, tokens, shared components) and
+   styles/shell.css (rail, workspace, top bar).
 
-.dashboard-header {
-    border-bottom: 2px solid var(--border-color);
-    position: relative;
-    z-index: 20;
-}
+   A teacher watches ONE section live. Where the admin console is built for
+   managing many things, this is built for watching a handful of rows change:
+   fewer views, bigger status affordances, and a roster that is legible at a
+   glance from the front of a classroom.
+   ==========================================================================*/
 
-.teacher-logo {
-    height: 2.5rem;
-}
+/* ------------------------------------------------------------- 1. TABLES */
+.table-wrap { overflow-x: auto; }
 
-.role-badge {
-    color: var(--accent-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    font-family: var(--font-mono);
-    padding: 0.3rem 0.65rem;
-}
+.table { font-size: 13px; }
 
-.nav-btn {
-    color: var(--accent-primary);
-    background-color: var(--bg-hover);
-    transition: background-color var(--transition-speed) ease;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-md);
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.nav-btn:hover {
-    background-color: var(--bg-card);
-}
-
-.teacher-identity {
-    text-align: right;
-}
-
-.teacher-name {
-    font-size: 0.875rem;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-.teacher-section {
-    font-size: 0.625rem;
-    font-family: var(--font-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-secondary);
-}
-
-.logout-btn {
-    color: var(--color-danger);
-    border-color: var(--color-danger-border);
-    background-color: transparent;
-}
-
-.logout-btn:hover {
-    background-color: var(--color-danger-bg-hover);
-    color: var(--color-danger-hover);
-}
-
-.dashboard-main {
-    flex: 1;
-    padding: 2rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.dashboard-toolbar {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-    justify-content: space-between;
-}
-
-@media (min-width: 768px) {
-    .dashboard-toolbar {
-        flex-direction: row;
-        align-items: flex-end;
-    }
-}
-
-.dashboard-title {
-    font-size: 1.5rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-primary);
-}
-
-.dashboard-subtitle {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-top: 0.25rem;
-}
-
-.dashboard-table-container {
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    background-color: var(--bg-card);
-}
-
-.filter-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1rem;
-}
-
-.filter-tab {
-    background: transparent;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-md);
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: all var(--transition-speed) ease;
-}
-
-.filter-tab:hover {
-    color: var(--text-primary);
-}
-
-.filter-tab.active {
-    color: var(--accent-primary);
-    background-color: var(--bg-hover);
-}
-
-.status-indicator {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.status-online { background-color: var(--color-success); }
-.status-offline { background-color: var(--color-neutral); }
-.status-inactive { background-color: var(--color-warning); }
-.status-smooth { background-color: var(--color-smooth); }
-.status-struggling { background-color: var(--color-danger); }
-
-.dashboard-table {
-    width: 100%;
+.table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 44px;
+    padding: 0 var(--sp-5);
+    background: var(--bg-surface);
     text-align: left;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-}
-
-.dashboard-table thead tr {
-    border-bottom: 2px solid var(--border-color);
-    color: var(--text-secondary);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.dashboard-table th,
-.dashboard-table td {
-    padding: 0.75rem 1rem;
-}
-
-.dashboard-table tbody {
-    color: var(--text-primary);
-    font-size: 0.75rem;
-}
-
-.dashboard-table tbody tr {
-    border-bottom: 1px solid var(--border-color);
-}
-
-.dashboard-table tbody tr:last-child {
-    border-bottom: none;
-}
-
-.empty-state {
-    padding: 3rem 0;
-    text-align: center;
-}
-
-.empty-state-icon {
-    color: var(--border-color);
-    margin: 0 auto 0.75rem;
-}
-
-/* --- Student Profile Overlay --- */
-.profile-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    background-color: var(--bg-main);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-
-.profile-overlay-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-}
-
-.profile-overlay-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-}
-
-.profile-overlay-close {
-    color: var(--text-secondary);
-}
-
-.profile-overlay-close:hover {
-    color: var(--text-primary);
-}
-
-.profile-overlay-main {
-    flex: 1;
-    padding: 2.5rem 1.5rem;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 2rem;
-    align-items: start;
-}
-
-@media (min-width: 1024px) {
-    .profile-overlay-main {
-        grid-template-columns: repeat(12, 1fr);
-    }
-}
-
-.profile-persona-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 1.5rem;
-}
-
-@media (min-width: 1024px) {
-    .profile-persona-col {
-        grid-column: span 4;
-    }
-}
-
-.profile-avatar-container {
-    width: 10rem;
-    height: 10rem;
-    border-radius: var(--radius-xl);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-color);
-    box-shadow: 4px 4px 0px var(--border-color);
-}
-
-.profile-avatar-img {
-    height: 8rem;
-    object-fit: contain;
-}
-
-.profile-identity {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.profile-persona-badge {
-    padding: 0.35rem 0.85rem;
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-family: var(--font-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    background-color: var(--color-success-bg);
-    color: var(--accent-primary);
-    border: 1px solid var(--border-color);
-    display: inline-block;
-}
-
-.profile-name {
-    font-size: 1.5rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-primary);
-}
-
-.profile-email {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-}
-
-.profile-details-col {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-@media (min-width: 1024px) {
-    .profile-details-col {
-        grid-column: span 8;
-    }
-}
-
-.profile-info-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
-
-.profile-info-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.profile-info-label {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-}
-
-.profile-info-value {
+    font-size: 11px;
     font-weight: 700;
-    font-size: 0.875rem;
-    color: var(--text-primary);
-}
-
-.profile-logs-card {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.profile-logs-heading {
-    font-size: 0.8rem;
-    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-primary);
+    color: var(--text-faint);
+    white-space: nowrap;
 }
 
-.profile-stat-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+.table tbody td {
+    height: 64px;              /* taller than admin: read from a distance */
+    padding: 0 var(--sp-5);
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
-.profile-stat-box {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
-    border-radius: var(--radius-md);
-    background-color: var(--bg-main);
-    border: 1px solid var(--border-color);
-    font-size: 0.75rem;
-}
+.table tbody tr { transition: background-color var(--t-base); }
+.table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.012); }
+.table tbody tr:hover,
+.table tbody tr:nth-child(even):hover { background: var(--bg-surface-hover); }
 
-.profile-stat-value {
-    font-family: var(--font-mono);
-    font-weight: 700;
-    color: var(--text-primary);
-}
+.col-right { text-align: right; }
 
-.teacher-footer {
-    width: 100%;
-    max-width: var(--page-max-width);
-    margin: 0 auto;
-    padding: 1rem 1.5rem;
-    text-align: center;
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-}
-
-/* --- Learning Status Indicators (dynamic JS bindings) --- */
-.learning-struggling { color: var(--color-danger); }
-.learning-smooth { color: var(--color-smooth); }
-
-.status-badge-offline,
-.status-dot-offline { color: var(--color-neutral); }
-.status-dot-offline { background-color: var(--color-neutral); }
-.status-badge-inactive { color: var(--color-warning); }
-.status-badge-online { color: var(--color-success); }
-
-.badge-group {
-    background-color: var(--color-success-bg);
-    border: 1px solid var(--color-success-border);
-    color: var(--accent-primary);
-}
+.cell-user { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.cell-name { display: block; font-weight: 600; line-height: 18px; }
+.cell-mail { display: block; font-size: 11.5px; line-height: 16px; color: var(--text-muted); }
 
 .empty-cell {
-    padding: 2rem 1rem;
+    height: 200px;
     text-align: center;
-    color: var(--text-secondary);
+    color: var(--text-muted);
+    font-size: 13.5px;
 }
 
-.engagement-badge {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-}
-
+/* ------------------------------------------------------ 2. STATUS PILLS --
+   Fixed heights and nowrap: a row switching from Online to Inactive changes
+   colour and nothing else. */
+.engagement-badge,
 .learning-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    font-weight: 500;
+    gap: 6px;
+    height: 26px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
 }
+
+.status-badge-online { background: var(--accent-soft); color: var(--accent); }
+.status-badge-inactive { background: var(--support-amber-soft); color: var(--support-amber); }
+.status-badge-offline { background: var(--bg-chip); color: var(--text-muted); }
+
+.learning-smooth { background: var(--support-teal-soft); color: var(--support-teal); }
+.learning-struggling { background: var(--danger-soft); color: var(--danger); }
+
+.learning-badge .icon { width: 13px; height: 13px; }
 
 .status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
     border-radius: 50%;
+    background: var(--track);
 }
 
-.engagement-dot-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.status-dot-online { background: var(--accent); }
+.status-dot-inactive { background: var(--support-amber); }
+.status-dot-offline { background: var(--track); }
+
+/* Only the live state pulses, so a scanning eye is drawn to who is actually
+   working right now. Opacity only — the dot never changes size. */
+.engagement-dot-pulse { animation: teacher-pulse 2s ease-in-out infinite; }
+
+@keyframes teacher-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
 }
 
-.student-name-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-.student-avatar-wrap {
-    position: relative;
-}
+/* ------------------------------------------------- 3. ROSTER AVATAR + DOT */
+.student-avatar-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
 
 .student-avatar-initial {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    background-color: var(--color-info-bg);
-    color: var(--accent-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-sm);
+    background: var(--bg-chip);
+    display: grid;
+    place-items: center;
+    font-size: 13px;
     font-weight: 700;
 }
 
+/* The ring is the surrounding surface's own colour — a gap punched out of the
+   avatar, never an outline. */
 .student-avatar-status {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 0.6rem;
-    height: 0.6rem;
+    right: -2px;
+    bottom: -2px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
-    border: 1px solid var(--bg-main);
+    box-shadow: 0 0 0 2.5px var(--bg-surface);
 }
 
-.student-name {
-    color: var(--text-primary);
+.table tbody tr:hover .student-avatar-status { box-shadow: 0 0 0 2.5px var(--bg-surface-hover); }
+
+/* --------------------------------------------------------- 4. STAT TILES */
+.stat {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 128px;
+    padding: var(--sp-5);
+    background: var(--bg-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    text-align: left;
+    transition: background-color var(--t-base);
 }
 
-.student-email {
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
+button.stat { cursor: pointer; }
+button.stat:hover { background: var(--bg-surface-hover); }
+button.stat.is-active { background: var(--accent-soft); }
+
+.stat-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.stat-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+
+.stat-glyph {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: var(--r-sm);
+    display: grid;
+    place-items: center;
+    background: var(--bg-chip);
+    color: var(--text-muted);
+}
+
+.stat-glyph .icon { width: 15px; height: 15px; }
+.stat-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
+.stat-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+.stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
+.stat-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
+
+.stat-value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 36px;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-foot { min-height: 18px; font-size: 11.5px; color: var(--text-muted); }
+
+/* ------------------------------------------------------- 5. FILTER TABS */
+.filter-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+
+.filter-tab {
+    height: 34px;
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-pill);
+    background: var(--bg-field);
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.filter-tab:hover { background: var(--bg-chip); color: var(--text); }
+.filter-tab.active { background: var(--accent-soft); color: var(--accent); }
+
+/* --------------------------------------------------- 6. EMPTY / LOADING */
+.state-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+    min-height: 260px;
+    padding: var(--sp-6);
+    text-align: center;
+}
+
+.state-glyph {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-lg);
+    background: var(--bg-field);
+    color: var(--text-faint);
+}
+
+.state-title { font-size: 14px; font-weight: 600; }
+.state-desc { font-size: 12.5px; color: var(--text-muted); max-width: 42ch; }
+
+.skeleton { border-radius: var(--r-xs); background: var(--bg-surface-hi); animation: skel 1.4s ease-in-out infinite; }
+@keyframes skel { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
+.skeleton-line { height: 10px; border-radius: var(--r-pill); }
+.skeleton-line + .skeleton-line { margin-top: 6px; }
+.skeleton-pill { height: 26px; width: 92px; border-radius: var(--r-pill); }
+.skeleton-avatar { width: 36px; height: 36px; border-radius: var(--r-sm); flex: 0 0 36px; }
+
+/* -------------------------------------------------------- 7. BOOT GATE */
+body[data-boot="pending"] .app,
+body[data-boot="pending"] .toast-stack { visibility: hidden; }
+
+.boot-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-4);
+    background: var(--bg-body);
+    opacity: 1;
+    transition: opacity var(--t-base);
+}
+
+body:not([data-boot="pending"]) .boot-veil { opacity: 0; pointer-events: none; }
+body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
+.boot-text { font-size: 13px; color: var(--text-muted); }
+
+.error-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 350;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+    min-height: 44px;
+    padding: var(--sp-2) var(--sp-5);
+    background: var(--danger);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.error-banner .icon { width: 16px; height: 16px; }
+.error-banner[hidden] { display: none; }
+
+/* --------------------------------------------------- 8. STUDENT DRAWER */
+.drawer-overlay { justify-content: flex-end; padding: 0; }
+
+.drawer {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 440px;
+    height: 100%;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(16px);
+    opacity: 0;
+    transition: transform var(--t-layout), opacity var(--t-base);
+}
+
+.overlay.is-open .drawer { transform: translateX(0); opacity: 1; }
+
+.drawer-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex: 0 0 auto;
+    min-height: var(--topbar-h);
+    padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-5);
+}
+
+.drawer-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-5); }
+
+.drawer-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    padding-bottom: var(--sp-5);
+}
+
+.drawer-avatar {
+    width: 60px;
+    height: 60px;
+    flex: 0 0 60px;
+    border-radius: var(--r-lg);
+    background: var(--bg-field);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.drawer-avatar img { width: 100%; height: 100%; object-fit: contain; }
+/* Missing persona art falls back to a monogram rather than a broken image. */
+.drawer-avatar[data-mono] img { display: none; }
+.drawer-avatar[data-mono]::after { content: attr(data-mono); color: var(--accent); }
+
+.kv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+
+.kv {
+    min-height: 66px;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.kv-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.kv-value { margin-top: var(--sp-1); font-size: 15px; font-weight: 600; }
+
+/* ---------------------------------------------------------- 9. UTILITIES */
+.grid { display: grid; gap: var(--sp-4); align-items: stretch; }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+/* ------------------------------------------------------- 10. RESPONSIVE */
+@media (max-width: 1279px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+@media (max-width: 768px) {
+    .grid-4 { grid-template-columns: minmax(0, 1fr); }
+    .drawer { max-width: 100%; }
+    .filter-row { width: 100%; }
 }

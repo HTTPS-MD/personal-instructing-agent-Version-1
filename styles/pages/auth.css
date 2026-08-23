@@ -1,59 +1,191 @@
-/* --- Auth / Account Activation Page --- */
-.auth-page-body {
+/* ============================================================================
+   PIA SYSTEM — ACCOUNT ACTIVATION
+   sign-up.html: where the "Activate my account" and "Reset password" magic
+   links land. REQUIRES styles/global.css.
+
+   Deliberately built from the same parts as the landing page's auth modals —
+   same card radius, same field wells, same reserved status row — because a
+   student arrives here directly from that flow via their email. Crossing from
+   one to the other should feel like the same product, not a different site.
+   ==========================================================================*/
+
+.auth-page {
+    min-height: 100vh;
     min-height: 100dvh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 3rem 1.5rem;
+    padding: var(--sp-6);
 }
 
+.auth-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(56rem 38rem at 12% -10%, rgba(5, 196, 107, 0.075), transparent 60%),
+        radial-gradient(44rem 32rem at 92% 6%, rgba(79, 168, 147, 0.055), transparent 62%);
+}
+
+.auth-page > * { position: relative; z-index: 1; }
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+}
+
+.auth-mark {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: var(--r-md);
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.auth-brand-text { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+
+/* Card radius matches .modal exactly, so arriving here from the landing
+   page's dialog is visually continuous. */
 .auth-card {
     width: 100%;
-    max-width: 28rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    box-shadow: var(--shadow-soft);
+    max-width: 460px;
+    padding: var(--sp-7);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
 }
 
-.auth-card-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    text-align: center;
-}
-
-.auth-logo {
-    height: 2.5rem;
-    margin-bottom: 0.5rem;
+.auth-greeting {
+    min-height: 30px;                 /* reserved: filled from the profile */
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
 }
 
 .auth-title {
-    font-weight: 700;
+    margin-top: var(--sp-1);
+    font-size: 24px;
+    font-weight: 800;
     letter-spacing: -0.025em;
-    color: var(--text-primary);
-    font-size: 1.375rem;
 }
 
-.auth-form {
+.auth-lede {
+    margin-top: var(--sp-2);
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text-muted);
+}
+
+/* The address the link was issued for. Reserved so the form does not shift
+   when it arrives. */
+.auth-identity {
     display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 56px;
+    margin: var(--sp-5) 0;
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
 }
 
-.auth-bottom-text {
+.auth-identity .icon { flex: 0 0 18px; color: var(--text-faint); }
+.auth-identity-text { min-width: 0; }
+.auth-identity-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.auth-identity-value { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Always present at a fixed height. A server error appearing can never push
+   the password fields or the submit button down the page. */
+.auth-status {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    min-height: 42px;
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+    font-size: 12.5px;
+    line-height: 1.5;
+    background: transparent;
+    color: transparent;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.auth-status .icon { width: 15px; height: 15px; flex: 0 0 15px; margin-top: 2px; opacity: 0; }
+.auth-status.auth-status-error { background: var(--danger-soft); color: var(--danger); }
+.auth-status.auth-status-success { background: var(--accent-soft); color: var(--accent); }
+.auth-status.auth-status-error .icon,
+.auth-status.auth-status-success .icon { opacity: 1; }
+
+/* The controller's contract is to un-hide this element. The row is permanent
+   now, so `hidden` on it must NOT pull it out of the flow — otherwise the
+   first message to appear pushes the password fields and the submit button
+   29px down the page. It goes transparent, never display:none. */
+.auth-status.hidden {
+    display: flex !important;
+    background: transparent;
+    color: transparent;
+}
+
+.auth-status.hidden .icon { opacity: 0; }
+
+.auth-form { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.auth-show-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 24px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.auth-show-row input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.auth-show-box {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    border-radius: var(--r-xs);
+    background: var(--bg-chip);
+    display: grid;
+    place-items: center;
+    transition: background-color var(--t-base);
+}
+
+.auth-show-box .icon { width: 12px; height: 12px; stroke-width: 3; color: var(--on-accent); opacity: 0; transition: opacity var(--t-base); }
+.auth-show-row input:checked + .auth-show-box { background: var(--accent); }
+.auth-show-row input:checked + .auth-show-box .icon { opacity: 1; }
+.auth-show-row input:focus-visible + .auth-show-box { box-shadow: 0 0 0 3px var(--accent-soft); }
+.auth-show-text { font-size: 13px; color: var(--text-muted); }
+
+.auth-submit { height: 50px; font-size: 15px; font-weight: 700; }
+
+.auth-hint {
+    margin-top: var(--sp-5);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-faint);
     text-align: center;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
 }
 
-.auth-link {
-    color: var(--accent-primary);
-    font-weight: 600;
-    transition: color var(--transition-speed) ease;
-}
+.auth-hint a { color: var(--accent); font-weight: 600; }
+.auth-hint a:hover { text-decoration: underline; }
 
-.auth-link:hover {
-    color: var(--accent-hover);
+/* .hidden is how the controller removes the form on an expired link. */
+.hidden { display: none !important; }
+
+@media (max-width: 480px) {
+    .auth-page { padding: var(--sp-4); }
+    .auth-card { padding: var(--sp-6) var(--sp-5); }
+    .auth-title { font-size: 21px; }
 }

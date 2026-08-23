@@ -1,0 +1,464 @@
+/* ============================================================================
+   PIA SYSTEM — APP SHELL
+   The hover-expand rail, the workspace offset and the sticky top bar.
+   REQUIRES styles/global.css. Loaded by every signed-in console surface
+   (admin, teacher) so the chrome behaves identically across roles and the
+   rail's geometry is defined exactly once.
+
+   Pair it with assets/js/shell.js, which owns the rail's behaviour.
+   ==========================================================================*/
+
+/* ------------------------------------------------------------ 4. APP SHELL */
+/* Overlay rail shell.
+   ---------------------------------------------------------------------------
+   The sidebar is taken OUT OF FLOW (position: fixed) and the workspace holds a
+   permanent margin equal to the collapsed rail width. Because that margin is a
+   constant, expanding the rail cannot move, resize or reflow a single pixel of
+   the main content — the panel simply grows over the top of it.
+
+   Icon geometry (constraint #3):
+       rail width ................ 76px  (--rail-w)
+       rail side padding ......... 8px   (--rail-pad)
+       icon slot ................. 60px  (--rail-w − 2 × --rail-pad)
+       icon centre ............... 8 + 30 = 38px = exactly the rail's midpoint
+   The slot is a fixed-basis flex item, so its width is identical in both
+   states. Every icon therefore sits on the same vertical axis whether the rail
+   is 76px or 264px wide — the labels appear beside it, nothing shifts.       */
+.app {
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
+/* ---- 4.1 The rail ---- */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;                       /* above the topbar (30), below modals (100) */
+    display: flex;
+    flex-direction: column;
+    width: var(--rail-w);
+    height: 100vh;
+    height: 100dvh;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-edge);
+    overflow: hidden;                  /* clips labels while collapsed */
+    transition: width var(--t-layout), box-shadow var(--t-layout);
+}
+
+/* Expanded state is driven entirely by JS (hover intent, focus, touch), so
+   the delay and the touch fallback live in one place. */
+.app[data-rail="expanded"] .sidebar {
+    width: var(--rail-w-open);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Brand block matches the topbar height exactly so both baselines align. */
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    height: var(--topbar-h);
+    padding: 0 var(--rail-pad);
+    flex: 0 0 auto;
+}
+
+/* The one shared alignment primitive: a fixed-width box that centres its
+   child. Used by the brand mark, every nav icon and the footer avatar. */
+.rail-slot {
+    width: var(--rail-icon);
+    flex: 0 0 var(--rail-icon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brand-mark {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: var(--r-md);
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+/* Text that only exists in the expanded state. It is laid out at full width
+   at all times and merely faded — never re-measured — so expanding does not
+   reflow the column. */
+.rail-reveal {
+    min-width: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-fast);
+}
+
+.app[data-rail="expanded"] .rail-reveal {
+    opacity: 1;
+    pointer-events: auto;
+    /* Fade in only after the panel has most of its width, so letters never
+       appear outside the panel edge. Collapsing fades out immediately. */
+    transition: opacity 140ms cubic-bezier(0.4, 0, 0.2, 1) 90ms;
+}
+
+.brand-text { padding-left: var(--sp-3); }
+
+.brand-name {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+.brand-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.sidebar-scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--sp-5) var(--rail-pad);
+}
+
+/* The scrollbar would otherwise appear inside the 76px rail and pull the
+   icons off-centre. */
+.sidebar-scroll::-webkit-scrollbar { width: 0; }
+.sidebar-scroll { scrollbar-width: none; }
+
+.nav-group + .nav-group { margin-top: var(--sp-6); }
+
+/* Group labels keep their box in both states — only the text fades — so the
+   vertical rhythm of the nav is identical collapsed and expanded. */
+.nav-group-label {
+    height: 16px;
+    padding-left: calc(var(--rail-icon) + var(--sp-1));
+    margin-bottom: var(--sp-2);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    line-height: 16px;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 44px;                      /* fixed: the nav never reflows */
+    padding: 0;                        /* the icon slot owns the left inset */
+    border-radius: var(--r-md);
+    color: var(--text-muted);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.nav-item + .nav-item { margin-top: 2px; }
+.nav-item:hover { background: var(--bg-surface-hover); color: var(--text); }
+
+.nav-item.is-active {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+/* Active marker hugs the panel's left edge in both states. */
+.nav-item.is-active::before {
+    content: "";
+    position: absolute;
+    left: calc(var(--rail-pad) * -1);
+    top: 50%;
+    width: 3px;
+    height: 20px;
+    margin-top: -10px;
+    border-radius: 0 var(--r-pill) var(--r-pill) 0;
+    background: var(--accent);
+}
+
+.nav-item.is-active .icon { color: var(--accent); }
+
+.nav-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-count {
+    flex: 0 0 auto;
+    min-width: 24px;
+    height: 20px;
+    margin-right: var(--sp-3);
+    padding: 0 var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.sidebar-foot {
+    flex: 0 0 auto;
+    padding: var(--sp-3) var(--rail-pad);
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 52px;
+    padding: 0;
+    border-radius: var(--r-md);
+    transition: background-color var(--t-base);
+}
+
+.sidebar-user:hover { background: var(--bg-surface-hover); }
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: var(--r-sm);
+    background: var(--bg-chip);
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.sidebar-user-text {
+    min-width: 0;
+    padding-right: var(--sp-3);
+    text-align: left;
+}
+
+.sidebar-user-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- 4.2 Workspace ---- */
+.workspace {
+    /* The offset is a constant. It is never recalculated when the rail
+       expands, which is precisely why the content cannot jump. */
+    margin-left: var(--rail-w);
+    min-width: 0;              /* allows tables to scroll instead of pushing */
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    height: var(--topbar-h);
+    flex: 0 0 var(--topbar-h);
+    padding: 0 var(--sp-6);
+    background: rgba(15, 19, 17, 0.90);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-under);
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: 13px;
+    color: var(--text-muted);
+    min-width: 0;
+}
+
+.crumbs .icon { color: var(--text-faint); }
+
+/* The current crumb truncates instead of wrapping — the topbar keeps its
+   exact 64px height at every viewport width. */
+.crumbs strong {
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-left: auto;
+}
+
+.env-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--bg-surface);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+}
+
+.dot-live { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dot-warn { background: var(--support-amber); box-shadow: 0 0 0 3px var(--support-amber-soft); }
+.dot-off { background: var(--text-faint); }
+
+.main {
+    flex: 1 1 auto;
+    padding: var(--sp-7) var(--sp-6) var(--sp-9);
+    scrollbar-gutter: stable;
+}
+
+.page { max-width: 1440px; margin: 0 auto; }
+
+/* ---- 4.3 Page header ---- */
+.page-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--sp-6);
+}
+
+.page-head-text { min-width: 260px; flex: 1 1 320px; }
+
+.page-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+}
+
+.page-desc {
+    margin-top: var(--sp-1);
+    font-size: 13.5px;
+    color: var(--text-muted);
+    max-width: 68ch;
+}
+
+.page-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------- SHELL RESPONSIVE */
+/* ------------------------------------------------------------ 14. RESPONSIVE */
+.scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    display: none;
+    background: rgba(7, 10, 8, 0.62);
+    opacity: 0;
+    transition: opacity var(--t-base);
+}
+
+.scrim.is-mounted { display: block; }
+.scrim.is-open { opacity: 1; }
+
+@media (max-width: 1279px) {
+    .grid-main { grid-template-columns: minmax(0, 1fr); }
+    .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1024px) {
+    .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    /* Touch layout: there is no hover, so the rail stops being a rail. It
+       hides off-canvas at full width and the hamburger slides it in. The
+       workspace reclaims the reserved 76px because nothing is pinned there. */
+    .workspace { margin-left: 0; }
+
+    .sidebar {
+        width: var(--rail-w-open);
+        transform: translateX(-100%);
+        transition: transform var(--t-layout);
+        box-shadow: var(--shadow-lg);
+    }
+
+    /* Hover expansion is meaningless here — the drawer is always full width. */
+    .app[data-rail="expanded"] .sidebar { width: var(--rail-w-open); }
+    .app[data-mobile-nav="open"] .sidebar { transform: translateX(0); }
+
+    /* Labels are always visible in the drawer. */
+    .rail-reveal { opacity: 1; pointer-events: auto; }
+}
+
+@media (min-width: 1025px) { .nav-toggle-mobile { display: none; } }
+
+@media (max-width: 768px) {
+    .main { padding: var(--sp-5) var(--sp-4) var(--sp-8); }
+    .topbar { padding: 0 var(--sp-4); }
+    .grid-2, .grid-3, .grid-4, .funnel, .kv-grid { grid-template-columns: minmax(0, 1fr); }
+    .form-grid-2, .form-grid-3, .choice-grid, .gate-foot { grid-template-columns: minmax(0, 1fr); }
+    .form-span-2 { grid-column: span 1; }
+    .search { flex: 1 1 100%; }
+    .env-pill, .crumbs-trail { display: none; }
+    .overlay { padding: 0; align-items: flex-end; }
+    .modal { max-width: 100%; max-height: 92vh; border-radius: var(--r-xl) var(--r-xl) 0 0; }
+
+    /* The footer note is supporting copy — drop it so the action row keeps a
+       single, predictable line on small screens. */
+    .modal-foot-note { display: none; }
+    .modal-foot, .modal-foot-split { justify-content: flex-end; }
+    .modal-foot-actions { flex: 1 1 auto; }
+    .modal-foot-actions .btn, .modal-foot > .btn { flex: 1 1 auto; }
+    .drawer { max-width: 100%; }
+    .toast-stack { right: var(--sp-4); left: var(--sp-4); bottom: var(--sp-4); width: auto; }
+    .page-actions { width: 100%; }
+    .page-actions .btn { flex: 1 1 auto; }
+}

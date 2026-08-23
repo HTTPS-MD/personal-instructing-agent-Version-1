@@ -1,985 +1,98 @@
 /**
  * ============================================================================
- * PIA SYSTEM: ADMIN DASHBOARD CONTROLLER
+ * PIA SYSTEM — ADMIN CONSOLE v2 (backend-wired)
  * ============================================================================
- * This file handles all administrative functions, real-time database tracking,
- * student/professor roster management, device limits, and system configurations.
- * ============================================================================
- */
+ * Vanilla JavaScript, no build step. Talks to Supabase through the shared
+ * `sb` client created in assets/js/function.js.
+ *
+ * Ported from admin-dashboard.js. Every RPC name and argument shape is
+ * preserved exactly, because the server-side definitions are not versioned in
+ * this repository — renaming an argument here would silently 404.
+ *
+ * Sections
+ *   1.  Utilities and shared-helper bridges
+ *   2.  Application state
+ *   3.  UI kit: sidebar, router, modals, toasts, confirm/notice, busy buttons
+ *   4.  Data layer (all Supabase reads)
+ *   5.  Overview renderers
+ *   6.  Sections
+ *   7.  Student roster
+ *   8.  Student drawer and per-student actions
+ *   9.  Faculty
+ *   10. Stage controls and targeted access
+ *   11. Settings and admin devices
+ *   12. Scores encoding
+ *   13. Realtime subscriptions
+ *   14. CSV export
+ *   15. Boot sequence
+ * ==========================================================================*/
+(function () {
+    'use strict';
 
-/// ==========================================
-// 0. IIFE GLOBAL ENCAPSULATION
-// ==========================================
-(function (global) {
+    /* ================================================== 1. UTILITIES ==== */
 
-    // ==========================================
-    // 1. STATE MANAGEMENT & UTILS
-    // ==========================================
-
-    let currentActiveSection = '';
-    let currentManagingEmail = '';
-    let currentAdminEmail = null;
-
-    // Unified Roster States
-    let studentDataCache = [];
-    let stateGroupFilter = 'all';
-    let stateSubgroupFilter = 'all';
-    let stateStageDrilldown = null;
-    let pendingRealtimeUpdate = false;
-    let realtimeUpdateTimeout = null;
-    let realtimeBackoffMs = 1000;
-    let lastSearchQuery = '';
-
-    function triggerDeferredRealtimeUpdate() {
-        if (pendingRealtimeUpdate) return;
-        pendingRealtimeUpdate = true;
-
-        if (realtimeUpdateTimeout) clearTimeout(realtimeUpdateTimeout);
-        realtimeUpdateTimeout = setTimeout(() => {
-            pendingRealtimeUpdate = false;
-
-            const activeEl = document.activeElement;
-            const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
-            const isInteracting = isTyping || (activeEl && activeEl.closest('form')) || document.querySelector('.modal-active') || document.querySelector('.show-menu');
-
-            if (isInteracting) {
-                // Kung aktibong nakikipag-ugnayan ang user, mag-antay sandali.
-                // BACKOFF: dati, muling nag-a-arm ito bawat 1s nang walang hanggan
-                // habang bukas ang modal -- 600 na wakeup sa 10 minutong nakabukas
-                // na form. Dumadoble na ito hanggang 8s, at nire-reset kapag
-                // tumakbo na ang refresh.
-                realtimeBackoffMs = Math.min(realtimeBackoffMs * 2, 8000);
-                triggerDeferredRealtimeUpdate();
-                return;
-            }
-            realtimeBackoffMs = 1000;
-
-            loadStudents();
-            loadSections();
-            // Dating WALA dito: ang apat na stage counter box (OCEAN /
-            // Character / Dashboard / Active Game) ay ina-update lang sa init,
-            // sa tab switch, at pagkatapos ng targeted grant. Kaya sa gitna ng
-            // isang live na session -- ang mismong oras na tinitingnan mo sila
-            // -- naiiwan silang luma habang gumagalaw ang roster sa ibaba.
-            updateStageCounters();
-        }, realtimeBackoffMs);
-    }
-
-    // Pagination States
-    let currentStudentPage = 1;
-    let totalStudentCount = 0;
-    const STUDENTS_PER_PAGE = 50;
-
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    const debouncedSearchStudents = debounce(() => {
-        currentStudentPage = 1;
-        loadStudents();
-    }, 300);
-
-    function previousStudentPage() {
-        if (currentStudentPage > 1) {
-            currentStudentPage--;
-            loadStudents();
-        }
-    }
-
-    function nextStudentPage() {
-        // May bounds check na, katulad ng previousStudentPage(). Dati, walang
-        // upper limit dito -- kaya kung luma na ang UI state (halimbawa, may
-        // nabura habang nakabukas ang huling page), kayang lumagpas sa huling
-        // page at magpakita ng walang laman na table.
-        const totalPages = Math.max(1, Math.ceil(totalStudentCount / STUDENTS_PER_PAGE));
-        if (currentStudentPage < totalPages) {
-            currentStudentPage++;
-            loadStudents();
-        }
-    }
-
-    // UI State Persistence
-    const uiState = {
-        tab: sessionStorage.getItem('activeTab') || 'sections',
-        modal: sessionStorage.getItem('activeModal') || null
+    var $ = function (sel, root) { return (root || document).querySelector(sel); };
+    var $$ = function (sel, root) {
+        return Array.prototype.slice.call((root || document).querySelectorAll(sel));
     };
 
-    // ==========================================
-    // 2. INITIALIZATION
-    // ==========================================
-
-    // escapeHTML() / escapeJS() ay nasa function.js na (shared helper)
-
-    // Gumagawa ng random, hindi-nahuhulaang initial password gamit ang Web Crypto API.
-    // Hindi na ito naka-store kahit saan at hindi na kailangang malaman ng estudyante --
-    // ang account ay 'inactive' hanggang sa i-click nila ang activation magic-link
-    // (sign-up.html) at doon nila itatakda ang sarili nilang totoong password.
-    function generateSecurePassword(length = 20) {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
-        const bytes = new Uint32Array(length);
-        crypto.getRandomValues(bytes);
-        return Array.from(bytes, b => chars[b % chars.length]).join('');
-    }
-
-    // fully working
-    document.addEventListener("DOMContentLoaded", async () => {
-        if (typeof sb === 'undefined') {
-            const errorBanner = document.getElementById('global-error-banner');
-            if (errorBanner) {
-                document.getElementById('global-error-message').textContent = "Database connection failed. Please refresh.";
-                errorBanner.classList.remove('hidden');
-            }
-            return;
-        }
-
-        lucide.createIcons();
-
-        // 🔥 MOBILE MENU FIX: Isolated to prevent const 'btn' conflict with function.js
-        const hamburgerBtn = document.getElementById('mobile-toggle');
-        const mobileBg = document.getElementById('menu-backdrop');
-
-        if (hamburgerBtn && mobileBg) {
-            hamburgerBtn.addEventListener('click', toggleMobileMenu);
-            mobileBg.addEventListener('click', toggleMobileMenu);
-
-            document.addEventListener('click', (e) => {
-                const dynCloseGlobal = document.getElementById('dynamic-close-btn');
-                if (dynCloseGlobal && (e.target === dynCloseGlobal || dynCloseGlobal.contains(e.target))) {
-                    toggleMobileMenu(e);
-                }
-            });
-        }
-
-        // FIX: dating iisang try/catch lang ang bumabalot sa AUTH check AT sa
-        // buong data-loading -- kaya kahit anong maliit na kabiguan sa pag-load
-        // ng data (transient network hiccup, isang hindi inaasahang null field,
-        // atbp.) pagkatapos ma-verify na valid admin, ay natreat bilang
-        // "unauthorized" at pinipilit ang admin na mag-logout + ma-redirect.
-        // Ngayon, hiwalay na: (1) AUTH phase -- kapag nabigo ito, tama lang na
-        // i-redirect dahil hindi talaga authorized ang user; (2) DATA-LOAD
-        // phase -- kapag nabigo ito, ipakita lang ang error banner, HINDI na
-        // pipilitin ang pag-logout ng isang valid na admin session.
-        let email;
-        try {
-            const { data: { session }, error: sessionError } = await sb.auth.getSession();
-            if (sessionError || !session) {
-                throw new Error("Session expired. Please log in again.");
-            }
-
-            email = session.user.email;
-            const { data: profile, error } = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
-
-            if (error || !profile || profile.role !== 'admin') {
-                throw new Error("Unauthorized access. Admin privileges required.");
-            }
-        } catch (e) {
-            console.error("Auth check failed:", e);
-            const errorBanner = document.getElementById('global-error-banner');
-            const errorMessage = document.getElementById('global-error-message');
-            if (errorBanner && errorMessage) {
-                errorMessage.textContent = e.message || "Failed to verify admin access.";
-                errorBanner.classList.remove('hidden');
-            }
-            localStorage.removeItem('pia_user_email');
-            setTimeout(() => window.location.replace('../../index.html'), 3000);
-            return;
-        }
-
-        localStorage.setItem('pia_user_email', email); // For legacy calls
-
-        // Reveal the dashboard now that the backend has confirmed admin role.
-        // Mula dito, hindi na natin i-eevict ang admin dahil lang sa isang
-        // paikutan ng data-loading na nabigo -- na-verify na ang identity nila.
-        document.body.classList.remove('opacity-0');
-
-        try {
-            await Promise.all([
-                initAdminProfile(email),
-                loadSections(),
-                loadStudents(),
-                updateStageCounters(),
-                loadProfessors(),
-                loadSettings()
-            ]);
-
-            restoreUIState();
-
-            currentAdminEmail = email;
-            setupRealtimeSubscriptions();
-
-            loadAdminDeviceSettings(currentAdminEmail);
-        } catch (e) {
-            console.error("Dashboard data failed to load:", e);
-            const errorBanner = document.getElementById('global-error-banner');
-            const errorMessage = document.getElementById('global-error-message');
-            if (errorBanner && errorMessage) {
-                errorMessage.textContent = (e.message ? `Some data failed to load: ${e.message}` : "Some data failed to load.") + " Please refresh the page.";
-                errorBanner.classList.remove('hidden');
-            }
-            // Sadyang WALANG logout/redirect dito -- valid pa rin ang session,
-            // kaya panatilihin lang ang admin sa page kahit may naging error
-            // sa data-loading, sa halip na basta i-force logout.
-        }
-
-        // ==========================================
-        // TABLE EVENT DELEGATION
-        // ==========================================
-        // DALAWANG BUG DITO DATI, kaya patay ang 3-dots menu ng student roster:
-        //
-        // (1) Ang action <td> ay may inline na onclick="event.stopPropagation()".
-        //     Ang event ay umaakyat: button -> td -> tr -> tbody. Pinapatigil ito
-        //     ng td BAGO pa marating ang tbody, kaya HINDI KAILANMAN tumatakbo
-        //     ang delegated listener at walang nangyayari sa pag-click.
-        //
-        // (2) Kahit tumakbo pa ito, inililipat ng toggleActionMenu() ang menu sa
-        //     document.body (para hindi ito ma-clip ng table overflow). Sa
-        //     sandaling iyon, ang menu ay WALA NA sa loob ng tbody -- kaya ang
-        //     mga item nito (Edit / Delete / Retake) ay hindi rin maaabot ng
-        //     isang tbody-scoped na listener.
-        //
-        // Ang delegation ay nasa `document` na, kaya nahuhuli nito ang toggle
-        // button (nasa tbody) AT ang mga menu item (nailipat na sa body).
-        // Ang stopPropagation() sa ibaba ang pumipigil sa window-level na
-        // closeAllMenus na agad itong isara.
-        //
-        // Ganito na rin gumagana ang professors tab -- inline onclick ang gamit
-        // nito, kaya hindi ito naapektuhan ng bug na ito.
-        {
-            document.addEventListener('click', (e) => {
-                const btn = e.target.closest('button[data-action]');
-                if (!btn) return;
-                e.stopPropagation();
-
-                const action = btn.getAttribute('data-action');
-                if (action === 'toggle-menu') {
-                    toggleActionMenu(e, btn.getAttribute('data-email-id'), btn);
-                    return;
-                }
-
-                const email = btn.getAttribute('data-email');
-                const student = studentDataCache.find(s => s.email === email);
-
-                if (action === 'send-activation') { sendActivationEmail(email); closeAllMenus(); }
-                else if (action === 'edit-student' && student) {
-                    openEditStudent(student.full_name, email, student.section || '', student.pre_test_score ?? '', student.group_type, student.max_devices ?? 1);
-                    closeAllMenus();
-                }
-                else if (action === 'device-manager') { openDeviceManager(email); closeAllMenus(); }
-                else if (action === 'retake-ocean') { allowStudentRetakeOcean(email); closeAllMenus(); }
-                else if (action === 'retake-character') { allowStudentRetakeCharacter(email); closeAllMenus(); }
-                else if (action === 'reset-password') { resetPasswordFromMenu(email); closeAllMenus(); }
-                else if (action === 'delete-user') { deleteUserFromMenu(email, 'profiles'); closeAllMenus(); }
-            });
-        }
-    });
-
-
-    // ==========================================
-    // 2. REALTIME TRACKING & TIMERS
-    // ==========================================
-
-    // fully working
-    function setupRealtimeSubscriptions() {
-        registerChannel('admin-realtime-profiles', (ch) => ch
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-                triggerDeferredRealtimeUpdate();
-
-                const modalEmailEl = document.getElementById('device-modal-email');
-                if (modalEmailEl && payload.new?.email && modalEmailEl.textContent === payload.new.email) {
-                    renderDeviceList(payload.new.active_devices || []);
-                }
-
-                if (currentAdminEmail && payload.new?.email && currentAdminEmail === payload.new.email) {
-                    loadAdminDeviceSettings(currentAdminEmail);
-                }
-            })
-            .subscribe());
-
-        // Ang mga estudyante ay nakikinig sa `settings`, pero ang admin ay
-        // HINDI kailanman -- kaya ang tatlong stage switch ay nananatiling luma
-        // kung may ibang admin (o ibang tab) na nagpalit, at walang senyas na
-        // hindi na tugma ang ipinapakita sa totoong estado ng lab.
-        registerChannel('admin-realtime-settings', (ch) => ch
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
-                loadSettings();
-            })
-            .subscribe());
-    }
-
-    // fully working
-    function calculateDuration(startedAt) {
-        if (!startedAt) return 'Not Started';
-        const start = new Date(startedAt);
-        const now = new Date();
-        const diffMs = now - start;
-        if (diffMs < 0) return 'Just started';
-
-        const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
-
-        if (diffHrs > 0) return `${diffHrs}h ${diffMins}m ${diffSecs}s`;
-        if (diffMins > 0) return `${diffMins}m ${diffSecs}s`;
-        return `${diffSecs}s`;
-    }
-
-    // fully working
-    setInterval(() => {
-        document.querySelectorAll('#unified-tbody tr[data-started-at]').forEach(tr => {
-            const startedAt = tr.getAttribute('data-started-at');
-            const durationEl = tr.querySelector('.student-duration');
-            if (durationEl && startedAt) {
-                durationEl.textContent = calculateDuration(startedAt);
-            }
-        });
-    }, 1000);
-
-
-    // ==========================================
-    // 3. CORE UI & UTILITY FUNCTIONS
-    // ==========================================
-
-    // fully working
-    function cleanupGhostMenus() {
-        document.querySelectorAll('body > .action-menu, body > [id^="menu-"]').forEach(menu => {
-            if (menu.id !== 'menu-backdrop' && menu.id !== 'mobile-menu') {
-                if (menu.originalParent && document.body.contains(menu.originalParent)) {
-                    menu.originalParent.appendChild(menu);
-                } else {
-                    menu.remove();
-                }
-            }
-        });
-    }
-
-    // fully working
-    function toggleMobileMenu(event) {
-        // Prevent the click from bubbling up and triggering closeAllMenus()
-        if (event && event.stopPropagation) event.stopPropagation();
-
-        const menu = document.querySelector('#mobile-menu');
-        const backdrop = document.getElementById('menu-backdrop');
-        if (menu && backdrop) {
-            menu.classList.toggle('translate-x-full');
-            menu.classList.toggle('translate-x-0');
-            backdrop.classList.toggle('hidden');
-
-            const isOpen = !menu.classList.contains('translate-x-full');
-            document.body.style.overflow = isOpen ? 'hidden' : '';
-            document.documentElement.style.overflow = isOpen ? 'hidden' : '';
-
-            const dynClose = document.getElementById('dynamic-close-btn');
-            if (dynClose) {
-                dynClose.classList.toggle('opacity-0', !isOpen);
-                dynClose.classList.toggle('opacity-100', isOpen);
-            }
-        }
-    }
-
-    // fully working
-    function restoreUIState() {
-        switchTab(uiState.tab);
-        const blacklist = ['edit-student-modal', 'section-details-modal', 'device-manager-modal', 'scores-modal', 'targeted-modal'];
-        if (uiState.modal && !blacklist.includes(uiState.modal)) {
-            openModal(uiState.modal);
-        }
-    }
-
-    // fully working
-    function switchTab(tabName) {
-        if (tabName === 'students') updateStageCounters();
-        sessionStorage.setItem('activeTab', tabName);
-        cleanupGhostMenus();
-        ['sections', 'students', 'professors', 'controls', 'settings'].forEach(t => {
-            const el = document.getElementById(`view-${t}`);
-            if (el) el.style.display = 'none';
-
-            const navBtn = document.getElementById(`nav-${t}`);
-            if (navBtn) navBtn.className = "admin-nav-btn inactive";
-
-            const mobBtn = document.getElementById(`mob-nav-${t}`);
-            if (mobBtn) mobBtn.className = "mobile-nav-link admin-nav-btn inactive";
-        });
-
-        const activeView = document.getElementById(`view-${tabName}`);
-        if (activeView) activeView.style.display = 'block';
-
-        const activeBtn = document.getElementById(`nav-${tabName}`);
-        if (activeBtn) activeBtn.className = "admin-nav-btn active";
-
-        const activeMobBtn = document.getElementById(`mob-nav-${tabName}`);
-        if (activeMobBtn) activeMobBtn.className = "mobile-nav-link admin-nav-btn active";
-    }
-
-    function toggleActionMenu(event, safeId, explicitBtn = null) {
-        event.stopPropagation();
-        const btn = explicitBtn || event.currentTarget;
-        const targetMenu = document.getElementById('menu-' + safeId);
-        const isOpen = targetMenu && targetMenu.classList.contains('show-menu');
-        closeAllMenus();
-
-        if (targetMenu && !isOpen) {
-            if (!targetMenu.originalParent) {
-                targetMenu.originalParent = targetMenu.parentElement;
-            }
-            document.body.appendChild(targetMenu);
-            targetMenu.classList.remove('hidden');
-            targetMenu.classList.add('show-menu');
-
-            const rect = btn.getBoundingClientRect();
-            targetMenu.style.position = 'absolute';
-            targetMenu.style.zIndex = '999999';
-
-            const menuWidth = targetMenu.offsetWidth || 220;
-            let leftPos = rect.right - menuWidth + window.scrollX;
-            if (leftPos < 10 + window.scrollX) leftPos = 10 + window.scrollX;
-
-            let topPos = rect.bottom + 4 + window.scrollY;
-            const menuHeight = targetMenu.offsetHeight || 200;
-            if (rect.bottom + 4 + menuHeight > window.innerHeight) topPos = rect.top - menuHeight - 4 + window.scrollY;
-
-            targetMenu.style.top = topPos + 'px';
-            targetMenu.style.left = leftPos + 'px';
-        }
-    }
-
-    function closeAllMenus() {
-        document.querySelectorAll('.action-menu, [id^="menu-"]').forEach(m => {
-            if (m.id === 'menu-backdrop' || m.id === 'mobile-menu') return;
-            m.classList.add('hidden');
-            m.classList.remove('show-menu');
-
-            // Ibalik sa original parent para walang maiwang ghost element sa body
-            if (m.originalParent && document.body.contains(m.originalParent)) {
-                m.originalParent.appendChild(m);
-            }
-        });
-    }
-    window.addEventListener('click', closeAllMenus);
-
-
-    // ==========================================
-    // 4. MODALS & POPUPS
-    // ==========================================
-
-    // fully working
-    function openModal(id) {
-        const modal = document.getElementById(id);
-        const content = document.getElementById(id + '-content');
-        if (modal) modal.classList.add('modal-active');
-        if (content) content.classList.add('modal-content-active');
-        document.body.style.overflow = 'hidden';
-        sessionStorage.setItem('activeModal', id);
-    }
-
-    // fully working
-    function closeModal(id) {
-        const modal = document.getElementById(id);
-        const content = document.getElementById(id + '-content');
-        if (modal) modal.classList.remove('modal-active');
-        if (content) content.classList.remove('modal-content-active');
-        document.body.style.overflow = '';
-        sessionStorage.removeItem('activeModal');
-
-        if (pendingRealtimeUpdate && !document.querySelector('.modal-active') && !document.querySelector('.show-menu')) {
-            pendingRealtimeUpdate = false;
-            triggerDeferredRealtimeUpdate();
-        }
-    }
-
-    // fully working
-    function showCustomAlert(title, message, type = 'info') {
-        document.getElementById('alert-title').textContent = title;
-        document.getElementById('alert-message').textContent = message;
-
-        const container = document.getElementById('alert-icon-container');
-        if (type === 'error') {
-            container.innerHTML = `<i data-lucide="alert-circle" class="icon-md text-danger" id="alert-icon"></i>`;
-        } else if (type === 'success') {
-            container.innerHTML = `<i data-lucide="check-circle" class="icon-md text-accent" id="alert-icon"></i>`;
-        } else {
-            container.innerHTML = `<i data-lucide="info" class="icon-md text-info" id="alert-icon"></i>`;
-        }
-        lucide.createIcons();
-        openModal('custom-alert');
-    }
-
-    // fully working
-    function closeCustomAlert() {
-        closeModal('custom-alert');
-    }
-
-    let currentConfirmCallback = null;
-
-    // fully working
-    function showCustomConfirm(title, message, onConfirm) {
-        document.getElementById('confirm-title').textContent = title;
-        document.getElementById('confirm-message').textContent = message;
-        currentConfirmCallback = onConfirm;
-        openModal('custom-confirm');
-    }
-
-    // fully working
-    function closeCustomConfirm() {
-        closeModal('custom-confirm');
-        currentConfirmCallback = null;
-    }
-
-    // fully working
-    document.getElementById('confirm-yes-btn').addEventListener('click', async () => {
-        const btn = document.getElementById('confirm-yes-btn');
-        if (currentConfirmCallback) {
-            btn.disabled = true;
-            try {
-                await currentConfirmCallback();
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Proceed';
-            }
-        }
-        closeCustomConfirm();
-    });
-
-
-    // ==========================================
-    // 5. STUDENT ROSTER & FILTER MANAGEMENT
-    // ==========================================
-
-    // fully working
-    async function loadStudents() {
-        const searchQueryEl = document.getElementById('search-student');
-        const searchQuery = searchQueryEl ? searchQueryEl.value.trim().toLowerCase() : '';
-
-        let query = sb.from('profiles').select('*', { count: 'exact' }).neq('role', 'admin');
-
-        if (searchQuery) {
-            query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
-        }
-
-        if (stateStageDrilldown !== null) {
-            if (stateStageDrilldown === 'Active Game') {
-                query = query.eq('is_in_game', true);
-            } else {
-                query = query.eq('current_stage', stateStageDrilldown).eq('is_in_game', false);
-            }
-        } else {
-            if (stateGroupFilter === 'experimental') {
-                if (stateSubgroupFilter === 'all') {
-                    query = query.in('group_type', ['assigned', 'non-assigned', 'neutral']);
-                } else {
-                    query = query.eq('group_type', stateSubgroupFilter);
-                }
-            } else if (stateGroupFilter === 'control') {
-                query = query.eq('group_type', 'control');
-            }
-        }
-
-        const startIndex = (currentStudentPage - 1) * STUDENTS_PER_PAGE;
-        const endIndex = startIndex + STUDENTS_PER_PAGE - 1;
-        query = query.range(startIndex, endIndex).order('full_name', { ascending: true });
-
-        const { data, error, count } = await query;
-        if (error) return console.error('Error loading profiles:', error);
-
-        studentDataCache = data || [];
-        totalStudentCount = count || 0;
-        renderUnifiedTable();
-    }
-
-    // fully working
-    async function updateStageCounters() {
-        const promises = [
-            // 'email' sa halip na 'id': ang 'id' ay wala sa profiles, kaya ang
-            // apat na counter query na ito ay bumabagsak sa 42703 (undefined
-            // column) at nagbabalik ng 400. Dahil head:true + count:'exact'
-            // ang gamit, hindi naman talaga binabasa ang column -- kailangan
-            // lang nitong umiral. Ang 'email' ay tiyak na meron.
-            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('current_stage', 'OCEAN').neq('role', 'admin').eq('is_in_game', false),
-            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('current_stage', 'Character Selection').neq('role', 'admin').eq('is_in_game', false),
-            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('current_stage', 'Tutoring Dashboard').neq('role', 'admin').eq('is_in_game', false),
-            sb.from('profiles').select('email', { count: 'exact', head: true }).eq('is_in_game', true).neq('role', 'admin')
-        ];
-
-        try {
-            const [oceanRes, charRes, dashRes, gameRes] = await Promise.all(promises);
-            document.getElementById('count-ocean').textContent = oceanRes.count || 0;
-            document.getElementById('count-char').textContent = charRes.count || 0;
-            document.getElementById('count-dash').textContent = dashRes.count || 0;
-            document.getElementById('count-game').textContent = gameRes.count || 0;
-            lucide.createIcons();
-        } catch (err) {
-            console.error("Error updating stage counters:", err);
-        }
-    }
-
-    // fully working
-    function setGroupFilter(group) {
-        currentStudentPage = 1;
-        stateGroupFilter = group; // Ibinalik sa tamang variable
-        ['all', 'experimental', 'control'].forEach(g => {
-            const btn = document.getElementById(`filter-group-${g}`);
-            if (btn) btn.className = (g === group) ? "admin-nav-btn active" : "admin-nav-btn inactive";
-        });
-
-        const secContainer = document.getElementById('secondary-filter-container');
-        if (group === 'experimental') {
-            secContainer.classList.remove('hidden');
-            setSubgroupFilter('all');
-        } else {
-            secContainer.classList.add('hidden');
-            stateSubgroupFilter = 'all';
-        }
-        loadStudents();
-    }
-
-    // fully working
-    function setSubgroupFilter(subgroup) {
-        currentStudentPage = 1;
-        stateSubgroupFilter = subgroup; // Ibinalik sa tamang variable
-        ['all', 'assigned', 'non-assigned', 'neutral'].forEach(sub => {
-            const btn = document.getElementById(`filter-sub-${sub}`);
-            if (btn) {
-                btn.className = (sub === subgroup)
-                    ? "badge badge-pill badge-success"
-                    : "badge badge-pill badge-neutral";
-            }
-        });
-        loadStudents();
-    }
-
-    function toggleStageDrilldown(stage) {
-        currentStudentPage = 1;
-        if (stateStageDrilldown === stage) {
-            clearStageDrilldown();
-            return;
-        }
-        stateStageDrilldown = stage;
-        document.getElementById('nested-filters-container').classList.add('hidden');
-        document.getElementById('btn-clear-drilldown').classList.remove('hidden');
-
-        const titleEl = document.getElementById('table-view-title');
-        const descEl = document.getElementById('table-view-desc');
-
-        ['ocean', 'char', 'dash', 'game'].forEach(box => {
-            document.getElementById(`box-${box}`).classList.remove('selected');
-        });
-
-        if (stage === 'OCEAN') {
-            titleEl.innerHTML = `<i data-lucide="brain" class="icon-sm text-accent"></i> OCEAN Test Live View`;
-            descEl.textContent = "Monitoring students currently taking the Big Five Personality Inventory.";
-            document.getElementById('box-ocean').classList.add('selected');
-        } else if (stage === 'Character Selection') {
-            titleEl.innerHTML = `<i data-lucide="users" class="icon-sm text-info"></i> Character Select Live View`;
-            descEl.textContent = "Monitoring Non-Assigned subgroup choosing their persona.";
-            document.getElementById('box-char').classList.add('selected');
-        } else if (stage === 'Tutoring Dashboard') {
-            titleEl.innerHTML = `<i data-lucide="layout-dashboard" class="icon-sm text-warning"></i> Dashboard Live View`;
-            descEl.textContent = "Students browsing the main tutoring dashboard.";
-            document.getElementById('box-dash').classList.add('selected');
-        } else if (stage === 'Active Game') {
-            titleEl.innerHTML = `<i data-lucide="gamepad-2" class="icon-sm text-success"></i> Active Session Live View`;
-            descEl.textContent = "Students actively solving math problems. Tracking Decision Tree metrics.";
-            document.getElementById('box-game').classList.add('selected');
-        }
-        loadStudents();
-    }
-
-    // fully working
-    function clearStageDrilldown() {
-        currentStudentPage = 1;
-        stateStageDrilldown = null;
-        document.getElementById('nested-filters-container').classList.remove('hidden');
-        document.getElementById('btn-clear-drilldown').classList.add('hidden');
-        document.getElementById('table-view-title').innerHTML = `<i data-lucide="users" class="icon-sm text-accent"></i> General Student Roster`;
-        document.getElementById('table-view-desc').textContent = "Click any student row to view full-screen profile and alignment metrics.";
-
-        ['ocean', 'char', 'dash', 'game'].forEach(box => {
-            document.getElementById(`box-${box}`).classList.remove('selected');
-        });
-        loadStudents();
-    }
-
-    // fully working
-    function renderUnifiedTable() {
-        cleanupGhostMenus();
-
-        const thead = document.getElementById('unified-thead');
-        const tbody = document.getElementById('unified-tbody');
-
-        thead.innerHTML = '';
-        tbody.innerHTML = '';
-
-        if (stateStageDrilldown === null) {
-            thead.innerHTML = `
-            <tr>
-                <th>Student Name</th>
-                <th>Email Address</th>
-                <th>Section</th>
-                <th>Group</th>
-                <th>Persona Setup</th>
-                <th>Current Stage</th>
-                <th>Pre-Test</th>
-                <th class="text-right">Actions</th>
-            </tr>
-        `;
-        } else if (stateStageDrilldown === 'Active Game') {
-            thead.innerHTML = `
-            <tr>
-                <th>Student Name</th>
-                <th>Current Problem</th>
-                <th>Difficulty</th>
-                <th>Hints Used</th>
-                <th>Consecutive Correct</th>
-                <th>Duration</th>
-                <th class="text-right">Actions</th>
-            </tr>
-        `;
-        } else {
-            thead.innerHTML = `
-            <tr>
-                <th>Student Name</th>
-                <th>Section</th>
-                <th>Current Activity</th>
-                <th>Time Elapsed</th>
-                <th class="text-right">Actions</th>
-            </tr>
-        `;
-        }
-
-        if (studentDataCache.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="empty-row">No students match the current filters.</td></tr>`;
-            const paginationControls = document.getElementById('pagination-controls');
-            if (paginationControls) paginationControls.classList.add('hidden');
-            lucide.createIcons();
-            return;
-        }
-
-        const totalPages = Math.ceil(totalStudentCount / STUDENTS_PER_PAGE);
-        const paginationControls = document.getElementById('pagination-controls');
-        if (paginationControls) {
-            if (totalPages > 1) {
-                paginationControls.classList.remove('hidden');
-                document.getElementById('pagination-info').textContent = `Page ${currentStudentPage} of ${totalPages} (${totalStudentCount} students)`;
-                document.getElementById('btn-prev-page').disabled = currentStudentPage === 1;
-                document.getElementById('btn-next-page').disabled = currentStudentPage === totalPages;
-                document.getElementById('btn-prev-page').onclick = previousStudentPage;
-                document.getElementById('btn-next-page').onclick = nextStudentPage;
-            } else {
-                paginationControls.classList.add('hidden');
-            }
-        }
-
-        studentDataCache.forEach(student => {
-            const tr = document.createElement('tr');
-            tr.className = "student-row";
-            tr.setAttribute('data-started-at', student.stage_started_at || '');
-
-            const safeEmailId = escapeHTML(String(student.email).replace(/[@.]/g, '_'));
-            const safeEmail = escapeHTML(student.email);
-            const isOnline = (student.active_devices || []).length > 0;
-            const statusClass = isOnline ? 'status-dot-active' : 'status-dot-offline';
-
-            tr.onclick = (e) => {
-                // Ang action cell ay hindi na humihinto ng propagation (tingnan
-                // ang delegation fix), kaya dito na tahasang inaalis ang row
-                // click -- kung hindi, sabay na magbubukas ang profile overlay
-                // at ang menu.
-                if (e.target.closest('.action-cell') || e.target.closest('.action-menu')) return;
-                openStudentProfile(
-                    student.full_name, student.email, student.section || 'N/A', student.group_type || 'N/A',
-                    isOnline ? 'Online' : 'Offline', student.max_devices ?? 1,
-                    student.pre_test_score ?? 'n/a', student.post_test_score ?? 'n/a',
-                    student.ocean_o ?? 'n/a', student.ocean_c ?? 'n/a', student.ocean_e ?? 'n/a', student.ocean_a ?? 'n/a', student.ocean_n ?? 'n/a'
-                );
-            };
-
-            const actionMenuHTML = `
-            <td class="action-cell">
-                <button class="action-toggle-btn" data-action="toggle-menu" data-email-id="${safeEmailId}">
-                    <i data-lucide="more-vertical" class="icon-xs"></i>
-                </button>
-                <div id="menu-${safeEmailId}" class="action-menu hidden">
-                    <button data-action="send-activation" data-email="${safeEmail}" class="action-menu-item">
-                        <i data-lucide="mail" class="icon-xs text-info"></i> Send Activation Email
-                    </button>
-                    <button data-action="edit-student" data-email="${safeEmail}" class="action-menu-item">
-                        <i data-lucide="edit-3" class="icon-xs icon-edit"></i> Edit Details
-                    </button>
-                    <button data-action="device-manager" data-email="${safeEmail}" class="action-menu-item">
-                        <i data-lucide="monitor" class="icon-xs text-accent"></i> Active Devices
-                    </button>
-                    <div class="action-menu-divider"></div>
-                    <button data-action="retake-ocean" data-email="${safeEmail}" class="action-menu-item">
-                        <i data-lucide="rotate-ccw" class="icon-xs text-warning"></i> Retake OCEAN Test
-                    </button>
-                    <button data-action="retake-character" data-email="${safeEmail}" class="action-menu-item">
-                        <i data-lucide="user-cog" class="icon-xs text-accent"></i> Retake Char Select
-                    </button>
-                    <button data-action="reset-password" data-email="${safeEmail}" class="action-menu-item">
-                        <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
-                    </button>
-                    <div class="action-menu-divider"></div>
-                    <button data-action="delete-user" data-email="${safeEmail}" class="action-menu-item action-delete">
-                        <i data-lucide="trash-2" class="icon-xs"></i> Delete User
-                    </button>
-                </div>
-            </td>
-        `;
-
-            if (stateStageDrilldown === null) {
-                let groupLabel = student.group_type?.toLowerCase() === 'control' ? 'CTRL' : 'EXP';
-                let groupColor = groupLabel === 'CTRL' ? 'text-info' : 'text-accent';
-                let personaSetup = groupLabel === 'EXP'
-                    ? (student.group_type === 'assigned' ? 'Assigned' : student.group_type === 'non-assigned' ? 'Free Choice' : student.group_type === 'neutral' ? 'Neutral' : 'N/A')
-                    : 'Traditional';
-
-                tr.innerHTML = `
-                <td data-label="Student Name" class="row-name-cell">
-                    <div class="row-avatar-wrap">
-                        <div class="row-avatar-icon ${groupColor}"><i data-lucide="${groupLabel === 'CTRL' ? 'book' : 'user'}" class="icon-xs"></i></div>
-                        <span class="row-status-dot ${statusClass}"></span>
-                    </div>
-                    <span class="truncate">${escapeHTML(student.full_name)}</span>
-                </td>
-                <td data-label="Email" class="cell-mono-xs truncate">${escapeHTML(student.email)}</td>
-                <td data-label="Section" class="text-secondary truncate">${escapeHTML(student.section || 'N/A')}</td>
-                <td data-label="Group" class="cell-label ${groupColor}">${groupLabel}</td>
-                <td data-label="Setup" class="cell-label text-secondary truncate">${personaSetup}</td>
-                <td data-label="Stage" class="text-primary truncate">${escapeHTML(student.current_stage || 'Idle')}</td>
-                <td data-label="Pre-Test" class="cell-mono-xs">${escapeHTML(student.pre_test_score ?? 'n/a')}</td>
-                ${actionMenuHTML}
-            `;
-            } else if (stateStageDrilldown === 'Active Game') {
-                const duration = calculateDuration(student.stage_started_at);
-                tr.innerHTML = `
-                <td data-label="Student Name" class="row-name-cell">
-                    <div class="row-avatar-icon text-success"><i data-lucide="gamepad-2" class="icon-xs"></i></div>
-                    <span class="truncate">${escapeHTML(student.full_name)}</span>
-                </td>
-                <td data-label="Problem" class="cell-mono-xs truncate">Question ${safeInt(student.current_problem, 1)}</td>
-                <td data-label="Difficulty" class="cell-label text-info">${escapeHTML(student.current_difficulty || 'Normal')}</td>
-                <td data-label="Hints" class="cell-mono-xs text-warning">${safeInt(student.hints_used, 0)}</td>
-                <td data-label="Correct" class="cell-mono-xs text-success">${safeInt(student.consecutive_correct, 0)}</td>
-                <td data-label="Duration" class="cell-mono-xs student-duration">${duration}</td>
-                ${actionMenuHTML}
-            `;
-            } else {
-                const duration = calculateDuration(student.stage_started_at);
-                let activity = "Reading Instructions";
-                if (stateStageDrilldown === 'OCEAN') activity = `Answering Item ${safeInt(student.ocean_current_item, 1)}/50`;
-                if (stateStageDrilldown === 'Character Selection') activity = `Browsing Personas`;
-                if (stateStageDrilldown === 'Tutoring Dashboard') activity = `Browsing Dashboard`;
-
-                tr.innerHTML = `
-                <td data-label="Student Name" class="row-name-cell">
-                    <span class="status-dot ${statusClass}"></span>
-                    <span class="truncate">${escapeHTML(student.full_name)}</span>
-                </td>
-                <td data-label="Section" class="text-secondary truncate">${escapeHTML(student.section || 'N/A')}</td>
-                <td data-label="Activity" class="cell-label text-accent truncate">${activity}</td>
-                <td data-label="Duration" class="cell-mono-xs student-duration">${duration}</td>
-                ${actionMenuHTML}
-            `;
-            }
-
-            tbody.appendChild(tr);
-        });
-        lucide.createIcons();
-    }
-
-
-    // ==========================================
-    // 6. STUDENT PROFILE OVERLAYS & FORMS
-    // ==========================================
-
-    // normalizeOceanScore() / OCEAN_SCORE_MAX ay nasa function.js na (shared helper)
-
-    function openStudentProfile(name, email, section, type, status, maxDevices, pre, post, o, c, e, a, n) {
-        document.getElementById('profile-name').textContent = name;
-        document.getElementById('profile-email').textContent = email;
-        document.getElementById('profile-section').textContent = section;
-        document.getElementById('profile-type').textContent = type;
-        document.getElementById('profile-device-limit').textContent = maxDevices;
-        document.getElementById('profile-pre').textContent = pre;
-        document.getElementById('profile-post').textContent = post;
-
-        const normalized = {
-            Openness: normalizeOceanScore(o),
-            Conscientiousness: normalizeOceanScore(c),
-            Extroversion: normalizeOceanScore(e),
-            Agreeableness: normalizeOceanScore(a),
-            Neuroticism: normalizeOceanScore(n)
+    /* function.js owns these helpers. Local fallbacks keep this file usable
+       even if it is loaded on its own (for example in a design review). */
+    var esc = (typeof escapeHTML === 'function') ? escapeHTML : function (value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    var toInt = (typeof safeInt === 'function') ? safeInt : function (value, fallback) {
+        var n = parseInt(value, 10);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    var OCEAN_MAX = (typeof OCEAN_SCORE_MAX !== 'undefined') ? OCEAN_SCORE_MAX : 40;
+    var toOceanPct = (typeof normalizeOceanScore === 'function') ? normalizeOceanScore : function (raw) {
+        var n = parseFloat(raw);
+        return Number.isFinite(n) ? Math.round((n / OCEAN_MAX) * 100) : null;
+    };
+
+    function debounce(fn, wait) {
+        var timer = null;
+        return function () {
+            var args = arguments, self = this;
+            clearTimeout(timer);
+            timer = setTimeout(function () { fn.apply(self, args); }, wait || 200);
         };
-
-        document.getElementById('profile-ocean-o').textContent = normalized.Openness !== null ? `${normalized.Openness}%` : 'n/a';
-        document.getElementById('profile-ocean-c').textContent = normalized.Conscientiousness !== null ? `${normalized.Conscientiousness}%` : 'n/a';
-        document.getElementById('profile-ocean-e').textContent = normalized.Extroversion !== null ? `${normalized.Extroversion}%` : 'n/a';
-        document.getElementById('profile-ocean-a').textContent = normalized.Agreeableness !== null ? `${normalized.Agreeableness}%` : 'n/a';
-        document.getElementById('profile-ocean-n').textContent = normalized.Neuroticism !== null ? `${normalized.Neuroticism}%` : 'n/a';
-
-        let dominantTraits = [];
-        let maxScore = -1;
-        for (const [trait, score] of Object.entries(normalized)) {
-            if (score === null) continue;
-            if (score > maxScore) { maxScore = score; dominantTraits = [trait]; }
-            else if (score === maxScore) dominantTraits.push(trait);
-        }
-        if (dominantTraits.length === 0) dominantTraits = ['Openness'];
-
-        document.getElementById('profile-persona-badge').textContent = `${dominantTraits.join(' & ')} Persona`;
-        document.getElementById('student-profile-screen').classList.remove('hidden');
-        document.getElementById('student-profile-screen').classList.add('flex');
-        document.body.style.overflow = 'hidden';
     }
 
-    // fully working
-    function closeStudentProfile() {
-        document.getElementById('student-profile-screen').classList.add('hidden');
-        document.getElementById('student-profile-screen').classList.remove('flex');
-        document.body.style.overflow = 'auto';
+    function icon(name, extraClass) {
+        return '<svg class="icon ' + (extraClass || '') + '"><use href="#i-' + name + '"></use></svg>';
     }
 
-    // fully working
-    function toggleAvatarVisibility() {
-        const container = document.getElementById('avatar-container');
-        const btn = document.getElementById('toggle-avatar-btn');
-        if (container.classList.contains('hidden')) {
-            container.classList.remove('hidden');
-            btn.textContent = 'Hide Image';
-        } else {
-            container.classList.add('hidden');
-            btn.textContent = 'Show Image';
-        }
+    function initialsOf(fullName, email) {
+        /* Honorifics are part of the stored name for faculty, so 'Dr. Alan
+           Reyes' would otherwise initial as "DR" instead of "AR". */
+        var source = (fullName || '').trim().replace(/^(Dr|Prof|Mr|Mrs|Ms|Engr|Atty)\.?\s+/i, '');
+        if (!source) { return (email || '?').slice(0, 2).toUpperCase(); }
+        var parts = source.split(/\s+/);
+        if (parts.length === 1) { return parts[0].slice(0, 2).toUpperCase(); }
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
 
-    // fully working
-    // ==========================================
-    // SHARED HELPERS PARA SA REGISTER / EDIT
-    // ==========================================
+    function pct(part, total) {
+        return total > 0 ? Math.round((part / total) * 100) : 0;
+    }
 
-    // Ang Supabase Auth ay nag-iimbak ng email nang LOWERCASE, at ang app ay
-    // eksaktong tugma ang hinahanap: .eq('email', session.user.email). Kaya ang
-    // isang 'Juan@UE.edu.ph' na na-type sa form ay gumagawa ng profile row na
-    // HINDI KAILANMAN matutugma sa session -- nagla-log in ang estudyante, wala
-    // namang nakikitang profile ang requireStudentSession(), at agad silang
-    // itinatapon pabalik sa index. Iyon ang "Account configuration error".
-    // Sa 76 na account na manu-manong itina-type, tiyak itong mangyayari.
+    /* Ported verbatim: Supabase Auth stores emails lowercased and the app
+       matches exactly, so a typed 'Juan@UE.edu.ph' would never match its own
+       session. */
     function normalizeEmail(raw) {
         return (raw || '').trim().toLowerCase();
     }
 
-    // Ginagawang nababasang mensahe ang mga Postgres error code.
+    /* Turns Postgres error codes into readable text. */
     function friendlyDbError(error, fallback) {
-        if (!error) return fallback;
-        const msg = error.message || '';
+        if (!error) { return fallback; }
+        var msg = error.message || '';
         if (error.code === '23505' || /duplicate key|already exists/i.test(msg)) {
             return 'An account already uses this email. Only one account per email is allowed.';
         }
@@ -989,1385 +102,2781 @@
         return msg || fallback;
     }
 
-    // 0-100 ang saklaw ng pre/post test. Ang isang mali-type na 1000 ay tahimik
-    // na sumisira ng research data -- at ginagamit ito ng teacher dashboard sa
-    // threshold na < 70 para sa "Struggling".
+    /* Pre/post test scores are 0–100. A mistyped 1000 silently corrupts the
+       research data, and the teacher dashboard thresholds on < 70. */
     function parseScore(raw) {
-        if (raw === null || raw === undefined || String(raw).trim() === '') return { ok: true, value: null };
-        const n = parseFloat(raw);
-        if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false, value: null };
+        if (raw === null || raw === undefined || String(raw).trim() === '') {
+            return { ok: true, value: null };
+        }
+        var n = parseFloat(raw);
+        if (!Number.isFinite(n) || n < 0 || n > 100) { return { ok: false, value: null }; }
         return { ok: true, value: n };
     }
 
-    async function handleRegisterStudent(event) {
-        event.preventDefault();
+    function isEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
 
-        const form = event.target;
-        const btn = form.querySelector('button[type="submit"]');
+    /* Commas and parentheses are the delimiters of a PostgREST .or() filter.
+       Left in place they break the query or return a 400. */
+    function sanitizeFilterTerm(raw) {
+        return (raw || '').replace(/[,()*]/g, ' ').trim();
+    }
 
-        const first = document.getElementById('add-first-name').value.trim();
-        const middle = document.getElementById('add-middle-name').value.trim();
-        const last = document.getElementById('add-last-name').value.trim();
-        const full_name = [first, middle, last].filter(Boolean).join(' ');
+    /* Random, unguessable initial password. Never stored or shown — the owner
+       sets their real password through the activation link. */
+    function generateSecurePassword(length) {
+        var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+        var bytes = new Uint32Array(length || 20);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, function (b) { return chars[b % chars.length]; }).join('');
+    }
 
-        const email = normalizeEmail(document.getElementById('student-email').value);
-        const section = document.getElementById('student-section').value;
-        const group_type = document.getElementById('student-type').value;
-        const max_devices = parseInt(document.getElementById('student-device-limit').value) || 1;
+    function formatDuration(startedAt) {
+        if (!startedAt) { return 'Not started'; }
+        var diff = Date.now() - new Date(startedAt).getTime();
+        if (diff < 0) { return 'Just started'; }
 
-        const score = parseScore(document.getElementById('student-pretest').value);
-        if (!score.ok) return showCustomAlert("Validation Error", "Pre-test score must be between 0 and 100.", "error");
+        var hrs = Math.floor(diff / 3600000);
+        var mins = Math.floor((diff % 3600000) / 60000);
+        var secs = Math.floor((diff % 60000) / 1000);
 
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return showCustomAlert("Validation Error", "Invalid email address.", "error");
+        if (hrs > 0) { return hrs + 'h ' + mins + 'm'; }
+        if (mins > 0) { return mins + 'm ' + secs + 's'; }
+        return secs + 's';
+    }
+
+    /* Device IDs carry the platform in their signature (see getDeviceSignature
+       in function.js). */
+    function describeDevice(deviceId) {
+        var id = String(deviceId || '');
+        if (id.indexOf('Android') !== -1) { return { label: 'Android smartphone', glyph: 'phone' }; }
+        if (id.indexOf('iPad') !== -1) { return { label: 'iPad tablet', glyph: 'tablet' }; }
+        if (id.indexOf('iOS') !== -1) { return { label: 'iOS device', glyph: 'phone' }; }
+        if (id.indexOf('macOS') !== -1) { return { label: 'macOS computer', glyph: 'laptop' }; }
+        if (id.indexOf('Windows') !== -1) { return { label: 'Windows PC', glyph: 'monitor' }; }
+        return { label: 'Unknown device', glyph: 'monitor' };
+    }
+
+    function activationRedirect() {
+        return new URL('../../assets/html/sign-up.html', window.location.href).href;
+    }
+
+    /* ============================================ 2. APPLICATION STATE == */
+
+    var STAGE_META = {
+        'OCEAN': { label: 'OCEAN test', badge: 'badge-amber', fill: 'f-amber' },
+        'Character Selection': { label: 'Character select', badge: 'badge-teal', fill: 'f-teal' },
+        'Tutoring Dashboard': { label: 'Tutoring dashboard', badge: '', fill: 'f-muted' },
+        'Active Game': { label: 'Active session', badge: 'badge-accent', fill: '' }
+    };
+
+    var CONDITIONS = {
+        'assigned': { short: 'EXP · Assigned', badge: 'badge-accent', family: 'experimental' },
+        'non-assigned': { short: 'EXP · Free choice', badge: 'badge-teal', family: 'experimental' },
+        'neutral': { short: 'EXP · Neutral', badge: 'badge-amber', family: 'experimental' },
+        'control': { short: 'CTRL · Traditional', badge: '', family: 'control' }
+    };
+
+    /* Stage gate keys map to settings rows: stage_ocean / stage_char / stage_dash.
+       These strings are also the p_stage argument of admin_set_stage_open and
+       admin_grant_stage — do not rename them. */
+    var GATES = [
+        { key: 'ocean', stage: 'Stage 1', title: 'OCEAN personality test', open: false,
+          desc: 'Allows students to answer the Big Five Inventory. Responses are scored server-side.' },
+        { key: 'char', stage: 'Stage 2', title: 'Character selection', open: false,
+          desc: 'Allows the free-choice group to pick their preferred agent persona.' },
+        { key: 'dash', stage: 'Stage 3', title: 'Tutoring dashboard', open: false,
+          desc: 'Allows students to open the problem sets and begin a tutoring session.' }
+    ];
+
+    var PAGE_SIZE = 50;
+
+    var state = {
+        adminEmail: null,
+        adminName: 'Admin',
+        sections: [],
+        cohort: [],          // lightweight summary of every non-admin profile
+        rosterPage: [],      // the current page of the roster table
+        faculty: [],
+        totalStudents: 0,
+        page: 1,
+        filters: { group: 'all', sub: 'all', stage: null, search: '' },
+        activeStudent: null,
+        managingEmail: null,
+        activeSection: null,
+        loading: { roster: false, cohort: false }
+    };
+
+    /* ==================================================== 3. UI KIT ===== */
+
+    /* ---- 3.1 Boot gate and error banner ---- */
+
+    function setBootText(message) {
+        var node = $('#boot-text');
+        if (node) { node.textContent = message; }
+    }
+
+    function revealApp() {
+        document.body.removeAttribute('data-boot');
+        var veil = $('#boot-veil');
+        if (!veil) { return; }
+        setTimeout(function () { veil.hidden = true; }, 200);
+    }
+
+    function showGlobalError(message) {
+        var banner = $('#global-error-banner');
+        var text = $('#global-error-message');
+        if (!banner || !text) { return; }
+        text.textContent = message;
+        banner.hidden = false;
+    }
+
+    function hideGlobalError() {
+        var banner = $('#global-error-banner');
+        if (banner) { banner.hidden = true; }
+    }
+
+    /* ---- 3.2 Rail ----
+       Behaviour lives in assets/js/shell.js, shared with the teacher console.
+       The rail is told when a modal owns the Escape key so the two do not
+       fight over it. */
+
+    var app = $('#app');
+
+    function closeMobileNav() { PIAShell.closeMobileNav(); }
+
+    /* ---- 3.3 View router ---- */
+
+    var VIEW_TITLES = {
+        overview: 'Overview',
+        sections: 'Sections',
+        students: 'Student Roster',
+        faculty: 'Faculty',
+        controls: 'Stage Controls',
+        settings: 'Settings'
+    };
+
+    function switchView(view) {
+        if (!VIEW_TITLES[view]) { view = 'overview'; }
+
+        $$('[data-view-panel]').forEach(function (panel) {
+            panel.classList.toggle('is-hidden', panel.getAttribute('data-view-panel') !== view);
+        });
+        $$('.nav-item').forEach(function (item) {
+            item.classList.toggle('is-active', item.getAttribute('data-view') === view);
+        });
+
+        $('#crumb-current').textContent = VIEW_TITLES[view];
+        document.title = VIEW_TITLES[view] + ' — PIA Admin Console';
+
+        try { sessionStorage.setItem('pia.admin.view', view); } catch (err) { /* ignore */ }
+        if (window.location.hash !== '#' + view) {
+            history.replaceState(null, '', '#' + view);
         }
 
-        // DOUBLE-SUBMIT GUARD: kung wala ito, ang dalawang mabilis na click ay
-        // dalawang beses tumatawag ng admin_create_auth_user bago pa makabalik
-        // ang una.
-        if (btn) { btn.disabled = true; btn.textContent = 'Registering...'; }
+        /* Stage counters are the one thing that goes stale between visits. */
+        if (view === 'students') { loadStageCounters(); }
 
-        try {
-            // PRE-CHECK BAGO GUMAWA NG AUTH USER. Ang admin_create_auth_user ay
-            // tumatakbo MUNA; kung mabibigo ang profiles insert pagkatapos (hal.
-            // duplicate email), may naiwang auth user na WALANG profile -- at
-            // ang susunod na pagsubok ay babagsak sa "user already exists",
-            // kaya hindi na talaga mairerehistro ang estudyanteng iyon.
-            // Ang pagsusuri muna ang umiiwas sa buong sitwasyong iyon.
-            const { data: existing } = await sb.from('profiles')
-                .select('email').eq('email', email).maybeSingle();
+        closeMobileNav();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+    }
 
-            if (existing) {
-                return showCustomAlert("Duplicate Email",
-                    `${email} is already on the roster. Use Edit Details to change it.`, "error");
+    function initRouter() {
+        $$('.nav-item').forEach(function (item) {
+            item.addEventListener('click', function () {
+                switchView(item.getAttribute('data-view'));
+            });
+        });
+        $$('[data-view-link]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                switchView(btn.getAttribute('data-view-link'));
+            });
+        });
+
+        var fromHash = (window.location.hash || '').replace('#', '');
+        var stored = '';
+        try { stored = sessionStorage.getItem('pia.admin.view') || ''; } catch (err) { /* ignore */ }
+        switchView(fromHash || stored || 'overview');
+    }
+
+    /* ---- 3.4 Modal manager ---- */
+
+    var openLayers = [];
+    var lastFocused = null;
+    var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
+        ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    function lockScroll() {
+        var gap = window.innerWidth - document.documentElement.clientWidth;
+        document.documentElement.style.setProperty('--scrollbar-w', gap + 'px');
+        document.body.classList.add('is-locked');
+    }
+
+    function unlockScroll() {
+        document.body.classList.remove('is-locked');
+        document.documentElement.style.setProperty('--scrollbar-w', '0px');
+    }
+
+    function openModal(id) {
+        var overlay = document.getElementById(id);
+        if (!overlay || openLayers.indexOf(overlay) !== -1) { return; }
+
+        if (!openLayers.length) {
+            lastFocused = document.activeElement;
+            lockScroll();
+        }
+
+        overlay.classList.add('is-mounted');
+        openLayers.push(overlay);
+
+        /* Mount, force a style flush, then animate. Synchronous, unlike
+           requestAnimationFrame, which is throttled in background tabs. */
+        void overlay.offsetWidth;
+        overlay.classList.add('is-open');
+
+        var first = overlay.querySelector('input:not([type="hidden"]), select, textarea, button');
+        if (first) { first.focus({ preventScroll: true }); }
+    }
+
+    function closeModal(target) {
+        var overlay = (typeof target === 'string') ? document.getElementById(target) : target;
+        overlay = overlay || openLayers[openLayers.length - 1];
+        if (!overlay) { return; }
+
+        overlay.classList.remove('is-open');
+        openLayers = openLayers.filter(function (layer) { return layer !== overlay; });
+
+        setTimeout(function () {
+            overlay.classList.remove('is-mounted');
+            if (!openLayers.length) {
+                unlockScroll();
+                if (lastFocused && lastFocused.focus) { lastFocused.focus({ preventScroll: true }); }
+                /* A realtime tick may have been deferred while a form was open. */
+                flushDeferredRefresh();
+            }
+        }, 160);
+    }
+
+    function initModals() {
+        $$('[data-modal-open]').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                openModal(trigger.getAttribute('data-modal-open'));
+            });
+        });
+
+        $$('.overlay').forEach(function (overlay) {
+            var noDismiss = overlay.hasAttribute('data-no-dismiss');
+
+            if (!noDismiss) {
+                overlay.addEventListener('mousedown', function (event) {
+                    if (event.target === overlay) { closeModal(overlay); }
+                });
             }
 
-            const { error: authError } = await sb.rpc('admin_create_auth_user', {
+            $$('[data-modal-close]', overlay).forEach(function (btn) {
+                btn.addEventListener('click', function () { closeModal(overlay); });
+            });
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (!openLayers.length) { return; }
+            var top = openLayers[openLayers.length - 1];
+
+            if (event.key === 'Escape') {
+                if (top.hasAttribute('data-no-dismiss')) { return; }
+                event.preventDefault();
+                closeModal(top);
+                return;
+            }
+
+            if (event.key !== 'Tab') { return; }
+
+            var nodes = $$(FOCUSABLE, top).filter(function (node) { return node.offsetParent !== null; });
+            if (!nodes.length) { return; }
+
+            var first = nodes[0];
+            var last = nodes[nodes.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+    }
+
+    /* ---- 3.5 Toasts ---- */
+
+    function toast(title, description, tone) {
+        var stack = $('#toast-stack');
+        if (!stack) { return; }
+
+        var node = document.createElement('div');
+        node.className = 'toast toast-' + (tone === 'danger' ? 'danger' : 'accent');
+        node.innerHTML =
+            icon(tone === 'danger' ? 'alert' : 'check') +
+            '<div class="toast-text">' +
+            '<p class="toast-title">' + esc(title) + '</p>' +
+            (description ? '<p class="toast-desc">' + esc(description) + '</p>' : '') +
+            '</div>';
+
+        stack.appendChild(node);
+        void node.offsetWidth;
+        node.classList.add('is-open');
+
+        setTimeout(function () {
+            node.classList.remove('is-open');
+            setTimeout(function () { node.remove(); }, 200);
+        }, tone === 'danger' ? 6000 : 3800);
+    }
+
+    function toastOk(title, description) { toast(title, description, 'accent'); }
+    function toastErr(title, description) { toast(title, description, 'danger'); }
+
+    /* ---- 3.6 Confirm and notice dialogs ---- */
+
+    /* Returns a promise so callers can `await confirmAction(...)` instead of
+       threading a callback through every handler. */
+    function confirmAction(options) {
+        return new Promise(function (resolve) {
+            var overlay = $('#modal-confirm');
+            var accept = $('#confirm-accept');
+
+            $('#confirm-title').textContent = options.title || 'Confirm action';
+            $('#confirm-subtitle').textContent = options.subtitle || 'Please review before continuing.';
+            $('#confirm-heading').textContent = options.heading || options.title || 'Are you sure?';
+            $('#confirm-text').textContent = options.message || '';
+
+            var danger = options.tone !== 'accent';
+            $('#confirm-glyph').className = 'modal-hero-glyph' + (danger ? '' : ' g-accent');
+            $('#confirm-glyph').innerHTML = '<svg class="icon icon-lg"><use href="#i-' +
+                (danger ? 'alert' : 'info') + '"></use></svg>';
+
+            accept.textContent = options.confirmLabel || 'Proceed';
+            accept.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
+
+            /* Replacing the node drops every listener from a previous call. */
+            var fresh = accept.cloneNode(true);
+            accept.parentNode.replaceChild(fresh, accept);
+
+            function settle(result) {
+                overlay.removeEventListener('click', onBackdrop, true);
+                document.removeEventListener('keydown', onEsc, true);
+                resolve(result);
+            }
+
+            fresh.addEventListener('click', function () {
+                closeModal(overlay);
+                settle(true);
+            });
+
+            function onBackdrop(event) {
+                if (event.target === overlay) { settle(false); }
+            }
+            function onEsc(event) {
+                if (event.key === 'Escape') { settle(false); }
+            }
+
+            $$('[data-modal-close]', overlay).forEach(function (btn) {
+                btn.addEventListener('click', function () { settle(false); }, { once: true });
+            });
+            overlay.addEventListener('click', onBackdrop, true);
+            document.addEventListener('keydown', onEsc, true);
+
+            openModal('modal-confirm');
+        });
+    }
+
+    /* For outcomes too long for a toast: partial grants, broadcast summaries,
+       orphaned-auth-user warnings. */
+    function showNotice(title, body, tone) {
+        $('#notice-title').textContent = 'Result';
+        $('#notice-heading').textContent = title;
+        $('#notice-body').textContent = body;
+
+        var danger = tone === 'danger';
+        $('#notice-glyph').className = 'modal-hero-glyph' + (danger ? '' : ' g-accent');
+        $('#notice-glyph').innerHTML = '<svg class="icon icon-lg"><use href="#i-' +
+            (danger ? 'alert' : 'info') + '"></use></svg>';
+
+        openModal('modal-notice');
+    }
+
+    /* ---- 3.7 Busy buttons ----
+       The label swaps but the button keeps its measured width, so toolbars and
+       modal footers never resize mid-request. */
+    function setBusy(button, busyLabel) {
+        if (!button) { return function () {}; }
+        var originalHTML = button.innerHTML;
+        var originalWidth = button.getBoundingClientRect().width;
+
+        button.style.minWidth = Math.ceil(originalWidth) + 'px';
+        button.classList.add('is-busy');
+        button.disabled = true;
+        button.innerHTML = esc(busyLabel || 'Working…');
+
+        return function release() {
+            button.innerHTML = originalHTML;
+            button.classList.remove('is-busy');
+            button.disabled = false;
+            button.style.minWidth = '';
+        };
+    }
+
+    /* ---- 3.8 Field-level validation ---- */
+
+    function setFieldError(id, message) {
+        var field = document.getElementById(id);
+        var msg = $('[data-msg-for="' + id + '"]');
+        if (field) { field.classList.toggle('is-invalid', !!message); }
+        if (msg) { msg.textContent = message || ''; }
+        return !message;
+    }
+
+    function clearFormErrors(formId) {
+        var form = document.getElementById(formId);
+        if (!form) { return; }
+        $$('.field-msg', form).forEach(function (node) { node.textContent = ''; });
+        $$('.is-invalid', form).forEach(function (node) { node.classList.remove('is-invalid'); });
+    }
+
+    /* ---- 3.9 Skeleton helpers ---- */
+
+    function skeletonRows(columns, rows) {
+        var out = '';
+        for (var r = 0; r < (rows || 5); r++) {
+            out += '<tr aria-hidden="true">';
+            for (var c = 0; c < columns; c++) {
+                out += '<td>' + (c === 0
+                    ? '<div class="cell-user"><span class="skeleton skeleton-avatar"></span>' +
+                      '<span class="cell-user-text" style="width:160px">' +
+                      '<span class="skeleton skeleton-line" style="width:70%"></span>' +
+                      '<span class="skeleton skeleton-line" style="width:90%"></span></span></div>'
+                    : '<span class="skeleton skeleton-pill"></span>') + '</td>';
+            }
+            out += '</tr>';
+        }
+        return out;
+    }
+
+    /* ================================================ 4. DATA LAYER ===== */
+
+    /* Columns the overview aggregates need. Selecting the exact set rather
+       than '*' keeps active_devices the only array we pull, and keeps OCEAN
+       item-level answers out of the response entirely. */
+    var COHORT_COLUMNS = 'full_name, email, section, group_type, status, current_stage, is_in_game,' +
+        ' stage_started_at, active_devices, ocean_o, pre_test_score, post_test_score';
+
+    /* One pass over the cohort powers the KPI tiles, the pipeline, live
+       sessions, section health and the section card counts. The study is a
+       single Grade 7 cohort, so this is a small bounded read; the cap is a
+       guard rail, not a paging strategy. The roster table below still pages
+       server-side. */
+    async function loadCohort() {
+        state.loading.cohort = true;
+
+        var res = await sb.from('profiles')
+            .select(COHORT_COLUMNS)
+            .neq('role', 'admin')
+            .limit(2000);
+
+        state.loading.cohort = false;
+
+        if (res.error) { throw res.error; }
+
+        state.cohort = res.data || [];
+        renderKpis();
+        renderPipeline();
+        renderLiveSessions();
+        renderSectionHealth();
+        renderSections();
+    }
+
+    async function loadSections() {
+        var res = await sb.from('sections').select('name').order('name', { ascending: true });
+        if (res.error) { throw res.error; }
+
+        state.sections = res.data || [];
+        fillSectionSelects();
+        renderSections();
+        renderSectionHealth();
+        renderKpis();        /* the KPI footer quotes the section count */
+        $('#nav-count-sections').textContent = state.sections.length;
+    }
+
+    /* Server-side filtering, paging and counting — the same query shape the
+       original dashboard used. */
+    async function loadRoster() {
+        var tbody = $('#student-tbody');
+        if (!state.rosterPage.length) {
+            tbody.innerHTML = skeletonRows(7, 6);
+        }
+        state.loading.roster = true;
+        $('#pager-info').textContent = 'Loading…';
+
+        var query = sb.from('profiles').select('*', { count: 'exact' }).neq('role', 'admin');
+
+        var term = sanitizeFilterTerm(state.filters.search).toLowerCase();
+        if (term) {
+            query = query.or('full_name.ilike.%' + term + '%,email.ilike.%' + term + '%');
+        }
+
+        if (state.filters.stage !== null) {
+            if (state.filters.stage === 'Active Game') {
+                query = query.eq('is_in_game', true);
+            } else {
+                query = query.eq('current_stage', state.filters.stage).eq('is_in_game', false);
+            }
+        } else if (state.filters.group === 'experimental') {
+            if (state.filters.sub === 'all') {
+                query = query.in('group_type', ['assigned', 'non-assigned', 'neutral']);
+            } else {
+                query = query.eq('group_type', state.filters.sub);
+            }
+        } else if (state.filters.group === 'control') {
+            query = query.eq('group_type', 'control');
+        }
+
+        var start = (state.page - 1) * PAGE_SIZE;
+        query = query.range(start, start + PAGE_SIZE - 1).order('full_name', { ascending: true });
+
+        var res = await query;
+        state.loading.roster = false;
+
+        if (res.error) {
+            tbody.innerHTML = '';
+            $('#pager-info').textContent = 'Could not load the roster.';
+            toastErr('Roster failed to load', friendlyDbError(res.error, 'Unknown database error.'));
+            return;
+        }
+
+        state.rosterPage = res.data || [];
+        state.totalStudents = res.count || 0;
+        $('#nav-count-students').textContent = state.totalStudents;
+        renderRoster();
+    }
+
+    /* Four head-only counts. 'email' is selected because 'id' does not exist
+       on profiles — with head:true the column is never read, it only has to
+       exist. */
+    async function loadStageCounters() {
+        var base = function () {
+            return sb.from('profiles').select('email', { count: 'exact', head: true }).neq('role', 'admin');
+        };
+
+        try {
+            var results = await Promise.all([
+                base().eq('current_stage', 'OCEAN').eq('is_in_game', false),
+                base().eq('current_stage', 'Character Selection').eq('is_in_game', false),
+                base().eq('current_stage', 'Tutoring Dashboard').eq('is_in_game', false),
+                base().eq('is_in_game', true)
+            ]);
+
+            var keys = ['OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game'];
+            results.forEach(function (res, index) {
+                var node = $('[data-stage-count="' + keys[index] + '"]');
+                if (node) { node.textContent = res.count || 0; }
+            });
+        } catch (err) {
+            console.error('Stage counters failed:', err);
+        }
+    }
+
+    async function loadFaculty() {
+        var res = await sb.from('professors').select('*').order('name', { ascending: true });
+        if (res.error) { throw res.error; }
+
+        state.faculty = res.data || [];
+        $('#nav-count-faculty').textContent = state.faculty.length;
+        renderFaculty('');
+    }
+
+    /* settings holds one row per stage flag: stage_ocean / stage_char / stage_dash. */
+    async function loadSettings() {
+        var res = await sb.from('settings').select('key, value');
+        if (res.error) { throw res.error; }
+
+        (res.data || []).forEach(function (row) {
+            if (!row.key || row.key.indexOf('stage_') !== 0) { return; }
+            var key = row.key.replace('stage_', '');
+            var gate = GATES.filter(function (g) { return g.key === key; })[0];
+            if (gate) { gate.open = (row.value === true || row.value === 'true'); }
+        });
+
+        renderGates();
+        renderGateSummary();
+    }
+
+    function fillSectionSelects() {
+        var markup = state.sections.map(function (section) {
+            return '<option value="' + esc(section.name) + '">' + esc(section.name) + '</option>';
+        }).join('');
+
+        $$('[data-section-select]').forEach(function (select) {
+            var current = select.value;
+            select.innerHTML = markup || '<option value="">No sections yet</option>';
+            if (current) { select.value = current; }
+        });
+    }
+
+    /* ======================================= 5. OVERVIEW RENDERERS ====== */
+
+    function renderKpis() {
+        var cohort = state.cohort;
+        var total = cohort.length;
+        var oceanDone = cohort.filter(function (s) { return s.ocean_o !== null && s.ocean_o !== undefined; }).length;
+        var online = cohort.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
+        var inactive = cohort.filter(function (s) { return (s.status || '') !== 'active'; }).length;
+
+        $('#kpi-enrolled').textContent = total;
+        $('#kpi-online').textContent = online;
+        $('#kpi-ocean').textContent = pct(oceanDone, total) + '%';
+        $('#kpi-ocean-bar').style.width = pct(oceanDone, total) + '%';
+        $('#kpi-inactive').textContent = inactive;
+        $('#kpi-enrolled-foot').textContent = 'Across ' + state.sections.length + ' section' +
+            (state.sections.length === 1 ? '' : 's');
+    }
+
+    function stageOf(profile) {
+        if (profile.is_in_game) { return 'Active Game'; }
+        return profile.current_stage || null;
+    }
+
+    function renderPipeline() {
+        var total = state.cohort.length;
+        var order = ['OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game'];
+
+        $('#pipeline-strip').innerHTML = order.map(function (key) {
+            var count = state.cohort.filter(function (s) { return stageOf(s) === key; }).length;
+            var share = pct(count, total);
+            return '' +
+                '<div class="funnel-step">' +
+                '<div>' +
+                '<p class="funnel-num">' + count + '</p>' +
+                '<p class="funnel-name">' + esc(STAGE_META[key].label) + '</p>' +
+                '</div>' +
+                '<div class="funnel-foot">' +
+                '<div class="bar"><div class="bar-fill ' + STAGE_META[key].fill +
+                '" style="width:' + share + '%"></div></div>' +
+                '<p class="funnel-meta">' + share + '% of ' + total + ' participants</p>' +
+                '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    /* Presence is derived from the same field the rest of the app treats as
+       "signed in somewhere": a non-empty active_devices array, maintained
+       server-side by claim_device / release_device. A profile fetched without
+       that column returns null rather than a misleading "offline". */
+    function isOnline(profile) {
+        if (!profile || !Object.prototype.hasOwnProperty.call(profile, 'active_devices')) {
+            return null;
+        }
+        return (profile.active_devices || []).length > 0;
+    }
+
+    function avatarMarkup(profile) {
+        var online = isOnline(profile);
+        var dot = (online === null) ? '' :
+            '<span class="avatar-dot' + (online ? ' is-online' : '') +
+            '" data-presence="' + esc(profile.email) + '"' +
+            ' title="' + (online ? 'Online' : 'Offline') + '"></span>';
+
+        return '<span class="avatar-wrap">' +
+            '<span class="avatar">' + esc(initialsOf(profile.full_name, profile.email)) + '</span>' +
+            dot + '</span>';
+    }
+
+    function userCell(profile) {
+        return '' +
+            '<div class="cell-user">' +
+            avatarMarkup(profile) +
+            '<span class="cell-user-text">' +
+            '<span class="cell-name">' + esc(profile.full_name || '(no name)') + '</span>' +
+            '<span class="cell-mail">' + esc(profile.email) + '</span>' +
+            '</span>' +
+            '</div>';
+    }
+
+    /* Patches every dot for one email in place. Called from the realtime
+       handler so a student going online flips the indicator immediately,
+       without waiting for — or triggering — a table re-render. */
+    function applyPresence(email, online) {
+        $$('[data-presence="' + (email || '').replace(/"/g, '\\"') + '"]').forEach(function (dot) {
+            dot.classList.toggle('is-online', !!online);
+            dot.title = online ? 'Online' : 'Offline';
+        });
+    }
+
+    /* profiles.current_stage also holds values outside the four tracked
+       stages — 'Waiting Room' most of all. Every lookup falls back to the raw
+       string rather than assuming STAGE_META has an entry. */
+    function stageLabel(stageKey) {
+        if (!stageKey) { return 'Idle'; }
+        return STAGE_META[stageKey] ? STAGE_META[stageKey].label : stageKey;
+    }
+
+    function stageBadge(stageKey) {
+        if (!stageKey || !STAGE_META[stageKey]) {
+            return '<span class="badge">' + esc(stageKey || 'Idle') + '</span>';
+        }
+        return '<span class="badge ' + STAGE_META[stageKey].badge + '">' +
+            esc(STAGE_META[stageKey].label) + '</span>';
+    }
+
+    function renderLiveSessions() {
+        var rows = state.cohort
+            .filter(function (s) { return stageOf(s) && s.stage_started_at; })
+            .sort(function (a, b) { return new Date(a.stage_started_at) - new Date(b.stage_started_at); })
+            .slice(0, 6);
+
+        var tbody = $('#live-tbody');
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4">' +
+                '<div class="state-block" style="min-height:180px">' +
+                '<span class="state-glyph">' + icon('clock', 'icon-lg') + '</span>' +
+                '<p class="state-title">No sessions running</p>' +
+                '<p class="state-desc">Students appear here as soon as they enter a stage.</p>' +
+                '</div></td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(function (s) {
+            return '' +
+                '<tr data-started-at="' + esc(s.stage_started_at) + '">' +
+                '<td>' + userCell(s) + '</td>' +
+                '<td class="muted">' + esc(s.section || '—') + '</td>' +
+                '<td>' + stageBadge(stageOf(s)) + '</td>' +
+                '<td class="duration-cell" data-duration>' + esc(formatDuration(s.stage_started_at)) + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderGateSummary() {
+        $('#gate-summary').innerHTML = GATES.map(function (gate) {
+            return '' +
+                '<div class="device-row">' +
+                '<span class="dot ' + (gate.open ? 'dot-live' : 'dot-off') + '"></span>' +
+                '<div class="device-text">' +
+                '<p class="device-name">' + esc(gate.title) + '</p>' +
+                '<p class="device-meta">' + esc(gate.stage) + '</p>' +
+                '</div>' +
+                '<span class="badge ' + (gate.open ? 'badge-accent' : '') + '">' +
+                (gate.open ? 'Open' : 'Closed') + '</span>' +
+                '</div>';
+        }).join('');
+    }
+
+    function renderSectionHealth() {
+        var container = $('#section-health');
+        if (!state.sections.length) {
+            container.innerHTML = '<p class="state-desc">No sections yet.</p>';
+            return;
+        }
+
+        container.innerHTML = state.sections.map(function (section) {
+            var members = state.cohort.filter(function (s) { return s.section === section.name; });
+            var done = members.filter(function (s) { return s.ocean_o !== null && s.ocean_o !== undefined; }).length;
+            var share = pct(done, members.length);
+            return '' +
+                '<div>' +
+                '<div class="trait-top">' +
+                '<span class="trait-name">' + esc(section.name) + '</span>' +
+                '<span class="trait-val tnum">' + share + '%</span>' +
+                '</div>' +
+                '<div class="bar"><div class="bar-fill" style="width:' + share + '%"></div></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    /* ==================================================== 6. SECTIONS === */
+
+    function renderSections() {
+        var grid = $('#sections-grid');
+
+        if (!state.sections.length) {
+            grid.innerHTML = '<div class="card"><div class="state-block">' +
+                '<span class="state-glyph">' + icon('layers', 'icon-lg') + '</span>' +
+                '<p class="state-title">No sections yet</p>' +
+                '<p class="state-desc">Create a section before registering students — every participant must belong to one.</p>' +
+                '</div></div>';
+            return;
+        }
+
+        grid.innerHTML = state.sections.map(function (section) {
+            var members = state.cohort.filter(function (s) { return s.section === section.name; });
+            var online = members.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
+            var done = members.filter(function (s) { return s.ocean_o !== null && s.ocean_o !== undefined; }).length;
+
+            var stack = members.slice(0, 4).map(function (s) {
+                return '<span class="avatar">' + esc(initialsOf(s.full_name, s.email)) + '</span>';
+            }).join('');
+            var more = members.length > 4
+                ? '<span class="avatar avatar-more">+' + (members.length - 4) + '</span>' : '';
+
+            return '' +
+                '<article class="section-card">' +
+                '<div class="section-card-body">' +
+                '<div class="section-card-top">' +
+                '<div>' +
+                '<h3 class="section-name">' + esc(section.name) + '</h3>' +
+                '<p class="section-prof">' + esc(professorFor(section.name)) + '</p>' +
+                '</div>' +
+                '<span class="badge ' + (online ? 'badge-accent' : '') + '">' +
+                '<span class="dot ' + (online ? 'dot-live' : 'dot-off') + '"></span>' +
+                (online ? online + ' online' : 'Idle') + '</span>' +
+                '</div>' +
+                '<div class="section-metrics">' +
+                '<div><p class="metric-label">Students</p><p class="metric-value tnum">' + members.length + '</p></div>' +
+                '<div><p class="metric-label">OCEAN</p><p class="metric-value tnum">' + done + '</p></div>' +
+                '<div><p class="metric-label">Complete</p><p class="metric-value tnum">' + pct(done, members.length) + '%</p></div>' +
+                '</div>' +
+                '<div class="bar"><div class="bar-fill" style="width:' + pct(done, members.length) + '%"></div></div>' +
+                '</div>' +
+                '<div class="section-card-foot">' +
+                '<div class="avatar-stack">' + stack + more + '</div>' +
+                '<button class="btn btn-secondary btn-sm" data-section-open="' + esc(section.name) + '">' +
+                'View roster ' + icon('chev-right') + '</button>' +
+                '</div>' +
+                '</article>';
+        }).join('');
+
+        $$('[data-section-open]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                openSectionDetails(btn.getAttribute('data-section-open'));
+            });
+        });
+    }
+
+    function professorFor(sectionName) {
+        var match = state.faculty.filter(function (f) { return f.assigned_section === sectionName; })[0];
+        return match ? match.name : 'No professor assigned';
+    }
+
+    async function openSectionDetails(sectionName) {
+        state.activeSection = sectionName;
+        $('#section-details-title').textContent = 'Section ' + sectionName;
+        $('#section-details-sub').textContent = 'Loading enrolled students…';
+        $('#section-students-tbody').innerHTML = skeletonRows(5, 4);
+        openModal('modal-section-details');
+
+        var res = await sb.from('profiles')
+            .select('role, full_name, email, group_type, status, pre_test_score, post_test_score')
+            .eq('section', sectionName)
+            .order('full_name', { ascending: true });
+
+        if (res.error) {
+            $('#section-details-sub').textContent = 'Could not load this section.';
+            $('#section-students-tbody').innerHTML = '';
+            toastErr('Section failed to load', friendlyDbError(res.error, 'Unknown database error.'));
+            return;
+        }
+
+        var students = (res.data || []).filter(function (row) {
+            return (row.role || '').toLowerCase() !== 'admin';
+        });
+
+        $('#section-details-sub').textContent = students.length +
+            ' student' + (students.length === 1 ? '' : 's') + ' enrolled.';
+
+        if (!students.length) {
+            $('#section-students-tbody').innerHTML = '<tr><td colspan="5">' +
+                '<div class="state-block" style="min-height:200px">' +
+                '<span class="state-glyph">' + icon('users', 'icon-lg') + '</span>' +
+                '<p class="state-title">No students in this section</p>' +
+                '<p class="state-desc">Register a participant and assign them to ' + esc(sectionName) + '.</p>' +
+                '</div></td></tr>';
+            return;
+        }
+
+        $('#section-students-tbody').innerHTML = students.map(function (s) {
+            var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
+            var active = (s.status || '') === 'active';
+            return '' +
+                '<tr>' +
+                '<td>' + userCell(s) + '</td>' +
+                '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
+                '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
+                '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
+                (active ? 'Active' : 'Inactive') + '</span></td>' +
+                '<td class="tnum muted">' + esc(s.pre_test_score == null ? '—' : s.pre_test_score) + '</td>' +
+                '<td class="tnum muted">' + esc(s.post_test_score == null ? '—' : s.post_test_score) + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    /* ============================================== 7. STUDENT ROSTER === */
+
+    var ROSTER_HEADS = {
+        default:
+            '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Stage</th>' +
+            '<th>Pre-test</th><th>Devices</th><th class="col-right col-w-actions">Actions</th></tr>',
+        'Active Game':
+            '<tr><th>Student</th><th>Problem</th><th>Difficulty</th><th>Hints</th>' +
+            '<th>Streak</th><th>Duration</th><th class="col-right col-w-actions">Actions</th></tr>',
+        stage:
+            '<tr><th>Student</th><th>Section</th><th>Activity</th><th>Duration</th>' +
+            '<th class="col-right col-w-actions">Actions</th></tr>'
+    };
+
+    function rosterActions(email) {
+        return '' +
+            '<td class="col-right"><span class="row-actions">' +
+            '<button class="btn-icon" title="Edit participant" data-row-act="edit" data-email="' + esc(email) + '">' +
+            icon('pencil', 'icon-sm') + '</button>' +
+            '<button class="btn-icon" title="Delete participant" data-row-act="delete" data-email="' + esc(email) + '">' +
+            icon('trash', 'icon-sm') + '</button>' +
+            '</span></td>';
+    }
+
+    function renderRoster() {
+        var tbody = $('#student-tbody');
+        var empty = $('#student-empty');
+        var thead = $('#roster-thead');
+        var drill = state.filters.stage;
+
+        thead.innerHTML = drill === 'Active Game' ? ROSTER_HEADS['Active Game']
+            : (drill ? ROSTER_HEADS.stage : ROSTER_HEADS.default);
+
+        empty.classList.toggle('is-hidden', state.rosterPage.length !== 0);
+
+        tbody.innerHTML = state.rosterPage.map(function (s) {
+            var email = s.email;
+            var started = s.stage_started_at || '';
+
+            if (drill === 'Active Game') {
+                return '' +
+                    '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
+                    '<td>' + userCell(s) + '</td>' +
+                    '<td class="tnum muted">Question ' + toInt(s.current_problem, 1) + '</td>' +
+                    '<td><span class="badge badge-teal">' + esc(s.current_difficulty || 'Normal') + '</span></td>' +
+                    '<td class="tnum muted">' + toInt(s.hints_used, 0) + '</td>' +
+                    '<td class="tnum muted">' + toInt(s.consecutive_correct, 0) + '</td>' +
+                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>' +
+                    rosterActions(email) +
+                    '</tr>';
+            }
+
+            if (drill) {
+                var activity = 'Reading instructions';
+                if (drill === 'OCEAN') { activity = 'Answering item ' + toInt(s.ocean_current_item, 1) + '/50'; }
+                if (drill === 'Character Selection') { activity = 'Browsing personas'; }
+                if (drill === 'Tutoring Dashboard') { activity = 'Browsing dashboard'; }
+
+                return '' +
+                    '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
+                    '<td>' + userCell(s) + '</td>' +
+                    '<td class="muted">' + esc(s.section || '—') + '</td>' +
+                    '<td><span class="badge badge-accent">' + esc(activity) + '</span></td>' +
+                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>' +
+                    rosterActions(email) +
+                    '</tr>';
+            }
+
+            var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
+            var used = (s.active_devices || []).length;
+            var limit = toInt(s.max_devices, 1);
+            var deviceTone = used >= limit && used > 0 ? 'badge-amber' : '';
+
+            return '' +
+                '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
+                '<td>' + userCell(s) + '</td>' +
+                '<td class="muted">' + esc(s.section || '—') + '</td>' +
+                '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
+                '<td>' + stageBadge(stageOf(s)) + '</td>' +
+                '<td class="tnum muted">' + esc(s.pre_test_score == null ? '—' : s.pre_test_score) + '</td>' +
+                '<td><span class="badge ' + deviceTone + ' tnum">' + used + ' / ' + limit + '</span></td>' +
+                rosterActions(email) +
+                '</tr>';
+        }).join('');
+
+        var pages = Math.max(1, Math.ceil(state.totalStudents / PAGE_SIZE));
+        var from = state.totalStudents ? (state.page - 1) * PAGE_SIZE + 1 : 0;
+        var to = Math.min(state.page * PAGE_SIZE, state.totalStudents);
+
+        $('#pager-info').textContent = 'Showing ' + from + '–' + to + ' of ' + state.totalStudents +
+            (pages > 1 ? '  ·  page ' + state.page + ' of ' + pages : '');
+        $('#page-prev').disabled = state.page <= 1;
+        $('#page-next').disabled = state.page >= pages;
+    }
+
+    function initRoster() {
+        $('#student-search').addEventListener('input', debounce(function (event) {
+            state.filters.search = event.target.value;
+            state.page = 1;
+            loadRoster();
+        }, 300));
+
+        $$('[data-group-filter]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                $$('[data-group-filter]').forEach(function (b) { b.classList.remove('is-active'); });
+                btn.classList.add('is-active');
+
+                state.filters.group = btn.getAttribute('data-group-filter');
+                state.filters.sub = 'all';
+                $$('[data-sub-filter]').forEach(function (b) {
+                    b.classList.toggle('is-active', b.getAttribute('data-sub-filter') === 'all');
+                });
+                $('#subgroup-segment').classList.toggle('is-hidden', state.filters.group !== 'experimental');
+
+                state.page = 1;
+                loadRoster();
+            });
+        });
+
+        $$('[data-sub-filter]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                $$('[data-sub-filter]').forEach(function (b) { b.classList.remove('is-active'); });
+                btn.classList.add('is-active');
+                state.filters.sub = btn.getAttribute('data-sub-filter');
+                state.page = 1;
+                loadRoster();
+            });
+        });
+
+        $$('[data-stage-filter]').forEach(function (tile) {
+            tile.addEventListener('click', function () {
+                var key = tile.getAttribute('data-stage-filter');
+                var isSame = state.filters.stage === key;
+                state.filters.stage = isSame ? null : key;
+
+                $$('[data-stage-filter]').forEach(function (t) {
+                    t.classList.toggle('is-active', !isSame && t === tile);
+                });
+
+                applyDrilldownChrome();
+                state.page = 1;
+                loadRoster();
+            });
+        });
+
+        $('#clear-stage-filter').addEventListener('click', function () {
+            state.filters.stage = null;
+            $$('[data-stage-filter]').forEach(function (t) { t.classList.remove('is-active'); });
+            applyDrilldownChrome();
+            state.page = 1;
+            loadRoster();
+        });
+
+        $('#reset-filters').addEventListener('click', function () {
+            state.filters = { group: 'all', sub: 'all', stage: null, search: '' };
+            $('#student-search').value = '';
+            $$('[data-group-filter]').forEach(function (b) {
+                b.classList.toggle('is-active', b.getAttribute('data-group-filter') === 'all');
+            });
+            $$('[data-stage-filter]').forEach(function (t) { t.classList.remove('is-active'); });
+            $('#subgroup-segment').classList.add('is-hidden');
+            applyDrilldownChrome();
+            state.page = 1;
+            loadRoster();
+        });
+
+        $('#page-prev').addEventListener('click', function () {
+            if (state.page > 1) { state.page--; loadRoster(); }
+        });
+
+        $('#page-next').addEventListener('click', function () {
+            var pages = Math.max(1, Math.ceil(state.totalStudents / PAGE_SIZE));
+            if (state.page < pages) { state.page++; loadRoster(); }
+        });
+
+        /* One delegated listener covers every row and every row action. */
+        $('#student-tbody').addEventListener('click', function (event) {
+            var actionBtn = event.target.closest('[data-row-act]');
+            if (actionBtn) {
+                event.stopPropagation();
+                var email = actionBtn.getAttribute('data-email');
+                if (actionBtn.getAttribute('data-row-act') === 'edit') {
+                    openEditStudent(email);
+                } else {
+                    deleteStudent(email);
+                }
+                return;
+            }
+
+            var row = event.target.closest('[data-student]');
+            if (row) { openStudentDrawer(row.getAttribute('data-student')); }
+        });
+    }
+
+    function applyDrilldownChrome() {
+        var drill = state.filters.stage;
+        $('#clear-stage-filter').classList.toggle('is-hidden', !drill);
+        $('#roster-filter-bar').classList.toggle('is-hidden', !!drill);
+        $('#roster-title').textContent = drill ? stageLabel(drill) + ' — live view' : 'All students';
+        $('#roster-sub').textContent = drill
+            ? 'Participants currently at this stage.'
+            : 'Showing the full cohort.';
+    }
+
+    /* Ticks every second so live durations stay honest without a refetch. */
+    setInterval(function () {
+        $$('tr[data-started-at]').forEach(function (row) {
+            var startedAt = row.getAttribute('data-started-at');
+            var cell = row.querySelector('[data-duration]');
+            if (cell && startedAt) { cell.textContent = formatDuration(startedAt); }
+        });
+    }, 1000);
+
+    /* ========================== 8. STUDENT DRAWER AND ACTIONS =========== */
+
+    function findStudent(email) {
+        return state.rosterPage.filter(function (s) { return s.email === email; })[0] ||
+            state.cohort.filter(function (s) { return s.email === email; })[0] || null;
+    }
+
+    function openStudentDrawer(email) {
+        var s = findStudent(email);
+        if (!s) { return; }
+
+        state.activeStudent = s;
+        var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
+
+        $('#drawer-initials').textContent = initialsOf(s.full_name, s.email);
+
+        var drawerOnline = isOnline(s);
+        var drawerDot = $('#drawer-presence');
+        if (drawerDot) {
+            drawerDot.classList.toggle('is-hidden', drawerOnline === null);
+            drawerDot.classList.toggle('is-online', drawerOnline === true);
+            drawerDot.setAttribute('data-presence', s.email);
+            drawerDot.title = drawerOnline ? 'Online' : 'Offline';
+        }
+        $('#drawer-student-name').textContent = s.full_name || '(no name)';
+        $('#drawer-email').textContent = s.email;
+        $('#drawer-condition').textContent = condition.short;
+        $('#drawer-condition').className = 'badge ' + (condition.badge || '');
+        $('#drawer-section').textContent = s.section || '—';
+        $('#drawer-stage').textContent = stageLabel(stageOf(s));
+        $('#drawer-devices').textContent = (s.active_devices || []).length + ' of ' + toInt(s.max_devices, 1);
+        $('#drawer-status').textContent = (drawerOnline ? 'Online' : 'Offline') +
+            ' · ' + ((s.status || '') === 'active' ? 'Activated' : 'Not activated');
+        $('#drawer-pre').textContent = s.pre_test_score == null ? 'n/a' : s.pre_test_score;
+        $('#drawer-post').textContent = s.post_test_score == null ? 'n/a' : s.post_test_score;
+
+        renderTraits(s);
+        openModal('drawer-student');
+    }
+
+    /* Raw OCEAN sums are out of OCEAN_SCORE_MAX (40); normalizeOceanScore in
+       function.js converts them to the percentages shown here. */
+    function renderTraits(s) {
+        var traits = [
+            ['Openness', s.ocean_o],
+            ['Conscientiousness', s.ocean_c],
+            ['Extraversion', s.ocean_e],
+            ['Agreeableness', s.ocean_a],
+            ['Neuroticism', s.ocean_n]
+        ];
+
+        var hasAny = traits.some(function (pair) { return toOceanPct(pair[1]) !== null; });
+
+        if (!hasAny) {
+            $('#drawer-traits').innerHTML = '<div class="notice">' + icon('info') +
+                '<div><p class="notice-title">No OCEAN result yet</p>' +
+                '<p class="notice-text">This participant has not completed the Big Five Inventory.</p></div></div>';
+            return;
+        }
+
+        $('#drawer-traits').innerHTML = traits.map(function (pair) {
+            var value = toOceanPct(pair[1]);
+            var shown = value === null ? 'n/a' : value + '%';
+            return '' +
+                '<div class="trait">' +
+                '<div class="trait-top">' +
+                '<span class="trait-name">' + pair[0] + '</span>' +
+                '<span class="trait-val tnum">' + shown + '</span>' +
+                '</div>' +
+                '<div class="bar"><div class="bar-fill" style="width:' + (value || 0) + '%"></div></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function initDrawerActions() {
+        $$('[data-student-action]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var s = state.activeStudent;
+                if (!s) { return; }
+                var action = btn.getAttribute('data-student-action');
+
+                if (action === 'activate') { sendActivationEmail(s.email, btn); }
+                else if (action === 'edit') { closeModal('drawer-student'); openEditStudent(s.email); }
+                else if (action === 'devices') { openDeviceManager(s.email); }
+                else if (action === 'retake-ocean') { allowRetakeOcean(s.email); }
+                else if (action === 'retake-character') { allowRetakeCharacter(s.email); }
+                else if (action === 'reset-password') { sendPasswordReset(s.email, btn); }
+                else if (action === 'delete') { deleteStudent(s.email); }
+            });
+        });
+    }
+
+    /* ---- Activation and password-reset email ---- */
+
+    async function sendActivationEmail(email, sourceBtn) {
+        var ok = await confirmAction({
+            title: 'Send activation email',
+            heading: 'Email ' + email + '?',
+            message: 'The student receives a one-time link where they set their own password. ' +
+                'Their account becomes active once they use it.',
+            confirmLabel: 'Send email',
+            tone: 'accent'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Sending…');
+        var res = await sb.auth.signInWithOtp({
+            email: email,
+            options: { shouldCreateUser: false, emailRedirectTo: activationRedirect() }
+        });
+        release();
+
+        if (res.error) {
+            toastErr('Activation email failed', res.error.message);
+            return;
+        }
+        toastOk('Activation email sent', 'Delivered to ' + email + '.');
+    }
+
+    /* Security: the admin never sets a known password. The owner sets their
+       own through the emailed link. */
+    async function sendPasswordReset(email, sourceBtn) {
+        var ok = await confirmAction({
+            title: 'Reset password',
+            heading: 'Send a reset link to ' + email + '?',
+            message: 'They will choose their own new password through the emailed link. ' +
+                'No password is set or revealed here.',
+            confirmLabel: 'Send reset email',
+            tone: 'accent'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Sending…');
+        var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() });
+        release();
+
+        if (res.error) {
+            toastErr('Reset email failed', res.error.message);
+            return;
+        }
+        toastOk('Reset email sent', email + ' can now set a new password.');
+    }
+
+    /* ---- Retakes ---- */
+
+    async function allowRetakeOcean(email) {
+        var ok = await confirmAction({
+            title: 'Allow OCEAN retake',
+            heading: 'Clear the OCEAN result for ' + email + '?',
+            message: 'The five trait scores are erased and the student is sent back to the ' +
+                'OCEAN stage. The previous result cannot be recovered.',
+            confirmLabel: 'Clear and allow retake'
+        });
+        if (!ok) { return; }
+
+        var res = await sb.from('profiles').update({
+            is_ocean_done: false,
+            current_stage: 'OCEAN',
+            stage_started_at: new Date().toISOString(),
+            ocean_o: null, ocean_c: null, ocean_e: null, ocean_a: null, ocean_n: null
+        }).eq('email', email);
+
+        if (res.error) {
+            toastErr('Could not allow retake', friendlyDbError(res.error, 'Update rejected.'));
+            return;
+        }
+
+        toastOk('OCEAN retake enabled', email + ' can take the inventory again.');
+        closeModal('drawer-student');
+        refreshAll();
+    }
+
+    async function allowRetakeCharacter(email) {
+        var ok = await confirmAction({
+            title: 'Allow character re-selection',
+            heading: 'Clear the chosen persona for ' + email + '?',
+            message: 'Their selected agent is cleared and they return to the character ' +
+                'selection stage.',
+            confirmLabel: 'Clear selection'
+        });
+        if (!ok) { return; }
+
+        var res = await sb.from('profiles').update({
+            selected_character: null,
+            current_stage: 'Character Selection',
+            stage_started_at: new Date().toISOString()
+        }).eq('email', email);
+
+        if (res.error) {
+            toastErr('Could not allow re-selection', friendlyDbError(res.error, 'Update rejected.'));
+            return;
+        }
+
+        toastOk('Character re-selection enabled', email + ' can pick a persona again.');
+        closeModal('drawer-student');
+        refreshAll();
+    }
+
+    /* ---- Delete ---- */
+
+    async function deleteStudent(email) {
+        var ok = await confirmAction({
+            title: 'Delete participant',
+            heading: 'Permanently delete ' + email + '?',
+            message: 'The profile, the auth user and every collected response for this ' +
+                'participant are removed. This cannot be undone and will change your dataset.',
+            confirmLabel: 'Delete permanently'
+        });
+        if (!ok) { return; }
+
+        var res = await sb.rpc('admin_delete_user', { target_email: email });
+
+        if (res.error) {
+            toastErr('Deletion failed', friendlyDbError(res.error, 'The account was not deleted.'));
+            return;
+        }
+
+        closeModal('drawer-student');
+        toastOk('Participant deleted', email + ' was removed from the study.');
+        refreshAll();
+    }
+
+    /* ---- Register student ---- */
+
+    async function handleRegisterStudent(event) {
+        event.preventDefault();
+        clearFormErrors('register-student-form');
+
+        var first = $('#rs-first').value.trim();
+        var middle = $('#rs-middle').value.trim();
+        var last = $('#rs-last').value.trim();
+        var email = normalizeEmail($('#rs-email').value);
+        var section = $('#rs-section').value;
+        var groupType = ($('input[name="rs-condition"]:checked') || {}).value;
+        var maxDevices = toInt($('#rs-device').value, 1);
+        var score = parseScore($('#rs-pretest').value);
+
+        var valid = true;
+        valid = setFieldError('rs-first', first ? '' : 'First name is required.') && valid;
+        valid = setFieldError('rs-last', last ? '' : 'Last name is required.') && valid;
+        valid = setFieldError('rs-email', isEmail(email) ? '' : 'Enter a valid school email address.') && valid;
+        valid = setFieldError('rs-section', section ? '' : 'Create a section first.') && valid;
+        valid = setFieldError('rs-pretest', score.ok ? '' : 'Pre-test score must be between 0 and 100.') && valid;
+        valid = setFieldError('rs-consent', $('#rs-consent').checked ? '' : 'Parental consent must be recorded first.') && valid;
+        if (!valid) { return; }
+
+        var fullName = [first, middle, last].filter(Boolean).join(' ');
+        var release = setBusy($('#rs-submit'), 'Registering…');
+
+        try {
+            /* Pre-check BEFORE creating the auth user. admin_create_auth_user
+               runs first; if the profiles insert then fails (duplicate email,
+               for instance) an auth user is left behind with no profile, and
+               every later attempt fails with "user already exists" — that
+               student can never be registered again. Checking first avoids the
+               whole situation. */
+            var existing = await sb.from('profiles').select('email').eq('email', email).maybeSingle();
+
+            if (existing.data) {
+                setFieldError('rs-email', 'This email is already on the roster.');
+                toastErr('Duplicate email', email + ' already has an account.');
+                return;
+            }
+
+            var authRes = await sb.rpc('admin_create_auth_user', {
                 target_email: email,
                 default_password: generateSecurePassword()
             });
 
-            if (authError) {
-                return showCustomAlert("Auth Error", friendlyDbError(authError, "Could not create the auth user."), "error");
+            if (authRes.error) {
+                toastErr('Auth user not created', friendlyDbError(authRes.error, 'Could not create the auth user.'));
+                return;
             }
 
-            const { error } = await sb.from('profiles').insert([{
-                full_name, email, section, group_type,
-                pre_test_score: score.value, max_devices,
-                status: 'inactive', role: 'student'
+            var insertRes = await sb.from('profiles').insert([{
+                full_name: fullName,
+                email: email,
+                section: section,
+                group_type: groupType,
+                pre_test_score: score.value,
+                max_devices: maxDevices,
+                status: 'inactive',
+                role: 'student'
             }]);
 
-            if (error) {
-                // Naging matagumpay ang auth user pero nabigo ang profile row.
-                // Sabihin ito nang tahasan -- may naiwang orphan na kailangang
-                // linisin bago muling subukan.
-                return showCustomAlert("Registration Error",
-                    friendlyDbError(error, "Could not save the profile.") +
-                    ' (NOTE: an auth user was already created for ' + email +
-                    ' -- it must be deleted before registering again.)', "error");
+            if (insertRes.error) {
+                /* The auth user succeeded but the profile row failed. Say so
+                   plainly — an orphan needs cleaning up before retrying. */
+                showNotice('Registration incomplete',
+                    friendlyDbError(insertRes.error, 'Could not save the profile.') +
+                    '\n\nAn auth user was already created for ' + email +
+                    '. It must be deleted before registering this student again.',
+                    'danger');
+                return;
             }
 
-            document.getElementById('add-student-form').reset();
-            closeModal('add-student-modal');
-            loadStudents();
-            showCustomAlert("Registration Success", `${full_name} added to roster (Inactive until emailed).`, "success");
+            closeModal('modal-register-student');
+            $('#register-student-form').reset();
+            clearFormErrors('register-student-form');
+
+            toastOk('Student registered', fullName + ' is on the roster, inactive until they use the activation link.');
+            refreshAll();
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = 'Register'; }
+            release();
         }
     }
 
-    // fully working
-    function openEditStudent(fullName, email, section, pretest, type, maxDevices) {
-        const nameParts = fullName.trim().split(' ');
-        let first = nameParts[0] || '', middle = '', last = '';
-        if (nameParts.length === 2) last = nameParts[1];
-        else if (nameParts.length > 2) { last = nameParts[nameParts.length - 1]; middle = nameParts.slice(1, -1).join(' '); }
+    /* ---- Edit student ---- */
 
-        document.getElementById('edit-student-original-email').value = email;
-        document.getElementById('edit-first-name').value = first;
-        document.getElementById('edit-middle-name').value = middle;
-        document.getElementById('edit-last-name').value = last;
-        document.getElementById('edit-student-email-input').value = email;
+    function openEditStudent(email) {
+        var s = findStudent(email);
+        if (!s) { return; }
 
-        const sectionSelect = document.getElementById('edit-student-section');
-        const optionExists = Array.from(sectionSelect.options).some(opt => opt.value === section);
-        if (!optionExists && section) {
-            const newOpt = document.createElement('option');
-            newOpt.value = section;
-            newOpt.textContent = section;
-            sectionSelect.appendChild(newOpt);
+        clearFormErrors('edit-student-form');
+
+        var parts = (s.full_name || '').trim().split(/\s+/);
+        var first = parts[0] || '', middle = '', last = '';
+        if (parts.length === 2) { last = parts[1]; }
+        else if (parts.length > 2) { last = parts[parts.length - 1]; middle = parts.slice(1, -1).join(' '); }
+
+        $('#es-original-email').value = s.email;
+        $('#es-first').value = first;
+        $('#es-middle').value = middle;
+        $('#es-last').value = last;
+        $('#es-email').value = s.email;
+        $('#es-pretest').value = s.pre_test_score == null ? '' : s.pre_test_score;
+        $('#es-device').value = toInt(s.max_devices, 1);
+
+        /* A section that was deleted from `sections` must still be selectable,
+           otherwise saving would silently move the student. */
+        var sectionSelect = $('#es-section');
+        var known = $$('option', sectionSelect).some(function (opt) { return opt.value === s.section; });
+        if (!known && s.section) {
+            var opt = document.createElement('option');
+            opt.value = s.section;
+            opt.textContent = s.section + ' (not in sections list)';
+            sectionSelect.appendChild(opt);
         }
-        sectionSelect.value = section;
+        sectionSelect.value = s.section || '';
 
-        document.getElementById('edit-student-pretest').value = pretest;
-        document.getElementById('edit-student-type').value = type;
-        document.getElementById('edit-student-device-limit').value = maxDevices || 1;
+        var radio = $('input[name="es-condition"][value="' + (s.group_type || '') + '"]');
+        if (radio) { radio.checked = true; }
 
-        openModal('edit-student-modal');
+        openModal('modal-edit-student');
     }
 
     async function handleUpdateStudent(event) {
         event.preventDefault();
+        clearFormErrors('edit-student-form');
 
-        const form = event.target;
-        const btn = form.querySelector('button[type="submit"]');
-        const originalEmail = document.getElementById('edit-student-original-email').value;
+        var originalEmail = $('#es-original-email').value;
+        var first = $('#es-first').value.trim();
+        var middle = $('#es-middle').value.trim();
+        var last = $('#es-last').value.trim();
+        var email = normalizeEmail($('#es-email').value);
+        var section = $('#es-section').value;
+        var groupType = ($('input[name="es-condition"]:checked') || {}).value;
+        var maxDevices = toInt($('#es-device').value, 1);
+        var score = parseScore($('#es-pretest').value);
 
-        const first = document.getElementById('edit-first-name').value.trim();
-        const middle = document.getElementById('edit-middle-name').value.trim();
-        const last = document.getElementById('edit-last-name').value.trim();
-        const full_name = [first, middle, last].filter(Boolean).join(' ');
+        var valid = true;
+        valid = setFieldError('es-first', first ? '' : 'First name is required.') && valid;
+        valid = setFieldError('es-last', last ? '' : 'Last name is required.') && valid;
+        valid = setFieldError('es-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
+        valid = setFieldError('es-pretest', score.ok ? '' : 'Pre-test score must be between 0 and 100.') && valid;
+        if (!valid) { return; }
 
-        const email = normalizeEmail(document.getElementById('edit-student-email-input').value);
-        const section = document.getElementById('edit-student-section').value;
-        const group_type = document.getElementById('edit-student-type').value;
-        const max_devices = parseInt(document.getElementById('edit-student-device-limit').value) || 1;
-
-        const score = parseScore(document.getElementById('edit-student-pretest').value);
-        if (!score.ok) return showCustomAlert("Validation Error", "Pre-test score must be between 0 and 100.", "error");
-
-        const emailChanged = (email !== normalizeEmail(originalEmail));
-
-        if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return showCustomAlert("Validation Error", "Invalid email address.", "error");
-        }
-
-        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+        var fullName = [first, middle, last].filter(Boolean).join(' ');
+        var emailChanged = (email !== normalizeEmail(originalEmail));
+        var release = setBusy($('#es-submit'), 'Saving…');
 
         try {
-            // BANGGAAN MUNA, BAGO ANG AUTH. Dati, tumatakbo agad ang
-            // admin_update_user_email, tapos saka lang ang profiles update.
-            // Kapag nabigo ang pangalawa (hal. may ibang profile na gamit na ang
-            // bagong email), ang auth ay may BAGONG email na, ang profiles ay
-            // LUMA pa rin -- at wala nang tumutugmang profile ang session ng
-            // estudyante. Hindi na sila makaka-login, at tahimik ang pagkasira.
+            /* Check for a clash BEFORE touching auth. If the auth email is
+               changed first and the profiles update then fails, auth holds the
+               new address while profiles holds the old one — the student's
+               session no longer matches any profile and they cannot log in. */
             if (emailChanged) {
-                const { data: clash } = await sb.from('profiles')
-                    .select('email').eq('email', email).maybeSingle();
+                var clash = await sb.from('profiles').select('email').eq('email', email).maybeSingle();
 
-                if (clash) {
-                    return showCustomAlert("Duplicate Email",
-                        `${email} is already using that email. Choose a different one.`, "error");
+                if (clash.data) {
+                    setFieldError('es-email', 'Another account already uses this email.');
+                    toastErr('Duplicate email', email + ' is already taken.');
+                    return;
                 }
 
-                const { error: rpcError } = await sb.rpc('admin_update_user_email', {
+                var rpcRes = await sb.rpc('admin_update_user_email', {
                     target_email: originalEmail,
                     new_email: email
                 });
-                if (rpcError) {
-                    return showCustomAlert("Auth Sync Error",
-                        friendlyDbError(rpcError, "Could not update the auth email."), "error");
+
+                if (rpcRes.error) {
+                    toastErr('Auth email not updated', friendlyDbError(rpcRes.error, 'Could not update the auth email.'));
+                    return;
                 }
             }
 
-            const updatePayload = {
-                full_name, section, pre_test_score: score.value, group_type, max_devices
+            var payload = {
+                full_name: fullName,
+                section: section,
+                pre_test_score: score.value,
+                group_type: groupType,
+                max_devices: maxDevices
             };
-            if (emailChanged) updatePayload.email = email;
+            if (emailChanged) { payload.email = email; }
 
-            const { error } = await sb.from('profiles').update(updatePayload).eq('email', originalEmail);
+            var updateRes = await sb.from('profiles').update(payload).eq('email', originalEmail);
 
-            if (error) {
-                return showCustomAlert("Update Error",
-                    friendlyDbError(error, "Could not update the profile.") +
-                    (emailChanged ? ' (WARNING: the auth email was already changed to ' + email +
-                                    ' but the profile was not -- these must be reconciled immediately.)' : ''), "error");
+            if (updateRes.error) {
+                if (emailChanged) {
+                    showNotice('Profile not updated',
+                        friendlyDbError(updateRes.error, 'Could not update the profile.') +
+                        '\n\nWARNING: the auth email was already changed to ' + email +
+                        ' but the profile still holds ' + originalEmail +
+                        '. These must be reconciled before this student signs in again.',
+                        'danger');
+                } else {
+                    toastErr('Update failed', friendlyDbError(updateRes.error, 'Could not update the profile.'));
+                }
+                return;
             }
 
-            closeModal('edit-student-modal');
-            loadStudents();
-            showCustomAlert("Update Success", `Student details updated successfully.`, "success");
+            closeModal('modal-edit-student');
+            toastOk('Participant updated', fullName + ' was saved.');
+            refreshAll();
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+            release();
         }
     }
 
-    // fully working
-    async function allowStudentRetakeOcean(email) {
-        showCustomConfirm("Retake OCEAN Test", `Allow ${email} to retake OCEAN test?`, async () => {
-            await sb.from('profiles').update({
-                is_ocean_done: false, current_stage: 'OCEAN', stage_started_at: new Date().toISOString(),
-                ocean_e: null, ocean_a: null, ocean_c: null, ocean_n: null, ocean_o: null
-            }).eq('email', email);
-            showCustomAlert("Success", `${email} can now retake OCEAN test.`, "success");
-            loadStudents();
-        });
-    }
+    /* ---- Student device manager ---- */
 
-    // fully working
-    async function allowStudentRetakeCharacter(email) {
-        showCustomConfirm("Retake Character Select", `Allow ${email} to re-select character?`, async () => {
-            await sb.from('profiles').update({
-                selected_character: null, current_stage: 'Character Selection', stage_started_at: new Date().toISOString()
-            }).eq('email', email);
-            showCustomAlert("Success", `${email} can now re-select character.`, "success");
-            loadStudents();
-        });
-    }
+    async function openDeviceManager(email) {
+        state.managingEmail = email;
+        $('#devices-subject').textContent = email;
+        $('#student-device-list').innerHTML =
+            '<div class="device-row"><span class="skeleton skeleton-avatar"></span>' +
+            '<div class="device-text"><span class="skeleton skeleton-line" style="width:140px"></span>' +
+            '<span class="skeleton skeleton-line" style="width:200px"></span></div></div>';
+        openModal('modal-devices');
 
+        var res = await sb.from('profiles').select('active_devices').eq('email', email).maybeSingle();
 
-    // ==========================================
-    // 7. SECTION & SCORES MANAGEMENT
-    // ==========================================
-
-    // fully working
-    let lastSectionsSignature = null;
-
-    async function loadSections() {
-        const { data, error } = await sb.from('sections').select('*');
-        if (error) return console.error('Error loading sections:', error);
-
-        // Tumatakbo ito bawat realtime tick. Dati, muling itinatayo nito ang
-        // buong sections grid, nililinis at pinupuno ang APAT na <select>, at
-        // pinapatakbo ang lucide.createIcons() sa buong DOM -- bawat segundo sa
-        // isang live na session. Kapag hindi nagbago ang listahan, laktawan.
-        const signature = JSON.stringify((data || []).map(x => x.name).sort());
-        const sectionsChanged = (signature !== lastSectionsSignature);
-        lastSectionsSignature = signature;
-
-        const grid = document.getElementById('sections-grid');
-        grid.innerHTML = '';
-
-        const sectionSelects = document.querySelectorAll('#student-section, #edit-student-section, #prof-section, #target-section-select');
-        sectionSelects.forEach(select => { select.innerHTML = ''; });
-
-        if (!data || data.length === 0) {
-            grid.innerHTML = `<p class="empty-row admin-grid-span-all">No sections found. Click "Add Section" to create one.</p>`;
+        if (res.error) {
+            $('#student-device-list').innerHTML = '';
+            toastErr('Could not read devices', friendlyDbError(res.error, 'Unknown database error.'));
             return;
         }
 
-        const { data: allProfiles } = await sb.from('profiles').select('section').neq('role', 'admin');
+        renderStudentDevices((res.data && res.data.active_devices) || []);
+    }
 
-        // Ang enrolled count lang ang nagbabago kapag pareho pa rin ang mga
-        // section -- pero mura ang buong redraw sa ganitong laki, at ang
-        // mahalaga ay hindi na natatanggal ang napili ng admin sa dropdown
-        // kung walang tunay na pagbabago.
-        if (!sectionsChanged && grid.childElementCount > 0) {
-            const counts = {};
-            (allProfiles || []).forEach(pr => { if (pr.section) counts[pr.section] = (counts[pr.section] || 0) + 1; });
-            grid.querySelectorAll('.section-card').forEach(card => {
-                const title = card.querySelector('.section-card-title');
-                const badge = card.querySelector('.badge');
-                if (title && badge) badge.textContent = `${counts[title.textContent] || 0} Enrolled`;
-            });
+    function renderStudentDevices(devices) {
+        var container = $('#student-device-list');
+        $('#revoke-all-btn').disabled = !devices.length;
+
+        if (!devices.length) {
+            container.innerHTML = '<div class="state-block" style="min-height:160px">' +
+                '<span class="state-glyph">' + icon('monitor', 'icon-lg') + '</span>' +
+                '<p class="state-title">No active devices</p>' +
+                '<p class="state-desc">This account is not signed in anywhere right now.</p></div>';
             return;
         }
-        const sectionCounts = {};
-        if (allProfiles) {
-            allProfiles.forEach(p => {
-                if (p.section) sectionCounts[p.section] = (sectionCounts[p.section] || 0) + 1;
-            });
-        }
 
-        for (const sec of (data || [])) {
-            const name = sec.name;
-            sectionSelects.forEach(select => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                select.appendChild(option);
-            });
-
-            const count = sectionCounts[name] || 0;
-
-            const card = document.createElement('div');
-            card.className = "solid-card card-padded section-card";
-            card.onclick = () => openSectionDetails(name);
-
-            card.innerHTML = `
-            <div class="section-card-head">
-                <div class="flex-row gap-sm">
-                    <h3 class="section-card-title">${escapeHTML(name)}</h3>
-                    <span class="badge badge-neutral">${count} Enrolled</span>
-                </div>
-                <span class="section-card-arrow"><i data-lucide="chevron-right" class="icon-sm"></i></span>
-            </div>
-            <div class="admin-grid-2">
-                <div class="section-action-tile" onclick="event.stopPropagation(); openScoresModal('${escapeJS(name)}')">
-                    <p class="section-action-label">Scores <i data-lucide="edit-2" class="icon-xs text-accent"></i></p>
-                    <p class="section-action-value">Input / View</p>
-                </div>
-                <div class="section-action-tile" onclick="event.stopPropagation(); sendSectionEmails('${escapeJS(name)}')">
-                    <p class="section-action-label">Broadcast <i data-lucide="send" class="icon-xs text-accent"></i></p>
-                    <p class="section-action-value text-accent">Email Roster</p>
-                </div>
-            </div>
-        `;
-            grid.appendChild(card);
-        }
-        lucide.createIcons();
+        container.innerHTML = devices.map(function (deviceId) {
+            var info = describeDevice(deviceId);
+            return '' +
+                '<div class="device-row">' +
+                '<span class="stat-glyph">' + icon(info.glyph, 'icon-sm') + '</span>' +
+                '<div class="device-text">' +
+                '<p class="device-name">' + esc(info.label) + '</p>' +
+                '<p class="device-meta cell-mail">' + esc(deviceId) + '</p>' +
+                '</div>' +
+                '</div>';
+        }).join('');
     }
 
-    // fully working
-    async function saveNewSection() {
-        const name = document.getElementById('new-section-name').value.trim();
-        if (!name) return showCustomAlert("Validation Error", "Please enter a section name.", "error");
+    /* Revoking one row only edited an array; the student's access token stayed
+       valid until it expired on its own. admin_revoke_sessions is the only
+       call that actually ends their access, so the control says what it does:
+       it signs them out everywhere. */
+    async function revokeAllStudentSessions() {
+        var email = state.managingEmail;
+        if (!email) { return; }
 
-        const { error } = await sb.from('sections').insert([{ name }]);
-        if (error) return showCustomAlert("Creation Error", error.message, "error");
+        var ok = await confirmAction({
+            title: 'Sign out all devices',
+            heading: 'Sign ' + email + ' out everywhere?',
+            message: 'Every session for this account ends immediately and they will have to ' +
+                'log in again. Any unsaved answer in progress may be lost.',
+            confirmLabel: 'Sign out everywhere'
+        });
+        if (!ok) { return; }
 
-        document.getElementById('new-section-name').value = '';
-        closeModal('add-section-modal');
-        loadSections();
-        showCustomAlert("Section Added", `Section ${name} created successfully!`, "success");
-    }
+        var release = setBusy($('#revoke-all-btn'), 'Revoking…');
+        var res = await sb.rpc('admin_revoke_sessions', { p_email: email });
+        release();
 
-    // fully working
-    async function openSectionDetails(sectionName) {
-        currentActiveSection = sectionName;
-        document.getElementById('modal-section-title').textContent = `Section: ${sectionName}`;
-
-        // Ang eksaktong columns lang na ginagamit ng table na ito (dating '*',
-        // na naghahatid ng buong row kasama ang active_devices at iba pang
-        // field na hindi naman ipinapakita dito).
-        const { data } = await sb.from('profiles').select('role, full_name, email, section, group_type, status, max_devices, pre_test_score, post_test_score, ocean_o, ocean_c, ocean_e, ocean_a, ocean_n').eq('section', sectionName);
-        const studentsOnly = data ? data.filter(student => (student.role || '').toLowerCase() !== 'admin') : [];
-        const tbody = document.getElementById('section-students-tbody');
-        tbody.innerHTML = '';
-
-        if (studentsOnly.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No students found in this section.</td></tr>`;
-        } else {
-            studentsOnly.forEach(student => {
-                const safeEmailId = escapeHTML(String(student.email).replace(/[@.]/g, '_'));
-                const tr = document.createElement('tr');
-                tr.className = "student-row";
-                tr.onclick = () => { openStudentProfile(student.full_name, student.email, sectionName, student.group_type, student.status, student.max_devices ?? 1, student.pre_test_score ?? 'n/a', student.post_test_score ?? 'n/a', student.ocean_o ?? 'n/a', student.ocean_c ?? 'n/a', student.ocean_e ?? 'n/a', student.ocean_a ?? 'n/a', student.ocean_n ?? 'n/a'); };
-
-                tr.innerHTML = `
-                <td class="text-primary" style="font-weight:500;">${escapeHTML(student.full_name)}</td>
-                <td class="text-secondary">${escapeHTML(student.email)}</td>
-                <td><span class="badge badge-success">${escapeHTML(student.group_type || 'N/A')}</span></td>
-                <td>
-                    <div class="flex-row gap-xs">
-                        <span class="status-dot ${student.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
-                        <span class="cell-label text-secondary">${student.status === 'active' ? 'Active' : 'Inactive'}</span>
-                    </div>
-                </td>
-                <td class="action-cell" onclick="event.stopPropagation()">
-                    <button onclick="toggleActionMenu(event, 'sec-${safeEmailId}')" class="action-toggle-btn">
-                        <i data-lucide="more-vertical" class="icon-sm"></i>
-                    </button>
-                    <div id="menu-sec-${safeEmailId}" onclick="event.stopPropagation()" class="action-menu hidden">
-                        <button onclick="sendActivationEmail('${escapeJS(student.email)}'); closeAllMenus();" class="action-menu-item">
-                            <i data-lucide="mail" class="icon-xs text-info"></i> Send Email
-                        </button>
-                        <button onclick="closeModal('section-details-modal'); openEditStudent('${escapeJS(student.full_name)}', '${escapeJS(student.email)}', '${escapeJS(student.section || '')}', '${escapeJS(student.pre_test_score ?? '')}', '${escapeJS(student.group_type || '')}', ${safeInt(student.max_devices, 1)}); closeAllMenus();" class="action-menu-item">
-                            <i data-lucide="edit-3" class="icon-xs icon-edit"></i> Edit Details
-                        </button>
-                        <button onclick="resetPasswordFromMenu('${escapeJS(student.email)}'); closeAllMenus();" class="action-menu-item">
-                            <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
-                        </button>
-                    </div>
-                </td>
-            `;
-                tbody.appendChild(tr);
-            });
-            lucide.createIcons();
-        }
-        openModal('section-details-modal');
-    }
-
-    // fully working
-    async function openScoresModal(sectionName) {
-        currentActiveSection = sectionName;
-        document.getElementById('scores-modal-title').textContent = `Input Scores: ${sectionName}`;
-
-        const { data } = await sb.from('profiles').select('role, full_name, email, group_type, pre_test_score, post_test_score').eq('section', sectionName);
-        const studentsOnly = data ? data.filter(student => (student.role || '').toLowerCase() !== 'admin') : [];
-        const tbody = document.getElementById('scores-table-body');
-        tbody.innerHTML = '';
-
-        if (studentsOnly.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="empty-row">No students found in this section.</td></tr>`;
-        } else {
-            studentsOnly.forEach(student => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                <td class="text-primary" style="font-weight:500;">${escapeHTML(student.full_name)}</td>
-                <td><span class="badge badge-neutral">${escapeHTML(student.group_type || '')}</span></td>
-                <td><input type="number" step="0.1" class="form-input score-input score-pre" value="${escapeHTML(student.pre_test_score ?? '')}" data-email="${escapeHTML(student.email)}"></td>
-                <td><input type="number" step="0.1" class="form-input score-input score-post text-accent" value="${escapeHTML(student.post_test_score ?? '')}" data-email="${escapeHTML(student.email)}"></td>
-            `;
-                tbody.appendChild(tr);
-            });
-        }
-        openModal('scores-modal');
-    }
-
-    // fully working
-    function openScoresModalFromDetails() {
-        closeModal('section-details-modal');
-        setTimeout(() => openScoresModal(currentActiveSection), 300);
-    }
-
-    // fully working
-    async function saveBatchScores() {
-        const btn = document.querySelector('#scores-modal .btn-primary');
-        if (btn) { btn.disabled = true; btn.textContent = 'PROCESSING...'; }
-
-        const rows = document.querySelectorAll('#scores-table-body tr');
-        const updates = [];
-
-        for (const tr of rows) {
-            const preInput = tr.querySelector('.score-pre');
-            const postInput = tr.querySelector('.score-post');
-            if (!preInput || !postInput) continue;
-
-            const email = preInput.getAttribute('data-email');
-            const pre = parseScore(preInput.value);
-            const post = parseScore(postInput.value);
-
-            // 0-100 lang. Ang isang mali-type na 1000 ay tahimik na sumisira ng
-            // research data, at ginagamit ito ng teacher dashboard sa threshold
-            // na < 70 para sa "Struggling".
-            if (!pre.ok || !post.ok) {
-                if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
-                return showCustomAlert("Validation Error",
-                    `The score for ${email} must be between 0 and 100.`, "error");
-            }
-
-            updates.push({ email, pre_test_score: pre.value, post_test_score: post.value });
+        if (res.error) {
+            toastErr('Revoke failed', res.error.message);
+            return;
         }
 
-        if (updates.length > 0) {
-            // Dating .upsert(..., { onConflict: 'email' }).
-            //
-            // Dalawang bagay ang mahalaga:
-            //   * Bago ang 0010, WALANG unique constraint sa email -- kaya ang
-            //     ON CONFLICT (email) ay palaging bumabagsak. Hindi kailanman
-            //     gumana ang batch scores hangga't hindi naidadagdag iyon.
-            //   * Kahit gumagana na ito, ang upsert ay NAG-I-INSERT kapag walang
-            //     tugma. Kung may ibang admin na magbubura ng estudyante habang
-            //     nakabukas ang modal na ito, MULING BUBUHAYIN ng pag-save ang
-            //     row nila bilang multo: email at score lang, NULL ang pangalan,
-            //     at role='student' dahil sa default -- tapos lalabas ito sa
-            //     roster at sa research export.
-            //
-            // UPDATE na lang: kung wala na ang row, 0 row ang matatamaan --
-            // walang multong nagagawa.
-            const results = await Promise.all(updates.map(u =>
-                sb.from('profiles')
-                  .update({ pre_test_score: u.pre_test_score, post_test_score: u.post_test_score })
-                  .eq('email', u.email)
-            ));
-
-            const failed = results.find(r => r.error);
-            if (failed) {
-                if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
-                console.error('Batch save error:', failed.error);
-                return showCustomAlert("Error", friendlyDbError(failed.error, "Could not save the scores."), "error");
-            }
-        }
-
-        if (btn) { btn.disabled = false; btn.textContent = 'SAVE SCORES'; }
-        closeModal('scores-modal');
-        showCustomAlert("Scores Updated", `Grades for ${currentActiveSection} have been saved successfully.`, "success");
+        renderStudentDevices([]);
+        toastOk('Sessions revoked', email + ' was signed out of all devices.');
+        refreshAll();
     }
 
+    /* ================================================== 9. FACULTY ====== */
 
-    // ==========================================
-    // 8. PROFESSOR MANAGEMENT
-    // ==========================================
-
-    // fully working
-    async function loadProfessors() {
-        cleanupGhostMenus();
-
-        const { data, error } = await sb.from('professors').select('*');
-        if (error) return console.error('Error loading professors:', error);
-
-        const tbody = document.getElementById('professor-table-body');
-        const cardsContainer = document.getElementById('professor-cards-container');
-
-        tbody.innerHTML = '';
-        if (cardsContainer) cardsContainer.innerHTML = '';
-
-        (data || []).forEach(prof => {
-            const safeEmailId = prof.email.replace(/[@.]/g, '_');
-
-            // Desktop Row HTML
-            const tr = document.createElement('tr');
-            tr.className = "professor-row";
-            tr.onclick = () => { openProfessorProfile(prof.name, prof.email, prof.department, prof.assigned_section, prof.status); };
-
-            tr.innerHTML = `
-            <td class="row-name-cell">
-                <div class="row-avatar-icon text-info">
-                    <i data-lucide="shield-alert" class="icon-xs"></i>
-                </div>
-                ${escapeHTML(prof.name)}
-            </td>
-            <td class="text-secondary">${escapeHTML(prof.email)}</td>
-            <td class="text-secondary">${escapeHTML(prof.department)}</td>
-            <td><span class="badge badge-info">${escapeHTML(prof.assigned_section)}</span></td>
-            <td>
-                <div class="flex-row gap-xs">
-                    <span class="status-dot ${prof.status === 'active' ? 'status-dot-active' : 'status-dot-inactive'}"></span>
-                    <span class="cell-label text-secondary">${prof.status === 'active' ? 'Active' : 'Inactive'}</span>
-                </div>
-            </td>
-            <td class="action-cell" onclick="event.stopPropagation()">
-                <button onclick="toggleActionMenu(event, 'prof-${safeEmailId}')" class="action-toggle-btn">
-                    <i data-lucide="more-vertical" class="icon-sm"></i>
-                </button>
-                <div id="menu-prof-${safeEmailId}" onclick="event.stopPropagation()" class="action-menu hidden">
-                    <button onclick="resetPasswordFromMenu('${escapeJS(prof.email)}'); closeAllMenus();" class="action-menu-item">
-                        <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
-                    </button>
-                    <div class="action-menu-divider"></div>
-                    <button onclick="deleteUserFromMenu('${escapeJS(prof.email)}', 'professors'); closeAllMenus();" class="action-menu-item action-delete">
-                        <i data-lucide="trash-2" class="icon-xs"></i> Remove Faculty
-                    </button>
-                </div>
-            </td>
-        `;
-            tbody.appendChild(tr);
-
-            // Mobile Card HTML
-            if (cardsContainer) {
-                const card = document.createElement('div');
-                card.className = "solid-card card-padded professor-row prof-card";
-                card.onclick = () => { openProfessorProfile(prof.name, prof.email, prof.department, prof.assigned_section, prof.status); };
-
-                card.innerHTML = `
-                <div class="prof-card-head">
-                    <div class="row-name-cell">
-                        <div class="row-avatar-icon text-info prof-card-icon">
-                            <i data-lucide="shield-alert" class="icon-sm"></i>
-                        </div>
-                        <div>
-                            <p class="prof-card-name">${escapeHTML(prof.name)}</p>
-                            <p class="cell-mono-xs">${escapeHTML(prof.email)}</p>
-                        </div>
-                    </div>
-                    <div class="action-cell" onclick="event.stopPropagation()">
-                        <button onclick="toggleActionMenu(event, 'prof-mob-${safeEmailId}')" class="action-toggle-btn">
-                            <i data-lucide="more-vertical" class="icon-sm"></i>
-                        </button>
-                        <div id="menu-prof-mob-${safeEmailId}" class="action-menu hidden">
-                            <button onclick="resetPasswordFromMenu('${escapeJS(prof.email)}'); closeAllMenus();" class="action-menu-item">
-                                <i data-lucide="key" class="icon-xs icon-reset"></i> Reset Password
-                            </button>
-                            <div class="action-menu-divider"></div>
-                            <button onclick="deleteUserFromMenu('${escapeJS(prof.email)}', 'professors'); closeAllMenus();" class="action-menu-item action-delete">
-                                <i data-lucide="trash-2" class="icon-xs"></i> Remove Faculty
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="prof-card-details">
-                    <div>
-                        <p class="cell-label text-secondary">Department</p>
-                        <p class="prof-card-detail-value truncate">${escapeHTML(prof.department)}</p>
-                    </div>
-                    <div>
-                        <p class="cell-label text-secondary">Section</p>
-                        <p class="prof-card-detail-value text-info truncate">${escapeHTML(prof.assigned_section)}</p>
-                    </div>
-                </div>
-            `;
-                cardsContainer.appendChild(card);
-            }
+    function renderFaculty(term) {
+        var needle = sanitizeFilterTerm(term).toLowerCase();
+        var rows = state.faculty.filter(function (f) {
+            if (!needle) { return true; }
+            return ((f.name || '') + ' ' + (f.email || '') + ' ' + (f.department || ''))
+                .toLowerCase().indexOf(needle) !== -1;
         });
 
-        lucide.createIcons();
+        $('#faculty-empty').classList.toggle('is-hidden', rows.length !== 0);
+
+        $('#faculty-tbody').innerHTML = rows.map(function (f) {
+            var active = (f.status || '') === 'active';
+            return '' +
+                '<tr class="is-clickable" data-faculty="' + esc(f.email) + '">' +
+                '<td>' + userCell({ full_name: f.name, email: f.email }) + '</td>' +
+                '<td class="muted">' + esc(f.department || '—') + '</td>' +
+                '<td><span class="badge">' + esc(f.assigned_section || 'Unassigned') + '</span></td>' +
+                '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
+                '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
+                (active ? 'Active' : 'Inactive') + '</span></td>' +
+                '<td class="col-right"><span class="row-actions">' +
+                '<button class="btn-icon" title="Send password-reset email" data-fac-act="reset" data-email="' + esc(f.email) + '">' +
+                icon('key', 'icon-sm') + '</button>' +
+                '<button class="btn-icon" title="Remove faculty" data-fac-act="delete" data-email="' + esc(f.email) + '">' +
+                icon('trash', 'icon-sm') + '</button>' +
+                '</span></td>' +
+                '</tr>';
+        }).join('');
     }
 
-    // fully working
-    function filterProfessors() {
-        let query = document.getElementById('search-professor').value.toLowerCase();
-        document.querySelectorAll('.professor-row').forEach(row => {
-            let text = row.textContent.toLowerCase();
-            row.style.display = text.includes(query) ? '' : 'none';
+    function initFaculty() {
+        $('#faculty-search').addEventListener('input', debounce(function (event) {
+            renderFaculty(event.target.value);
+        }, 200));
+
+        $('#faculty-tbody').addEventListener('click', function (event) {
+            var actionBtn = event.target.closest('[data-fac-act]');
+            if (actionBtn) {
+                event.stopPropagation();
+                var email = actionBtn.getAttribute('data-email');
+                if (actionBtn.getAttribute('data-fac-act') === 'reset') {
+                    sendPasswordReset(email, actionBtn);
+                } else {
+                    deleteFaculty(email);
+                }
+                return;
+            }
+
+            var row = event.target.closest('[data-faculty]');
+            if (row) { openFacultyProfile(row.getAttribute('data-faculty')); }
+        });
+
+        $('#faculty-reset').addEventListener('click', function () {
+            if (state.activeFaculty) { sendPasswordReset(state.activeFaculty.email, this); }
+        });
+
+        $('#faculty-delete').addEventListener('click', function () {
+            if (state.activeFaculty) {
+                closeModal('modal-faculty');
+                deleteFaculty(state.activeFaculty.email);
+            }
         });
     }
 
-    // fully working
+    function openFacultyProfile(email) {
+        var f = state.faculty.filter(function (row) { return row.email === email; })[0];
+        if (!f) { return; }
+
+        state.activeFaculty = f;
+        $('#faculty-title').textContent = f.name || 'Faculty profile';
+        $('#faculty-subject').textContent = f.email;
+        $('#faculty-dept').textContent = f.department || '—';
+        $('#faculty-section').textContent = f.assigned_section || 'Unassigned';
+        $('#faculty-status').textContent = (f.status || '') === 'active' ? 'Active' : 'Inactive';
+
+        openModal('modal-faculty');
+    }
+
     async function handleRegisterProfessor(event) {
         event.preventDefault();
+        clearFormErrors('add-professor-form');
 
-        const form = event.target;
-        const btn = form.querySelector('button[type="submit"]');
+        var name = $('#ap-name').value.trim();
+        var email = normalizeEmail($('#ap-email').value);
+        var department = $('#ap-dept').value.trim();
+        var assignedSection = $('#ap-section').value;
 
-        const name = document.getElementById('prof-name').value.trim();
-        const email = normalizeEmail(document.getElementById('prof-email').value);
-        const department = document.getElementById('prof-dept').value;
-        const assigned_section = document.getElementById('prof-section').value;
+        var valid = true;
+        valid = setFieldError('ap-name', name ? '' : 'Full name is required.') && valid;
+        valid = setFieldError('ap-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
+        valid = setFieldError('ap-dept', department ? '' : 'Department is required.') && valid;
+        if (!valid) { return; }
 
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return showCustomAlert("Validation Error", "Invalid email address.", "error");
-        }
-
-        if (btn) { btn.disabled = true; btn.textContent = 'Registering...'; }
+        var release = setBusy($('#ap-submit'), 'Registering…');
 
         try {
-        // Katulad ng student registration: suriin MUNA bago gumawa ng auth user.
-        // Ang admin_register_teacher ay naglalagay ng profiles row, at may
-        // UNIQUE(email) na ito mula sa 0010 -- kaya ang email na ginagamit na ng
-        // isang estudyante ay babagsak DOON, pagkatapos nang magawa ang auth
-        // user, at maiiwan ang isang orphan na hindi na kayang irehistro muli.
-        const { data: existing } = await sb.from('profiles')
-            .select('email').eq('email', email).maybeSingle();
+            /* Same reasoning as student registration: check first, because
+               profiles carries UNIQUE(email) and a late failure would strand
+               an auth user that can never be registered again. */
+            var existing = await sb.from('profiles').select('email').eq('email', email).maybeSingle();
 
-        if (existing) {
-            return showCustomAlert("Duplicate Email",
-                `${email} is already used by another account.`, "error");
-        }
-
-        const authRes = await sb.rpc('admin_create_auth_user', { target_email: email, default_password: generateSecurePassword() });
-        if (authRes.error) return showCustomAlert("Auth Creation Error", friendlyDbError(authRes.error, "Could not create the auth user."), "error");
-
-        // FIX: dati, sa `professors` table lang ipinapasok ang bagong teacher.
-        // Pero ang login (index.js) at ang teacher guard (teacher-dashboard.js)
-        // ay parehong naghahanap ng profiles row na may role='teacher' -- kaya
-        // WALA NI ISANG admin-created na teacher ang nakapasok kailanman.
-        // Iisang RPC na ngayon ang naglalagay ng DALAWANG row sa isang
-        // transaction, kaya hindi na pwedeng ma-create nang kalahati lang.
-        const { error } = await sb.rpc('admin_register_teacher', {
-            p_email: email,
-            p_name: name,
-            p_department: department,
-            p_assigned_section: assigned_section
-        });
-        if (error) return showCustomAlert("Registration Error",
-            friendlyDbError(error, "Could not save the teacher.") +
-            ' (NOTE: an auth user was already created for ' + email +
-            ' -- it must be deleted before registering again.)', "error");
-
-        document.getElementById('add-professor-form').reset();
-        closeModal('add-professor-modal');
-        loadProfessors();
-        showCustomAlert("Registration Success", `${name} added to the faculty roster.`, "success");
-        } finally {
-            if (btn) { btn.disabled = false; btn.textContent = 'Register'; }
-        }
-    }
-
-    // fully working
-    // Tinatawag ito ng dalawang call site na may 5 argument (kasama ang status),
-    // pero 4 lang ang dating parameter dito kaya tahimik na nalalaglag ang status.
-    function openProfessorProfile(name, email, dept, section, status) {
-        document.getElementById('prof-profile-name').textContent = name;
-        document.getElementById('prof-profile-email').textContent = email;
-        document.getElementById('prof-profile-dept').textContent = dept;
-        document.getElementById('prof-profile-section').textContent = section || 'Unassigned';
-
-        const statusEl = document.getElementById('prof-profile-status');
-        const statusDot = document.getElementById('prof-profile-status-dot');
-        if (statusEl && statusDot) {
-            const isActive = status === 'active';
-            statusEl.textContent = isActive ? 'Active' : 'Offline';
-            statusDot.className = isActive
-                ? 'status-dot status-dot-active'
-                : 'status-dot status-dot-offline';
-        }
-
-        document.getElementById('professor-profile-screen').classList.remove('hidden');
-        document.getElementById('professor-profile-screen').classList.add('flex');
-        document.body.style.overflow = 'hidden';
-    }
-
-    // fully working
-    function closeProfessorProfile() {
-        document.getElementById('professor-profile-screen').classList.add('hidden');
-        document.getElementById('professor-profile-screen').classList.remove('flex');
-        document.body.style.overflow = 'auto';
-    }
-
-
-    // ==========================================
-    // 9. DEVICE & SECURITY MANAGEMENT
-    // ==========================================
-
-    // fully working
-    // getDeviceSignature() ay nasa function.js na (shared helper)
-
-    // fully working
-    async function openDeviceManager(email) {
-        currentManagingEmail = email;
-        document.getElementById('device-modal-email').textContent = email;
-
-        const { data: student } = await sb.from('profiles').select('active_devices').eq('email', email).maybeSingle();
-        renderDeviceList(student?.active_devices || []);
-        openModal('device-manager-modal');
-    }
-
-    // fully working
-    function renderDeviceList(devices) {
-        const container = document.getElementById('device-list-container');
-        container.innerHTML = '';
-
-        if (!devices || devices.length === 0) {
-            container.innerHTML = `<p class="empty-row">No active devices logged in.</p>`;
-            return;
-        }
-
-        devices.forEach((devId) => {
-            let platform = "Unknown Device";
-            let iconName = "monitor";
-            if (devId.includes('Android')) { platform = "Android Smartphone"; iconName = "smartphone"; }
-            else if (devId.includes('iOS')) { platform = "iOS Device"; iconName = "smartphone"; }
-            else if (devId.includes('iPad')) { platform = "iPad Tablet"; iconName = "tablet"; }
-            else if (devId.includes('macOS')) { platform = "macOS Computer"; iconName = "laptop"; }
-            else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
-
-            const item = document.createElement('div');
-            item.className = "device-item";
-            item.innerHTML = `
-            <div class="device-item-info">
-                <p class="device-item-name">
-                    <i data-lucide="${iconName}" class="icon-xs text-accent"></i>
-                    <span>${platform}</span>
-                </p>
-                <p class="device-item-id truncate">${escapeHTML(devId)}</p>
-            </div>
-            <button onclick="revokeStudentDevice('${escapeJS(currentManagingEmail)}', '${escapeJS(devId)}')" class="btn-danger-outline btn-sm">
-                Logout
-            </button>
-        `;
-            container.appendChild(item);
-        });
-        lucide.createIcons();
-    }
-
-    // fully working
-    // BAGONG SEMANTICS: sinasara nito ang LAHAT ng session ng estudyante, hindi
-    // lang ang isang device. Ito lang ang paraan para talagang mamatay ang mga
-    // access token na naipamahagi na -- ang dating pag-edit lang sa
-    // active_devices array ay pampalamuti: nananatiling gumagana ang session ng
-    // estudyante hanggang sa mag-expire ito nang kusa (hanggang isang oras).
-    async function revokeStudentDevice(email, deviceId) {
-        showCustomConfirm(
-            "Log Out Student",
-            `Sign ${email} out of ALL devices? Kakailanganin nilang mag-log in ulit.`,
-            async () => {
-                const { error } = await sb.rpc('admin_revoke_sessions', { p_email: email });
-                if (error) return showCustomAlert("Revoke Failed", error.message, "error");
-
-                showCustomAlert("Success", "Student signed out of all devices.", "success");
-                renderDeviceList([]);
-                loadStudents();
+            if (existing.data) {
+                setFieldError('ap-email', 'This email already belongs to another account.');
+                toastErr('Duplicate email', email + ' is already in use.');
+                return;
             }
-        );
-    }
 
-    // Pigilan ang magkakapatong na tawag: ang pag-register ng device ay
-    // gumagawa ng UPDATE sa profiles table, na nagpapa-trigger ulit ng
-    // realtime event pabalik dito (setupRealtimeSubscriptions). Kung tatakbo
-    // nang sabay-sabay ang dalawang tawag, pwedeng magbasa sila ng parehong
-    // "lumang" active_devices bago pa magcommit ang isa't isa (race condition).
-    let isRegisteringAdminDevice = false;
-
-    // fully working
-    async function loadAdminDeviceSettings(email) {
-        if (isRegisteringAdminDevice) return;
-
-        const { data, error } = await sb.from('profiles').select('max_devices, active_devices').eq('email', email).maybeSingle();
-        if (error) {
-            console.error('loadAdminDeviceSettings: failed to read profile', error);
-            return;
-        }
-        if (!data) return;
-
-        const limitInput = document.getElementById('admin-device-limit-input');
-        const currentLimit = data.max_devices || 1;
-        if (limitInput) limitInput.value = currentLimit;
-
-        let activeDevices = data.active_devices || [];
-        const currentDeviceId = getOrCreateDeviceId();
-
-        if (!activeDevices.includes(currentDeviceId)) {
-            // Ang huling read-then-write sa device path. Ang
-            // `isRegisteringAdminDevice` na flag ay in-page lang -- wala itong
-            // nakikitang ibang tab, ibang PC, o ang login ng estudyante mismo,
-            // kaya hindi ito tunay na proteksyon laban sa race.
-            //
-            // Ang claim_device() ay gumagamit ng SELECT ... FOR UPDATE, at ito
-            // rin ang nagpapatupad ng limit sa server -- kaya iisa na lang ang
-            // desisyon, hindi dalawang magkahiwalay na kopya ng parehong tuntunin.
-            isRegisteringAdminDevice = true;
-            try {
-                const { data: claimed, error: claimError } = await sb.rpc('claim_device', {
-                    p_device_id: currentDeviceId
-                });
-
-                if (claimError) {
-                    console.error('loadAdminDeviceSettings: claim_device failed', claimError);
-                } else if (claimed && claimed.allowed === false) {
-                    showDeviceLimitModal(claimed.devices || activeDevices, email);
-                    return;
-                } else if (claimed && claimed.devices) {
-                    activeDevices = claimed.devices;
-                }
-            } finally {
-                isRegisteringAdminDevice = false;
-            }
-        }
-        renderAdminDeviceList(activeDevices);
-    }
-
-    // Shows a forced modal when the admin's device limit is reached.
-    // The admin must revoke an older session to free up a slot — no dismiss without action.
-    function showDeviceLimitModal(activeDevices, email) {
-        const currentDeviceId = localStorage.getItem('pia_device_id');
-        const modal = document.getElementById('device-limit-modal');
-        const list = document.getElementById('device-limit-list');
-        if (!modal || !list) return;
-
-        list.innerHTML = '';
-
-        activeDevices.forEach((devId) => {
-            let platform = "Unknown Device";
-            let iconName = "monitor";
-            if (devId.includes('Android')) { platform = "Android Smartphone"; iconName = "smartphone"; }
-            else if (devId.includes('iOS')) { platform = "iOS Device"; iconName = "smartphone"; }
-            else if (devId.includes('iPad')) { platform = "iPad Tablet"; iconName = "tablet"; }
-            else if (devId.includes('macOS')) { platform = "macOS Computer"; iconName = "laptop"; }
-            else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
-
-            const isCurrentDevice = (devId === currentDeviceId);
-            const badgeHTML = isCurrentDevice ? `<span class="badge badge-neutral">This Device</span>` : '';
-
-            const item = document.createElement('div');
-            item.className = "device-item";
-            item.innerHTML = `
-            <div class="device-item-info">
-                <p class="device-item-name">
-                    <i data-lucide="${iconName}" class="icon-xs text-accent"></i>
-                    <span>${platform}</span>
-                    ${badgeHTML}
-                </p>
-                <p class="device-item-id truncate">${escapeHTML(devId)}</p>
-            </div>
-            <button onclick="revokeDeviceFromLimitModal('${escapeJS(devId)}', '${escapeJS(email)}')" class="btn-danger-outline btn-sm">
-                Revoke
-            </button>
-        `;
-            list.appendChild(item);
-        });
-
-        lucide.createIcons();
-        openModal('device-limit-modal');
-    }
-
-    // Revokes a device from the device-limit modal, then re-registers the current device and continues loading.
-    async function revokeDeviceFromLimitModal(deviceId, email) {
-        // Dalawang atomic na hakbang sa halip na isang read-filter-write:
-        // (1) palayain ang slot, (2) angkinin ito para sa device na ito.
-        // Ang dating bersyon ay nagsusulat ng buong array nang minsanan, kaya
-        // ang kahit anong login na nangyari sa pagitan ng read at write ay
-        // tahimik na nabubura.
-        const { error: revokeError } = await sb.rpc('admin_revoke_device', {
-            p_email: email, p_device_id: deviceId
-        });
-        if (revokeError) return showCustomAlert("Error", revokeError.message, "error");
-
-        const currentDeviceId = getOrCreateDeviceId();
-        let updated = [];
-
-        if (deviceId !== currentDeviceId) {
-            const { data: claimed, error: claimError } = await sb.rpc('claim_device', {
-                p_device_id: currentDeviceId
+            var authRes = await sb.rpc('admin_create_auth_user', {
+                target_email: email,
+                default_password: generateSecurePassword()
             });
-            if (claimError) return showCustomAlert("Error", claimError.message, "error");
-            updated = (claimed && claimed.devices) || [];
-        } else {
-            const { data: after } = await sb.from('profiles')
-                .select('active_devices').eq('email', email).maybeSingle();
-            updated = (after && after.active_devices) || [];
-        }
 
-        closeModal('device-limit-modal');
-        showCustomAlert("Device Revoked", "The session was revoked and this device is now registered.", "success");
-        renderAdminDeviceList(updated);
+            if (authRes.error) {
+                toastErr('Auth user not created', friendlyDbError(authRes.error, 'Could not create the auth user.'));
+                return;
+            }
 
-        // If the admin revoked their own current device, sign them out
-        if (localStorage.getItem('pia_device_id') === deviceId) {
-            await handleAdminSignOut();
+            /* One RPC writes BOTH the professors row and the profiles row with
+               role='teacher' in a single transaction. Login and the teacher
+               guard both look for the profiles row, so writing only the
+               professors table would create a teacher who can never sign in. */
+            var regRes = await sb.rpc('admin_register_teacher', {
+                p_email: email,
+                p_name: name,
+                p_department: department,
+                p_assigned_section: assignedSection
+            });
+
+            if (regRes.error) {
+                showNotice('Registration incomplete',
+                    friendlyDbError(regRes.error, 'Could not save the teacher.') +
+                    '\n\nAn auth user was already created for ' + email +
+                    '. It must be deleted before registering this professor again.',
+                    'danger');
+                return;
+            }
+
+            closeModal('modal-add-professor');
+            $('#add-professor-form').reset();
+            clearFormErrors('add-professor-form');
+
+            toastOk('Professor added', name + ' now has observer access.');
+            await loadFaculty();
+            renderSections();
+        } finally {
+            release();
         }
     }
 
-    // fully working
-    function toggleEditAdminLimit() {
-        const input = document.getElementById('admin-device-limit-input');
-        input.disabled = false;
-        input.classList.remove('opacity-50');
-        input.focus();
-        document.getElementById('edit-admin-limit-btn').style.display = 'none';
-        document.getElementById('save-admin-limit-btn').style.display = 'inline-block';
+    async function deleteFaculty(email) {
+        var ok = await confirmAction({
+            title: 'Remove faculty',
+            heading: 'Permanently delete ' + email + '?',
+            message: 'The auth user, the faculty record and the linked profile are all removed. ' +
+                'Student data is not affected.',
+            confirmLabel: 'Remove faculty'
+        });
+        if (!ok) { return; }
+
+        var res = await sb.rpc('admin_delete_user', { target_email: email });
+
+        if (res.error) {
+            toastErr('Removal failed', friendlyDbError(res.error, 'The account was not deleted.'));
+            return;
+        }
+
+        toastOk('Faculty removed', email + ' no longer has access.');
+        await loadFaculty();
+        renderSections();
     }
 
-    // fully working
-    async function saveAdminDeviceLimit() {
-        const input = document.getElementById('admin-device-limit-input');
-        const newLimit = parseInt(input.value) || 1;
+    /* ============================= 10. STAGE CONTROLS AND TARGETING ===== */
 
-        const { error } = await sb.from('profiles').update({ max_devices: newLimit }).eq('email', currentAdminEmail);
-        if (error) return showCustomAlert("Update Failed", friendlyDbError(error, "Could not update the device limit."), "error");
+    function renderGates() {
+        $('#gates-grid').innerHTML = GATES.map(function (gate) {
+            return '' +
+                '<article class="gate">' +
+                '<div class="gate-body">' +
+                '<div class="gate-top">' +
+                '<span class="badge">' + esc(gate.stage) + '</span>' +
+                '<span class="badge ' + (gate.open ? 'badge-accent' : '') + '" data-gate-status="' + gate.key + '">' +
+                (gate.open ? 'Open' : 'Closed') + '</span>' +
+                '</div>' +
+                '<h3 class="gate-title">' + esc(gate.title) + '</h3>' +
+                '<p class="gate-desc">' + esc(gate.desc) + '</p>' +
+                '<div class="gate-control">' +
+                '<span>' +
+                '<span class="gate-control-label">Global access</span><br>' +
+                '<span class="gate-control-sub">Applies to every section</span>' +
+                '</span>' +
+                '<label class="switch">' +
+                '<input type="checkbox" data-gate="' + gate.key + '"' + (gate.open ? ' checked' : '') + '>' +
+                '<span class="switch-track"></span>' +
+                '</label>' +
+                '</div>' +
+                '</div>' +
+                '<div class="gate-foot">' +
+                '<button class="btn btn-secondary btn-sm" data-target="' + gate.key + '" data-target-scope="section">Section override</button>' +
+                '<button class="btn btn-secondary btn-sm" data-target="' + gate.key + '" data-target-scope="student">Student override</button>' +
+                '</div>' +
+                '</article>';
+        }).join('');
+
+        $$('[data-gate]').forEach(function (input) {
+            input.addEventListener('change', function () { updateStageControl(input); });
+        });
+
+        $$('[data-target]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                openTargeted(btn.getAttribute('data-target'), btn.getAttribute('data-target-scope'));
+            });
+        });
+    }
+
+    function paintGateStatus(key, open) {
+        var label = $('[data-gate-status="' + key + '"]');
+        if (!label) { return; }
+        label.textContent = open ? 'Open' : 'Closed';
+        label.className = 'badge ' + (open ? 'badge-accent' : '');
+    }
+
+    /* Closing a stage through the settings table alone does not evict the
+       students already inside — their own current_stage acts as a targeted
+       grant, so they keep re-entering by direct URL. admin_set_stage_open
+       returns them to the Waiting Room as part of closing. */
+    async function updateStageControl(input) {
+        var key = input.getAttribute('data-gate');
+        var gate = GATES.filter(function (g) { return g.key === key; })[0];
+        var wanted = input.checked;
 
         input.disabled = true;
-        input.classList.add('opacity-50');
-        document.getElementById('edit-admin-limit-btn').style.display = 'inline-block';
-        document.getElementById('save-admin-limit-btn').style.display = 'none';
-        showCustomAlert("Settings Updated", "Admin device limit updated successfully!", "success");
-    }
+        paintGateStatus(key, wanted);
 
-    // fully working
-    function renderAdminDeviceList(devices) {
-        const container = document.getElementById('admin-active-devices-list');
-        if (!container) return;
-        container.innerHTML = '';
+        var res = await sb.rpc('admin_set_stage_open', { p_stage: key, p_open: wanted });
+        input.disabled = false;
 
-        if (!devices || devices.length === 0) {
-            container.innerHTML = `<p class="empty-row">No active devices found.</p>`;
+        if (res.error) {
+            /* Roll the control back to the server's actual state. */
+            input.checked = !wanted;
+            paintGateStatus(key, !wanted);
+            toastErr('Stage control failed', res.error.message);
             return;
         }
 
-        const currentDeviceId = localStorage.getItem('pia_device_id');
+        gate.open = wanted;
+        renderGateSummary();
 
-        devices.forEach((devId) => {
-            let platform = "Unknown Device";
-            let iconName = "monitor";
-            if (devId.includes('Android')) { platform = "Android Smartphone"; iconName = "smartphone"; }
-            else if (devId.includes('iOS')) { platform = "iOS Device"; iconName = "smartphone"; }
-            else if (devId.includes('iPad')) { platform = "iPad Tablet"; iconName = "tablet"; }
-            else if (devId.includes('macOS')) { platform = "macOS Computer"; iconName = "laptop"; }
-            else if (devId.includes('Windows')) { platform = "Windows PC"; iconName = "monitor"; }
-
-            const isCurrentDevice = (devId === currentDeviceId);
-            const badgeHTML = isCurrentDevice ? `<span class="badge badge-neutral">This Device</span>` : '';
-
-            const item = document.createElement('div');
-            item.className = "device-item";
-            item.innerHTML = `
-            <div class="device-item-info">
-                <p class="device-item-name">
-                    <i data-lucide="${iconName}" class="icon-xs text-accent"></i>
-                    <span>${platform}</span>
-                    ${badgeHTML}
-                </p>
-                <p class="device-item-id truncate">${escapeHTML(devId)}</p>
-            </div>
-            <button onclick="revokeAdminDevice('${escapeJS(devId)}')" class="btn-danger-outline btn-sm">
-                Logout
-            </button>
-        `;
-            container.appendChild(item);
-        });
-        lucide.createIcons();
-    }
-
-    // fully working
-    async function revokeAdminDevice(deviceId) {
-        showCustomConfirm("Logout Device", `Are you sure you want to log out this admin device session?`, async () => {
-            // Atomic na ngayon: dating read-filter-write, na tahimik na
-            // nagpapawalang-bisa sa isang login na nangyari sa pagitan.
-            const { data, error } = await sb.rpc('admin_revoke_device', {
-                p_email: currentAdminEmail, p_device_id: deviceId
-            });
-            if (error) return showCustomAlert("Revoke Failed", error.message, "error");
-
-            const updated = (data && data.devices) || [];
-            showCustomAlert("Success", "Admin device logged out.", "success");
-            renderAdminDeviceList(updated);
-
-            if (localStorage.getItem('pia_device_id') === deviceId) {
-                await handleAdminSignOut();
-            }
-        });
-    }
-
-    // fully working
-    async function deleteUserFromMenu(email, table) {
-        showCustomConfirm("Critical Warning", `Completely delete ${email}?`, async () => {
-            let error = null;
-            if (table === 'profiles' || table === 'professors') {
-                const { error: rpcError } = await sb.rpc('admin_delete_user', { target_email: email });
-                error = rpcError;
-            } else {
-                const { error: dbError } = await sb.from(table).delete().eq('email', email);
-                error = dbError;
-            }
-
-            if (error) return showCustomAlert("Deletion Failed", error.message, "error");
-            if (table === 'profiles') loadStudents();
-            if (table === 'professors') loadProfessors();
-            showCustomAlert("Success", "User deleted successfully.", "success");
-        });
-    }
-
-
-    // ==========================================
-    // 10. SYSTEM CONTROLS & STAGE SETTINGS
-    // ==========================================
-
-    // fully working
-    // NOTE: 'global_password' ay tinanggal na mula sa settings table (security fix --
-    // dating readable ito ng kahit sino via ang public anon key dahil parehong
-    // table ang binabasa pre-login para sa stage_ocean/stage_char/stage_dash flags).
-    // Random na password na per-student na ang ginagamit ngayon (generateSecurePassword()),
-    // kaya wala nang password value na kailangang i-load dito.
-    async function loadSettings() {
-        const { data } = await sb.from('settings').select('*');
-        if (!data) return;
-
-        data.forEach(item => {
-            if (item.key && item.key.startsWith('stage_')) {
-                const stageKey = item.key.replace('stage_', '');
-                const checkbox = document.getElementById(`toggle-${stageKey}`);
-                const lbl = document.getElementById(`${stageKey}-status-lbl`);
-                if (checkbox && lbl) {
-                    checkbox.checked = item.value === true || item.value === 'true';
-                    lbl.textContent = checkbox.checked ? "Open" : "Closed";
-                    lbl.className = checkbox.checked ? "stage-status-lbl open" : "stage-status-lbl";
-                }
-            }
-        });
-    }
-
-    // fully working
-    async function updateStageControl(stage, checkbox) {
-        const isOpen = checkbox.checked;
-        const lbl = document.getElementById(`${stage}-status-lbl`);
-        lbl.textContent = isOpen ? "Open" : "Closed";
-        lbl.className = isOpen ? "stage-status-lbl open" : "stage-status-lbl";
-
-        // Dating direktang `settings` upsert. Ang problema: ang pagsasara ng
-        // stage ay HINDI nagpapaalis ng mga nakapasok na -- dahil ang sarili
-        // nilang current_stage ang nagsisilbing targeted grant, tuloy-tuloy pa
-        // rin silang nakakapasok sa pamamagitan ng direktang URL. Ang RPC ang
-        // nagbabalik sa kanila sa Waiting Room kasabay ng pagsasara.
-        const { data, error } = await sb.rpc('admin_set_stage_open', {
-            p_stage: stage,
-            p_open: isOpen
-        });
-
-        if (error) {
-            checkbox.checked = !isOpen;
-            lbl.textContent = !isOpen ? "Open" : "Closed";
-            lbl.className = !isOpen ? "stage-status-lbl open" : "stage-status-lbl";
-            return showCustomAlert("Stage Control Error", error.message, "error");
-        }
-
-        if (!isOpen && data && data.evicted > 0) {
-            showCustomAlert("Stage Closed", `${data.evicted} student(s) were returned to the Waiting Room.`, "info");
-        }
-    }
-
-    // fully working
-    function openTargetedModal(stage, targetMode) {
-        document.getElementById('target-stage-key').value = stage;
-        document.getElementById('target-mode').value = targetMode;
-
-        if (targetMode === 'section') {
-            document.getElementById('target-section-container').classList.remove('hidden');
-            document.getElementById('target-student-container').classList.add('hidden');
+        var evicted = (res.data && res.data.evicted) || 0;
+        if (!wanted && evicted > 0) {
+            toastOk(gate.title + ' closed',
+                evicted + ' student' + (evicted === 1 ? '' : 's') + ' returned to the Waiting Room.');
         } else {
-            document.getElementById('target-section-container').classList.add('hidden');
-            document.getElementById('target-student-container').classList.remove('hidden');
-
-            document.getElementById('target-student-search').value = '';
-            document.getElementById('target-student-email-selected').value = '';
-            document.getElementById('selected-target-student-lbl').textContent = 'No student selected';
-            document.getElementById('selected-target-student-lbl').className = 'target-selected-lbl';
-            filterTargetStudents();
+            toastOk(gate.title + (wanted ? ' opened' : ' closed'), 'Global access updated for every section.');
         }
 
-        document.getElementById('grant-access-btn').disabled = false;
-        document.getElementById('grant-access-btn').classList.remove('opacity-50', 'cursor-not-allowed');
-
-        openModal('targeted-modal');
+        refreshAll();
     }
 
-    // fully working
-    // DALAWANG BUG DITO DATI:
-    //
-    // (1) Ang hinahanap ay `studentDataCache` -- ang KASALUKUYANG PAHINA lang
-    //     ng roster (50 row), at sinasalamin pa nito ang aktibong group/stage
-    //     filter. Sa 76 na estudyante, ang nasa page 2 ay HINDI kayang i-target
-    //     kahit kailan, at kapag may drilldown na aktibo ay iilan lang ang
-    //     makikita. Direktang query na sa DB ngayon -- hiwalay sa roster.
-    //
-    // (2) `s.full_name.toLowerCase()` ay pumuputok kapag NULL ang full_name,
-    //     at kasama ang buong listahan sa pagkabigo.
-    let targetSearchTimer = null;
+    /* ---- Targeted access ---- */
 
-    function filterTargetStudents() {
-        clearTimeout(targetSearchTimer);
-        targetSearchTimer = setTimeout(runTargetStudentSearch, 250);
+    var targeted = { gate: null, mode: 'section', email: null, name: null };
+
+    function openTargeted(gateKey, mode) {
+        var gate = GATES.filter(function (g) { return g.key === gateKey; })[0];
+        targeted.gate = gateKey;
+        targeted.email = null;
+        targeted.name = null;
+
+        $('#targeted-sub').textContent = 'Open "' + gate.title + '" for a single section or participant.';
+        $('#tg-search').value = '';
+        $('#tg-list').innerHTML = '';
+        setTargetMode(mode || 'section');
+        openModal('modal-targeted');
+
+        if ((mode || 'section') === 'student') { runTargetSearch(''); }
     }
 
-    async function runTargetStudentSearch() {
-        const listContainer = document.getElementById('target-student-list');
-        if (!listContainer) return;
+    function setTargetMode(mode) {
+        targeted.mode = mode;
+        $$('[data-target-mode]').forEach(function (btn) {
+            btn.classList.toggle('is-active', btn.getAttribute('data-target-mode') === mode);
+        });
+        $('#targeted-section-field').classList.toggle('is-hidden', mode !== 'section');
+        $('#targeted-student-field').classList.toggle('is-hidden', mode !== 'student');
 
-        const raw = (document.getElementById('target-student-search').value || '').trim();
-        // Ang koma at parentheses ang mga delimiter ng PostgREST .or() filter --
-        // kung hindi aalisin, sisira sila ng query o magpapalabas ng 400.
-        const query = raw.replace(/[,()]/g, ' ').trim();
+        if (mode === 'student' && !$('#tg-list').innerHTML) { runTargetSearch(''); }
+        updateTargetedFooter();
+    }
 
-        listContainer.innerHTML = '<p class="empty-row">Searching...</p>';
+    /* Queries the database directly rather than the roster cache: the cache
+       holds one page of 50 and reflects the active filters, so a student on
+       page 2 could never be targeted. */
+    async function runTargetSearch(rawTerm) {
+        var list = $('#tg-list');
+        list.innerHTML = '<div class="state-block" style="min-height:120px">' +
+            '<div class="spinner"></div><p class="state-desc">Searching…</p></div>';
 
-        let q = sb.from('profiles')
+        var term = sanitizeFilterTerm(rawTerm);
+
+        var query = sb.from('profiles')
             .select('full_name, email, section')
             .neq('role', 'admin')
             .order('full_name', { ascending: true })
             .limit(50);
 
-        if (query) q = q.or(`full_name.ilike.%${query}%,email.ilike.%${query}%`);
+        if (term) {
+            query = query.or('full_name.ilike.%' + term + '%,email.ilike.%' + term + '%');
+        }
 
-        const { data, error } = await q;
+        var res = await query;
 
-        if (error) {
-            listContainer.innerHTML = `<p class="empty-row">Search failed: ${escapeHTML(error.message)}</p>`;
+        if (res.error) {
+            list.innerHTML = '<div class="state-block" style="min-height:120px">' +
+                '<p class="state-title">Search failed</p>' +
+                '<p class="state-desc">' + esc(res.error.message) + '</p></div>';
             return;
         }
 
-        listContainer.innerHTML = '';
+        var rows = res.data || [];
 
-        if (!data || data.length === 0) {
-            listContainer.innerHTML = '<p class="empty-row">No student found.</p>';
+        if (!rows.length) {
+            list.innerHTML = '<div class="state-block" style="min-height:120px">' +
+                '<p class="state-title">No participant found</p>' +
+                '<p class="state-desc">Try a different name or email fragment.</p></div>';
             return;
         }
 
-        data.forEach(student => {
-            const item = document.createElement('div');
-            item.className = 'target-student-item';
+        list.innerHTML = rows.map(function (s) {
+            return '' +
+                '<button type="button" class="pick-row' + (targeted.email === s.email ? ' is-picked' : '') +
+                '" data-pick="' + esc(s.email) + '" data-name="' + esc(s.full_name || s.email) + '">' +
+                '<span class="avatar">' + esc(initialsOf(s.full_name, s.email)) + '</span>' +
+                '<span class="pick-text">' +
+                '<span class="cell-name">' + esc(s.full_name || '(no name)') + '</span>' +
+                '<span class="cell-mail">' + esc(s.email) + ' · ' + esc(s.section || 'no section') + '</span>' +
+                '</span>' +
+                '<span class="pick-check">' + icon('check', 'icon-sm') + '</span>' +
+                '</button>';
+        }).join('');
 
-            item.onclick = () => {
-                document.getElementById('target-student-email-selected').value = student.email;
-                document.getElementById('selected-target-student-lbl').textContent =
-                    student.full_name || student.email;
-                document.getElementById('selected-target-student-lbl').className = 'target-selected-lbl selected';
-            };
-
-            item.innerHTML = `
-            <div class="truncate">
-                <p class="target-student-item-name truncate">${escapeHTML(student.full_name || '(no name)')}</p>
-                <p class="cell-mono-xs truncate">${escapeHTML(student.email)}</p>
-            </div>
-        `;
-            listContainer.appendChild(item);
+        $$('[data-pick]', list).forEach(function (row) {
+            row.addEventListener('click', function () {
+                targeted.email = row.getAttribute('data-pick');
+                targeted.name = row.getAttribute('data-name');
+                $$('[data-pick]', list).forEach(function (r) { r.classList.remove('is-picked'); });
+                row.classList.add('is-picked');
+                updateTargetedFooter();
+            });
         });
     }
 
-    // fully working
-    // Dati, current_stage lang ang isinusulat nito. Pero sinusuri rin ng route
-    // guard (canEnterStage) ang is_ocean_done at selected_character, kaya ang
-    // grant ay agad na binabawi: ibinabalik ng guard ang estudyante sa waiting
-    // room, at ino-overwrite ng waiting room ang current_stage pabalik sa
-    // "Waiting Room" -- habang nakikita mo namang "success" ang toast.
-    //
-    // Ang RPC na ngayon ang nagre-reset ng TAMANG prerequisite flag bawat
-    // stage, at nag-uulat kung sino ang hindi kayang bigyan (hal. hindi pa
-    // tapos ang OCEAN test) sa halip na tahimik na palitan ang datos nila.
-    async function executeTargetedOpen() {
-        const stageKey = document.getElementById('target-stage-key').value;
-        const mode = document.getElementById('target-mode').value;
-        const btn = document.getElementById('grant-access-btn');
+    function updateTargetedFooter() {
+        var note = $('#targeted-selection');
+        var confirmBtn = $('#targeted-confirm');
 
-        const args = { p_stage: stageKey, p_emails: null, p_section: null };
-
-        if (mode === 'section') {
-            const section = document.getElementById('target-section-select').value;
-            // Dating walang check dito: ang blangkong section ay nagre-resulta
-            // sa .eq('section', '') na tumatama sa lahat ng walang section.
-            if (!section) return showCustomAlert("Validation Error", "Please select a section first.", "error");
-            args.p_section = section;
-        } else {
-            const email = document.getElementById('target-student-email-selected').value;
-            if (!email) return showCustomAlert("Validation Error", "Please select a student first.", "error");
-            args.p_emails = [email];
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = 'Processing...';
-
-        const { data, error } = await sb.rpc('admin_grant_stage', args);
-
-        btn.disabled = false;
-        btn.innerHTML = 'Grant Access';
-
-        if (error) return showCustomAlert("Error", error.message, "error");
-
-        const granted = (data && data.granted) || [];
-        const skipped = (data && data.skipped) || [];
-
-        closeModal('targeted-modal');
-        loadStudents();
-        updateStageCounters();
-
-        if (skipped.length === 0) {
-            showCustomAlert("Access Granted", `${granted.length} student(s) moved to ${stageKey.toUpperCase()}.`, "success");
+        if (targeted.mode === 'section') {
+            var section = $('#tg-section').value;
+            note.textContent = section ? 'Section: ' + section : 'No section available';
+            confirmBtn.disabled = !section;
             return;
         }
 
-        const lines = skipped.slice(0, 5).map(s => `• ${s.email}: ${s.reason}`).join('\n');
-        const more = skipped.length > 5 ? `\n…at ${skipped.length - 5} pa.` : '';
-        showCustomAlert(
-            granted.length ? "Partially Granted" : "Nothing Granted",
-            `Granted: ${granted.length}\nSkipped: ${skipped.length}\n\n${lines}${more}`,
-            granted.length ? "info" : "error"
+        note.textContent = targeted.name ? 'Selected: ' + targeted.name : 'Nothing selected';
+        confirmBtn.disabled = !targeted.email;
+    }
+
+    function initTargeted() {
+        $$('[data-target-mode]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setTargetMode(btn.getAttribute('data-target-mode'));
+            });
+        });
+
+        $('#tg-search').addEventListener('input', debounce(function (event) {
+            runTargetSearch(event.target.value);
+        }, 250));
+
+        $('#tg-section').addEventListener('change', updateTargetedFooter);
+
+        $('#targeted-confirm').addEventListener('click', executeTargetedOpen);
+    }
+
+    /* admin_grant_stage resets the correct prerequisite flag per stage and
+       reports who it could not grant (an unfinished OCEAN test, for example)
+       instead of silently rewriting their data. Writing current_stage alone
+       would be undone immediately: the route guard sends the student back to
+       the Waiting Room, which overwrites current_stage again. */
+    async function executeTargetedOpen() {
+        var args = { p_stage: targeted.gate, p_emails: null, p_section: null };
+
+        if (targeted.mode === 'section') {
+            var section = $('#tg-section').value;
+            if (!section) { toastErr('Select a section', 'Choose a section before granting access.'); return; }
+            args.p_section = section;
+        } else {
+            if (!targeted.email) { toastErr('Select a participant', 'Choose a student before granting access.'); return; }
+            args.p_emails = [targeted.email];
+        }
+
+        var release = setBusy($('#targeted-confirm'), 'Granting…');
+        var res = await sb.rpc('admin_grant_stage', args);
+        release();
+
+        if (res.error) {
+            toastErr('Grant failed', res.error.message);
+            return;
+        }
+
+        var granted = (res.data && res.data.granted) || [];
+        var skipped = (res.data && res.data.skipped) || [];
+
+        closeModal('modal-targeted');
+        refreshAll();
+
+        if (!skipped.length) {
+            toastOk('Access granted',
+                granted.length + ' student' + (granted.length === 1 ? '' : 's') +
+                ' moved to ' + targeted.gate.toUpperCase() + '.');
+            return;
+        }
+
+        var lines = skipped.slice(0, 8).map(function (item) {
+            return '• ' + item.email + ' — ' + item.reason;
+        }).join('\n');
+        var more = skipped.length > 8 ? '\n…and ' + (skipped.length - 8) + ' more.' : '';
+
+        showNotice(
+            granted.length ? 'Partially granted' : 'Nothing granted',
+            'Granted: ' + granted.length + '\nSkipped: ' + skipped.length + '\n\n' + lines + more,
+            granted.length ? 'accent' : 'danger'
         );
     }
 
+    /* ================================= 11. SETTINGS AND ADMIN DEVICES === */
 
-    // ==========================================
-    // 11. ADMIN ACCOUNT & SUPER ADMIN LOGIC
-    // ==========================================
-
-    // fully working
-    async function initAdminProfile(email) {
-        try {
-            let name = "Admin";
-            if (email) {
-                name = email.split('@')[0];
-                if (typeof sb !== 'undefined') {
-                    const { data: profile } = await sb.from('profiles').select('full_name').eq('email', email).maybeSingle();
-                    if (profile && profile.full_name) {
-                        name = profile.full_name.trim().split(' ')[0];
-                    }
-                }
-            }
-
-            const hour = new Date().getHours();
-            let greeting = "Good evening";
-            if (hour >= 0 && hour < 12) greeting = "Good morning";
-            else if (hour >= 12 && hour < 18) greeting = "Good afternoon";
-
-            const desktopEmailEl = document.getElementById('desktop-admin-email');
-            const desktopGreetingEl = document.getElementById('desktop-admin-greeting');
-            const mobileEmailEl = document.getElementById('mobile-admin-email');
-            const prefixEl = document.getElementById('mobile-greeting-prefix');
-            const nameEl = document.getElementById('mobile-greeting-name');
-
-            if (desktopEmailEl) desktopEmailEl.textContent = email || "admin@ue.edu.ph";
-            if (desktopGreetingEl) desktopGreetingEl.textContent = `${greeting}, ${name}`;
-            if (mobileEmailEl) mobileEmailEl.textContent = email || "admin@ue.edu.ph";
-            if (prefixEl) prefixEl.textContent = `${greeting},`;
-            if (nameEl) nameEl.textContent = name;
-
-        } catch (error) {
-            console.error("Profile Fetch Error:", error);
-        }
-    }
-
-    // fully working
-    async function handleAdminPasswordUpdate(event) {
+    async function handlePasswordUpdate(event) {
         event.preventDefault();
-        const newPass = document.getElementById('admin-new-password').value;
-        const confirmPass = document.getElementById('admin-confirm-password').value;
+        clearFormErrors('password-form');
 
-        if (newPass !== confirmPass) {
-            return showCustomAlert("Error", "Passwords do not match.", "error");
+        var next = $('#new-password').value;
+        var confirmValue = $('#confirm-password').value;
+
+        var valid = true;
+        valid = setFieldError('new-password', next.length >= 8 ? '' : 'Use at least 8 characters.') && valid;
+        valid = setFieldError('confirm-password', next === confirmValue ? '' : 'Passwords do not match.') && valid;
+        if (!valid) { return; }
+
+        var release = setBusy($('#password-submit'), 'Updating…');
+        var res = await sb.auth.updateUser({ password: next });
+        release();
+
+        if (res.error) {
+            toastErr('Password not updated', res.error.message);
+            return;
         }
 
-        const { error } = await sb.auth.updateUser({ password: newPass });
-        if (error) {
-            showCustomAlert("Update Failed", error.message, "error");
+        $('#password-form').reset();
+        toastOk('Password updated', 'Use the new password the next time you sign in.');
+    }
+
+    /* Reads the limit, then registers this browser through claim_device.
+       claim_device uses SELECT … FOR UPDATE and enforces the limit server-side,
+       so the rule lives in one place instead of two copies that can disagree. */
+    async function loadAdminDevices() {
+        var res = await sb.from('profiles')
+            .select('max_devices, active_devices')
+            .eq('email', state.adminEmail)
+            .maybeSingle();
+
+        if (res.error || !res.data) {
+            console.error('Admin device settings failed:', res.error);
+            return;
+        }
+
+        $('#device-limit').value = toInt(res.data.max_devices, 1);
+
+        var devices = res.data.active_devices || [];
+        var deviceId = (typeof getOrCreateDeviceId === 'function') ? getOrCreateDeviceId() : null;
+
+        if (deviceId && devices.indexOf(deviceId) === -1) {
+            var claim = await sb.rpc('claim_device', { p_device_id: deviceId });
+
+            if (claim.error) {
+                console.error('claim_device failed:', claim.error);
+            } else if (claim.data && claim.data.allowed === false) {
+                showDeviceLimitModal(claim.data.devices || devices);
+                return;
+            } else if (claim.data && claim.data.devices) {
+                devices = claim.data.devices;
+            }
+        }
+
+        renderAdminDevices(devices);
+    }
+
+    function renderAdminDevices(devices) {
+        var container = $('#admin-device-list');
+        var currentId = null;
+        try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
+
+        if (!devices || !devices.length) {
+            container.innerHTML = '<div class="notice">' + icon('info') +
+                '<div><p class="notice-title">No registered devices</p>' +
+                '<p class="notice-text">This browser registers itself the next time the console loads.</p></div></div>';
+            return;
+        }
+
+        container.innerHTML = devices.map(function (deviceId) {
+            var info = describeDevice(deviceId);
+            var isCurrent = (deviceId === currentId);
+            return '' +
+                '<div class="device-row">' +
+                '<span class="stat-glyph">' + icon(info.glyph, 'icon-sm') + '</span>' +
+                '<div class="device-text">' +
+                '<p class="device-name">' + esc(info.label) + '</p>' +
+                '<p class="device-meta cell-mail">' + esc(deviceId) + '</p>' +
+                '</div>' +
+                (isCurrent
+                    ? '<span class="badge badge-accent">This device</span>'
+                    : '<button class="btn btn-danger-soft btn-sm" data-revoke-admin="' + esc(deviceId) + '">Revoke</button>') +
+                '</div>';
+        }).join('');
+
+        $$('[data-revoke-admin]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                revokeAdminDevice(btn.getAttribute('data-revoke-admin'), btn);
+            });
+        });
+    }
+
+    async function revokeAdminDevice(deviceId, sourceBtn) {
+        var ok = await confirmAction({
+            title: 'Revoke device',
+            heading: 'Sign this device out?',
+            message: 'That session ends immediately. If it is the browser you are using right ' +
+                'now, you will be signed out too.',
+            confirmLabel: 'Revoke session'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Revoking…');
+        var res = await sb.rpc('admin_revoke_device', {
+            p_email: state.adminEmail,
+            p_device_id: deviceId
+        });
+        release();
+
+        if (res.error) {
+            toastErr('Revoke failed', res.error.message);
+            return;
+        }
+
+        renderAdminDevices((res.data && res.data.devices) || []);
+        toastOk('Device revoked', 'That session has been signed out.');
+
+        var currentId = null;
+        try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
+        if (currentId === deviceId) { await signOut(); }
+    }
+
+    async function saveAdminDeviceLimit() {
+        var value = toInt($('#device-limit').value, 0);
+
+        if (!value || value < 1 || value > 10) {
+            setFieldError('device-limit', 'Choose a limit between 1 and 10.');
+            return;
+        }
+        setFieldError('device-limit', '');
+
+        var release = setBusy($('#save-device-limit'), 'Saving…');
+        var res = await sb.from('profiles').update({ max_devices: value }).eq('email', state.adminEmail);
+        release();
+
+        if (res.error) {
+            toastErr('Policy not saved', friendlyDbError(res.error, 'Could not update the device limit.'));
+            return;
+        }
+
+        toastOk('Device policy saved', 'Maximum of ' + value + ' concurrent session' + (value === 1 ? '' : 's') + '.');
+    }
+
+    /* Forced modal: the admin must free a slot before the console continues. */
+    function showDeviceLimitModal(devices) {
+        var currentId = null;
+        try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
+
+        $('#device-limit-list').innerHTML = (devices || []).map(function (deviceId) {
+            var info = describeDevice(deviceId);
+            var isCurrent = (deviceId === currentId);
+            return '' +
+                '<div class="device-row">' +
+                '<span class="stat-glyph">' + icon(info.glyph, 'icon-sm') + '</span>' +
+                '<div class="device-text">' +
+                '<p class="device-name">' + esc(info.label) +
+                (isCurrent ? ' <span class="badge">This device</span>' : '') + '</p>' +
+                '<p class="device-meta cell-mail">' + esc(deviceId) + '</p>' +
+                '</div>' +
+                '<button class="btn btn-danger-soft btn-sm" data-limit-revoke="' + esc(deviceId) + '">Revoke</button>' +
+                '</div>';
+        }).join('');
+
+        $$('[data-limit-revoke]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                revokeFromLimitModal(btn.getAttribute('data-limit-revoke'), btn);
+            });
+        });
+
+        openModal('modal-device-limit');
+    }
+
+    /* Two atomic steps instead of one read-filter-write: free the slot, then
+       claim it for this device. Writing the whole array at once would silently
+       erase any login that happened in between. */
+    async function revokeFromLimitModal(deviceId, sourceBtn) {
+        var release = setBusy(sourceBtn, 'Revoking…');
+
+        var revoke = await sb.rpc('admin_revoke_device', {
+            p_email: state.adminEmail,
+            p_device_id: deviceId
+        });
+
+        if (revoke.error) {
+            release();
+            toastErr('Revoke failed', revoke.error.message);
+            return;
+        }
+
+        var currentId = (typeof getOrCreateDeviceId === 'function') ? getOrCreateDeviceId() : null;
+        var updated = [];
+
+        if (deviceId !== currentId) {
+            var claim = await sb.rpc('claim_device', { p_device_id: currentId });
+            if (claim.error) {
+                release();
+                toastErr('Could not register this device', claim.error.message);
+                return;
+            }
+            updated = (claim.data && claim.data.devices) || [];
         } else {
-            showCustomAlert("Success", "Admin password updated successfully.", "success");
-            document.getElementById('admin-password-form').reset();
+            var after = await sb.from('profiles')
+                .select('active_devices').eq('email', state.adminEmail).maybeSingle();
+            updated = (after.data && after.data.active_devices) || [];
+        }
+
+        release();
+        closeModal('modal-device-limit');
+        renderAdminDevices(updated);
+        toastOk('Device revoked', 'This browser is now registered.');
+
+        var storedId = null;
+        try { storedId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
+        if (storedId === deviceId) { await signOut(); }
+    }
+
+    /* executeForceLogout (function.js) releases the device slot, signs out
+       globally so refresh tokens die on the server, then clears storage. */
+    async function signOut() {
+        if (typeof executeForceLogout === 'function') {
+            await executeForceLogout();
+            return;
+        }
+        await sb.auth.signOut({ scope: 'global' });
+        window.location.replace('../../index.html');
+    }
+
+    /* ============================================ 12. SCORES ENCODING === */
+
+    async function openScoresModal(sectionName) {
+        state.activeSection = sectionName;
+        $('#scores-title').textContent = 'Input scores — ' + sectionName;
+        $('#scores-tbody').innerHTML = skeletonRows(4, 5);
+        openModal('modal-scores');
+
+        var res = await sb.from('profiles')
+            .select('role, full_name, email, group_type, pre_test_score, post_test_score')
+            .eq('section', sectionName)
+            .order('full_name', { ascending: true });
+
+        if (res.error) {
+            $('#scores-tbody').innerHTML = '';
+            toastErr('Could not load scores', friendlyDbError(res.error, 'Unknown database error.'));
+            return;
+        }
+
+        var students = (res.data || []).filter(function (row) {
+            return (row.role || '').toLowerCase() !== 'admin';
+        });
+
+        if (!students.length) {
+            $('#scores-tbody').innerHTML = '<tr><td colspan="4">' +
+                '<div class="state-block" style="min-height:200px">' +
+                '<p class="state-title">No students in this section</p>' +
+                '<p class="state-desc">Assign participants to ' + esc(sectionName) + ' first.</p>' +
+                '</div></td></tr>';
+            $('#scores-save').disabled = true;
+            return;
+        }
+
+        $('#scores-save').disabled = false;
+        $('#scores-note').textContent = students.length + ' row' + (students.length === 1 ? '' : 's') +
+            ' · values must be 0–100';
+
+        $('#scores-tbody').innerHTML = students.map(function (s) {
+            var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
+            return '' +
+                '<tr>' +
+                '<td>' + userCell(s) + '</td>' +
+                '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
+                '<td class="col-right"><input class="input score-input" type="number" step="0.1" min="0" max="100"' +
+                ' data-score="pre" data-email="' + esc(s.email) + '"' +
+                ' value="' + esc(s.pre_test_score == null ? '' : s.pre_test_score) + '"></td>' +
+                '<td class="col-right"><input class="input score-input" type="number" step="0.1" min="0" max="100"' +
+                ' data-score="post" data-email="' + esc(s.email) + '"' +
+                ' value="' + esc(s.post_test_score == null ? '' : s.post_test_score) + '"></td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    /* UPDATE per row, never upsert. An upsert INSERTS when nothing matches: if
+       another admin deletes a student while this modal is open, saving would
+       resurrect them as a ghost row — email and score only, NULL name, and
+       role defaulting to 'student' — which then shows up in the research
+       export. An UPDATE that matches nothing simply touches zero rows. */
+    async function saveBatchScores() {
+        var rows = $$('#scores-tbody tr');
+        var updates = [];
+
+        for (var i = 0; i < rows.length; i++) {
+            var preInput = rows[i].querySelector('[data-score="pre"]');
+            var postInput = rows[i].querySelector('[data-score="post"]');
+            if (!preInput || !postInput) { continue; }
+
+            var email = preInput.getAttribute('data-email');
+            var pre = parseScore(preInput.value);
+            var post = parseScore(postInput.value);
+
+            preInput.classList.toggle('is-invalid', !pre.ok);
+            postInput.classList.toggle('is-invalid', !post.ok);
+
+            if (!pre.ok || !post.ok) {
+                toastErr('Score out of range', 'The score for ' + email + ' must be between 0 and 100.');
+                return;
+            }
+
+            updates.push({ email: email, pre_test_score: pre.value, post_test_score: post.value });
+        }
+
+        if (!updates.length) { closeModal('modal-scores'); return; }
+
+        var release = setBusy($('#scores-save'), 'Saving…');
+
+        var results = await Promise.all(updates.map(function (u) {
+            return sb.from('profiles')
+                .update({ pre_test_score: u.pre_test_score, post_test_score: u.post_test_score })
+                .eq('email', u.email);
+        }));
+
+        release();
+
+        var failed = results.filter(function (r) { return r.error; });
+
+        if (failed.length) {
+            console.error('Batch score save failed:', failed[0].error);
+            toastErr('Scores not saved',
+                friendlyDbError(failed[0].error, 'Could not save the scores.') +
+                (failed.length > 1 ? ' (' + failed.length + ' rows failed)' : ''));
+            return;
+        }
+
+        closeModal('modal-scores');
+        toastOk('Scores saved', updates.length + ' record' + (updates.length === 1 ? '' : 's') +
+            ' updated for ' + state.activeSection + '.');
+        refreshAll();
+    }
+
+    /* ---- Section broadcast ---- */
+
+    async function broadcastSection(sectionName, sourceBtn) {
+        var res = await sb.from('profiles')
+            .select('email')
+            .eq('section', sectionName)
+            .eq('status', 'inactive');
+
+        if (res.error) {
+            toastErr('Broadcast failed', friendlyDbError(res.error, 'Could not read the section roster.'));
+            return;
+        }
+
+        var recipients = res.data || [];
+
+        if (!recipients.length) {
+            toastOk('Nothing to send', 'Every student in ' + sectionName + ' has already activated.');
+            return;
+        }
+
+        var ok = await confirmAction({
+            title: 'Email section roster',
+            heading: 'Send ' + recipients.length + ' activation email' + (recipients.length === 1 ? '' : 's') + '?',
+            message: 'One email per inactive student in ' + sectionName +
+                '. Sending is paced at roughly one per 1.5 seconds to stay inside the provider rate limit.',
+            confirmLabel: 'Send emails',
+            tone: 'accent'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Sending…');
+        var redirect = activationRedirect();
+        var sent = 0;
+        var failures = [];
+
+        for (var i = 0; i < recipients.length; i++) {
+            var mail = await sb.auth.signInWithOtp({
+                email: recipients[i].email,
+                options: { shouldCreateUser: false, emailRedirectTo: redirect }
+            });
+
+            if (mail.error) { failures.push(recipients[i].email + ' — ' + mail.error.message); }
+            else { sent++; }
+
+            /* Rate-limit pacing, ported from the original broadcast loop. */
+            await new Promise(function (resolve) { setTimeout(resolve, 1500); });
+        }
+
+        release();
+
+        if (!failures.length) {
+            toastOk('Broadcast complete', sent + ' activation email' + (sent === 1 ? '' : 's') +
+                ' sent to ' + sectionName + '.');
+            return;
+        }
+
+        showNotice('Broadcast finished with errors',
+            'Sent: ' + sent + '\nFailed: ' + failures.length + '\n\n' +
+            failures.slice(0, 8).join('\n') +
+            (failures.length > 8 ? '\n…and ' + (failures.length - 8) + ' more.' : ''),
+            'danger');
+    }
+
+    /* ============================================== 13. REALTIME ======== */
+
+    var deferredRefresh = false;
+    var refreshTimer = null;
+    var backoffMs = 1000;
+
+    function isUserBusy() {
+        var active = document.activeElement;
+        var typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+        return !!(typing || openLayers.length);
+    }
+
+    /* A realtime tick while a form is open would rewrite the table under the
+       admin's cursor. Defer instead, doubling the wait up to 8s so a modal
+       left open for ten minutes does not schedule 600 wake-ups. */
+    function scheduleRefresh() {
+        if (deferredRefresh) { return; }
+        deferredRefresh = true;
+
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(function () {
+            deferredRefresh = false;
+
+            if (isUserBusy()) {
+                backoffMs = Math.min(backoffMs * 2, 8000);
+                scheduleRefresh();
+                return;
+            }
+
+            backoffMs = 1000;
+            refreshAll();
+        }, backoffMs);
+    }
+
+    function flushDeferredRefresh() {
+        if (!deferredRefresh || isUserBusy()) { return; }
+        clearTimeout(refreshTimer);
+        deferredRefresh = false;
+        backoffMs = 1000;
+        refreshAll();
+    }
+
+    function setupRealtime() {
+        if (typeof registerChannel !== 'function') {
+            console.warn('registerChannel unavailable — realtime updates are off.');
+            return;
+        }
+
+        registerChannel('admin-realtime-profiles', function (channel) {
+            return channel
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, function (payload) {
+                    scheduleRefresh();
+
+                    /* Presence is the one thing too time-sensitive to wait for
+                       the debounced refresh — flip the dot now. */
+                    if (payload.new && payload.new.email) {
+                        applyPresence(payload.new.email, (payload.new.active_devices || []).length > 0);
+                    }
+
+                    /* Keep an open device manager in sync with the same row. */
+                    if (state.managingEmail && payload.new && payload.new.email === state.managingEmail) {
+                        renderStudentDevices(payload.new.active_devices || []);
+                    }
+
+                    /* And the admin's own device list. */
+                    if (state.adminEmail && payload.new && payload.new.email === state.adminEmail) {
+                        renderAdminDevices(payload.new.active_devices || []);
+                    }
+                })
+                .subscribe(function (status) { paintConnection(status); });
+        });
+
+        /* Students listen to `settings`; the admin never did, so the three
+           stage switches went stale whenever another admin or another tab
+           changed them. */
+        registerChannel('admin-realtime-settings', function (channel) {
+            return channel
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, function () {
+                    loadSettings().catch(function (err) { console.error('Settings reload failed:', err); });
+                })
+                .subscribe();
+        });
+    }
+
+    function paintConnection(status) {
+        var dot = $('#live-dot');
+        var label = $('#live-label');
+        if (!dot || !label) { return; }
+
+        if (status === 'SUBSCRIBED') {
+            dot.className = 'dot dot-live';
+            label.textContent = 'Live';
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            dot.className = 'dot dot-warn';
+            label.textContent = 'Reconnecting…';
+        } else if (status === 'CLOSED') {
+            dot.className = 'dot dot-off';
+            label.textContent = 'Offline';
         }
     }
 
-    // Security fix: hindi na admin ang nagse-set ng known password (na dating
-    // nire-reuse mula sa isang public-readable setting). Sa halip, magpapadala
-    // ng self-service reset email kung saan ang estudyante/professor mismo ang
-    // magtatakda ng bago at sarili nilang password.
-    async function resetPasswordFromMenu(email) {
-        showCustomConfirm("Reset Password", `Send a password-reset email to ${email}? They'll set their own new password via the link.`, async () => {
-            const { error } = await sb.auth.resetPasswordForEmail(email, {
-                redirectTo: new URL('../../assets/html/sign-up.html', window.location.href).href
+    /* ================================================ 14. CSV EXPORT ==== */
+
+    function toCsvValue(value) {
+        var text = value == null ? '' : String(value);
+        return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    }
+
+    /* Exports the cohort summary already in memory — no extra round trip, and
+       what you download is exactly what the dashboard is showing. */
+    function exportCohortCsv() {
+        if (!state.cohort.length) {
+            toastErr('Nothing to export', 'The cohort has not loaded yet.');
+            return;
+        }
+
+        var headers = ['full_name', 'email', 'section', 'group_type', 'status',
+            'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'ocean_o'];
+
+        var lines = [headers.join(',')];
+        state.cohort.forEach(function (row) {
+            lines.push(headers.map(function (key) { return toCsvValue(row[key]); }).join(','));
+        });
+
+        var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        var stamp = new Date().toISOString().slice(0, 10);
+
+        link.href = url;
+        link.download = 'pia-cohort-' + stamp + '.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        toastOk('Export ready', state.cohort.length + ' rows written to pia-cohort-' + stamp + '.csv.');
+    }
+
+    /* ============================================ 15. BOOT SEQUENCE ===== */
+
+    /* Every read the dashboard needs, in parallel. A failure here shows the
+       error banner but never signs the admin out — their identity is already
+       verified at this point. */
+    async function refreshAll() {
+        try {
+            await Promise.all([
+                loadCohort(),
+                loadSections(),
+                loadRoster(),
+                loadStageCounters(),
+                loadFaculty(),
+                loadSettings()
+            ]);
+            hideGlobalError();
+        } catch (err) {
+            console.error('Dashboard data failed to load:', err);
+            showGlobalError((err && err.message)
+                ? 'Some data failed to load: ' + err.message
+                : 'Some data failed to load. Please refresh the page.');
+        }
+    }
+
+    async function initAdminIdentity(email) {
+        state.adminEmail = email;
+
+        var name = email.split('@')[0];
+        var res = await sb.from('profiles').select('full_name').eq('email', email).maybeSingle();
+        if (res.data && res.data.full_name) { name = res.data.full_name.trim(); }
+
+        state.adminName = name;
+
+        var hour = new Date().getHours();
+        var greeting = 'Good evening';
+        if (hour < 12) { greeting = 'Good morning'; }
+        else if (hour < 18) { greeting = 'Good afternoon'; }
+
+        $('#admin-name').textContent = name;
+        $('#admin-email').textContent = email;
+        $('#admin-initials').textContent = initialsOf(name, email);
+        $('#overview-greeting').textContent = greeting + ', ' + name.split(' ')[0];
+    }
+
+    function initForms() {
+        $('#register-student-form').addEventListener('submit', handleRegisterStudent);
+        $('#edit-student-form').addEventListener('submit', handleUpdateStudent);
+        $('#add-professor-form').addEventListener('submit', handleRegisterProfessor);
+        $('#password-form').addEventListener('submit', handlePasswordUpdate);
+
+        $('#new-section-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            var name = $('#ns-name').value.trim();
+
+            if (!name) { setFieldError('ns-name', 'Section name is required.'); return; }
+
+            var duplicate = state.sections.some(function (s) {
+                return s.name.toLowerCase() === name.toLowerCase();
             });
-            if (error) return showCustomAlert("Reset Failed", error.message, "error");
-            showCustomAlert("Success", `Password-reset email sent to ${email}.`, "success");
+            if (duplicate) { setFieldError('ns-name', 'A section with that name already exists.'); return; }
+            setFieldError('ns-name', '');
+
+            var release = setBusy($('#ns-submit'), 'Creating…');
+            var res = await sb.from('sections').insert([{ name: name }]);
+            release();
+
+            if (res.error) {
+                setFieldError('ns-name', friendlyDbError(res.error, 'Could not create the section.'));
+                toastErr('Section not created', friendlyDbError(res.error, 'Insert rejected.'));
+                return;
+            }
+
+            closeModal('modal-new-section');
+            $('#new-section-form').reset();
+            toastOk('Section created', name + ' is ready for enrolment.');
+            refreshAll();
+        });
+
+        $('#save-device-limit').addEventListener('click', saveAdminDeviceLimit);
+        $('#scores-save').addEventListener('click', saveBatchScores);
+        $('#revoke-all-btn').addEventListener('click', revokeAllStudentSessions);
+        $('#signout-confirm').addEventListener('click', signOut);
+        $('#device-limit-signout').addEventListener('click', signOut);
+
+        $('#section-scores-btn').addEventListener('click', function () {
+            var section = state.activeSection;
+            closeModal('modal-section-details');
+            setTimeout(function () { openScoresModal(section); }, 200);
+        });
+
+        $('#section-broadcast-btn').addEventListener('click', function () {
+            broadcastSection(state.activeSection, this);
+        });
+
+        $('#export-overview').addEventListener('click', exportCohortCsv);
+        $('#export-roster').addEventListener('click', exportCohortCsv);
+
+        $('#refresh-btn').addEventListener('click', async function () {
+            var release = setBusy(this, '…');
+            await refreshAll();
+            release();
+            toastOk('Refreshed', 'Every panel is showing current data.');
         });
     }
 
-    // fully working
-    async function handleAdminSignOut() {
-        // Ang shared helper ang humahawak ng device release + GLOBAL signOut
-        // (pinapatay ang refresh tokens sa server, hindi lang ang lokal na
-        // kopya) + storage cleanup. Dati, local-scope signOut lang ito.
-        await executeForceLogout();
-    }
+    async function boot() {
+        /* The shared client must exist before anything else runs. */
+        if (typeof sb === 'undefined' || !sb) {
+            setBootText('Database connection failed.');
+            showGlobalError('Database connection failed. Please refresh the page.');
+            return;
+        }
 
+        /* --- Phase 1: AUTH. A failure here is a genuine authorization
+           problem, so redirecting is correct. --- */
+        var email;
+        try {
+            setBootText('Verifying administrator access…');
 
-    // ==========================================
-    // 12. EMAIL BROADCAST TOOLS
-    // ==========================================
-
-    // fully working
-    async function sendActivationEmail(email) {
-        showCustomConfirm("Send Email", `Trigger activation link to ${email}?`, async () => {
-            const btn = document.getElementById('confirm-yes-btn');
-            if (btn) { btn.disabled = true; btn.textContent = 'SENDING...'; }
-
-            // Palitan ang '/index.html' papunta sa '/assets/html/sign-up.html'
-            const redirectPath = new URL('../../assets/html/sign-up.html', window.location.href).href;
-            const { error } = await sb.auth.signInWithOtp({
-                email: email,
-                options: { shouldCreateUser: false, emailRedirectTo: redirectPath }
-            });
-
-            if (error) {
-                if (btn) { btn.disabled = false; btn.textContent = 'PROCEED'; }
-                return showCustomAlert("Error", error.message, "error");
-            }
-            showCustomAlert("Email Sent", `Activation link successfully sent to ${email}.`, "success");
-        });
-    }
-
-    // fully working
-    async function sendSectionEmails(sectionName) {
-        showCustomConfirm("Broadcast Section", `Send activation emails to all inactive students in section ${sectionName}?`, async () => {
-            const btn = document.getElementById('confirm-yes-btn');
-            btn.disabled = true;
-            btn.textContent = 'Sending...';
-
-            const { data: students } = await sb.from('profiles').select('email').eq('section', sectionName).eq('status', 'inactive');
-            if (!students || students.length === 0) {
-                btn.disabled = false;
-                btn.textContent = 'Proceed';
-                return showCustomAlert("Notice", "No inactive students found in this section.", "info");
+            var sessionRes = await sb.auth.getSession();
+            if (sessionRes.error || !sessionRes.data.session) {
+                throw new Error('Session expired. Please log in again.');
             }
 
-            // Palitan ang '/index.html' papunta sa '/assets/html/sign-up.html'
-            const redirectPath = new URL('../../assets/html/sign-up.html', window.location.href).href;
-            let successCount = 0;
+            email = sessionRes.data.session.user.email;
 
-            for (const student of students) {
-                const { error: mailError } = await sb.auth.signInWithOtp({
-                    email: student.email,
-                    options: { shouldCreateUser: false, emailRedirectTo: redirectPath }
-                });
-                if (!mailError) successCount++;
-                await new Promise(r => setTimeout(r, 1500));
+            var profileRes = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
+            if (profileRes.error || !profileRes.data || profileRes.data.role !== 'admin') {
+                throw new Error('Unauthorized access. Admin privileges required.');
             }
-            showCustomAlert("Broadcast Complete", `Successfully sent activation emails to ${successCount} student(s) in section ${sectionName}.`, "success");
-        });
+        } catch (err) {
+            console.error('Auth check failed:', err);
+            setBootText(err.message || 'Failed to verify admin access.');
+            showGlobalError(err.message || 'Failed to verify admin access.');
+            try { localStorage.removeItem('pia_user_email'); } catch (e) { /* ignore */ }
+            setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
+            return;
+        }
+
+        try { localStorage.setItem('pia_user_email', email); } catch (err) { /* ignore */ }
+
+        /* --- Phase 2: UI. Wire the shell before data arrives so the skeletons
+           are interactive. --- */
+        PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
+        initRouter();
+        initModals();
+        initRoster();
+        initDrawerActions();
+        initFaculty();
+        initTargeted();
+        initForms();
+
+        setBootText('Loading dashboard…');
+        await initAdminIdentity(email);
+
+        revealApp();
+
+        /* --- Phase 3: DATA. A failure here shows the banner and keeps the
+           verified admin on the page. --- */
+        await refreshAll();
+        applyDrilldownChrome();
+
+        setupRealtime();
+        await loadAdminDevices();
     }
 
-    // Export functions to global scope for HTML inline handlers
-    Object.assign(global, {
-        switchTab, toggleMobileMenu, handleAdminSignOut, openModal, closeModal,
-        toggleStageDrilldown, clearStageDrilldown, setGroupFilter, setSubgroupFilter,
-        openTargetedModal, executeTargetedOpen,
-        toggleEditAdminLimit, saveAdminDeviceLimit, closeStudentProfile, toggleAvatarVisibility,
-        closeProfessorProfile, revokeAdminDevice, deleteUserFromMenu,
-        sendActivationEmail, sendSectionEmails, resetPasswordFromMenu,
-        debouncedSearchStudents,
-        openEditStudent, openDeviceManager, allowStudentRetakeOcean, allowStudentRetakeCharacter,
-        openProfessorProfile, openSectionDetails, filterProfessors,
-        previousStudentPage, nextStudentPage,
-        showCustomAlert, handleAdminPasswordUpdate,
-        handleRegisterStudent, handleUpdateStudent, handleRegisterProfessor, toggleActionMenu,
-        openStudentProfile, saveBatchScores, showCustomConfirm,
-        saveNewSection, updateStageControl, openScoresModal,
-        openScoresModalFromDetails, filterTargetStudents, revokeStudentDevice,
-        revokeDeviceFromLimitModal, closeCustomAlert, closeCustomConfirm
-    });
-
-})(window);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();

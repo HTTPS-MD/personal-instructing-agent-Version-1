@@ -1,0 +1,872 @@
+/* ============================================================================
+   PIA SYSTEM — GLOBAL v2
+   The shared foundation: reset, design tokens, typography, and every
+   component that appears on more than one surface (buttons, form controls,
+   cards, badges, modals, toasts).
+
+   Load this FIRST, then a page stylesheet:
+       <link rel="stylesheet" href="/styles/global.css">
+       <link rel="stylesheet" href="/styles/pages/admin.css">
+
+   House rules enforced throughout:
+     * No borders. Anywhere. Separation is surface tone, shadow and spacing.
+     * No blue. Every neutral is mixed off a green hue at low saturation.
+     * Fixed control heights and reserved message slots, so no state change
+       can reflow a layout.
+     * Transitions cap at 200ms and animate colour/opacity only — nothing
+       scales or moves on hover.
+   ==========================================================================*/
+
+/* ---------------------------------------------------------------- 1. RESET */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html,
+body,
+h1, h2, h3, h4, h5, h6,
+p, figure, blockquote, dl, dd { margin: 0; }
+
+ul[class],
+ol[class] { list-style: none; margin: 0; padding: 0; }
+
+button,
+input,
+select,
+textarea { font: inherit; color: inherit; }
+
+button { background: none; border: 0; cursor: pointer; }
+
+/* Inputs carry a 2px inset UA border by default. .input strips it, but any
+   bespoke field class would inherit it and draw a line — so it is zeroed at
+   the reset instead of per component. */
+input,
+textarea,
+select { border: 0; }
+
+img,
+svg { display: block; max-width: 100%; }
+
+table { border-collapse: collapse; border-spacing: 0; width: 100%; }
+
+a { color: inherit; text-decoration: none; }
+
+:focus { outline: none; }
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r-xs);
+}
+
+/* --------------------------------------------------------------- 2. TOKENS */
+:root {
+    /* ======================= GRAPHITE-GREEN PALETTE =======================
+       Every neutral is mixed off a green hue (~150°) at very low saturation,
+       so the greys read warm-charcoal rather than blue-slate. Nothing here is
+       pure black — the darkest value still carries light, which is what keeps
+       the surface reading as a material instead of a void.
+       ==================================================================== */
+
+    /* --- Surfaces --- */
+    --bg-body: #0F1311;          /* deep charcoal, faint green cast */
+    --bg-surface: #171B19;       /* cards sit ABOVE the page, not outlined on it */
+    --bg-field: #0C100E;         /* inputs sit BELOW the surface — inset, not raised */
+
+    /* Elevated variants: menus, hover rows, toasts, tooltips. */
+    --bg-surface-hi: #1C211E;
+    --bg-surface-hover: #1E2320;
+
+    /* --- Accent --- */
+    --accent: #05C46B;
+    --accent-strong: #04AE5F;
+    --accent-soft: rgba(5, 196, 107, 0.12);
+    --accent-line: rgba(5, 196, 107, 0.30);
+    --on-accent: #04170D;
+
+    --danger: #FF4757;
+    --danger-strong: #F03A4A;
+    --danger-soft: rgba(255, 71, 87, 0.12);
+    --danger-line: rgba(255, 71, 87, 0.30);
+
+    /* Two support hues, used ONLY to tell statuses apart in badges, stage
+       pills and funnel bars — never for actions. Both are pulled toward the
+       warm/green side of the wheel so no blue enters the interface. */
+    --support-teal: #4FA893;
+    --support-teal-soft: rgba(79, 168, 147, 0.13);
+    --support-teal-line: rgba(79, 168, 147, 0.28);
+    --support-amber: #E3A65C;
+    --support-amber-soft: rgba(227, 166, 92, 0.13);
+    --support-amber-line: rgba(227, 166, 92, 0.28);
+
+    /* --- Text --- */
+    --text: #EDEDED;             /* crisp off-white, never pure #FFF */
+    --text-muted: #8C9691;       /* muted gray-green */
+    --text-faint: #69726D;
+
+    /* --- NO LINES ---
+       There are no border tokens, because there are no borders. Nothing in
+       this interface is separated by a drawn line: depth comes from the
+       surface ramp below, from shadow, and from spacing.
+
+       The ramp, darkest to lightest:
+           --bg-field    inset wells   (inputs, tiles, lists — BELOW a card)
+           --bg-body     the page
+           --bg-surface  cards         (ABOVE the page)
+           --bg-chip     small solids  (badges, avatars, toggles — ON a card)
+           --bg-surface-hi  trays and menus
+       Each step is a few percent of luminance, which is enough to read as a
+       distinct plane without ever resolving into an edge. */
+    --bg-chip: #232926;
+    --bg-chip-hover: #2A312D;
+    --track: #2A312D;                /* scrollbar thumb, inert progress fill */
+
+    /* --- Radii --- */
+    --r-xs: 6px;
+    --r-sm: 8px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 18px;
+    --r-pill: 999px;
+
+    /* --- Spacing scale (4px base) --- */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-7: 32px;
+    --sp-8: 40px;
+    --sp-9: 48px;
+
+    /* --- Fixed dimensions: the backbone of a non-shifting layout --- */
+    --rail-w: 76px;
+    --rail-w-open: 264px;
+    --rail-pad: 8px;
+    --rail-icon: calc(var(--rail-w) - (var(--rail-pad) * 2));   /* 60px */
+    --topbar-h: 64px;
+    --control-h: 38px;
+    --control-h-lg: 42px;
+    --field-h: 42px;
+    --row-h: 56px;
+    --icon-btn: 36px;
+
+    /* --- Elevation ---
+       This is the ONLY separator in the system. --shadow-card pairs a tight
+       contact shadow with a wide, very soft ambient one, so a card lifts off
+       the page without anything being drawn around it. --shadow-edge gives a
+       fixed panel (rail, topbar) a directional falloff instead of a rule. */
+    --shadow-edge: 8px 0 24px -20px rgba(0, 0, 0, 0.9);
+    --shadow-under: 0 10px 20px -18px rgba(0, 0, 0, 0.9);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 10px 28px -18px rgba(0, 0, 0, 0.55);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38);
+    --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.58);
+
+    /* --- Motion: capped at 200ms, no bounce curves --- */
+    --t-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-layout: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* --- Typography --- */
+    --font: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont,
+        'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+    /* Scrollbar compensation, measured by JS when a modal locks the body. */
+    --scrollbar-w: 0px;
+}
+
+/* ----------------------------------------------------------------- 3. BASE */
+body {
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* Numeric columns must not re-flow as digits change. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+.icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}
+
+.icon-sm { width: 16px; height: 16px; }
+.icon-lg { width: 24px; height: 24px; }
+
+.eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.muted { color: var(--text-muted); }
+.is-hidden { display: none !important; }
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Custom scrollbars keep the dark surfaces uninterrupted. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--track) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: var(--track);
+    border: 3px solid transparent;
+    border-radius: var(--r-pill);
+    background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: #3A423E; background-clip: content-box; }
+
+/* --------------------------------------------------------------- 5. BUTTONS */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    height: var(--control-h);
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+    user-select: none;
+    transition: background-color var(--t-base), color var(--t-base), box-shadow var(--t-base);
+}
+
+.btn .icon { width: 16px; height: 16px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+
+/* Secondary buttons are a raised chip, not an outline. */
+.btn-secondary {
+    background: var(--bg-chip);
+    color: var(--text);
+}
+.btn-secondary:hover:not(:disabled) {
+    background: var(--bg-chip-hover);
+}
+
+.btn-ghost { color: var(--text-muted); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text); }
+
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: var(--danger-strong); }
+
+.btn-danger-soft {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+.btn-danger-soft:hover:not(:disabled) { background: rgba(255, 71, 87, 0.18); }
+
+.btn-sm { height: 30px; padding: 0 var(--sp-3); font-size: 12px; border-radius: var(--r-sm); }
+.btn-lg { height: var(--control-h-lg); padding: 0 var(--sp-5); }
+.btn-block { width: 100%; }
+
+.btn-icon {
+    display: inline-grid;
+    place-items: center;
+    width: var(--icon-btn);
+    height: var(--icon-btn);
+    flex: 0 0 var(--icon-btn);
+    padding: 0;
+    border-radius: var(--r-md);
+    color: var(--text-muted);
+    transition: background-color var(--t-base), color var(--t-base);
+}
+.btn-icon:hover { background: var(--bg-surface-hover); color: var(--text); }
+.btn-icon.is-bordered { background: var(--bg-chip); }
+.btn-icon.is-bordered:hover { }
+
+/* ----------------------------------------------------------------- 6. FORMS */
+.field { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+}
+
+.label .req { color: var(--danger); margin-left: 2px; }
+
+.input,
+.select,
+.textarea {
+    width: 100%;
+    height: var(--field-h);
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    color: var(--text);
+    font-size: 13.5px;
+    transition: box-shadow var(--t-base), background-color var(--t-base);
+}
+
+.textarea { height: auto; min-height: 96px; padding: var(--sp-3) var(--sp-4); resize: vertical; line-height: 1.55; }
+
+.input::placeholder,
+.textarea::placeholder { color: var(--text-faint); }
+
+.input:hover,
+.select:hover,
+.textarea:hover { }
+
+/* Focus is a soft ring of light around the well — a glow, not an edge. */
+.input:focus,
+.select:focus,
+.textarea:focus {
+    background: #0E1310;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.input:disabled,
+.select:disabled { color: var(--text-muted); cursor: not-allowed; }
+
+.input.is-invalid,
+.select.is-invalid { box-shadow: 0 0 0 3px var(--danger-soft); }
+
+/* Native arrow removed and redrawn so the control keeps a fixed height. */
+.select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: var(--sp-8);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238C9691' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--sp-4) center;
+}
+
+/* Error text slot is always reserved: showing a message never shifts a form. */
+.field-msg {
+    min-height: 16px;
+    font-size: 11.5px;
+    line-height: 16px;
+    color: var(--danger);
+}
+
+.search {
+    position: relative;
+    flex: 0 1 280px;
+    min-width: 200px;
+}
+
+.search .icon {
+    position: absolute;
+    left: var(--sp-3);
+    top: 50%;
+    margin-top: -8px;
+    width: 16px;
+    height: 16px;
+    color: var(--text-faint);
+    pointer-events: none;
+}
+
+.search .input {
+    height: var(--control-h);
+    padding-left: var(--sp-8);
+    font-size: 13px;
+}
+
+/* Checkbox — drawn from scratch to a fixed 18px box. */
+.check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    cursor: pointer;
+    user-select: none;
+}
+
+.check input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.check-box {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    margin-top: 1px;
+    border-radius: var(--r-xs);
+    background: var(--bg-chip);
+    display: grid;
+    place-items: center;
+    transition: background-color var(--t-base);
+}
+
+.check-box .icon { width: 12px; height: 12px; stroke-width: 3; color: var(--on-accent); opacity: 0; transition: opacity var(--t-base); }
+.check input:checked + .check-box { background: var(--accent); }
+.check input:checked + .check-box .icon { opacity: 1; }
+.check input:focus-visible + .check-box { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.check-text { font-size: 13px; line-height: 1.45; }
+.check-text small { display: block; color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
+
+/* Toggle switch — 44×24 track, 18px knob, 13px travel. */
+.switch { position: relative; display: inline-flex; flex: 0 0 auto; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.switch-track {
+    width: 44px;
+    height: 24px;
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+    transition: background-color var(--t-base);
+}
+
+.switch-track::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform var(--t-base), background-color var(--t-base);
+}
+
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { transform: translateX(20px); background: var(--on-accent); }
+.switch input:focus-visible + .switch-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ------------------------------------------------------- 7. CARDS & TILES */
+/* Cards are separated from the page by ELEVATION, not by an outline. The
+   hairline that remains is barely off-surface and only resolves the edge at
+   close range; the shadow ramp does the actual work of lifting the card. */
+.card {
+    background: var(--bg-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    min-height: 68px;
+    padding: var(--sp-4) var(--sp-5);
+}
+
+.card-head-text { min-width: 0; flex: 1 1 auto; }
+
+.card-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.card-sub {
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.card-body { padding: var(--sp-5); }
+.card-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 60px;
+    padding: var(--sp-3) var(--sp-5);
+}
+
+.card-tools { display: flex; align-items: center; gap: var(--sp-2); flex: 0 0 auto; }
+
+/* Grids — all children stretch, so cards in a row share one height. */
+.grid { display: grid; gap: var(--sp-4); align-items: stretch; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-main { grid-template-columns: minmax(0, 1fr) 360px; }
+.stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+.stack-lg { display: flex; flex-direction: column; gap: var(--sp-6); }
+
+/* Stat tile: fixed 132px so a loading zero and a four-digit value look alike. */
+.stat {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 132px;
+    padding: var(--sp-5);
+    background: var(--bg-surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    text-align: left;
+    transition: background-color var(--t-base);
+}
+
+button.stat { cursor: pointer; }
+button.stat:hover { background: var(--bg-surface-hover); }
+button.stat.is-active { background: var(--accent-soft); }
+
+.stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+}
+
+.stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stat-glyph {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: var(--r-sm);
+    display: grid;
+    place-items: center;
+    background: var(--bg-chip);
+    color: var(--text-muted);
+}
+
+.stat-glyph .icon { width: 15px; height: 15px; }
+.stat-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
+.stat-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
+.stat-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+.stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
+
+.stat-value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 36px;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    min-height: 18px;
+}
+
+/* Progress bar — fixed 6px rail, width is the only animated property. */
+.bar {
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--bg-field);
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    transition: width var(--t-layout);
+}
+
+.bar-fill.f-teal { background: var(--support-teal); }
+.bar-fill.f-amber { background: var(--support-amber); }
+.bar-fill.f-muted { background: var(--track); }
+
+/* -------------------------------------------------------- 8. BADGES / PILLS */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-accent { background: var(--accent-soft); color: var(--accent); }
+.badge-danger { background: var(--danger-soft); color: var(--danger); }
+.badge-teal { background: var(--support-teal-soft); color: var(--support-teal); }
+.badge-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+
+/* Segmented filter control */
+.segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.segment-btn {
+    height: 30px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-sm);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.segment-btn:hover { color: var(--text); }
+.segment-btn.is-active { background: var(--bg-chip); color: var(--text); box-shadow: var(--shadow-sm); }
+
+/* --------------------------------------------------------------- 11. MODALS */
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-6);
+    background: rgba(7, 10, 8, 0.74);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity var(--t-base);
+}
+
+.overlay.is-mounted { display: flex; }
+.overlay.is-open { opacity: 1; }
+
+/* Modal container.
+   ---------------------------------------------------------------------------
+   Close-button geometry (constraint #4):
+     dialog radius .......... 18px  (--r-xl)
+     header padding ......... 20px 20px 20px 24px
+     close button ........... 36×36, radius 10px, sits IN FLOW at the end of
+                              the header row — never absolutely positioned.
+   The button's outer edge therefore stops 20px short of the dialog edge,
+   which is greater than the 18px corner radius. The rounded corner curve and
+   the button box never intersect, so no clipping, no overlap, and
+   `overflow: hidden` on the dialog is completely safe.                       */
+.modal {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 520px;
+    max-height: calc(100vh - var(--sp-9));
+    background: var(--bg-surface);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    transform: translateY(8px);
+    transition: transform var(--t-base), opacity var(--t-base);
+    opacity: 0;
+}
+
+.overlay.is-open .modal { transform: translateY(0); opacity: 1; }
+
+.modal-sm { max-width: 420px; }
+.modal-md { max-width: 560px; }
+.modal-lg { max-width: 720px; }
+.modal-xl { max-width: 940px; }
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    flex: 0 0 auto;
+    padding: var(--sp-5) var(--sp-5) var(--sp-5) var(--sp-6);
+}
+
+.modal-head-text { flex: 1 1 auto; min-width: 0; padding-top: 2px; }
+
+.modal-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.modal-sub { margin-top: var(--sp-1); font-size: 12.5px; color: var(--text-muted); }
+
+/* The close control: fixed box, subtle bordered surface, nested safely. */
+.modal-close {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: var(--r-md);
+    background: var(--bg-chip);
+    color: var(--text-muted);
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.modal-close:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.modal-close .icon { width: 16px; height: 16px; }
+
+.modal-body {
+    flex: 1 1 auto;
+    padding: var(--sp-6);
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.modal-body-flush { padding: 0; }
+
+.modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-3);
+    flex: 0 0 auto;
+    min-height: 72px;
+    padding: var(--sp-4) var(--sp-6);
+    background: var(--bg-surface-hi);
+    box-shadow: 0 -12px 20px -20px rgba(0, 0, 0, 0.9);
+}
+
+.modal-foot-split { justify-content: space-between; }
+.modal-foot-note { font-size: 11.5px; color: var(--text-muted); }
+.modal-foot-actions { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+
+/* Centred confirmation layout */
+.modal-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--sp-3); }
+
+.modal-hero-glyph {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-lg);
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.modal-hero-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
+.modal-hero-title { font-size: 16px; font-weight: 700; }
+.modal-hero-text { font-size: 13px; color: var(--text-muted); line-height: 1.6; max-width: 44ch; }
+
+/* Form grid inside modals */
+.form-grid { display: grid; gap: var(--sp-4); }
+.form-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.form-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.form-span-2 { grid-column: span 2; }
+
+/* Sections are separated by breathing room, not a rule. */
+.form-section + .form-section { margin-top: var(--sp-8); }
+.form-section-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); margin-bottom: var(--sp-4); }
+
+/* Radio cards for group assignment */
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+
+.choice {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 74px;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    cursor: pointer;
+    transition: background-color var(--t-base);
+}
+
+.choice input { position: absolute; opacity: 0; width: 0; height: 0; }
+.choice:hover { }
+.choice-title { font-size: 13px; font-weight: 600; }
+.choice-desc { margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.choice:has(input:checked) { background: var(--accent-soft); }
+.choice:has(input:checked) .choice-title { color: var(--accent); }
+.choice:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Selectable list (targeted access) */
+.pick-list {
+    max-height: 232px;             /* exactly 4 rows + border */
+    overflow-y: auto;
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.pick-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    height: 58px;
+    padding: 0 var(--sp-4);
+    text-align: left;
+    transition: background-color var(--t-base);
+}
+
+.pick-row:hover { background: var(--bg-surface-hover); }
+.pick-row.is-picked { background: var(--accent-soft); }
+.pick-row.is-picked .pick-check { opacity: 1; }
+.pick-text { flex: 1 1 auto; min-width: 0; }
+.pick-check { color: var(--accent); opacity: 0; transition: opacity var(--t-base); }
+
+/* ----------------------------------------------------------------- 13. TOAST */
+.toast-stack {
+    position: fixed;
+    right: var(--sp-6);
+    bottom: var(--sp-6);
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    width: 340px;
+    max-width: calc(100vw - var(--sp-8));
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-surface-hi);
+    box-shadow: var(--shadow-md);
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity var(--t-base);
+}
+
+.toast.is-open { opacity: 1; }
+.toast .icon { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; }
+.toast-accent .icon { color: var(--accent); }
+.toast-danger .icon { color: var(--danger); }
+.toast-text { flex: 1 1 auto; min-width: 0; }
+.toast-title { font-size: 13px; font-weight: 600; }
+.toast-desc { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+
+/* Body lock: the scrollbar width is substituted as padding so opening a
+   modal cannot shift the page horizontally. */
+body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
+
+/* ------------------------------------------------------- 15. REDUCED MOTION */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

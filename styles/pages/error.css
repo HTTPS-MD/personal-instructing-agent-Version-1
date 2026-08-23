@@ -1,62 +1,87 @@
-/* --- 404 / Error Page --- */
-.error-page-body {
+/* ============================================================================
+   PIA SYSTEM — ERROR PAGE
+   404.html. REQUIRES styles/global.css.
+   ==========================================================================*/
+
+.error-page {
+    min-height: 100vh;
     min-height: 100dvh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
+    padding: var(--sp-6);
+    text-align: center;
 }
+
+.error-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(56rem 38rem at 12% -10%, rgba(5, 196, 107, 0.06), transparent 60%),
+        radial-gradient(44rem 32rem at 92% 6%, rgba(79, 168, 147, 0.045), transparent 62%);
+}
+
+.error-page > * { position: relative; z-index: 1; }
 
 .error-card {
-    max-width: 28rem;
     width: 100%;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    box-shadow: var(--shadow-soft);
+    max-width: 480px;
+    padding: var(--sp-8);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
 }
 
-.error-code-block {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
+.error-glyph {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto var(--sp-5);
+    border-radius: var(--r-lg);
+    display: grid;
+    place-items: center;
+    background: var(--support-amber-soft);
+    color: var(--support-amber);
 }
 
 .error-code {
-    color: var(--accent-primary);
-    font-size: 4.5rem;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    font-family: var(--font-secondary);
-}
-
-.error-message-block {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
 }
 
 .error-title {
-    color: var(--text-primary);
-    font-size: 1.5rem;
+    margin-top: var(--sp-2);
+    font-size: clamp(24px, 4vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.028em;
+    line-height: 1.15;
+    text-wrap: balance;
 }
 
-.error-desc {
-    font-size: 0.875rem;
-    line-height: 1.6;
+.error-lede {
+    margin: var(--sp-3) auto 0;
+    max-width: 42ch;
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--text-muted);
 }
 
 .error-actions {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    padding-top: 0.5rem;
+    justify-content: center;
+    gap: var(--sp-3);
+    margin-top: var(--sp-7);
+    flex-wrap: wrap;
 }
 
-@media (min-width: 640px) {
-    .error-actions {
-        flex-direction: row;
-    }
+.error-actions .btn { height: 46px; padding: 0 var(--sp-5); }
+
+@media (max-width: 480px) {
+    .error-card { padding: var(--sp-7) var(--sp-5); }
+    .error-actions .btn { flex: 1 1 100%; }
 }

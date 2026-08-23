@@ -130,7 +130,6 @@ async function checkAccessAndInit() {
     if (loadOceanProgress()) {
         gatekeeperScreen.classList.add('hidden');
         testContainer.classList.remove('hidden');
-        testContainer.classList.add('fade-in');
         document.body.style.overflow = 'auto';
         initTestUI();
         loadQuestion();
@@ -145,31 +144,27 @@ async function checkAccessAndInit() {
 function renderGatekeeper() {
     if (isTestAllowed) {
         gatekeeperScreen.innerHTML = `
-                    <div class="gatekeeper-layout">
-                        <div class="gatekeeper-media">
-                            <img src="/assets/images/ocean.png" alt="">
-                            <div class="gatekeeper-media-fade-mobile"></div>
-                            <div class="gatekeeper-media-fade-desktop"></div>
-                        </div>
-                        <div id="step-container" class="gatekeeper-panel fade-in">
-                        </div>
-                    </div>
-                `;
+            <div class="gate-wrap">
+                <div id="step-container"></div>
+            </div>
+        `;
         showPrivacyStep();
     } else {
         gatekeeperScreen.innerHTML = `
-                <div class="gatekeeper-layout">
-                    <div class="gatekeeper-media">
-                        <img src="/assets/images/board.png" alt="" class="gatekeeper-media-dim">
-                    </div>
-                    <div class="gatekeeper-panel">
-                        <span class="gatekeeper-locked-icon">🔒</span>
-                        <h2 class="gatekeeper-locked-title">Assessment Locked</h2>
-                        <p class="text-secondary gatekeeper-locked-desc">Sorry, the administrator has closed the OCEAN Personality Assessment stage.</p>
-                        <a href="waiting-room.html" class="btn btn-secondary btn-lg">Return to Waiting Room</a>
-                    </div>
+            <div class="gate-wrap">
+                <div class="gate-glyph is-locked">
+                    <svg class="icon icon-lg"><use href="#i-lock"></use></svg>
                 </div>
-            `;
+                <h1 class="gate-title">Not open yet</h1>
+                <p class="gate-lede">
+                    Your teacher hasn't started the questionnaire. Head back to the waiting
+                    room and it will bring you here automatically when it opens.
+                </p>
+                <div class="gate-actions">
+                    <a href="waiting-room.html" class="btn btn-secondary btn-block">Back to the waiting room</a>
+                </div>
+            </div>
+        `;
     }
 }
 
@@ -211,22 +206,35 @@ function setupRealtimeListener() {
 function showPrivacyStep() {
     const container = document.getElementById('step-container');
     if (!container) return;
-    container.classList.remove('opacity-0');
     container.innerHTML = `
-                <div class="fade-in gatekeeper-step">
-                    <h2 class="gatekeeper-step-title">Start OCEAN Test</h2>
-                    <span class="eyebrow gatekeeper-step-eyebrow">Assessment Setup</span>
+        <div class="gate-glyph">
+            <svg class="icon icon-lg"><use href="#i-brain"></use></svg>
+        </div>
+        <h1 class="gate-title">A few questions about you</h1>
+        <p class="gate-lede">
+            There are 50 short statements, and there are no right or wrong answers —
+            just pick how well each one describes you. It takes about ten minutes, and
+            you can go back and change any answer before you submit.
+        </p>
 
-                    <div class="privacy-note-box">
-                        <h3 class="privacy-note-title">🛡️ Data Privacy Handling</h3>
-                        <p class="text-secondary privacy-note-desc">Your responses will be strictly used to determine your learning profile. Your results are encrypted and will not be shared.</p>
-                    </div>
-                    <div class="gatekeeper-step-actions">
-                        <button onclick="startTestDirectly()" class="btn btn-primary btn-lg btn-block">I Agree, Continue</button>
-                        <a href="waiting-room.html" class="gatekeeper-return-link">Return to Waiting Room</a>
-                    </div>
-                </div>
-            `;
+        <div class="privacy-box">
+            <svg class="icon"><use href="#i-shield"></use></svg>
+            <div>
+                <p class="privacy-title">Your answers are private</p>
+                <p class="privacy-text">
+                    They are used only to set up your tutor. Your classmates never see them,
+                    and this is not graded — it does not affect your marks in any way.
+                </p>
+            </div>
+        </div>
+
+        <div class="gate-actions">
+            <button type="button" onclick="startTestDirectly()" class="btn btn-primary btn-block">
+                I understand — start
+            </button>
+            <a href="waiting-room.html" class="btn btn-secondary btn-block">Not right now</a>
+        </div>
+    `;
 }
 
 async function startTestDirectly() {
@@ -240,15 +248,11 @@ async function startTestDirectly() {
         await supabaseClient.rpc('set_student_stage', { p_stage: 'OCEAN' });
     }
 
-    gatekeeperScreen.classList.add('opacity-0');
-    setTimeout(() => {
-        gatekeeperScreen.classList.add('hidden');
-        testContainer.classList.remove('hidden');
-        testContainer.classList.add('fade-in');
-        document.body.style.overflow = 'auto';
-        initTestUI();
-        loadQuestion();
-    }, 500);
+    gatekeeperScreen.classList.add('hidden');
+    testContainer.classList.remove('hidden');
+    document.body.style.overflow = 'auto';
+    initTestUI();
+    loadQuestion();
 }
 
 // Binubuo ang 50-button na navigator at ikinakabit ang lahat ng kontrol.
@@ -297,7 +301,6 @@ function initTestUI() {
         if (e.key === 'ArrowRight') goToQuestion(currentQuestionIndex + 1);
     });
 
-    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function goToQuestion(index) {
@@ -320,7 +323,11 @@ function loadQuestion() {
     // ngayong makakagalaw na sila nang malaya, ang posisyon ay walang sinasabi
     // tungkol sa kung gaano na sila katapos.
     const done = answeredCount();
-    document.getElementById('progress-lbl').textContent = `${Math.round((done / total) * 100)}% Completed`;
+    const pctDone = Math.round((done / total) * 100);
+    document.getElementById('progress-lbl').textContent = `${pctDone}% completed`;
+
+    const fill = document.getElementById('ocean-progress-fill');
+    if (fill) fill.style.width = `${pctDone}%`;
 
     const tally = document.getElementById('answered-tally');
     if (tally) tally.textContent = `${done} of ${total} answered`;
@@ -383,9 +390,10 @@ async function submitTestResults() {
     hasSubmitted = true;
 
     testContainer.innerHTML = `
-        <div class="solid-card p-12 text-center space-y-4">
-            <h2 class="text-2xl font-bold text-primary">Submitting your assessment...</h2>
-            <p class="text-secondary text-sm">Please wait while we save your profile data.</p>
+        <div class="state-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <h2>Saving your answers…</h2>
+            <p>This only takes a moment. Please don't close this page.</p>
         </div>
     `;
 
@@ -411,10 +419,12 @@ async function submitTestResults() {
 
     if (error) {
         testContainer.innerHTML = `
-            <div class="solid-card p-12 text-center space-y-4">
-                <h2 class="text-2xl font-bold text-danger">Assessment could not be saved</h2>
-                <p class="text-secondary text-sm">${escapeHTML(error.message)}</p>
-                <button onclick="window.location.reload()" class="btn btn-primary btn-lg">Try Again</button>
+            <div class="state-card">
+                <h2>We couldn't save your answers</h2>
+                <p>${escapeHTML(error.message)}</p>
+                <p style="margin-top:12px">Your answers are still saved on this computer, so
+                   nothing is lost — try again.</p>
+                <button onclick="window.location.reload()" class="btn btn-primary">Try again</button>
             </div>
         `;
         return;
@@ -423,6 +433,16 @@ async function submitTestResults() {
     // Tapos na -- linisin ang naka-save na progreso para hindi na ito mabuhay
     // muli kung babalik sila sa page na ito.
     clearOceanProgress();
+
+    testContainer.innerHTML = `
+        <div class="state-card">
+            <div class="modal-hero-glyph g-accent" style="margin:0 auto 20px">
+                <svg class="icon icon-lg"><use href="#i-check"></use></svg>
+            </div>
+            <h2>All done — thank you!</h2>
+            <p>Your answers are saved. Taking you to the next step…</p>
+        </div>
+    `;
 
     // Ang server ang nagpasya kung saan sila susunod na pupunta.
     const nextStage = data && data.next_stage;
@@ -471,8 +491,7 @@ function confirmQuit() {
         modal.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
 
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
+    
         // Ang ligtas na opsyon ang naka-focus: ang isang pagpindot ng Enter ay
         // nagpapatuloy sa test, hindi umaalis dito.
         stayBtn.focus();

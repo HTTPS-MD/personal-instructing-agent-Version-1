@@ -4,181 +4,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
-         Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
-         tumutugma sa totoong Supabase Auth session. Nakatago ang body
-         (opacity-0) hangga't hindi pa kumpirmado ang session. -->
+    <meta name="color-scheme" content="dark">
+    <title>My Tutoring Session — PIA</title>
+
+    <!-- Convenience gate only. The real check is enforceStudentStage('dash')
+         in student-dashboard.js, which verifies the session server-side and
+         walks the full prerequisite chain. -->
     <script>
-        (function () {
-            var hasToken = false;
-            try {
-                for (var i = 0; i < localStorage.length; i++) {
-                    if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { hasToken = true; break; }
-                }
-            } catch (e) { /* storage blocked -- hayaan ang async guard ang bahala */ }
-            if (!hasToken) window.location.replace('../../index.html');
-        })();
+        function enforceAuthGuard() {
+            if (!localStorage.getItem('pia_user_email')) {
+                window.location.replace('../../index.html');
+            }
+        }
+        enforceAuthGuard();
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) { enforceAuthGuard(); }
+        });
     </script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
-    <link rel="stylesheet" href="../../styles/pages/student.css">
-    <title>Dashboard - PIA System</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/pages/student-dashboard.css">
 </head>
 
-<body class="dashboard-page opacity-0">
+<body data-boot="pending">
 
-    <!-- HEADER -->
-    <header class="dash-header">
-        <a href="../../index.html" class="site-nav-logo"><img src="../../assets/images/logo.png" alt="PIA Logo"></a>
-        <a href="../../index.html" class="btn-secondary btn-sm">
-            <i data-lucide="home" class="icon-sm"></i> Home
-        </a>
-    </header>
+    <!-- ===================================================== ICON SPRITE -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 17.5h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3Z"/></symbol>
+            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
+            <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5L7 4.5Z"/></symbol>
+            <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5.5H4.5A2.5 2.5 0 0 0 7 10.5"/><path d="M17 5.5h2.5A2.5 2.5 0 0 1 17 10.5"/><path d="M10 20h4M12 14.2V20"/></symbol>
+            <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3s5.5 4.2 5.5 9a5.5 5.5 0 0 1-11 0c0-1.6.7-3 1.5-4 0 1.6 1 2.5 2 2.5 1.4 0 2-1.4 2-3.5 0-2-.5-3.4-.5-4Z"/></symbol>
+            <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+        </defs>
+    </svg>
 
-    <!-- MAIN CONTENT AREA -->
-    <main class="dashboard-hero-layout">
+    <!-- Nothing renders until the server confirms this student may be here. -->
+    <div class="learn-veil" id="boot-veil">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="boot-text" id="boot-text">Getting your session ready…</p>
+    </div>
 
-        <!-- LEFT: FLOATING AGENT -->
-        <div class="dashboard-agent-col">
-            <div class="agent-float">
-                <img id="dashboard-agent-img" src="/assets/images/char-1.png" alt="PIA Character"
-                    class="dashboard-agent-img character-glow">
-            </div>
+    <div class="error-banner" id="global-error-banner" role="alert" hidden>
+        <svg class="icon"><use href="#i-alert"></use></svg>
+        <span id="global-error-message"></span>
+    </div>
 
-            <h1 id="welcome-title" class="dashboard-welcome-title">Welcome, Student!</h1>
-            <p class="dashboard-welcome-desc">I am PIA, your personal agent. Ready to conquer your next mathematical
-                mission?</p>
+    <div class="learn">
+        <div class="learn-ambient" aria-hidden="true"></div>
 
-            <button onclick="startGame()" class="btn-start-game">
-                <i data-lucide="play" class="icon-md"></i>
-                <span>Start Game</span>
-            </button>
+        <!-- ==================================================== TOP BAR -->
+        <header class="learn-bar">
+            <div class="learn-shell learn-bar-inner">
+                <div class="learn-brand">
+                    <span class="learn-mark" aria-hidden="true">PIA</span>
+                    <span class="stage-chip hide-sm">
+                        <span class="dot dot-live"></span>
+                        Stage 3 · Tutoring
+                    </span>
+                </div>
 
-            <button id="about-agent-btn" class="btn-secondary btn-sm">
-                <i data-lucide="info" class="icon-sm"></i>
-                <span>About the Agent</span>
-            </button>
-        </div>
-
-        <!-- RIGHT: THE CARDS -->
-        <div class="dashboard-cards-col">
-
-            <!-- OCEAN INTEGRATION CARD -->
-            <div class="solid-card card-padded ocean-profile-card">
-                <div class="ocean-profile-head">
-                    <div class="flex-row gap-sm">
-                        <i data-lucide="brain-circuit" class="icon-md text-accent"></i>
-                        <h3 class="card-heading">Your Learning Profile</h3>
+                <div class="learn-bar-right">
+                    <div class="who">
+                        <span class="who-text">
+                            <span class="who-name" id="who-name">—</span>
+                            <span class="who-meta" id="who-meta">—</span>
+                        </span>
+                        <span class="avatar" id="who-initials" aria-hidden="true">··</span>
                     </div>
-                    <span class="badge badge-success badge-pill">OCEAN-Matched</span>
-                </div>
-                <p class="ocean-profile-note">
-                    Ang iyong agent ay pinili batay sa resulta ng OCEAN Personality Assessment na sinagutan mo.
-                </p>
-                <div id="ocean-trait-bars" class="ocean-trait-bars">
-                    <!-- Populated by student-dashboard.js -->
+                    <button class="btn btn-secondary" id="signout-btn">
+                        <svg class="icon"><use href="#i-logout"></use></svg>
+                        <span class="hide-sm-inline">Sign out</span>
+                    </button>
                 </div>
             </div>
+        </header>
 
-            <!-- AWARDS CARD -->
-            <div class="solid-card card-padded">
-                <div class="awards-card-head">
-                    <div class="flex-row gap-sm">
-                        <img src="/assets/images/icon-trophy.png" alt="Trophy" class="icon-md">
-                        <h3 class="card-heading">My Awards</h3>
-                    </div>
-                    <span class="badge badge-neutral badge-pill">2 Unlocked</span>
-                </div>
+        <main class="learn-main">
 
-                <div class="awards-grid">
-                    <div class="award-tile-wrap">
-                        <div class="dashboard-award-card">
-                            <img src="/assets/images/icon-star.png" alt="Perfect Score" class="award-icon">
-                            <h4 class="award-name">Perfect Score</h4>
+            <!-- ============================================ START SCREEN -->
+            <section class="learn-shell screen is-active" id="screen-start">
+                <div class="start-wrap">
+                    <div class="start-card">
+                        <h1 class="start-hello" id="start-hello">Welcome back!</h1>
+                        <p class="start-lede" id="start-lede">
+                            Today you'll solve algebra problems with your tutor. Take your time — there's no
+                            timer, and you can ask for a hint whenever you're stuck.
+                        </p>
+
+                        <div class="start-facts">
+                            <div class="fact">
+                                <p class="fact-value" id="fact-target">10</p>
+                                <p class="fact-label">Problems this session</p>
+                            </div>
+                            <div class="fact">
+                                <p class="fact-value">2</p>
+                                <p class="fact-label">Tries per problem</p>
+                            </div>
+                            <div class="fact">
+                                <p class="fact-value" id="fact-progress">0</p>
+                                <p class="fact-label">Already answered</p>
+                            </div>
                         </div>
-                        <div class="dashboard-tooltip">
-                            <h5 class="tooltip-title">Perfect Score</h5>
-                            <p class="tooltip-desc">Cleared Stage 1 with 100% accuracy.</p>
+
+                        <button class="btn btn-primary btn-start" id="start-btn">
+                            <svg class="icon"><use href="#i-play"></use></svg>
+                            <span id="start-btn-label">Start my session</span>
+                        </button>
+                    </div>
+
+                    <aside class="agent-card">
+                        <div class="agent-portrait">
+                            <img id="agent-img-start" src="../../assets/images/char-1.png" alt="Your tutor"
+                                width="128" height="128">
+                        </div>
+                        <p class="agent-name" id="agent-name-start">Your tutor</p>
+                        <p class="agent-role">Here to help you through each step</p>
+                    </aside>
+                </div>
+            </section>
+
+            <!-- ========================================== SESSION SCREEN -->
+            <section class="learn-shell screen" id="screen-session">
+                <div class="session-wrap">
+                    <div>
+                        <!-- Progress -->
+                        <div class="progress-card">
+                            <div class="progress-top">
+                                <span class="progress-label">Your progress</span>
+                                <span class="progress-count" id="progress-count">0 / 10</span>
+                            </div>
+                            <div class="bar"><div class="bar-fill" id="progress-fill" style="width:0%"></div></div>
+                            <div class="progress-stats">
+                                <span class="pstat"><b id="stat-correct">0</b> correct</span>
+                                <span class="pstat"><b id="stat-streak">0</b> in a row</span>
+                                <span class="pstat"><b id="stat-level">1</b> level</span>
+                            </div>
+                        </div>
+
+                        <!-- The work -->
+                        <div class="problem-card">
+                            <p class="problem-kicker" id="problem-kicker">Problem 1</p>
+                            <p class="problem-expression" id="problem-expression">—</p>
+                            <p class="problem-instruction" id="problem-instruction">Solve for x.</p>
+
+                            <form id="answer-form" novalidate>
+                                <div class="answer-row">
+                                    <input class="answer-input" type="text" id="answer-input"
+                                        inputmode="decimal" autocomplete="off" autocapitalize="off"
+                                        spellcheck="false" placeholder="x = ?" aria-label="Your answer">
+                                    <button class="btn btn-primary btn-answer" type="submit" id="submit-btn">Check</button>
+                                </div>
+                            </form>
+
+                            <!-- Reserved: never empty of space, only of text. -->
+                            <div class="answer-meta">
+                                <span id="attempts-note">You have 2 tries</span>
+                                <span id="hints-note"></span>
+                            </div>
+
+                            <p class="feedback" id="feedback" role="status" aria-live="polite">
+                                <svg class="icon"><use href="#i-info"></use></svg>
+                                <span id="feedback-text"></span>
+                            </p>
+
+                            <!-- The button sits ABOVE the hints it produces. Ordered the
+                                 other way round, each new hint pushed the button down the
+                                 screen — the one control the student is reaching for. Now
+                                 nothing moves; the card simply grows at the bottom. -->
+                            <div class="hint-actions">
+                                <button class="btn btn-secondary btn-hint" id="hint-btn">
+                                    <svg class="icon"><use href="#i-bulb"></use></svg>
+                                    <span id="hint-btn-label">Give me a hint</span>
+                                </button>
+                            </div>
+
+                            <div class="hint-zone" id="hint-zone"></div>
                         </div>
                     </div>
 
-                    <div class="award-tile-wrap">
-                        <div class="dashboard-award-card">
-                            <img src="/assets/images/icon-stopwatch.png" alt="Speed Demon" class="award-icon">
-                            <h4 class="award-name">Speed Demon</h4>
+                    <!-- Agent -->
+                    <aside class="agent-panel">
+                        <div class="agent-portrait">
+                            <img id="agent-img" src="../../assets/images/char-1.png" alt="Your tutor"
+                                width="104" height="104">
                         </div>
-                        <div class="dashboard-tooltip">
-                            <h5 class="tooltip-title">Speed Demon</h5>
-                            <p class="tooltip-desc">Successfully solved a challenge under 1 minute.</p>
+                        <p class="agent-name" id="agent-name">Your tutor</p>
+                        <p class="agent-speech" id="agent-speech">Let's get started. Read the problem carefully.</p>
+                    </aside>
+                </div>
+            </section>
+
+            <!-- ========================================== SUMMARY SCREEN -->
+            <section class="learn-shell screen" id="screen-summary">
+                <div class="summary-card">
+                    <div class="summary-glyph">
+                        <svg class="icon icon-lg"><use href="#i-trophy"></use></svg>
+                    </div>
+                    <h2 class="summary-title">Session complete</h2>
+                    <p class="summary-lede" id="summary-lede">Nice work getting all the way through.</p>
+
+                    <div class="summary-grid">
+                        <div class="summary-tile">
+                            <p class="summary-value" id="summary-correct">0 / 0</p>
+                            <p class="summary-label">Correct</p>
+                        </div>
+                        <div class="summary-tile">
+                            <p class="summary-value" id="summary-accuracy">0%</p>
+                            <p class="summary-label">Accuracy</p>
+                        </div>
+                        <div class="summary-tile">
+                            <p class="summary-value" id="summary-level">Level 1</p>
+                            <p class="summary-label">Reached</p>
                         </div>
                     </div>
+
+                    <button class="btn btn-secondary" id="summary-signout">
+                        <svg class="icon"><use href="#i-logout"></use></svg>
+                        Sign out
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ============================================= MODAL · CONFIRM ----
+         Same mechanics as every other dialog in the system: 18px radius, the
+         36×36 close button in flow 21px from the edge, scroll lock that
+         substitutes the scrollbar width. -->
+    <div class="overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="confirm-title">Are you sure?</h2>
+                    <p class="modal-sub" id="confirm-subtitle">Check before you continue.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+            <div class="modal-body">
+                <div class="modal-hero">
+                    <span class="modal-hero-glyph" id="confirm-glyph">
+                        <svg class="icon icon-lg"><use href="#i-alert"></use></svg>
+                    </span>
+                    <p class="modal-hero-title" id="confirm-heading">Sign out?</p>
+                    <p class="modal-hero-text" id="confirm-text"></p>
                 </div>
             </div>
-
-            <!-- HOW TO PLAY CARD -->
-            <div class="solid-card action-card">
-                <img src="/assets/images/icon-howtoplay.png" alt="How to Play" class="action-card-icon">
-                <div class="action-card-body">
-                    <h3 class="card-heading">How to Play</h3>
-                    <p class="action-card-sub">Watch tutorial</p>
-                </div>
-                <i data-lucide="chevron-right" class="icon-sm action-card-arrow"></i>
-            </div>
-
-            <!-- CONTACT ADMIN CARD -->
-            <div class="solid-card action-card">
-                <img src="/assets/images/icon-contact.png" alt="Contact Admin" class="action-card-icon">
-                <div class="action-card-body">
-                    <h3 class="card-heading">Contact Admin</h3>
-                    <p class="action-card-sub">Need help or bug?</p>
-                </div>
-                <i data-lucide="chevron-right" class="icon-sm action-card-arrow"></i>
-            </div>
-
-        </div>
-    </main>
-
-    <!-- ABOUT THE AGENT MODAL -->
-    <div id="agent-modal" class="modal-overlay">
-        <div class="solid-card card-padded-lg modal-content agent-modal-content" id="modal-content">
-            <button id="close-modal-btn" class="agent-modal-close">
-                <i data-lucide="x" class="icon-md"></i>
-            </button>
-            <div class="agent-modal-body">
-                <div class="modal-agent-portrait">
-                    <img src="/assets/images/agent-character.png" alt="PIA Portrait" class="modal-agent-portrait-img character-glow">
-                </div>
-                <h2 class="agent-modal-title">Personal Instructing Agent</h2>
-                <span class="badge badge-pill version-badge">Version 1.0</span>
-                <p class="agent-modal-desc">
-                    PIA is an AI-powered tutor specifically designed to adapt to your learning style. Instead of a
-                    one-size-fits-all approach, PIA monitors your progress and adjusts its teaching method based on your
-                    unique personality and pacing.
-                </p>
-                <div class="agent-modal-features">
-                    <div class="agent-modal-feature">
-                        <i data-lucide="brain-circuit" class="icon-md"></i>
-                        <h4 class="feature-title">Adaptive Logic</h4>
-                        <p class="feature-sub">Real-time adjusting</p>
-                    </div>
-                    <div class="agent-modal-feature">
-                        <i data-lucide="shield-check" class="icon-md"></i>
-                        <h4 class="feature-title">Safe Space</h4>
-                        <p class="feature-sub">Zero pressure zone</p>
-                    </div>
-                </div>
-            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close id="confirm-cancel">Go back</button>
+                <button class="btn btn-danger" id="confirm-accept">Sign out</button>
+            </footer>
         </div>
     </div>
 
+    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
+
     <script src="../../assets/js/function.js"></script>
+    <script src="../js/math-problems.js"></script>
     <script src="../js/student-dashboard.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
 </body>
 
 </html>

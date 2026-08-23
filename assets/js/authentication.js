@@ -12,7 +12,15 @@ const setupSubmitBtn = document.getElementById('setup-submit-btn');
 
 function showSetupStatus(message, type) {
     if (!setupStatus) return;
-    setupStatus.textContent = message;
+
+    // Write into the inner <span>, not the row itself: the row also holds an
+    // icon, and textContent on the parent would delete it.
+    const textEl = setupStatus.querySelector('span') || setupStatus;
+    textEl.textContent = message;
+
+    const glyph = setupStatus.querySelector('use');
+    if (glyph) glyph.setAttribute('href', type === 'error' ? '#i-alert' : '#i-check');
+
     setupStatus.classList.remove('hidden', 'auth-status-error', 'auth-status-success');
     setupStatus.classList.add(type === 'error' ? 'auth-status-error' : 'auth-status-success');
 }
@@ -70,14 +78,15 @@ if (setupForm) {
         if (password !== confirmPassword) return showSetupStatus("Passwords do not match.", "error");
 
         setupSubmitBtn.disabled = true;
-        setupSubmitBtn.innerHTML = 'Saving...';
+        setupSubmitBtn.disabled = true;
+        setupSubmitBtn.textContent = 'Saving…';
 
         const { error: updateError } = await window.supabaseClient.auth.updateUser({ password });
 
         if (updateError) {
             showSetupStatus(updateError.message, "error");
             setupSubmitBtn.disabled = false;
-            setupSubmitBtn.innerHTML = 'Activate Account';
+            setupSubmitBtn.textContent = 'Activate my account';
             return;
         }
 

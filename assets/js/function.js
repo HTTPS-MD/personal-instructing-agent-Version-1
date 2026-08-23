@@ -586,7 +586,10 @@ async function validateDeviceOnLoad() {
     const userEmail = localStorage.getItem('pia_user_email');
     const currentDeviceId = localStorage.getItem('pia_device_id');
 
-    if (!userEmail || !currentDeviceId || window.location.pathname.includes('admin-dashboard.html') || window.location.pathname.includes('sign-in.html')) {
+    // 'admin-dashboard' (walang .html) para matugma ang admin-dashboard.html AT
+    // admin-dashboard.html. Ang student device watcher na ito ay hindi dapat
+    // tumakbo sa admin console -- ang claim_device() ng admin ang humahawak doon.
+    if (!userEmail || !currentDeviceId || window.location.pathname.includes('admin-dashboard') || window.location.pathname.includes('sign-in.html')) {
         return;
     }
 
@@ -610,7 +613,7 @@ async function watchDeviceSession() {
     const currentDeviceId = localStorage.getItem('pia_device_id');
 
     if (!userEmail || !currentDeviceId) return;
-    if (window.location.pathname.includes('admin-dashboard.html') || window.location.pathname.includes('sign-in.html')) return;
+    if (window.location.pathname.includes('admin-dashboard') || window.location.pathname.includes('sign-in.html')) return;
 
     // SECURITY FIX: dati, `event:'*'` na WALANG filter -- kaya ang bawat
     // pagbabago sa BUONG profiles table ay ipinapadala sa browser ng bawat

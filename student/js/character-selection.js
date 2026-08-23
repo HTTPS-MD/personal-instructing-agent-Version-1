@@ -24,13 +24,15 @@ enforceStageLock();
 function previewCharacter(element) {
     if (isLockedIn) return;
 
-    document.querySelectorAll('.solid-card').forEach(card => {
+    document.querySelectorAll('.persona-card').forEach(card => {
         card.classList.remove('selected');
+        card.setAttribute('aria-pressed', 'false');
         const img = card.querySelector('.agent-img-thumbnail');
         if (img) img.classList.add('grayscale');
     });
 
     element.classList.add('selected');
+    element.setAttribute('aria-pressed', 'true');
     const activeImg = element.querySelector('.agent-img-thumbnail');
     if (activeImg) activeImg.classList.remove('grayscale');
 
@@ -55,7 +57,6 @@ function previewCharacter(element) {
 
     const lockBtn = document.getElementById('lock-in-btn');
     lockBtn.disabled = false;
-    lockBtn.classList.add('glow-primary-shadow');
 }
 
 function openConfirmModal() {
@@ -79,6 +80,14 @@ async function finalLockIn() {
     if (!selectedChar) return;
     if (!verifiedEmail) return; // hindi pa kumpirmado ng guard ang session
 
+    // Double-tap guard: without it two quick taps send two updates.
+    const lockBtn = document.getElementById('lock-in-btn');
+    if (lockBtn) {
+        if (lockBtn.dataset.busy === '1') return;
+        lockBtn.dataset.busy = '1';
+        lockBtn.disabled = true;
+    }
+
     // Session-verified email, hindi na ang spoofable na localStorage value.
     const { error } = await supabaseClient
         .from('profiles')
@@ -86,7 +95,18 @@ async function finalLockIn() {
         .eq('email', verifiedEmail);
 
     if (error) {
-        alert("Could not save your selection: " + error.message);
+        const status = document.getElementById('status-text');
+        if (status) {
+            status.textContent = 'NOT SAVED';
+            status.style.color = 'var(--danger)';
+        }
+        const btn = document.getElementById('lock-in-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Try locking in again';
+        }
+        closeConfirmModal();
+        console.error('Could not save selection:', error.message);
         return;
     }
 
@@ -95,10 +115,13 @@ async function finalLockIn() {
     closeConfirmModal();
 
     isLockedIn = true;
-    document.getElementById('status-text').textContent = 'LOCKED IN';
+    const statusEl = document.getElementById('status-text');
+    statusEl.textContent = 'LOCKED IN';
+    statusEl.style.color = 'var(--accent)';
 
-    document.querySelectorAll('.solid-card').forEach(card => {
+    document.querySelectorAll('.persona-card').forEach(card => {
         card.style.pointerEvents = 'none';
+        card.disabled = true;
     });
 
     document.getElementById('lock-in-btn').style.display = 'none';

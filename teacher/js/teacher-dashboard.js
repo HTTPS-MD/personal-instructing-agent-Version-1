@@ -1,282 +1,496 @@
-// Supabase Configuration ay nasa function.js na
+/**
+ * ============================================================================
+ * PIA SYSTEM — TEACHER CONSOLE
+ * ============================================================================
+ * Live monitoring for one section. Uses the shared `sb` client from
+ * function.js and the shared rail from shell.js.
+ *
+ * RESEARCH INTEGRITY: ocean_* is never selected here. A teacher who knows a
+ * student's trait scores may teach them differently, which would contaminate
+ * the variable the study measures. Only progress and activity are exposed.
+ * ==========================================================================*/
+(function () {
+    'use strict';
 
-let currentFilter = 'all';
-let teacherSection = null;
+    var $ = function (s, r) { return (r || document).querySelector(s); };
+    var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-// ==========================================
-// SESSION + ROLE GUARD (security fix)
-// Dating walang kahit anong verification dito -- direktang na-render na ang
-// buong student roster kahit walang session/role check. Ngayon, i-verify muna
-// server-side (via Supabase session + profiles.role) bago ipakita ang laman.
-// ==========================================
-async function enforceTeacherAccess() {
-    if (typeof sb === 'undefined') {
-        showAccessError("Database connection failed. Please refresh.");
-        return false;
+    var esc = (typeof escapeHTML === 'function') ? escapeHTML : function (v) {
+        return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    /* A student is "gone quiet" after this long without the app writing a
+       timestamp for them. */
+    var IDLE_MINUTES = 10;
+    var STRUGGLING_BELOW = 70;
+
+    var state = {
+        section: null,
+        name: null,
+        email: null,
+        students: [],
+        filter: 'all',
+        search: ''
+    };
+
+    function debounce(fn, wait) {
+        var t = null;
+        return function () {
+            var a = arguments, s = this;
+            clearTimeout(t);
+            t = setTimeout(function () { fn.apply(s, a); }, wait || 200);
+        };
     }
 
-    try {
-        const { data: { session }, error: sessionError } = await sb.auth.getSession();
-        if (sessionError || !session) throw new Error("Session expired. Please log in again.");
-
-        const email = session.user.email;
-        const { data: profile, error } = await sb.from('profiles').select('role, section, full_name').eq('email', email).maybeSingle();
-
-        if (error || !profile || profile.role !== 'teacher') {
-            throw new Error("Unauthorized access. Teacher privileges required.");
-        }
-
-        localStorage.setItem('pia_user_email', email);
-
-        // Kunin ang section na naka-assign sa naka-login na teacher: profiles.section
-        // muna, at kung wala, i-check ang professors.assigned_section bilang fallback.
-        teacherSection = profile.section || null;
-        let teacherName = profile.full_name || null;
-        if (!teacherSection || !teacherName) {
-            const { data: profRow } = await sb.from('professors').select('name, assigned_section').eq('email', email).maybeSingle();
-            if (!teacherSection) teacherSection = profRow?.assigned_section || null;
-            if (!teacherName) teacherName = profRow?.name || null;
-        }
-
-        const nameEl = document.querySelector('.teacher-name');
-        if (nameEl && teacherName) nameEl.textContent = teacherName;
-        const sectionLabelEl = document.getElementById('teacher-section-label');
-        if (sectionLabelEl) sectionLabelEl.textContent = `Section ${teacherSection || 'Unassigned'} (Grade 7)`;
-
-        document.body.classList.remove('opacity-0');
-        return true;
-    } catch (e) {
-        console.error("Teacher dashboard access error:", e);
-        showAccessError(e.message || "Failed to verify access.");
-        localStorage.removeItem('pia_user_email');
-        setTimeout(() => window.location.replace('../../index.html'), 3000);
-        return false;
-    }
-}
-
-function showAccessError(message) {
-    const banner = document.getElementById('global-error-banner');
-    const msgEl = document.getElementById('global-error-message');
-    if (banner && msgEl) {
-        msgEl.textContent = message;
-        banner.classList.remove('hidden');
-    }
-}
-
-// Fetch and Render Students on Page Load & Setup Realtime Subscriptions
-window.addEventListener('DOMContentLoaded', async () => {
-    const allowed = await enforceTeacherAccess();
-    if (!allowed) return;
-
-    await loadTeacherMonitoring();
-    setupRealtimeSubscription();
-    lucide.createIcons();
-});
-
-async function loadTeacherMonitoring() {
-    if (!supabaseClient) return;
-
-    const tbody = document.getElementById('student-monitoring-body');
-
-    if (!teacherSection) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-cell">No section is assigned to your account yet. Contact the admin.</td></tr>`;
-        return;
+    function initialsOf(name, email) {
+        var src = (name || '').trim().replace(/^(Dr|Prof|Mr|Mrs|Ms)\.?\s+/i, '');
+        if (!src) { return (email || '?').slice(0, 2).toUpperCase(); }
+        var p = src.split(/\s+/);
+        return (p.length === 1 ? p[0].slice(0, 2) : p[0][0] + p[p.length - 1][0]).toUpperCase();
     }
 
-    // Ang columns lang na talagang ginagamit ng monitoring table. Dating '*',
-    // kaya nadadala pati active_devices, max_devices, role, at OCEAN scores ng
-    // bawat estudyante papunta sa browser ng teacher kahit hindi ipinapakita.
-    const { data, error } = await supabaseClient
-        .from('profiles')
-        // WALANG `last_seen` at `updated_at` na column sa profiles -- ang
-        // paghingi sa kanila ay 42703 (undefined column) -> HTTP 400, kaya
-        // BLANGKO ang buong teacher dashboard. Ang `is_in_game` at
-        // `stage_started_at` ay totoong umiiral at sapat para sa engagement.
-        .select('full_name, email, group_type, status, is_in_game, stage_started_at, selected_character, pre_test_score, post_test_score')
-        .eq('section', teacherSection);
+    /* ============================================ 1. BOOT GATE ========= */
 
-    tbody.innerHTML = '';
+    function setBootText(m) { var n = $('#boot-text'); if (n) { n.textContent = m; } }
 
-    if (error || !data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-cell">No students found in Section ${escapeHTML(teacherSection)}.</td></tr>`;
-        return;
+    function reveal() {
+        document.body.removeAttribute('data-boot');
+        var v = $('#boot-veil');
+        if (v) { setTimeout(function () { v.hidden = true; }, 200); }
     }
 
-    const now = new Date();
+    function showAccessError(message) {
+        var banner = $('#global-error-banner');
+        if (!banner) { return; }
+        $('#global-error-message').textContent = message;
+        banner.hidden = false;
+    }
 
-    data.forEach(student => {
-        const isLoggedIn = student.status === 'active';
+    /* ============================================ 2. MODALS + TOAST ==== */
 
-        // Huling kilalang aktibidad. Ang aktibong naglalaro ay laging Online;
-        // kung hindi, ang stage_started_at ang pinakabagong timestamp na
-        // talagang isinusulat ng app.
-        const lastActiveTime = student.stage_started_at ? new Date(student.stage_started_at) : null;
-        const diffMinutes = student.is_in_game
-            ? 0
-            : (lastActiveTime ? (now - lastActiveTime) / (1000 * 60) : 999);
+    var openLayers = [];
+    var lastFocused = null;
+    var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
+        ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-        // Status logic:
-        // 1. Offline kung hindi pa nakapag-sign in (status != 'active')
-        // 2. Inactive kung nakasigning-in pero lumagpas sa 10 minuto ang huling galaw
-        // 3. Online kung active at wala pang 10 minuto ang huling galaw
-        let engagementState = 'offline';
-        let engagementHtml = '';
+    function lockScroll() {
+        var gap = window.innerWidth - document.documentElement.clientWidth;
+        document.documentElement.style.setProperty('--scrollbar-w', gap + 'px');
+        document.body.classList.add('is-locked');
+    }
 
-        if (!isLoggedIn) {
-            engagementState = 'offline';
-            engagementHtml = `<span class="engagement-badge status-badge-offline"><span class="status-dot status-dot-offline"></span> Offline (Not Signed In)</span>`;
-        } else if (diffMinutes > 10) {
-            engagementState = 'inactive';
-            engagementHtml = `<span class="engagement-badge status-badge-inactive"><span class="status-dot status-dot-inactive"></span> Inactive (&gt;10m idle)</span>`;
-        } else {
-            engagementState = 'online';
-            engagementHtml = `<span class="engagement-badge status-badge-online"><span class="status-dot status-dot-online engagement-dot-pulse"></span> Online (Active)</span>`;
-        }
+    function unlockScroll() {
+        document.body.classList.remove('is-locked');
+        document.documentElement.style.setProperty('--scrollbar-w', '0px');
+    }
 
-        const isStruggling = student.pre_test_score !== null && student.pre_test_score < 70;
-        const learningState = isStruggling ? 'struggling' : 'smooth';
+    function openModal(id) {
+        var o = document.getElementById(id);
+        if (!o || openLayers.indexOf(o) !== -1) { return; }
+        if (!openLayers.length) { lastFocused = document.activeElement; lockScroll(); }
+        o.classList.add('is-mounted');
+        openLayers.push(o);
+        void o.offsetWidth;
+        o.classList.add('is-open');
+        var f = o.querySelector('button, input, select, textarea');
+        if (f) { f.focus({ preventScroll: true }); }
+    }
 
-        const learningStatusHtml = isStruggling
-            ? `<span class="learning-badge learning-struggling"><i data-lucide="alert-triangle" class="icon-xs"></i> Struggling</span>`
-            : `<span class="learning-badge learning-smooth"><i data-lucide="trending-up" class="icon-xs"></i> Smooth</span>`;
-
-        const tr = document.createElement('tr');
-        tr.className = "student-row";
-        tr.setAttribute('data-learning', learningState);
-        tr.setAttribute('data-engagement', engagementState);
-
-        const initial = student.full_name ? student.full_name.charAt(0).toUpperCase() : 'S';
-        const dotColor = engagementState === 'online' ? 'status-dot-online' : (engagementState === 'inactive' ? 'status-dot-inactive' : 'status-dot-offline');
-
-        tr.innerHTML = `
-            <td class="student-name-cell">
-                <div class="student-avatar-wrap">
-                    <div class="student-avatar-initial">${escapeHTML(initial)}</div>
-                    <span class="student-avatar-status ${dotColor}"></span>
-                </div>
-                <div>
-                    <p class="student-name">${escapeHTML(student.full_name || 'Unnamed Student')}</p>
-                    <p class="student-email">${escapeHTML(student.email || 'no-email@ue.edu.ph')}</p>
-                </div>
-            </td>
-            <td><span class="badge badge-pill badge-group">${escapeHTML(student.group_type || 'EXP')}</span></td>
-            <td class="text-secondary">Algebraic Expressions</td>
-            <td>${learningStatusHtml}</td>
-            <td>${engagementHtml}</td>
-            <td class="text-right">
-                <button onclick="openStudentProfile('${escapeJS(student.full_name || 'Student')}', '${escapeJS(student.email || '')}', '${escapeJS(student.group_type || 'EXP')}', '${escapeJS(student.pre_test_score ?? 'n/a')}', '${escapeJS(student.post_test_score ?? 'n/a')}', '${escapeJS(student.selected_character || 'openness')}')"
-                    class="btn-secondary btn-sm">View Details</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-
-    lucide.createIcons();
-    applyCurrentFilter();
-}
-
-// Realtime Listener para kusang mag-update kapag may nagbago sa database
-function setupRealtimeSubscription() {
-    if (!supabaseClient || !teacherSection) return;
-
-    // SECURITY FIX: dati, `event:'*'` sa BUONG profiles table -- kaya ang
-    // browser ng teacher ay tumatanggap ng bawat pagbabago sa lahat ng
-    // estudyante ng buong sistema, pati ang mga section na hindi kanila.
-    // Ang sariling section na lang ang sinu-subscribe-an ngayon.
-    //
-    // Nadagdagan din ng debounce: dati, bawat isang event ay nagpapatakbo ng
-    // buong table reload, kaya ang isang bugso ng update (hal. sabay-sabay na
-    // pumasok ang klase) ay naghahambalos ng dose-dosenang query.
-    const channelSuffix = String(teacherSection).replace(/[^A-Za-z0-9_-]/g, '_');
-    let reloadTimer = null;
-
-    registerChannel('teacher-monitoring-' + channelSuffix, (ch) => ch
-        .on(
-            'postgres_changes',
-            {
-                event: '*',
-                schema: 'public',
-                table: 'profiles',
-                filter: `section=eq.${teacherSection}`
-            },
-            () => {
-                clearTimeout(reloadTimer);
-                reloadTimer = setTimeout(loadTeacherMonitoring, 400);
+    function closeModal(target) {
+        var o = (typeof target === 'string') ? document.getElementById(target) : target;
+        o = o || openLayers[openLayers.length - 1];
+        if (!o) { return; }
+        o.classList.remove('is-open');
+        openLayers = openLayers.filter(function (l) { return l !== o; });
+        setTimeout(function () {
+            o.classList.remove('is-mounted');
+            if (!openLayers.length) {
+                unlockScroll();
+                if (lastFocused && lastFocused.focus) { lastFocused.focus({ preventScroll: true }); }
             }
-        )
-        .subscribe());
-}
+        }, 160);
+    }
 
-function filterTable(filterType, btnElement) {
-    currentFilter = filterType;
-    document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
-    if (btnElement) btnElement.classList.add('active');
+    function initModals() {
+        $$('[data-modal-open]').forEach(function (t) {
+            t.addEventListener('click', function () { openModal(t.getAttribute('data-modal-open')); });
+        });
+        $$('.overlay').forEach(function (o) {
+            o.addEventListener('mousedown', function (e) { if (e.target === o) { closeModal(o); } });
+            $$('[data-modal-close]', o).forEach(function (b) {
+                b.addEventListener('click', function () { closeModal(o); });
+            });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (!openLayers.length) { return; }
+            var top = openLayers[openLayers.length - 1];
+            if (e.key === 'Escape') { e.preventDefault(); closeModal(top); return; }
+            if (e.key !== 'Tab') { return; }
+            var n = $$(FOCUSABLE, top).filter(function (x) { return x.offsetParent !== null; });
+            if (!n.length) { return; }
+            var first = n[0], last = n[n.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        });
+    }
 
-    applyCurrentFilter();
-}
+    function toast(title, description, tone) {
+        var stack = $('#toast-stack');
+        if (!stack) { return; }
+        var n = document.createElement('div');
+        n.className = 'toast toast-' + (tone === 'danger' ? 'danger' : 'accent');
+        n.innerHTML = '<svg class="icon"><use href="#i-' + (tone === 'danger' ? 'alert' : 'check') +
+            '"></use></svg><div class="toast-text"><p class="toast-title">' + esc(title) + '</p>' +
+            (description ? '<p class="toast-desc">' + esc(description) + '</p>' : '') + '</div>';
+        stack.appendChild(n);
+        void n.offsetWidth;
+        n.classList.add('is-open');
+        setTimeout(function () {
+            n.classList.remove('is-open');
+            setTimeout(function () { n.remove(); }, 200);
+        }, 3800);
+    }
 
-function applyCurrentFilter() {
-    const rows = document.querySelectorAll('.student-row');
-    let visibleCount = 0;
+    function setBusy(button, label) {
+        if (!button) { return function () {}; }
+        var html = button.innerHTML, w = button.getBoundingClientRect().width;
+        button.style.minWidth = Math.ceil(w) + 'px';
+        button.disabled = true;
+        button.textContent = label || 'Working…';
+        return function () {
+            button.innerHTML = html;
+            button.disabled = false;
+            button.style.minWidth = '';
+        };
+    }
 
-    rows.forEach(row => {
-        const learning = row.getAttribute('data-learning');
-        const engagement = row.getAttribute('data-engagement');
+    /* ============================================ 3. ACCESS GUARD ====== */
 
-        let show = false;
-        if (currentFilter === 'all') show = true;
-        else if (currentFilter === 'online' && engagement === 'online') show = true;
-        else if (currentFilter === 'offline' && engagement === 'offline') show = true;
-        else if (currentFilter === 'inactive' && engagement === 'inactive') show = true;
-        else if (currentFilter === 'smooth' && learning === 'smooth') show = true;
-        else if (currentFilter === 'struggling' && learning === 'struggling') show = true;
-
-        row.style.display = show ? '' : 'none';
-        if (show) visibleCount++;
-    });
-
-    document.getElementById('empty-state').style.display = visibleCount === 0 ? 'block' : 'none';
-}
-
-function searchTable() {
-    let query = document.getElementById('search-student').value.toLowerCase();
-    let rows = document.querySelectorAll('.student-row');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        let nameText = row.querySelector('.student-name').textContent.toLowerCase();
-        if (nameText.includes(query)) {
-            row.style.display = '';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
+    async function enforceTeacherAccess() {
+        if (typeof sb === 'undefined' || !sb) {
+            setBootText('Could not connect.');
+            showAccessError('Database connection failed. Please refresh.');
+            return false;
         }
-    });
 
-    document.getElementById('empty-state').style.display = visibleCount === 0 ? 'block' : 'none';
-}
+        try {
+            var session = await sb.auth.getSession();
+            if (session.error || !session.data.session) { throw new Error('Session expired. Please log in again.'); }
 
-function openStudentProfile(name, email, type, pretest, posttest, character) {
-    document.getElementById('profile-name').textContent = name;
-    document.getElementById('profile-email').textContent = email;
-    document.getElementById('profile-section').textContent = teacherSection || '--';
-    document.getElementById('profile-type').textContent = type;
-    document.getElementById('profile-pretest').textContent = pretest;
-    document.getElementById('profile-posttest').textContent = posttest;
+            var email = session.data.session.user.email;
+            var res = await sb.from('profiles').select('role, section, full_name').eq('email', email).maybeSingle();
 
-    const cleanChar = character ? character.replace('pia-', '') : 'openness';
-    document.getElementById('profile-persona-badge').textContent = `${cleanChar.toUpperCase()} Agent`;
-    document.getElementById('profile-avatar-img').src = `/assets/images/persona-${cleanChar.toLowerCase()}.png`;
+            if (res.error || !res.data || res.data.role !== 'teacher') {
+                throw new Error('Unauthorized access. Teacher privileges required.');
+            }
 
-    document.getElementById('student-profile-screen').classList.remove('hidden');
-}
+            try { localStorage.setItem('pia_user_email', email); } catch (e) { /* private mode */ }
 
-function closeStudentProfile() {
-    document.getElementById('student-profile-screen').classList.add('hidden');
-}
+            state.email = email;
+            state.section = res.data.section || null;
+            state.name = res.data.full_name || null;
 
-// Dating localStorage.clear() lang -- nananatiling buhay ang Supabase session
-// (kasama ang refresh token) pagkatapos ng "sign out".
-function handleSignOut() {
-    return executeForceLogout();
-}
+            /* profiles is the source of truth; the professors row is a fallback
+               for accounts created before the two were written together. */
+            if (!state.section || !state.name) {
+                var prof = await sb.from('professors').select('name, assigned_section').eq('email', email).maybeSingle();
+                if (!state.section) { state.section = (prof.data && prof.data.assigned_section) || null; }
+                if (!state.name) { state.name = (prof.data && prof.data.name) || null; }
+            }
+
+            var shown = state.name || email.split('@')[0];
+            $('#teacher-name').textContent = shown;
+            $('#teacher-email').textContent = email;
+            $('#teacher-initials').textContent = initialsOf(shown, email);
+            $('#teacher-section-label').textContent = state.section
+                ? 'Section ' + state.section : 'No section assigned';
+
+            var hour = new Date().getHours();
+            var greet = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+
+            /* Faculty names carry an honorific, so a naive first-word split
+               greets them as "Dr." — keep the title WITH the surname, which is
+               how a teacher is actually addressed. */
+            var honorific = /^(Dr|Prof|Mr|Mrs|Ms)\.?\s+/i.exec(shown);
+            var parts = shown.trim().split(/\s+/);
+            var address = honorific
+                ? parts[0] + ' ' + parts[parts.length - 1]
+                : parts[0];
+            $('#page-greeting').textContent = greet + ', ' + address;
+
+            return true;
+        } catch (e) {
+            console.error('Teacher dashboard access error:', e);
+            setBootText(e.message || 'Failed to verify access.');
+            showAccessError(e.message || 'Failed to verify access.');
+            try { localStorage.removeItem('pia_user_email'); } catch (err) { /* ignore */ }
+            setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
+            return false;
+        }
+    }
+
+    /* ============================================ 4. DATA ============== */
+
+    /* Exactly the columns the table renders. Selecting '*' would ship every
+       student's device IDs and OCEAN scores to the teacher's browser. */
+    var COLUMNS = 'full_name, email, group_type, status, is_in_game, stage_started_at,' +
+        ' selected_character, pre_test_score, post_test_score';
+
+    function skeletonRows(n) {
+        var out = '';
+        for (var i = 0; i < (n || 5); i++) {
+            out += '<tr aria-hidden="true"><td><div class="cell-user">' +
+                '<span class="skeleton skeleton-avatar"></span><span style="width:150px">' +
+                '<span class="skeleton skeleton-line" style="width:70%"></span>' +
+                '<span class="skeleton skeleton-line" style="width:90%"></span></span></div></td>' +
+                '<td><span class="skeleton skeleton-pill"></span></td>' +
+                '<td><span class="skeleton skeleton-pill"></span></td>' +
+                '<td><span class="skeleton skeleton-pill"></span></td>' +
+                '<td><span class="skeleton skeleton-pill"></span></td>' +
+                '<td class="col-right"><span class="skeleton skeleton-pill"></span></td></tr>';
+        }
+        return out;
+    }
+
+    /* Derives the three engagement states. is_in_game means working right now;
+       otherwise stage_started_at is the newest timestamp the app actually
+       writes (profiles has no last_seen column). */
+    function engagementOf(s) {
+        if ((s.status || '') !== 'active') { return 'offline'; }
+        if (s.is_in_game) { return 'online'; }
+        if (!s.stage_started_at) { return 'inactive'; }
+        var mins = (Date.now() - new Date(s.stage_started_at).getTime()) / 60000;
+        return mins > IDLE_MINUTES ? 'inactive' : 'online';
+    }
+
+    function learningOf(s) {
+        return (s.pre_test_score !== null && s.pre_test_score !== undefined &&
+            s.pre_test_score < STRUGGLING_BELOW) ? 'struggling' : 'smooth';
+    }
+
+    async function loadMonitoring() {
+        var tbody = $('#student-monitoring-body');
+
+        if (!state.section) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">' +
+                'No section is assigned to your account yet. Please contact the administrator.</td></tr>';
+            paintStats([]);
+            return;
+        }
+
+        if (!state.students.length) { tbody.innerHTML = skeletonRows(6); }
+
+        var res = await sb.from('profiles').select(COLUMNS).eq('section', state.section)
+            .order('full_name', { ascending: true });
+
+        if (res.error) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">Could not load your roster. ' +
+                esc(res.error.message) + '</td></tr>';
+            return;
+        }
+
+        state.students = res.data || [];
+        $('#nav-count-students').textContent = state.students.length;
+        render();
+    }
+
+    function paintStats(list) {
+        var online = list.filter(function (s) { return engagementOf(s) === 'online'; }).length;
+        var idle = list.filter(function (s) { return engagementOf(s) === 'inactive'; }).length;
+        var strug = list.filter(function (s) { return learningOf(s) === 'struggling'; }).length;
+
+        $('#stat-total').textContent = list.length;
+        $('#stat-online').textContent = online;
+        $('#stat-inactive').textContent = idle;
+        $('#stat-struggling').textContent = strug;
+    }
+
+    function render() {
+        paintStats(state.students);
+
+        var term = state.search.trim().toLowerCase();
+        var rows = state.students.filter(function (s) {
+            var eng = engagementOf(s), learn = learningOf(s);
+
+            if (state.filter === 'online' && eng !== 'online') { return false; }
+            if (state.filter === 'inactive' && eng !== 'inactive') { return false; }
+            if (state.filter === 'offline' && eng !== 'offline') { return false; }
+            if (state.filter === 'struggling' && learn !== 'struggling') { return false; }
+            if (state.filter === 'smooth' && learn !== 'smooth') { return false; }
+
+            if (term) {
+                return ((s.full_name || '') + ' ' + (s.email || '')).toLowerCase().indexOf(term) !== -1;
+            }
+            return true;
+        });
+
+        var tbody = $('#student-monitoring-body');
+        $('#empty-state').style.display = rows.length ? 'none' : 'block';
+
+        tbody.innerHTML = rows.map(function (s) {
+            var eng = engagementOf(s);
+            var learn = learningOf(s);
+
+            var engLabel = { online: 'Working now', inactive: 'Gone quiet', offline: 'Not signed in' }[eng];
+            var engClass = { online: 'status-badge-online', inactive: 'status-badge-inactive', offline: 'status-badge-offline' }[eng];
+            var dotClass = { online: 'status-dot-online', inactive: 'status-dot-inactive', offline: 'status-dot-offline' }[eng];
+            var pulse = eng === 'online' ? ' engagement-dot-pulse' : '';
+
+            return '' +
+                '<tr class="is-clickable" data-student="' + esc(s.email) + '">' +
+                '<td><div class="cell-user">' +
+                '<span class="student-avatar-wrap">' +
+                '<span class="student-avatar-initial">' + esc(initialsOf(s.full_name, s.email)) + '</span>' +
+                '<span class="student-avatar-status ' + dotClass + '"></span></span>' +
+                '<span><span class="cell-name">' + esc(s.full_name || 'Unnamed student') + '</span>' +
+                '<span class="cell-mail">' + esc(s.email || '') + '</span></span>' +
+                '</div></td>' +
+                '<td><span class="badge">' + esc(s.group_type || '—') + '</span></td>' +
+                '<td class="muted">Algebraic expressions</td>' +
+                '<td><span class="learning-badge ' + (learn === 'struggling' ? 'learning-struggling' : 'learning-smooth') + '">' +
+                '<svg class="icon"><use href="#i-' + (learn === 'struggling' ? 'alert' : 'trend') + '"></use></svg>' +
+                (learn === 'struggling' ? 'May need help' : 'Doing fine') + '</span></td>' +
+                '<td><span class="engagement-badge ' + engClass + '">' +
+                '<span class="status-dot ' + dotClass + pulse + '"></span>' + engLabel + '</span></td>' +
+                '<td class="col-right"><button class="btn btn-secondary btn-sm" data-open="' + esc(s.email) + '">View</button></td>' +
+                '</tr>';
+        }).join('');
+
+        $('#roster-sub').textContent = rows.length === state.students.length
+            ? 'Showing all ' + rows.length + ' student' + (rows.length === 1 ? '' : 's') + '.'
+            : 'Showing ' + rows.length + ' of ' + state.students.length + '.';
+
+        $$('[data-filter]').forEach(function (el) {
+            if (el.classList.contains('filter-tab')) {
+                el.classList.toggle('active', el.getAttribute('data-filter') === state.filter);
+            } else {
+                el.classList.toggle('is-active', el.getAttribute('data-filter') === state.filter);
+            }
+        });
+    }
+
+    /* ============================================ 5. DRAWER ============ */
+
+    function openStudent(email) {
+        var s = state.students.filter(function (x) { return x.email === email; })[0];
+        if (!s) { return; }
+
+        var persona = (s.selected_character || '').replace('pia-', '') || 'not chosen';
+
+        $('#profile-name').textContent = s.full_name || 'Unnamed student';
+        $('#profile-email').textContent = s.email || '';
+        $('#profile-section').textContent = state.section || '—';
+        $('#profile-type').textContent = s.group_type || '—';
+        $('#profile-pretest').textContent = s.pre_test_score == null ? 'Not recorded' : s.pre_test_score;
+        $('#profile-posttest').textContent = s.post_test_score == null ? 'Not taken yet' : s.post_test_score;
+        $('#profile-persona-badge').textContent = persona === 'not chosen'
+            ? 'No tutor chosen' : persona.charAt(0).toUpperCase() + persona.slice(1) + ' tutor';
+
+        /* Most persona art is not in the repo yet; fall back to a monogram
+           rather than showing a broken image. */
+        var box = $('#profile-avatar');
+        var img = $('#profile-avatar-img');
+        box.removeAttribute('data-mono');
+        img.onerror = function () {
+            box.setAttribute('data-mono', initialsOf(s.full_name, s.email));
+        };
+        img.src = s.selected_character
+            ? '../../assets/images/' + s.selected_character.replace('pia-', 'char-') + '.png'
+            : '../../assets/images/char-1.png';
+
+        openModal('student-profile-screen');
+    }
+
+    /* ============================================ 6. REALTIME ========== */
+
+    function paintConnection(status) {
+        var dot = $('#live-dot'), label = $('#live-label');
+        if (!dot || !label) { return; }
+        if (status === 'SUBSCRIBED') { dot.className = 'dot dot-live'; label.textContent = 'Live'; }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { dot.className = 'dot dot-warn'; label.textContent = 'Reconnecting…'; }
+        else if (status === 'CLOSED') { dot.className = 'dot dot-off'; label.textContent = 'Offline'; }
+    }
+
+    function setupRealtime() {
+        if (typeof registerChannel !== 'function' || !state.section) { return; }
+
+        /* Scoped to this teacher's own section: without the filter every change
+           in the whole system reaches this browser. Debounced so a class all
+           signing in at once does not fire dozens of reloads. */
+        var suffix = String(state.section).replace(/[^A-Za-z0-9_-]/g, '_');
+        var timer = null;
+
+        registerChannel('teacher-monitoring-' + suffix, function (ch) {
+            return ch.on('postgres_changes', {
+                event: '*', schema: 'public', table: 'profiles',
+                filter: 'section=eq.' + state.section
+            }, function () {
+                clearTimeout(timer);
+                timer = setTimeout(loadMonitoring, 400);
+            }).subscribe(paintConnection);
+        });
+    }
+
+    /* Engagement is time-based, so a row can go stale without any database
+       change. Re-deriving once a minute keeps "gone quiet" honest. */
+    setInterval(function () { if (state.students.length) { render(); } }, 60000);
+
+    /* ============================================ 7. BOOT ============== */
+
+    async function boot() {
+        setBootText('Verifying your access…');
+        var allowed = await enforceTeacherAccess();
+        if (!allowed) { return; }
+
+        initModals();
+        PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
+
+        $('#search-student').addEventListener('input', debounce(function (e) {
+            state.search = e.target.value;
+            render();
+        }, 200));
+
+        $$('[data-filter]').forEach(function (el) {
+            el.addEventListener('click', function () {
+                state.filter = el.getAttribute('data-filter');
+                render();
+            });
+        });
+
+        $('#reset-filters').addEventListener('click', function () {
+            state.filter = 'all';
+            state.search = '';
+            $('#search-student').value = '';
+            render();
+        });
+
+        $('#student-monitoring-body').addEventListener('click', function (e) {
+            var row = e.target.closest('[data-student]');
+            if (row) { openStudent(row.getAttribute('data-student')); }
+        });
+
+        $('#refresh-btn').addEventListener('click', async function () {
+            var release = setBusy(this, '…');
+            await loadMonitoring();
+            release();
+            toast('Refreshed', 'Your roster is up to date.');
+        });
+
+        $('#signout-confirm').addEventListener('click', function () {
+            if (typeof executeForceLogout === 'function') { executeForceLogout(); }
+            else { window.location.replace('../../index.html'); }
+        });
+
+        setBootText('Loading your section…');
+        await loadMonitoring();
+        reveal();
+        setupRealtime();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();

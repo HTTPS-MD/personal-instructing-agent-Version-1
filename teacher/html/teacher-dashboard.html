@@ -4,210 +4,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Teacher Console — PIA System</title>
 
-    <!-- Instant client-side gate (UX only) -- ang totoong verification (session +
-         role === 'teacher') ay nangyayari sa teacher-dashboard.js bago ma-reveal ang body. -->
     <script>
         function enforceAuthGuard() {
-            const userEmail = localStorage.getItem('pia_user_email');
-            if (!userEmail) {
+            if (!localStorage.getItem('pia_user_email')) {
                 window.location.replace('../../index.html');
             }
         }
         enforceAuthGuard();
-        window.addEventListener('pageshow', function (event) {
-            if (event.persisted) {
-                enforceAuthGuard();
-            }
-        });
+        window.addEventListener('pageshow', function (e) { if (e.persisted) { enforceAuthGuard(); } });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
 
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/shell.css">
     <link rel="stylesheet" href="../../styles/pages/teacher.css">
-
-    <title>Teacher Portal - PIA System</title>
 </head>
 
-<body class="dashboard-wrapper fade-in opacity-0">
+<body data-boot="pending">
 
-    <!-- GLOBAL ERROR BANNER -->
-    <div id="global-error-banner" class="error-banner hidden">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
+            <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7.5" r="3.5"/><path d="M22 20v-1.5a4 4 0 0 0-3-3.87"/><path d="M16 4.1a4 4 0 0 1 0 7"/></symbol>
+            <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
+            <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 16.5 6-6 4 4 8-8"/><path d="M15 6.5h6v6"/></symbol>
+            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.1 1.9"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4"/><path d="m10 6-6 6 6 6"/></symbol>
+            <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+            <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
+            <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.5V10H15"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+        </defs>
+    </svg>
+
+    <div class="boot-veil" id="boot-veil">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="boot-text" id="boot-text">Verifying your access…</p>
+    </div>
+
+    <div class="error-banner" id="global-error-banner" role="alert" hidden>
+        <svg class="icon"><use href="#i-alert"></use></svg>
         <span id="global-error-message"></span>
     </div>
 
-    <!-- HEADER / NAVBAR -->
-    <header class="site-nav dashboard-header">
-        <div class="site-nav-inner">
-            <div class="flex-row gap-lg">
-                <div class="flex-row gap-sm">
-                    <img src="../../assets/images/logo.png" alt="PIA Logo" class="teacher-logo">
-                    <span class="role-badge">Teacher Portal</span>
+    <div class="scrim" id="nav-scrim" aria-hidden="true"></div>
+
+    <div class="app" id="app" data-rail="collapsed">
+
+        <!-- Same hover rail as the admin console, from styles/shell.css and
+             assets/js/shell.js. A teacher has one view, so the rail is short —
+             but the chrome behaves identically across roles. -->
+        <aside class="sidebar" id="sidebar" aria-label="Primary">
+            <div class="sidebar-brand">
+                <span class="rail-slot"><span class="brand-mark" aria-hidden="true">PIA</span></span>
+                <div class="brand-text rail-reveal">
+                    <div class="brand-name">PIA System</div>
+                    <div class="brand-sub">Teacher Console</div>
                 </div>
-                <nav class="hide-mobile flex-row gap-xs">
-                    <button class="nav-btn active">Monitoring Dashboard</button>
+            </div>
+
+            <div class="sidebar-scroll">
+                <nav class="nav-group" aria-label="Workspace">
+                    <p class="nav-group-label rail-reveal">My Section</p>
+
+                    <button class="nav-item is-active" data-view="monitor">
+                        <span class="rail-slot"><svg class="icon"><use href="#i-activity"></use></svg></span>
+                        <span class="nav-label rail-reveal">Live monitor</span>
+                        <span class="nav-count rail-reveal" id="nav-count-students">—</span>
+                    </button>
                 </nav>
             </div>
 
-            <div class="flex-row gap-md">
-                <div class="teacher-identity hide-mobile">
-                    <p class="teacher-name">Dr. Juan Dela Cruz</p>
-                    <p id="teacher-section-label" class="teacher-section">Section -- (Grade 7)</p>
-                </div>
-                <button onclick="handleSignOut()" class="btn-icon logout-btn">
-                    <i data-lucide="log-out" class="icon-sm"></i>
+            <div class="sidebar-foot">
+                <button class="sidebar-user" data-modal-open="modal-signout">
+                    <span class="rail-slot"><span class="avatar" id="teacher-initials" aria-hidden="true">··</span></span>
+                    <span class="sidebar-user-text rail-reveal">
+                        <span class="sidebar-user-name teacher-name" id="teacher-name">Loading…</span>
+                        <span class="sidebar-user-role" id="teacher-email">—</span>
+                    </span>
                 </button>
             </div>
-        </div>
-    </header>
+        </aside>
 
-    <!-- MAIN CONTENT CONTAINER -->
-    <main class="content-container dashboard-main">
-
-        <!-- DASHBOARD HEADER & STATS -->
-        <div class="dashboard-toolbar">
-            <div>
-                <h2 class="dashboard-title">
-                    <i data-lucide="users" class="icon-lg text-accent"></i> Student Monitoring
-                </h2>
-                <p class="dashboard-subtitle">Track real-time engagement, AI-detected learning progress, and
-                    attendance.</p>
-            </div>
-            <div class="search-input-wrap">
-                <i data-lucide="search" class="icon-sm search-input-icon"></i>
-                <input type="text" id="search-student" oninput="searchTable()" placeholder="Search student name..."
-                    class="search-input">
-            </div>
-        </div>
-
-        <!-- MAIN TABLE CONTAINER -->
-        <div class="card-padded dashboard-table-container">
-
-            <!-- TABS FOR FILTERING -->
-            <div class="filter-tabs">
-                <button onclick="filterTable('all', this)" class="filter-tab active">All Students</button>
-                <button onclick="filterTable('online', this)" class="filter-tab">
-                    <span class="status-indicator status-online"></span> Online
-                </button>
-                <button onclick="filterTable('offline', this)" class="filter-tab">
-                    <span class="status-indicator status-offline"></span> Offline
-                </button>
-                <button onclick="filterTable('inactive', this)" class="filter-tab">
-                    <span class="status-indicator status-inactive"></span> Inactive (&gt;10 mins)
-                </button>
-                <button onclick="filterTable('smooth', this)" class="filter-tab">
-                    <span class="status-indicator status-smooth"></span> Smooth
-                </button>
-                <button onclick="filterTable('struggling', this)" class="filter-tab">
-                    <span class="status-indicator status-struggling"></span> Struggling
-                </button>
-            </div>
-
-            <!-- ONE BIG TABLE -->
-            <div class="data-table-wrapper">
-                <table class="dashboard-table">
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Group Assignment</th>
-                            <th>Current Topic</th>
-                            <th>Learning Status (AI)</th>
-                            <th>Engagement Status</th>
-                            <th class="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="student-monitoring-body">
-                        <!-- Dynamically populated via Supabase -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Empty State for Search/Filter -->
-            <div id="empty-state" class="empty-state hidden">
-                <i data-lucide="search-x" class="icon-xl empty-state-icon"></i>
-                <p class="text-secondary">No students match this filter.</p>
-            </div>
-
-        </div>
-    </main>
-
-    <!-- FULL-SCREEN STUDENT PROFILE VIEW (READ ONLY FOR TEACHER) -->
-    <div id="student-profile-screen" class="profile-overlay hidden">
-
-        <header class="site-nav profile-overlay-header">
-            <div class="flex-row gap-sm">
-                <button onclick="closeStudentProfile()" class="btn-secondary btn-sm">
-                    <i data-lucide="arrow-left" class="icon-sm"></i> Back to Dashboard
-                </button>
-                <span class="profile-overlay-label">Student Mathematical Profile</span>
-            </div>
-            <button onclick="closeStudentProfile()" class="profile-overlay-close">
-                <i data-lucide="x" class="icon-md"></i>
-            </button>
-        </header>
-
-        <main class="content-container profile-overlay-main">
-
-            <!-- LEFT COLUMN: Persona Info -->
-            <div class="profile-persona-col">
-                <div class="profile-avatar-container">
-                    <img id="profile-avatar-img" src="/assets/images/persona-openness.png" alt="PIA Persona"
-                        class="profile-avatar-img">
-                </div>
-                <div class="profile-identity">
-                    <span id="profile-persona-badge" class="profile-persona-badge">Openness Agent</span>
-                    <h3 id="profile-name" class="profile-name">Student Name</h3>
-                    <p id="profile-email" class="profile-email">email@student.ue.edu.ph</p>
-                </div>
-            </div>
-
-            <!-- RIGHT COLUMN: Details -->
-            <div class="profile-details-col">
-                <div class="profile-info-grid">
-                    <div class="solid-card card-padded profile-info-tile">
-                        <p class="profile-info-label">Section</p>
-                        <p id="profile-section" class="profile-info-value">--</p>
-                    </div>
-                    <div class="solid-card card-padded profile-info-tile">
-                        <p class="profile-info-label">Group Assignment</p>
-                        <p id="profile-type" class="profile-info-value text-accent">EXP (Assigned)</p>
-                    </div>
+        <div class="workspace">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="btn-icon nav-toggle-mobile" id="mobile-nav-toggle" title="Open navigation">
+                        <svg class="icon"><use href="#i-menu"></use></svg>
+                        <span class="sr-only">Open navigation</span>
+                    </button>
+                    <nav class="crumbs" aria-label="Breadcrumb">
+                        <span class="crumbs-trail">Teacher</span>
+                        <svg class="icon icon-sm crumbs-trail"><use href="#i-chev-right"></use></svg>
+                        <strong id="teacher-section-label">Loading…</strong>
+                    </nav>
                 </div>
 
-                <div class="solid-card card-padded profile-logs-card">
-                    <h4 class="profile-logs-heading">
-                        <i data-lucide="activity" class="icon-sm text-accent"></i> Engagement &amp; System Logs
-                    </h4>
-                    <div class="profile-stat-list">
-                        <div class="profile-stat-box">
-                            <span class="text-secondary">Pre-Test Score:</span>
-                            <span id="profile-pretest" class="profile-stat-value">n/a</span>
-                        </div>
-                        <div class="profile-stat-box">
-                            <span class="text-secondary">Post-Test Score:</span>
-                            <span id="profile-posttest" class="profile-stat-value">n/a</span>
+                <div class="topbar-right">
+                    <span class="env-pill" id="live-pill">
+                        <span class="dot dot-off" id="live-dot"></span>
+                        <span id="live-label">Connecting…</span>
+                    </span>
+                    <button class="btn-icon is-bordered" id="refresh-btn" title="Refresh">
+                        <svg class="icon"><use href="#i-refresh"></use></svg>
+                        <span class="sr-only">Refresh</span>
+                    </button>
+                    <button class="btn btn-secondary" data-modal-open="modal-signout">
+                        <svg class="icon"><use href="#i-logout"></use></svg>
+                        Sign out
+                    </button>
+                </div>
+            </header>
+
+            <main class="main">
+                <section class="page">
+                    <div class="page-head">
+                        <div class="page-head-text">
+                            <h1 class="page-title" id="page-greeting">Live monitor</h1>
+                            <p class="page-desc">Who is working right now, and who may need a hand. This updates
+                                by itself — there's no need to refresh.</p>
                         </div>
                     </div>
-                </div>
-            </div>
-        </main>
+
+                    <div class="stack">
+                        <!-- Clickable tiles double as the filter control. -->
+                        <div class="grid grid-4" id="stat-tiles">
+                            <button class="stat" data-filter="all">
+                                <span class="stat-top">
+                                    <span class="stat-label">Class size</span>
+                                    <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-users"></use></svg></span>
+                                </span>
+                                <span class="stat-value" id="stat-total">—</span>
+                                <span class="stat-foot">Students in your section</span>
+                            </button>
+
+                            <button class="stat" data-filter="online">
+                                <span class="stat-top">
+                                    <span class="stat-label">Working now</span>
+                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-activity"></use></svg></span>
+                                </span>
+                                <span class="stat-value" id="stat-online">—</span>
+                                <span class="stat-foot">Active in the last 10 minutes</span>
+                            </button>
+
+                            <button class="stat" data-filter="inactive">
+                                <span class="stat-top">
+                                    <span class="stat-label">Gone quiet</span>
+                                    <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-clock"></use></svg></span>
+                                </span>
+                                <span class="stat-value" id="stat-inactive">—</span>
+                                <span class="stat-foot">Signed in but idle</span>
+                            </button>
+
+                            <button class="stat" data-filter="struggling">
+                                <span class="stat-top">
+                                    <span class="stat-label">May need help</span>
+                                    <span class="stat-glyph g-danger"><svg class="icon"><use href="#i-alert"></use></svg></span>
+                                </span>
+                                <span class="stat-value" id="stat-struggling">—</span>
+                                <span class="stat-foot">Pre-test below 70</span>
+                            </button>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-head">
+                                <div class="card-head-text">
+                                    <h2 class="card-title">Student roster</h2>
+                                    <p class="card-sub" id="roster-sub">Select a student to see their details.</p>
+                                </div>
+                                <div class="card-tools">
+                                    <label class="search">
+                                        <svg class="icon"><use href="#i-search"></use></svg>
+                                        <input type="search" class="input" id="search-student"
+                                            placeholder="Search by name" aria-label="Search students">
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="card-head" style="min-height:60px">
+                                <div class="filter-row" role="group" aria-label="Filter students">
+                                    <button class="filter-tab active" data-filter="all">Everyone</button>
+                                    <button class="filter-tab" data-filter="online">Working now</button>
+                                    <button class="filter-tab" data-filter="inactive">Gone quiet</button>
+                                    <button class="filter-tab" data-filter="offline">Not signed in</button>
+                                    <button class="filter-tab" data-filter="struggling">May need help</button>
+                                    <button class="filter-tab" data-filter="smooth">Doing fine</button>
+                                </div>
+                            </div>
+
+                            <div class="table-wrap">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>Group</th>
+                                            <th>Topic</th>
+                                            <th>Progress</th>
+                                            <th>Right now</th>
+                                            <th class="col-right">Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="student-monitoring-body"></tbody>
+                                </table>
+
+                                <div id="empty-state" class="state-block" style="display:none">
+                                    <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-search"></use></svg></span>
+                                    <p class="state-title">Nobody matches that</p>
+                                    <p class="state-desc">Try a different filter, or clear the search box.</p>
+                                    <button class="btn btn-secondary btn-sm" id="reset-filters">Show everyone</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
     </div>
 
-    <!-- FOOTER -->
-    <footer class="teacher-footer">
-        PIA SYSTEM // TEACHER PORTAL
-    </footer>
+    <!-- ============================================ DRAWER · STUDENT ---- -->
+    <div class="overlay drawer-overlay" id="student-profile-screen" role="dialog" aria-modal="true"
+        aria-labelledby="profile-name">
+        <div class="drawer">
+            <header class="drawer-head">
+                <button class="btn-icon" data-modal-close aria-label="Close">
+                    <svg class="icon"><use href="#i-arrow-left"></use></svg>
+                </button>
+                <p class="card-title" style="flex:1 1 auto">Student details</p>
+                <button class="modal-close" data-modal-close aria-label="Close">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
 
-    <!-- SCRIPTS -->
+            <div class="drawer-body stack">
+                <div class="drawer-identity">
+                    <span class="drawer-avatar" id="profile-avatar">
+                        <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="" width="60" height="60">
+                    </span>
+                    <div style="min-width:0">
+                        <span class="badge badge-accent" id="profile-persona-badge">—</span>
+                        <h3 class="page-title" style="font-size:18px;margin-top:8px" id="profile-name">—</h3>
+                        <p class="cell-mail" id="profile-email">—</p>
+                    </div>
+                </div>
+
+                <div class="kv-grid">
+                    <div class="kv">
+                        <p class="kv-label">Section</p>
+                        <p class="kv-value" id="profile-section">—</p>
+                    </div>
+                    <div class="kv">
+                        <p class="kv-label">Group</p>
+                        <p class="kv-value" id="profile-type">—</p>
+                    </div>
+                    <div class="kv">
+                        <p class="kv-label">Pre-test</p>
+                        <p class="kv-value tnum" id="profile-pretest">—</p>
+                    </div>
+                    <div class="kv" style="background:var(--accent-soft)">
+                        <p class="kv-label">Post-test</p>
+                        <p class="kv-value tnum" id="profile-posttest" style="color:var(--accent)">—</p>
+                    </div>
+                </div>
+
+                <!-- Research integrity: the OCEAN breakdown is never sent to a
+                     teacher's browser, only to the admin/researcher views. -->
+                <div class="notice">
+                    <svg class="icon"><use href="#i-check"></use></svg>
+                    <div>
+                        <p class="notice-title">Personality results are not shown here</p>
+                        <p class="notice-text">Trait scores stay with the research team so they can't affect
+                            how a student is taught. You see progress and activity only.</p>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-secondary btn-block" data-modal-close>Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- =========================================== MODAL · SIGN OUT ----- -->
+    <div class="overlay" id="modal-signout" role="dialog" aria-modal="true" aria-labelledby="signout-heading">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title">Sign out</h2>
+                    <p class="modal-sub">End this teacher session.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+            <div class="modal-body">
+                <div class="modal-hero">
+                    <span class="modal-hero-glyph g-accent">
+                        <svg class="icon icon-lg"><use href="#i-logout"></use></svg>
+                    </span>
+                    <p class="modal-hero-title" id="signout-heading">Sign out of the console?</p>
+                    <p class="modal-hero-text">Your students' sessions are not affected. You can sign back in
+                        at any time.</p>
+                </div>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close>Stay signed in</button>
+                <button class="btn btn-primary" id="signout-confirm">Sign out</button>
+            </footer>
+        </div>
+    </div>
+
+    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
+
     <script src="../../assets/js/function.js"></script>
+    <script src="../../assets/js/shell.js"></script>
     <script src="../js/teacher-dashboard.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
 </body>
 
 </html>

@@ -1,0 +1,485 @@
+/* ============================================================================
+   PIA SYSTEM — LANDING v2
+   Public marketing + sign-in surface. REQUIRES styles/global.css.
+   Same house rules: no borders, no blue, fixed control heights, ≤200ms
+   colour-only transitions.
+   ==========================================================================*/
+
+/* ---------------------------------------------------------------- 1. SHELL */
+.site {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* The ambient wash. Two very soft radial pools of accent light sit behind
+   everything, which is what keeps a borderless dark page from reading flat.
+   Fixed and non-interactive, so it never affects layout or hit-testing. */
+.ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(60rem 40rem at 12% -10%, rgba(5, 196, 107, 0.075), transparent 60%),
+        radial-gradient(48rem 36rem at 92% 8%, rgba(79, 168, 147, 0.055), transparent 62%);
+}
+
+.site > *:not(.ambient) { position: relative; z-index: 1; }
+
+.shell {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--sp-6);
+}
+
+/* ------------------------------------------------------------- 2. TOP NAV */
+.site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: var(--topbar-h);
+    display: flex;
+    align-items: center;
+    background: rgba(15, 19, 17, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-under);
+}
+
+.site-nav-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    width: 100%;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    flex: 0 0 auto;
+}
+
+.logo-mark {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: var(--r-md);
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 13px;
+}
+
+.logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-left: auto;
+}
+
+.nav-link {
+    height: var(--control-h);
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-md);
+    display: inline-flex;
+    align-items: center;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.nav-link:hover { background: var(--bg-chip); color: var(--text); }
+
+/* ----------------------------------------------------------------- 3. HERO */
+.hero {
+    padding: var(--sp-9) 0 var(--sp-9);
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: var(--sp-9);
+    align-items: center;
+    min-height: calc(100vh - var(--topbar-h));
+}
+
+.eyebrow-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 30px;
+    padding: 0 var(--sp-3);
+    margin-bottom: var(--sp-5);
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.hero-title {
+    font-size: clamp(34px, 5.2vw, 58px);
+    line-height: 1.06;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    margin-bottom: var(--sp-5);
+    /* Balanced wrapping keeps the headline from leaving one orphan word on
+       the last line as the viewport changes. */
+    text-wrap: balance;
+}
+
+.hero-title .accent { color: var(--accent); }
+
+.hero-lede {
+    font-size: clamp(15px, 1.6vw, 17.5px);
+    line-height: 1.65;
+    color: var(--text-muted);
+    max-width: 54ch;
+    margin-bottom: var(--sp-7);
+}
+
+.hero-cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-7);
+}
+
+.hero-cta .btn { height: 48px; padding: 0 var(--sp-6); font-size: 14px; }
+
+.hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-6);
+}
+
+.meta-item { min-width: 96px; }
+.meta-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.meta-label {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ---- 3.1 Hero panel: an abstract of the tutoring session ---- */
+.hero-panel {
+    padding: var(--sp-5);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.panel-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 28px;
+    margin-bottom: var(--sp-4);
+}
+
+.panel-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--track); }
+.panel-title { margin-left: var(--sp-2); font-size: 12px; color: var(--text-faint); }
+
+.chat-line {
+    display: flex;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.chat-line + .chat-line { margin-top: var(--sp-2); }
+.chat-line.is-agent { background: var(--accent-soft); }
+
+.chat-who {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r-sm);
+    background: var(--bg-chip);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.chat-line.is-agent .chat-who { background: var(--accent); color: var(--on-accent); }
+.chat-body { min-width: 0; font-size: 13px; line-height: 1.55; padding-top: 5px; }
+.chat-body strong { color: var(--accent); font-weight: 600; }
+
+.panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-4);
+}
+
+.trait-mini { flex: 1 1 auto; }
+.trait-mini + .trait-mini { margin-left: var(--sp-4); }
+.trait-mini-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+/* -------------------------------------------------------------- 4. SECTIONS */
+.section { padding: var(--sp-9) 0; }
+
+.section-head {
+    max-width: 62ch;
+    margin: 0 auto var(--sp-7);
+    text-align: center;
+}
+
+.section-title {
+    font-size: clamp(24px, 3.2vw, 34px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    text-wrap: balance;
+}
+
+.section-lede {
+    margin-top: var(--sp-3);
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text-muted);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-4);
+}
+
+.feature {
+    display: flex;
+    flex-direction: column;
+    min-height: 232px;
+    padding: var(--sp-6);
+    border-radius: var(--r-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    transition: background-color var(--t-base);
+}
+
+.feature:hover { background: var(--bg-surface-hover); }
+
+.feature-glyph {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    margin-bottom: var(--sp-4);
+    border-radius: var(--r-md);
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.feature-glyph.g-teal { background: var(--support-teal-soft); color: var(--support-teal); }
+.feature-glyph.g-amber { background: var(--support-amber-soft); color: var(--support-amber); }
+
+.feature-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: var(--sp-2); }
+.feature-text { font-size: 13.5px; line-height: 1.65; color: var(--text-muted); }
+
+/* ---- 4.1 Steps ---- */
+.steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-4);
+}
+
+.step {
+    min-height: 176px;
+    padding: var(--sp-5);
+    border-radius: var(--r-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.step-num {
+    width: 30px;
+    height: 30px;
+    margin-bottom: var(--sp-4);
+    border-radius: var(--r-sm);
+    background: var(--bg-chip);
+    color: var(--accent);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.step-title { font-size: 14.5px; font-weight: 700; margin-bottom: var(--sp-2); }
+.step-text { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+
+/* ---- 4.2 Closing call to action ---- */
+.cta-panel {
+    padding: var(--sp-9) var(--sp-7);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    text-align: center;
+}
+
+.cta-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-top: var(--sp-6);
+}
+
+.cta-actions .btn { height: 46px; padding: 0 var(--sp-6); }
+
+/* ---------------------------------------------------------------- 5. FOOTER */
+.site-foot {
+    margin-top: auto;
+    padding: var(--sp-7) 0 var(--sp-8);
+}
+
+.foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    font-size: 12.5px;
+    color: var(--text-faint);
+}
+
+/* ------------------------------------------------- 6. AUTH MODAL EXTRAS ---
+   The dialog mechanics come from global.css untouched — 18px radius, the
+   close button nested in flow 21px from the edge, reserved .field-msg slots.
+   Only the auth-specific pieces live here. */
+
+.auth-intro {
+    display: flex;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-5);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.auth-intro .icon { flex: 0 0 18px; color: var(--accent); margin-top: 1px; }
+.auth-intro-text { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }
+
+/* A status line that is always present in the DOM at a reserved height, so a
+   server error appearing cannot push the form's buttons down the screen. */
+.auth-status {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    min-height: 40px;
+    margin-bottom: var(--sp-4);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+    font-size: 12.5px;
+    line-height: 1.5;
+    background: transparent;
+    color: transparent;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.auth-status .icon { width: 15px; height: 15px; flex: 0 0 15px; margin-top: 2px; opacity: 0; }
+.auth-status.is-error { background: var(--danger-soft); color: var(--danger); }
+.auth-status.is-ok { background: var(--accent-soft); color: var(--accent); }
+.auth-status.is-error .icon,
+.auth-status.is-ok .icon { opacity: 1; }
+
+.auth-alt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+    margin-top: var(--sp-4);
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.link-btn {
+    color: var(--accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 0;
+    transition: color var(--t-base);
+}
+
+.link-btn:hover { color: var(--accent-strong); text-decoration: underline; }
+
+/* One-time-code boxes: fixed 48×54 cells, so typing never resizes the row. */
+.otp-row {
+    display: flex;
+    gap: var(--sp-2);
+    justify-content: center;
+}
+
+.otp-box {
+    border: 0;
+    width: 48px;
+    height: 54px;
+    flex: 0 0 48px;
+    padding: 0;
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    transition: background-color var(--t-base), box-shadow var(--t-base);
+}
+
+.otp-box:focus { background: #0E1310; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ------------------------------------------------------------ 7. RESPONSIVE */
+@media (max-width: 1024px) {
+    .hero {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--sp-7);
+        padding: var(--sp-8) 0;
+        min-height: 0;
+    }
+    .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+    .shell { padding: 0 var(--sp-4); }
+    .section { padding: var(--sp-8) 0; }
+    .feature-grid, .steps { grid-template-columns: minmax(0, 1fr); }
+    .feature { min-height: 0; }
+    .step { min-height: 0; }
+    .cta-panel { padding: var(--sp-7) var(--sp-5); }
+    .nav-link.hide-sm { display: none; }
+    .hero-cta .btn { flex: 1 1 100%; }
+    .foot-inner { justify-content: center; text-align: center; }
+}
+
+/* At 375px the OTP row is the tightest thing on the page: six 48px cells plus
+   five 8px gaps needs 328px, which fits inside the 375 − 2×16 padding. Below
+   that the cells shrink rather than wrap. */
+@media (max-width: 380px) {
+    .otp-box { width: 44px; flex-basis: 44px; height: 50px; font-size: 18px; }
+    .hero-meta { gap: var(--sp-4); }
+}

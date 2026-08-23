@@ -4,179 +4,307 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
-         Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
-         tumutugma sa totoong Supabase Auth session. Nakatago ang body
-         (opacity-0) hangga't hindi pa kumpirmado ang session. -->
-    <script>
-        (function () {
-            var hasToken = false;
-            try {
-                for (var i = 0; i < localStorage.length; i++) {
-                    if (/^sb-.*-auth-token$/.test(localStorage.key(i))) { hasToken = true; break; }
-                }
-            } catch (e) { /* storage blocked -- hayaan ang async guard ang bahala */ }
-            if (!hasToken) window.location.replace('../../index.html');
-        })();
-    </script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <meta name="color-scheme" content="dark">
+    <title>Choose Your Tutor — PIA</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
-    <link rel="stylesheet" href="../../styles/pages/student.css">
-    <title>Select Agent - PIA System</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/pages/student-journey.css">
 </head>
 
-<body class="char-select-page opacity-0">
+<!-- enforceStudentStage('char') removes `opacity-0` once the whole
+     prerequisite chain has passed on the server. -->
+<body class="opacity-0">
 
-    <header class="char-select-header">
-        <div>
-            <p class="protocol-label">PROTOCOL // AGENT SELECT</p>
-            <h1 class="screen-title">CHOOSE YOUR COMPANION</h1>
-        </div>
-        <div class="flex-row gap-md">
-            <div class="char-select-status hide-mobile">
-                STATUS: <span id="status-text">READY TO PICK</span>
-            </div>
-            <a href="../../index.html" class="btn-secondary btn-sm">
-                <i data-lucide="home" class="icon-sm"></i> Home
-            </a>
-        </div>
-    </header>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+            <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5v-1a5 5 0 0 1 5-5h5a5 5 0 0 1 5 5v1"/></symbol>
+            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
+        </defs>
+    </svg>
 
-    <p class="char-select-intro">Hover any agent to preview their focus, or click one to see their full teaching
-        profile.</p>
+    <div class="journey">
+        <div class="journey-ambient" aria-hidden="true"></div>
 
-    <main class="char-select-main">
-        <!-- Agent Selection Grid -->
-        <div class="char-grid-wrap">
-            <div id="agent-grid" class="agent-grid-container">
-
-                <div class="solid-card agent-card" data-character="pia-open" data-name="PIA OPEN" data-role="CONCEPTUAL"
-                    data-style="Explorative &amp; Creative" data-pace="Flexible Pace" data-best="Abstract Thinkers"
-                    data-desc="Creative and exploratory guidance designed for conceptual problem solvers who enjoy exploring deep mathematical perspectives."
-                    data-img="/assets/images/char-1.png" onclick="previewCharacter(this)">
-                    <img src="/assets/images/char-1.png" alt="PIA Open" class="agent-img-thumbnail">
-                    <span class="agent-hover-tip"><strong>PIA OPEN</strong>Conceptual</span>
+        <header class="journey-bar">
+            <div class="journey-shell journey-bar-inner">
+                <div class="journey-brand">
+                    <span class="journey-mark" aria-hidden="true">PIA</span>
+                    <div class="stage-rail hide-sm" aria-label="Your progress through the study">
+                        <span class="stage-node is-done"><span class="pip"></span>Waiting</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node is-done"><span class="pip"></span>Test</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node is-current"><span class="pip"></span>Tutor</span>
+                        <span class="stage-sep"></span>
+                        <span class="stage-node"><span class="pip"></span>Practice</span>
+                    </div>
                 </div>
 
-                <div class="solid-card agent-card" data-character="pia-conscientious" data-name="PIA STRUCTURE"
-                    data-role="DISCIPLINED" data-style="Step-by-Step Structure" data-pace="Steady &amp; Methodical"
-                    data-best="Detail-Oriented Learners"
-                    data-desc="Structured, highly organized, and disciplined pacing for students who thrive in step-by-step routines."
-                    data-img="/assets/images/char-conscientious.png" onclick="previewCharacter(this)">
-                    <img src="/assets/images/char-conscientious.png" alt="PIA Conscientious"
-                        class="agent-img-thumbnail">
-                    <span class="agent-hover-tip"><strong>PIA STRUCTURE</strong>Disciplined</span>
-                </div>
-
-                <div class="solid-card agent-card" data-character="pia-extravert" data-name="PIA DYNAMIC"
-                    data-role="HIGH-ENERGY" data-style="Interactive &amp; Engaging" data-pace="Fast &amp; Energetic"
-                    data-best="Active Participants"
-                    data-desc="High-energy, interactive, and enthusiastic reinforcement to keep active problem solvers engaged and motivated."
-                    data-img="/assets/images/char-extravert.png" onclick="previewCharacter(this)">
-                    <img src="/assets/images/char-extravert.png" alt="PIA Extravert" class="agent-img-thumbnail">
-                    <span class="agent-hover-tip"><strong>PIA DYNAMIC</strong>High-Energy</span>
-                </div>
-
-                <div class="solid-card agent-card" data-character="pia-agreeable" data-name="PIA EMPATH"
-                    data-role="SUPPORTIVE" data-style="Gentle Encouragement" data-pace="Relaxed Pace"
-                    data-best="Collaborative Learners"
-                    data-desc="Gentle, supportive, and collaborative encouragement built for learners who prefer a low-stress environment."
-                    data-img="/assets/images/char-agreeable.png" onclick="previewCharacter(this)">
-                    <img src="/assets/images/char-agreeable.png" alt="PIA Agreeable" class="agent-img-thumbnail">
-                    <span class="agent-hover-tip"><strong>PIA EMPATH</strong>Supportive</span>
-                </div>
-
-                <div class="solid-card agent-card" data-character="pia-calm" data-name="PIA STABLE" data-role="STRESS-FREE"
-                    data-style="Calm &amp; Reassuring" data-pace="Slow &amp; Steady" data-best="Cautious Learners"
-                    data-desc="Stress-free zone focusing on calm feedback, steady progress tracking, and methodical pacing."
-                    data-img="/assets/images/char-calm.png" onclick="previewCharacter(this)">
-                    <img src="/assets/images/char-calm.png" alt="PIA Calm" class="agent-img-thumbnail">
-                    <span class="agent-hover-tip"><strong>PIA STABLE</strong>Stress-Free</span>
-                </div>
-
-                <div class="solid-card agent-card" data-character="pia-neutral" data-name="PIA NEUTRAL" data-role="BALANCED"
-                    data-style="Standard Adaptive" data-pace="Balanced Pace" data-best="General Learners"
-                    data-desc="Standard balanced baseline assistant with no specialized bias, perfect for standard adaptive learning modules."
-                    data-img="/assets/images/char-neutral.png" onclick="previewCharacter(this)">
-                    <img src="/assets/images/char-neutral.png" alt="PIA Neutral" class="agent-img-thumbnail">
-                    <span class="agent-hover-tip"><strong>PIA NEUTRAL</strong>Balanced</span>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- Preview Image -->
-        <div class="char-preview-wrap">
-            <div class="preview-container">
-                <img id="preview-bg-img" src="/assets/images/char-1.png" alt="Selected Agent Preview"
-                    class="preview-img character-glow">
-            </div>
-        </div>
-
-        <!-- Description & Actions -->
-        <div class="char-detail-wrap">
-            <div>
-                <span id="preview-role" class="protocol-label">SELECT AN AGENT</span>
-                <h2 id="preview-name" class="char-detail-name">NO AGENT SELECTED</h2>
-            </div>
-
-            <p id="preview-desc" class="char-detail-desc">
-                Click any agent box on the left to review their attributes, tactical style, and pedagogical approach
-                before locking in your choice.
-            </p>
-
-            <div id="preview-characteristics" class="char-characteristics hidden">
-                <div class="char-characteristic-chip">
-                    <span class="char-characteristic-label">Teaching Style</span>
-                    <span id="preview-style" class="char-characteristic-value">--</span>
-                </div>
-                <div class="char-characteristic-chip">
-                    <span class="char-characteristic-label">Pace</span>
-                    <span id="preview-pace" class="char-characteristic-value">--</span>
-                </div>
-                <div class="char-characteristic-chip">
-                    <span class="char-characteristic-label">Best For</span>
-                    <span id="preview-best" class="char-characteristic-value">--</span>
+                <div class="journey-bar-right">
+                    <span class="pick-status" id="status-text">CHOOSING</span>
+                    <button class="btn btn-secondary" id="signout-btn">
+                        <svg class="icon"><use href="#i-logout"></use></svg>
+                        Sign out
+                    </button>
                 </div>
             </div>
+        </header>
 
-            <div class="char-actions">
-                <button id="lock-in-btn" onclick="openConfirmModal()" disabled class="btn-primary btn-lg lock-in-btn">
-                    LOCK IN
+        <main class="journey-main">
+            <div class="journey-shell">
+                <div class="pick-wrap">
+                    <div>
+                        <div class="pick-head">
+                            <h1 class="pick-title">Choose your tutor</h1>
+                            <p class="pick-lede">
+                                Each tutor teaches the same maths, but explains it differently. Tap one to
+                                see how it works, then lock in the one that sounds right for you.
+                            </p>
+                        </div>
+
+                        <div class="persona-grid">
+                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                                data-character="pia-open"
+                                data-name="PIA Open"
+                                data-role="Conceptual"
+                                data-img="../../assets/images/char-1.png"
+                                data-desc="Creative and exploratory guidance designed for conceptual problem solvers who enjoy exploring deep mathematical perspectives."
+                                data-style="Explorative &amp; creative"
+                                data-pace="Flexible pace"
+                                data-best="Abstract thinkers">
+                                <span class="persona-thumb">
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-1.png"
+                                        alt="PIA Open" width="76" height="76">
+                                </span>
+                                <span class="persona-name">PIA Open</span>
+                                <span class="persona-role">Conceptual</span>
+                            </button>
+                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                                data-character="pia-conscientious"
+                                data-name="PIA Structure"
+                                data-role="Disciplined"
+                                data-img="../../assets/images/char-conscientious.png"
+                                data-desc="Structured, highly organized, and disciplined pacing for students who thrive in step-by-step routines."
+                                data-style="Step-by-step structure"
+                                data-pace="Steady &amp; methodical"
+                                data-best="Detail-oriented learners">
+                                <span class="persona-thumb">
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-conscientious.png"
+                                        alt="PIA Structure" width="76" height="76">
+                                </span>
+                                <span class="persona-name">PIA Structure</span>
+                                <span class="persona-role">Disciplined</span>
+                            </button>
+                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                                data-character="pia-extravert"
+                                data-name="PIA Dynamic"
+                                data-role="High-energy"
+                                data-img="../../assets/images/char-extravert.png"
+                                data-desc="High-energy, interactive, and enthusiastic reinforcement to keep active problem solvers engaged and motivated."
+                                data-style="Interactive &amp; engaging"
+                                data-pace="Fast &amp; energetic"
+                                data-best="Active participants">
+                                <span class="persona-thumb">
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-extravert.png"
+                                        alt="PIA Dynamic" width="76" height="76">
+                                </span>
+                                <span class="persona-name">PIA Dynamic</span>
+                                <span class="persona-role">High-energy</span>
+                            </button>
+                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                                data-character="pia-agreeable"
+                                data-name="PIA Empath"
+                                data-role="Supportive"
+                                data-img="../../assets/images/char-agreeable.png"
+                                data-desc="Gentle, supportive, and collaborative encouragement built for learners who prefer a low-stress environment."
+                                data-style="Gentle encouragement"
+                                data-pace="Relaxed pace"
+                                data-best="Collaborative learners">
+                                <span class="persona-thumb">
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-agreeable.png"
+                                        alt="PIA Empath" width="76" height="76">
+                                </span>
+                                <span class="persona-name">PIA Empath</span>
+                                <span class="persona-role">Supportive</span>
+                            </button>
+                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                                data-character="pia-calm"
+                                data-name="PIA Stable"
+                                data-role="Stress-free"
+                                data-img="../../assets/images/char-calm.png"
+                                data-desc="Stress-free zone focusing on calm feedback, steady progress tracking, and methodical pacing."
+                                data-style="Calm &amp; reassuring"
+                                data-pace="Slow &amp; steady"
+                                data-best="Cautious learners">
+                                <span class="persona-thumb">
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-calm.png"
+                                        alt="PIA Stable" width="76" height="76">
+                                </span>
+                                <span class="persona-name">PIA Stable</span>
+                                <span class="persona-role">Stress-free</span>
+                            </button>
+                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                                data-character="pia-neutral"
+                                data-name="PIA Neutral"
+                                data-role="Balanced"
+                                data-img="../../assets/images/char-neutral.png"
+                                data-desc="Standard balanced baseline assistant with no specialized bias, perfect for standard adaptive learning modules."
+                                data-style="Standard adaptive"
+                                data-pace="Balanced pace"
+                                data-best="General learners">
+                                <span class="persona-thumb">
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-neutral.png"
+                                        alt="PIA Neutral" width="76" height="76">
+                                </span>
+                                <span class="persona-name">PIA Neutral</span>
+                                <span class="persona-role">Balanced</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview panel. Every text slot has a reserved height, so
+                         picking a persona swaps the content without the Lock-in
+                         button moving under the student's finger. -->
+                    <aside class="preview-card">
+                        <div class="preview-portrait">
+                            <img id="preview-bg-img" src="../../assets/images/char-neutral.png" alt=""
+                                width="132" height="132">
+                        </div>
+
+                        <span class="preview-role" id="preview-role">Pick a tutor</span>
+                        <p class="preview-name" id="preview-name">No one chosen yet</p>
+                        <p class="preview-desc" id="preview-desc">
+                            Tap any of the tutors on the left and their teaching style will show up here.
+                        </p>
+
+                        <!-- Present from first paint with em-dash placeholders. Revealing
+                             this block from display:none pushed the Lock-in button 131px
+                             down the moment a student picked their first tutor. The
+                             controller still calls classList.remove('hidden') on it; that
+                             is now a harmless no-op. -->
+                        <div class="preview-traits" id="preview-characteristics">
+                            <div class="trait-row">
+                                <span class="trait-key">Teaching style</span>
+                                <span class="trait-val" id="preview-style">—</span>
+                            </div>
+                            <div class="trait-row">
+                                <span class="trait-key">Pace</span>
+                                <span class="trait-val" id="preview-pace">—</span>
+                            </div>
+                            <div class="trait-row">
+                                <span class="trait-key">Best for</span>
+                                <span class="trait-val" id="preview-best">—</span>
+                            </div>
+                        </div>
+
+                        <div class="preview-actions">
+                            <button class="btn btn-primary btn-block" id="lock-in-btn"
+                                onclick="openConfirmModal()" disabled>
+                                <svg class="icon"><use href="#i-check"></use></svg>
+                                Lock in this tutor
+                            </button>
+                            <button class="btn btn-primary btn-block" id="continue-btn"
+                                onclick="goToDashboard()" style="display:none">
+                                Continue to my session
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- =============================================== MODAL · CONFIRM ---
+         Standard dialog mechanics from global.css: 18px radius, the 36×36
+         close button in flow 21px from the edge. The controller toggles
+         `modal-active` / `modal-content-active`, which student-journey.css
+         maps onto the same visual states the rest of the system uses. -->
+    <div class="overlay" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
+        <div class="modal modal-sm" id="modal-content">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="confirm-heading">Lock in your tutor?</h2>
+                    <p class="modal-sub">You keep this tutor for the whole study.</p>
+                </div>
+                <button class="modal-close" onclick="closeConfirmModal()" aria-label="Close">
+                    <svg class="icon"><use href="#i-x"></use></svg>
                 </button>
-                <button id="continue-btn" onclick="goToDashboard()" class="btn-primary btn-lg hidden">
-                    CONTINUE TO DASHBOARD
-                </button>
-            </div>
-        </div>
-    </main>
+            </header>
 
-    <footer class="char-select-footer">
-        PIA SYSTEM // SECURE SELECTION PROTOCOL
-    </footer>
-
-    <!-- CONFIRMATION MODAL -->
-    <div id="confirm-modal" class="modal-overlay">
-        <div class="solid-card card-padded-lg modal-content char-confirm-modal" id="modal-content">
-            <h3 class="char-confirm-title">CONFIRM LOCK IN?</h3>
-            <p class="char-confirm-desc">
-                Once you lock in your agent, your selection will be permanently bound to your account profile for this
-                session. Proceed?
-            </p>
-            <div class="char-confirm-actions">
-                <button onclick="closeConfirmModal()" class="btn-secondary">CHOOSE AGAIN</button>
-                <button onclick="finalLockIn()" class="btn-primary">CONFIRM</button>
+            <div class="modal-body">
+                <div class="modal-hero">
+                    <span class="modal-hero-glyph g-accent">
+                        <svg class="icon icon-lg"><use href="#i-user"></use></svg>
+                    </span>
+                    <p class="modal-hero-title">This choice is final</p>
+                    <p class="modal-hero-text">
+                        You won't be able to swap tutors later, so pick the one whose style
+                        sounds best for how you like to learn.
+                    </p>
+                </div>
             </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Let me look again</button>
+                <button class="btn btn-primary" onclick="finalLockIn()">Yes, lock it in</button>
+            </footer>
         </div>
     </div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/character-selection.js"></script>
     <script>
-        lucide.createIcons();
+        document.getElementById('signout-btn').addEventListener('click', function () {
+            if (typeof executeForceLogout === 'function') { executeForceLogout(); }
+        });
+
+        // Persona art fallback. A missing illustration marks its container with
+        // the persona's initials; CSS then renders a tinted monogram in place of
+        // the broken image. Wired before first paint so nothing flashes.
+        (function wireArtFallback() {
+            function monogram(name) {
+                return (name || 'PIA').replace(/^PIA\s*/i, '').slice(0, 2).toUpperCase() || 'PIA';
+            }
+
+            document.querySelectorAll('.persona-card').forEach(function (card) {
+                var img = card.querySelector('img');
+                var box = card.querySelector('.persona-thumb');
+                if (!img || !box) { return; }
+                img.addEventListener('error', function () {
+                    box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
+                }, { once: true });
+                if (img.complete && img.naturalWidth === 0) {
+                    box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
+                }
+            });
+
+            var preview = document.querySelector('.preview-portrait');
+            var previewImg = document.getElementById('preview-bg-img');
+            function markPreview() {
+                // Derive the monogram from the SELECTED card, never from the
+                // preview heading — before a pick that heading is placeholder
+                // copy ("No one chosen yet"), which produced a stray "NO".
+                var chosen = document.querySelector('.persona-card.selected');
+                preview.setAttribute('data-mono',
+                    chosen ? monogram(chosen.getAttribute('data-name')) : '·');
+            }
+            previewImg.addEventListener('error', markPreview);
+            // previewCharacter() swaps the src; re-arm the check after each swap.
+            new MutationObserver(function () {
+                preview.removeAttribute('data-mono');
+                if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
+            }).observe(previewImg, { attributes: true, attributeFilter: ['src'] });
+            if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
+        })();
     </script>
 </body>
 

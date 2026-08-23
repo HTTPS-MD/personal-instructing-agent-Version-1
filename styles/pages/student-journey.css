@@ -1,0 +1,670 @@
+/* ============================================================================
+   PIA SYSTEM — STUDENT JOURNEY
+   Covers the three stages a Grade 7 student passes through before the
+   tutoring dashboard: waiting-room, ocean-test, character-selection.
+   REQUIRES styles/global.css.
+
+   One stylesheet rather than three, because the three pages are one journey:
+   they share the top bar, the ambient wash, the reveal behaviour and the
+   card language, and a student crosses all of them in a single sitting. Only
+   the middle section of each page differs.
+
+   House rules inherited from global.css: no borders, no blue, ≤200ms
+   colour-only transitions, and every dynamic region reserves its space
+   before it has anything to show.
+   ==========================================================================*/
+
+/* ---------------------------------------------------- 1. REVEAL / LEGACY --
+   enforceStudentStage() and requireStudentSession() in function.js reveal a
+   page by removing `opacity-0` from <body>. That contract is shared with the
+   pages still on the old design system, so it is honoured here rather than
+   swapped for the data-boot attribute the redesigned pages use — one reveal
+   mechanism, no page left half-migrated. */
+body {
+    opacity: 1;
+    transition: opacity var(--t-layout);
+}
+
+body.opacity-0 { opacity: 0; }
+
+/* The controllers on these pages predate the current class vocabulary. These
+   three rules map the state classes they already toggle onto the new visual
+   system, so the JS keeps working untouched. */
+.hidden { display: none !important; }
+
+.overlay.modal-active { display: flex; opacity: 1; }
+.modal.modal-content-active { transform: translateY(0); opacity: 1; }
+
+/* ------------------------------------------------------------- 2. SHELL */
+.journey {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.journey-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(56rem 38rem at 10% -12%, rgba(5, 196, 107, 0.06), transparent 60%),
+        radial-gradient(44rem 32rem at 94% 4%, rgba(79, 168, 147, 0.045), transparent 62%);
+}
+
+.journey > *:not(.journey-ambient) { position: relative; z-index: 1; }
+
+.journey-shell {
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 var(--sp-6);
+}
+
+.journey-main {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    padding: var(--sp-8) 0 var(--sp-9);
+}
+
+/* ---- 2.1 Top bar: identical geometry to the tutoring dashboard, so the
+        header does not jump as the student moves between stages. ---- */
+.journey-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: 68px;
+    flex: 0 0 68px;
+    display: flex;
+    align-items: center;
+    background: rgba(15, 19, 17, 0.90);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-under);
+}
+
+.journey-bar-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    width: 100%;
+}
+
+.journey-brand { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
+
+.journey-mark {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: var(--r-md);
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 13px;
+}
+
+.journey-bar-right { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; }
+
+/* ---- 2.2 Stage rail: shows all four stages so the student can see where
+        they are and what is still ahead. Fixed-size dots, so marking one
+        complete never reflows the row. ---- */
+.stage-rail {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 32px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+}
+
+.stage-node {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+.stage-node .pip {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: var(--track);
+}
+
+.stage-node.is-done { color: var(--text-muted); }
+.stage-node.is-done .pip { background: var(--support-teal); }
+.stage-node.is-current { color: var(--accent); }
+.stage-node.is-current .pip { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.stage-sep { width: 14px; height: 2px; border-radius: 2px; background: var(--track); flex: 0 0 14px; }
+
+/* ================================================== 3. WAITING ROOM ==== */
+
+.wait-card {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: var(--sp-9) var(--sp-8);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    text-align: center;
+}
+
+/* A calm breathing pulse rather than a spinner: the student may be sitting
+   here for several minutes, and a spinner reads as "something is loading and
+   may fail". Opacity only — nothing resizes. */
+.wait-orb {
+    width: 88px;
+    height: 88px;
+    margin: 0 auto var(--sp-6);
+    border-radius: 50%;
+    background: var(--accent-soft);
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    animation: wait-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes wait-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+}
+
+.wait-orb .icon { width: 34px; height: 34px; }
+
+/* The controller swaps this text between three stage variants. Reserving two
+   lines means the button below never moves when it does. */
+.wait-title {
+    min-height: 40px;
+    font-size: clamp(22px, 3.2vw, 28px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    margin-bottom: var(--sp-3);
+    text-wrap: balance;
+}
+
+.wait-desc {
+    min-height: 48px;
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--text-muted);
+    max-width: 46ch;
+    margin: 0 auto var(--sp-6);
+}
+
+.wait-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    text-align: left;
+}
+
+.wait-note .icon { flex: 0 0 18px; color: var(--support-teal); margin-top: 1px; }
+.wait-note p { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+
+/* =================================================== 4. OCEAN TEST ===== */
+
+/* ---- 4.1 Gatekeeper (consent / locked) ---- */
+.gate-wrap {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: var(--sp-8);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.gate-glyph {
+    width: 64px;
+    height: 64px;
+    margin-bottom: var(--sp-5);
+    border-radius: var(--r-lg);
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.gate-glyph.is-locked { background: var(--support-amber-soft); color: var(--support-amber); }
+
+.gate-title {
+    font-size: clamp(23px, 3.2vw, 30px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin-bottom: var(--sp-3);
+}
+
+.gate-lede { font-size: 14.5px; line-height: 1.7; color: var(--text-muted); margin-bottom: var(--sp-6); }
+
+.privacy-box {
+    display: flex;
+    gap: var(--sp-3);
+    padding: var(--sp-5);
+    margin-bottom: var(--sp-6);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.privacy-box .icon { flex: 0 0 20px; color: var(--accent); margin-top: 1px; }
+.privacy-title { font-size: 14px; font-weight: 700; margin-bottom: var(--sp-2); }
+.privacy-text { font-size: 13px; line-height: 1.65; color: var(--text-muted); }
+
+.gate-actions { display: flex; flex-direction: column; gap: var(--sp-3); }
+.gate-actions .btn { height: 52px; font-size: 15px; font-weight: 700; }
+
+/* ---- 4.2 The test ---- */
+.test-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: var(--sp-5);
+    align-items: start;
+    width: 100%;
+}
+
+.test-progress {
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: var(--sp-4);
+    border-radius: var(--r-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.test-progress-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+    font-size: 13px;
+}
+
+.test-progress-top b { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.question-card {
+    padding: var(--sp-7) var(--sp-6);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.question-counter {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-align: center;
+}
+
+/* Reserved for the longest item in the bank at the narrowest column, so the
+   answer buttons hold their position across all 50 questions. */
+.question-text {
+    min-height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: var(--sp-4) 0 var(--sp-6);
+    font-size: clamp(19px, 2.6vw, 25px);
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: -0.015em;
+    text-align: center;
+    text-wrap: balance;
+}
+
+/* ---- 4.3 Likert scale ---- */
+.answer-list { display: flex; flex-direction: column; gap: var(--sp-2); max-width: 520px; margin: 0 auto; }
+
+.ocean-answer-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    width: 100%;
+    min-height: 56px;
+    padding: 0 var(--sp-5);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    color: var(--text);
+    font-size: 14.5px;
+    font-weight: 600;
+    text-align: left;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.ocean-answer-btn:hover { background: var(--bg-chip); }
+
+.ocean-answer-btn .dial {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    border-radius: 50%;
+    background: var(--bg-chip);
+    display: grid;
+    place-items: center;
+    transition: background-color var(--t-base);
+}
+
+.ocean-answer-btn .dial::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: transparent;
+    transition: background-color var(--t-base);
+}
+
+.ocean-answer-btn.is-selected { background: var(--accent-soft); color: var(--accent); }
+.ocean-answer-btn.is-selected .dial { background: var(--accent); }
+.ocean-answer-btn.is-selected .dial::after { background: var(--on-accent); }
+
+.test-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    max-width: 520px;
+    margin: var(--sp-6) auto 0;
+}
+
+.test-nav .btn { height: 48px; min-width: 116px; }
+
+/* Reserved single line: swapping between "12 questions left" and the ready
+   message must not move the submit button. */
+.submit-hint {
+    min-height: 20px;
+    margin-top: var(--sp-4);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* ---- 4.4 Question navigator ---- */
+.qnav {
+    padding: var(--sp-5);
+    border-radius: var(--r-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.qnav-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--sp-4);
+}
+
+.qnav-title { font-size: 13px; font-weight: 700; }
+.qnav-count { font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.qgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+
+.qgrid-btn {
+    height: 34px;
+    border-radius: var(--r-sm);
+    background: var(--bg-field);
+    color: var(--text-faint);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    transition: background-color var(--t-base), color var(--t-base);
+}
+
+.qgrid-btn:hover { background: var(--bg-chip); color: var(--text); }
+.qgrid-btn.is-answered { background: var(--accent-soft); color: var(--accent); }
+.qgrid-btn.is-current { background: var(--accent); color: var(--on-accent); }
+
+.qnav-legend { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-4); }
+.legend-row { display: flex; align-items: center; gap: var(--sp-2); font-size: 11.5px; color: var(--text-muted); }
+.legend-chip { width: 14px; height: 14px; flex: 0 0 14px; border-radius: 4px; }
+.legend-chip.c-todo { background: var(--bg-field); }
+.legend-chip.c-done { background: var(--accent-soft); }
+.legend-chip.c-now { background: var(--accent); }
+
+/* ---- 4.5 Submitting / result states ---- */
+.state-card {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: var(--sp-8);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    text-align: center;
+}
+
+.state-card .spinner { margin: 0 auto var(--sp-5); }
+.state-card h2 { font-size: 21px; font-weight: 700; margin-bottom: var(--sp-3); }
+.state-card p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+.state-card .btn { margin-top: var(--sp-6); }
+
+/* ---- 4.6 Quit modal progress ---- */
+.quit-progress-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--sp-2);
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.quit-progress-row b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ============================================ 5. CHARACTER SELECTION === */
+
+.pick-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--sp-6);
+    align-items: start;
+    width: 100%;
+}
+
+.pick-head { margin-bottom: var(--sp-5); }
+
+.pick-title {
+    font-size: clamp(24px, 3.4vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.028em;
+    margin-bottom: var(--sp-2);
+}
+
+.pick-lede { font-size: 14.5px; line-height: 1.65; color: var(--text-muted); max-width: 54ch; }
+
+.persona-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+
+/* Uniform min-height so the grid never re-flows as a card is chosen. */
+.persona-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 186px;
+    padding: var(--sp-4);
+    border-radius: var(--r-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+    text-align: center;
+    cursor: pointer;
+    transition: background-color var(--t-base);
+}
+
+.persona-card:hover { background: var(--bg-surface-hover); }
+.persona-card.selected { background: var(--accent-soft); }
+.persona-card.selected .persona-name { color: var(--accent); }
+
+.persona-thumb {
+    width: 76px;
+    height: 76px;
+    flex: 0 0 76px;
+    margin-bottom: var(--sp-3);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.persona-thumb img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Unchosen personas sit back rather than being dimmed to grey mush — the
+   filter is what the controller toggles, so the class name is preserved. */
+.agent-img-thumbnail { transition: filter var(--t-base), opacity var(--t-base); }
+.agent-img-thumbnail.grayscale { filter: grayscale(1); opacity: 0.55; }
+
+.persona-name { font-size: 13px; font-weight: 700; line-height: 1.3; transition: color var(--t-base); }
+.persona-role { margin-top: 2px; font-size: 11px; color: var(--text-muted); }
+
+/* ---- 5.1 Preview panel ---- */
+.preview-card {
+    position: sticky;
+    top: 92px;
+    padding: var(--sp-6);
+    border-radius: var(--r-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+}
+
+.preview-portrait {
+    width: 132px;
+    height: 132px;
+    margin: 0 auto var(--sp-4);
+    border-radius: var(--r-lg);
+    background: var(--bg-field);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.preview-portrait img { width: 100%; height: 100%; object-fit: contain; }
+
+.preview-role {
+    display: block;
+    min-height: 18px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-align: center;
+}
+
+/* Both reserved: the panel starts empty and fills on the first pick, and the
+   text lengths differ per persona. */
+.preview-name {
+    min-height: 30px;
+    margin-top: var(--sp-1);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-align: center;
+}
+
+.preview-desc {
+    min-height: 88px;
+    margin-top: var(--sp-3);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.preview-traits { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.trait-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    min-height: 46px;
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    font-size: 12.5px;
+}
+
+.trait-key { color: var(--text-muted); }
+.trait-val { font-weight: 700; text-align: right; }
+
+.preview-actions { margin-top: var(--sp-5); }
+.preview-actions .btn { height: 52px; font-size: 15px; font-weight: 700; }
+
+.pick-status {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    height: 32px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--bg-chip);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* ------------------------------------------------------- 6. RESPONSIVE */
+@media (max-width: 1024px) {
+    .test-wrap { grid-template-columns: minmax(0, 1fr); }
+    .pick-wrap { grid-template-columns: minmax(0, 1fr); }
+    .preview-card { position: static; order: -1; }
+    .qnav { order: 2; }
+}
+
+@media (max-width: 720px) {
+    .journey-shell { padding: 0 var(--sp-4); }
+    .journey-main { padding: var(--sp-5) 0 var(--sp-8); }
+    .wait-card { padding: var(--sp-7) var(--sp-5); }
+    .gate-wrap { padding: var(--sp-6) var(--sp-5); }
+    .question-card { padding: var(--sp-6) var(--sp-4); }
+    .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stage-rail.hide-sm { display: none; }
+    .test-nav .btn { min-width: 0; flex: 1 1 auto; }
+    .qgrid { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+}
+
+@media (max-width: 380px) {
+    .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+    .persona-card { min-height: 168px; padding: var(--sp-3); }
+    .persona-thumb { width: 64px; height: 64px; flex-basis: 64px; }
+    .qgrid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+    .question-text { min-height: 84px; }
+}
+
+/* ---------------------------------------------- 7. PERSONA ART FALLBACK --
+   Five of the six persona illustrations are not in the repository yet. Rather
+   than showing a 12-year-old six broken-image boxes on the one screen where
+   they are asked to tell the tutors apart, a missing file falls back to a
+   tinted monogram. Each persona keeps a distinct colour, so the screen still
+   does its job; drop the artwork in and the monograms disappear on their own. */
+.persona-thumb[data-mono]::after,
+.preview-portrait[data-mono]::after {
+    content: attr(data-mono);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+}
+
+.preview-portrait[data-mono]::after { font-size: 34px; }
+
+.persona-thumb[data-mono] img,
+.preview-portrait[data-mono] img { display: none; }
+
+/* Distinct tint per persona so they remain tellable apart at a glance. */
+.persona-card[data-character="pia-open"] .persona-thumb[data-mono]::after           { color: var(--accent); }
+.persona-card[data-character="pia-conscientious"] .persona-thumb[data-mono]::after  { color: var(--support-teal); }
+.persona-card[data-character="pia-extravert"] .persona-thumb[data-mono]::after      { color: var(--support-amber); }
+.persona-card[data-character="pia-agreeable"] .persona-thumb[data-mono]::after      { color: #C89BE0; }
+.persona-card[data-character="pia-calm"] .persona-thumb[data-mono]::after           { color: #7FB5D5; }
+.persona-card[data-character="pia-neutral"] .persona-thumb[data-mono]::after        { color: var(--text-muted); }
