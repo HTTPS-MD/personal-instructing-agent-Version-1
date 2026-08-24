@@ -1,874 +1,1526 @@
 /* ============================================================================
-   PIA SYSTEM — LANDING
+   PIA SYSTEM — SCROLLYTELLING LANDING · "PLAYFUL BRUTALISM"
    REQUIRES styles/global.css.
 
-   COLOUR: nothing is defined here. Every colour is a variable from
-   global.css, so the light/dark toggle works with no per-page work and there
-   is not a single raw hex value in this file. The palette is exactly:
-   surface tones, text tones, green accent, and red/amber for semantics.
+   WHO THIS IS FOR
+   ---------------
+   Twelve-year-olds doing algebra. That is the whole brief. The previous pass
+   was a hairline-and-grain terminal aesthetic, which looked sharp and read as
+   a developer tool. This one keeps the same bones — the same scroll engine,
+   the same DOM, the same reveal contract — and swaps the surface for
+   something a Grade 7 student would want to touch: thick rounded edges,
+   solid offset shadows, and colours that are having a good time.
 
-   SIZING: no fixed layout dimensions. Sections size to their content, type
-   scales with clamp(), and the only fixed values are control heights and
-   locked aspect-ratios — both of which exist to PREVENT layout shift.
+   THE THREE RULES THAT MAKE IT COHERENT
+     1. EDGES are 2px and rounded. Never 1px, never square.
+     2. DEPTH is a solid offset shadow — `4px 4px 0` — never a blur. Every
+        surface reads as a sticker sitting on the page rather than a pane
+        floating over it.
+     3. PRESSING moves the thing. translate(2px, 2px) with the shadow
+        shrinking to match, so the element visibly travels into its own
+        shadow. That is the entire micro-interaction language.
+
+   COLOUR SCOPE
+   ------------
+   The palette below is declared HERE, not in global.css, and only overrides
+   colour ROLES. Nothing else on the system inherits it: the admin, teacher
+   and student dashboards keep the neutral grey system exactly as it is. This
+   page is the front door and is allowed to be louder than the rooms.
+
+   No raw hex appears outside the two :root blocks. Every contrast figure in
+   the comments is measured against that block's own ground.
+
+   DEPLOY NOTE
+   -----------
+   The <meta> CSP in index.html cannot carry frame-ancestors, report-to or
+   sandbox — those are ignored in meta by spec. Send them as real response
+   headers in production, along with:
+       Strict-Transport-Security, X-Content-Type-Options: nosniff,
+       Referrer-Policy: strict-origin-when-cross-origin,
+       Permissions-Policy: camera=(), microphone=(), geolocation=()
    ==========================================================================*/
 
-/* --------------------------------------------------- 1. PAGE RHYTHM ---- */
+
+/* ═══════════════════════════════════════════ 1. PALETTE ═══════════════ */
+/* Deep indigo, never black. #000 on a screen this size is a hole; indigo has
+   a temperature, and it makes every accent sitting on it look warmer.
+
+   CONTRAST, measured on --pop-void:
+       --pop-ink   15.8:1     --pop-ink-2   8.3:1     --pop-ink-3  5.1:1
+       yellow      12.2:1     coral         6.3:1     sky          9.3:1
+       mint        10.7:1     lilac         8.6:1     rose         5.7:1
+   Every one clears WCAG AA for body text, which matters more here than
+   usual: the readers are twelve and half of them will be on a school laptop
+   with the brightness turned down. */
 :root {
-    /* Spacing rhythm for this page, derived from the global scale. */
-    --band: clamp(var(--sp-9), 9vh, 7rem);
+    /* ── Ground ── */
+    --pop-void: #12102B;        /* the page */
+    --pop-panel: #1C1942;       /* a card sitting on it */
+    --pop-panel-2: #262252;     /* a chip, or a card being hovered */
+
+    /* ── Ink ── */
+    --pop-ink: #F4F1FF;
+    --pop-ink-2: #B3AED6;
+    --pop-ink-3: #8B85B8;
+
+    /* ── The fun ── */
+    --pop-yellow: #FFD166;
+    --pop-yellow-2: #FFC13D;    /* pressed / hovered yellow */
+    --pop-coral: #FF6B5E;
+    --pop-sky: #5AC8FA;
+    --pop-mint: #5CE1A0;
+    --pop-lilac: #C4A7FF;
+    --pop-rose: #FF5470;        /* errors, and nothing else */
+
+    /* Accents used as TEXT need no darkening on the indigo ground — see the
+       table above. Light mode is a different story and overrides these. */
+    --coral-text: var(--pop-coral);
+    --sky-text: var(--pop-sky);
+    --yellow-text: var(--pop-yellow);
+    --mint-text: var(--pop-mint);
+    --lilac-text: var(--pop-lilac);
+
+    /* ── Role aliases. Everything below, and every global.css component this
+           page mounts, reads one of these. ── */
+    --bg-body: var(--pop-void);
+    --bg-surface: var(--pop-panel);
+    --bg-field: var(--pop-void);
+    --bg-chip: var(--pop-panel-2);
+    --bg-chip-hover: var(--pop-panel-2);
+    --bg-surface-hover: var(--pop-panel-2);
+
+    --text: var(--pop-ink);
+    --text-muted: var(--pop-ink-2);
+    --text-faint: var(--pop-ink-3);
+
+    /* Yellow is the primary action, not coral. Two reasons: it is the loudest
+       thing on an indigo ground at 12.2:1, and it can never be confused with
+       the error colour — which coral, sitting two hue steps from rose, could
+       be. Coral gets the more fun job of being the decoration. */
+    --accent: var(--pop-yellow);
+    --accent-strong: var(--pop-yellow-2);
+    --accent-soft: color-mix(in srgb, var(--pop-yellow) 16%, transparent);
+    --on-accent: var(--pop-void);         /* 12.2:1 on the yellow fill */
+
+    --danger: var(--pop-rose);
+    --danger-strong: var(--pop-coral);
+    --danger-soft: color-mix(in srgb, var(--pop-rose) 15%, transparent);
+    --danger-line: color-mix(in srgb, var(--pop-rose) 55%, transparent);
+    --on-danger: var(--pop-void);
+
+    /* ── The local accent ──
+       Set once here and re-pointed per section further down, so a single
+       declaration re-colours a card's border tint, its offset shadow, its
+       chips and its hover state together. This is what stops the page being
+       one colour repeated eleven times. */
+    --pop: var(--pop-coral);
+    --pop-text: var(--coral-text);
+    /* Ink that sits ON a --pop fill. Every accent in the set is light, so in
+       dark mode this is the ground and in light mode it is the body ink —
+       either way it is the darkest thing available and clears 11:1. */
+    --on-pop: var(--pop-void);
+
+    /* ── Edges ── */
+    --edge-w: 2px;
+    --edge: var(--pop-ink);
+    --edge-soft: color-mix(in srgb, var(--pop-ink) 26%, transparent);
+
+    --r-pop-sm: 10px;
+    --r-pop: 16px;
+    --r-pop-lg: 24px;
+    --r-pop-xl: 32px;
+    --r-pop-pill: 999px;
+
+    /* ── Depth ──
+       Solid, never blurred. The offset is the depth.
+
+       Only the DISTANCES are tokens. There is deliberately no composed
+       `--shadow-pop: var(--lift) var(--lift) 0 var(--pop)` here, because a
+       custom property substitutes its var() references at computed-value
+       time on the element that DECLARES it — so such a token would bake in
+       :root's coral and inherit that literal everywhere, and the per-section
+       --pop overrides below would silently do nothing to it. Every shadow is
+       therefore written out at the point of use, where --pop resolves
+       against the element that actually has it. */
+    --lift-sm: 3px;
+    --lift: 5px;
+    --lift-lg: 8px;
+
+    /* ── Rhythm ── */
+    --band-pad: clamp(var(--sp-9), 12vh, 9rem);
     --gutter: clamp(var(--sp-5), 5vw, var(--sp-9));
 
-    --font: 'Plus Jakarta Sans', 'Jakarta Metrics Fallback', 'Inter',
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Minimum touch target, per WCAG 2.5.8. Applied via .tap. */
+    --tap-min: 44px;
+
+    /* ── Layer ladder ──
+       Every rung sits BELOW --z-sticky (30) so the navbar always wins, and
+       far below --z-overlay (100) so a dialog can never be trapped under the
+       pinned video. Top of the page down:
+           400  boot                (global)
+           350  skip link, offline wire
+           300  toasts              (global)
+           100  modals              (global)
+            30  navbar              (global --z-sticky)
+             4  reel copy
+             3  vignette
+             2  scrim
+             1  colour wash
+             0  video               */
+    --z-reel-video: 0;
+    --z-reel-wash: 1;
+    --z-reel-scrim: 2;
+    --z-reel-vignette: 3;
+    --z-reel-copy: 4;
+
+    /* ── Motion ──
+       --ease-pop overshoots very slightly, which is what makes a press feel
+       springy rather than mechanical. --ease-drift has a long tail, for
+       motion the user did not trigger. */
+    --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out-hard: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-drift: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Metrics-matched fallback so the webfont swap costs no layout shift. */
-@font-face {
-    font-family: 'Jakarta Metrics Fallback';
-    src: local('Arial');
-    size-adjust: 104%;
-    ascent-override: 96%;
-    descent-override: 23%;
-    line-gap-override: 0%;
+/* ─────────────────────────────────────────── LIGHT THEME ──────────────
+   Warm paper rather than white — the same reason the dark ground is indigo
+   rather than black. Only colour roles change; sizing, radii, depth and the
+   layer ladder are theme-independent and are not repeated.
+
+   The accents keep their exact values as FILLS, where indigo ink sits on
+   them at 11:1 or better. As TEXT on paper they would all fail, so each one
+   has a darkened sibling of the same hue below — the same trick global.css
+   uses for its green. Measured on --pop-paper:
+       coral-text 5.2:1   sky-text 5.3:1   yellow-text 5.6:1
+       mint-text  5.0:1   lilac-text 6.0:1                       */
+:root[data-theme="light"] {
+    --pop-paper: #FBF7F0;
+
+    --bg-body: var(--pop-paper);
+    --bg-surface: #FFFFFF;
+    --bg-field: var(--pop-paper);
+    --bg-chip: #F0EAFF;
+    --bg-chip-hover: #E4DAFF;
+    --bg-surface-hover: #F5F0FF;
+
+    --text: #1E1B4B;                      /* 15.0:1 on paper */
+    --text-muted: #4C4677;                /* 8.0:1 */
+    --text-faint: #6B6494;                /* 5.0:1 */
+
+    --coral-text: #C4301F;
+    --sky-text: #0B6E99;
+    --yellow-text: #8A5A00;
+    --mint-text: #0F7A4E;
+    --lilac-text: #6D3FD1;
+
+    --accent: var(--pop-yellow);
+    --accent-strong: var(--pop-yellow-2);
+    --accent-soft: color-mix(in srgb, var(--pop-yellow) 30%, transparent);
+    --on-accent: #1E1B4B;                 /* 11.1:1 on the yellow fill */
+
+    --danger: #D6224A;
+    --danger-strong: #B01739;
+    --danger-soft: color-mix(in srgb, #D6224A 12%, transparent);
+    --danger-line: color-mix(in srgb, #D6224A 45%, transparent);
+    --on-danger: var(--pop-paper);
+
+    --pop: var(--pop-coral);
+    --pop-text: var(--coral-text);
+    --on-pop: var(--text);
+
+    /* Ink borders on paper — the classic neo-brutalist edge. */
+    --edge: var(--text);
+    --edge-soft: color-mix(in srgb, var(--text) 22%, transparent);
+
+    color-scheme: light;
 }
 
-body { background: var(--bg-body); color: var(--text); }
-
-/* Theme changes are colour-only, so switching can never shift the layout. */
-body,
-.site-nav::before,
-.panel, .media, .btn, .step, .theme-toggle {
-    transition: background-color var(--t-layout), color var(--t-layout),
-                box-shadow var(--t-layout);
+body {
+    background: var(--bg-body);
+    color: var(--text);
+    /* The reel pins a child, and overflow-x on <body> breaks sticky in some
+       engines. Edge bleed is prevented by .shell instead. */
+    overflow-x: clip;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .js [data-reveal] { opacity: 1 !important; transform: none !important; }
-    * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+/* Yellow highlighter, indigo ink. */
+::selection { background: var(--pop-yellow); color: var(--on-pop); }
+
+/* Chunky and rounded, like everything else. */
+* { scrollbar-width: thin; scrollbar-color: var(--pop-coral) transparent; }
+*::-webkit-scrollbar { width: 12px; height: 12px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: var(--pop-coral);
+    border: 3px solid transparent;
+    border-radius: var(--r-pop-pill);
+    background-clip: content-box;
 }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--pop-yellow); background-clip: content-box; }
 
-/* ------------------------------------------------------- 2. CONTAINERS - */
-.site { position: relative; }
 
-/* The single horizontal rhythm. Anything that also wears .shell must set
-   vertical padding with LONGHAND, or its shorthand will silently reset this
-   gutter to zero. */
+/* ═══════════════════════════════════════════ 2. PRIMITIVES ════════════ */
+
+/* The single horizontal rhythm, and the only thing standing between content
+   and the edge of the viewport. Anything that also sets vertical padding must
+   use LONGHAND, or the shorthand silently resets this gutter to zero. */
 .shell {
     width: 100%;
-    max-width: 72rem;
+    max-width: 78rem;
     margin-inline: auto;
     padding-inline: var(--gutter);
 }
 
-.section { padding-block: var(--band); }
-.section-tight { padding-block-end: var(--band); }
+.anchor { display: block; position: relative; inset-block-start: calc(var(--topbar-h) * -1); }
 
-/* ------------------------------------------------------------ 3. NAV --- */
-.site-nav {
-    position: sticky;
-    top: 0;
+/* Offscreen until focused, then a yellow sticker in the corner. Moved out of
+   view with a transform rather than display:none, so it stays focusable. */
+.skip-link {
+    position: fixed;
+    inset-block-start: var(--sp-3);
+    inset-inline-start: var(--sp-3);
+    z-index: var(--z-banner);
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    padding-inline: var(--sp-5);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--edge);
+    transform: translateY(calc(-100% - var(--sp-6)));
+    transition: transform 220ms var(--ease-pop);
+}
+
+.skip-link:focus-visible { transform: translateY(0); outline: none; }
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Every interactive control wears .tap. WCAG 2.5.8 wants 44x44 minimum; the
+   visual box may stay smaller than that as long as the HIT area is not,
+   which is what the pseudo-element buys. */
+.tap { position: relative; }
+
+.tap::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: max(100%, var(--tap-min));
+    height: max(100%, var(--tap-min));
+    transform: translate(-50%, -50%);
+}
+
+/* ---- 2.1 Buttons -------------------------------------------------------
+   Two variants. Both are stickers: 2px edge, rounded, sitting on a solid
+   offset shadow. Hover pulls the sticker up off the page (shadow grows),
+   press pushes it down INTO its own shadow (shadow shrinks by exactly the
+   distance travelled, so the far corner never moves). That symmetry is what
+   makes it feel physical rather than animated. */
+.btn-pop,
+.btn-pop-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-height: var(--tap-min);
+    padding-inline: var(--sp-5);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform 140ms var(--ease-pop),
+                box-shadow 140ms var(--ease-pop),
+                background-color 140ms var(--ease-out-hard),
+                color 140ms var(--ease-out-hard);
+}
+
+.btn-pop {
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--edge);
+}
+
+.btn-pop:hover:not(:disabled) {
+    background: var(--accent-strong);
+    transform: translate(-1px, -1px);
+    box-shadow: var(--lift) var(--lift) 0 var(--edge);
+}
+
+.btn-pop:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--edge);
+}
+
+.btn-pop-ghost {
+    background: transparent;
+    color: var(--text);
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 transparent;
+}
+
+.btn-pop-ghost:hover:not(:disabled) {
+    background: var(--bg-chip);
+    transform: translate(-1px, -1px);
+    box-shadow: var(--lift) var(--lift) 0 var(--edge);
+}
+
+.btn-pop-ghost:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--edge);
+}
+
+.btn-pop:focus-visible,
+.btn-pop-ghost:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 3px; }
+
+.btn-pop:disabled,
+.btn-pop-ghost:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.btn-pop .icon,
+.btn-pop-ghost .icon { width: 16px; height: 16px; }
+
+.btn-xl { min-height: 3.5rem; padding-inline: var(--sp-7); font-size: 1rem; }
+
+/* The press is the point of the whole language, so it is the one thing that
+   survives — as an instant state change with no travel. */
+@media (prefers-reduced-motion: reduce) {
+    .btn-pop:hover:not(:disabled),
+    .btn-pop-ghost:hover:not(:disabled),
+    .btn-pop:active:not(:disabled),
+    .btn-pop-ghost:active:not(:disabled) { transform: none; }
+}
+
+/* ---- 2.2 Readout chips -------------------------------------------------
+   Mono is still here, but it is no longer the voice of the page — it is a
+   label on a toy. Small, rounded, tinted with the section's own colour. */
+.mono-tag {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.mono-idx,
+.mono-letter {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding-inline: var(--sp-2);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: color-mix(in srgb, var(--pop) 22%, transparent);
+    color: var(--pop-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.mono-letter { padding-inline: 0; font-size: 0.75rem; font-weight: 700; }
+
+
+/* ═══════════════════════════════════════════ 3. FIXED NAVBAR ══════════ */
+.nav {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline: 0;
     z-index: var(--z-sticky);
     min-height: var(--topbar-h);
     display: flex;
     align-items: center;
-}
-
-/* Opacity-only, so becoming "stuck" mid-scroll stays on the compositor. */
-.site-nav::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: var(--bg-body);
-    box-shadow: var(--shadow-under);
-    opacity: 0;
-    transition: opacity var(--t-layout);
-}
-
-.site-nav.is-stuck::before { opacity: 1; }
-
-.site-nav-inner {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-    width: 100%;
-}
-
-.brand {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-3);
-    flex: 0 0 auto;
-    border-radius: var(--r-md);
-}
-
-.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-
-.brand-mark {
-    width: var(--icon-btn);
-    height: var(--icon-btn);
-    flex: 0 0 var(--icon-btn);
-    border-radius: var(--r-md);
-    background: var(--accent);
-    color: var(--on-accent);
-    display: grid;
-    place-items: center;
-    font-size: 0.8125rem;
-    font-weight: 800;
-}
-
-.brand-name { font-size: 0.9375rem; font-weight: 700; letter-spacing: -0.01em; }
-
-.nav-links {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin-inline-start: auto;
-}
-
-.nav-link {
-    display: inline-flex;
-    align-items: center;
-    height: var(--control-h);
-    padding-inline: var(--sp-3);
-    border-radius: var(--r-md);
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    transition: background-color var(--t-base), color var(--t-base);
-}
-
-.nav-link:hover { background: var(--bg-chip); color: var(--text); }
-.nav-link:active { background: var(--bg-chip-hover); }
-.nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* ---- 3.1 Theme toggle: fixed box, so flipping themes changes only colour */
-.theme-toggle {
-    width: var(--icon-btn);
-    height: var(--icon-btn);
-    flex: 0 0 var(--icon-btn);
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-md);
-    background: var(--bg-chip);
-    color: var(--text-muted);
-    transition: background-color var(--t-base), color var(--t-base);
-}
-
-.theme-toggle:hover { background: var(--bg-chip-hover); color: var(--text); }
-.theme-toggle:active { background: var(--bg-chip-hover); }
-.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.theme-toggle .icon-moon { display: none; }
-:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
-:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
-
-/* ------------------------------------------------------------ 4. HERO -- */
-/* STAGE 1 — "Meet your buddy". A full-viewport panel:
-
-       .hero-info     greeting, description, switcher + auth  (LEFT)
-       .hero-visual   radial glow + <model-viewer>            (RIGHT)
-
-   Height comes from the viewport, with the figure's locked aspect-ratio as
-   the floor — so the box is correct at first paint, before the model or even
-   its script exists. */
-.hero {
-    /* svh, not vh: on mobile browsers vh is the height with the URL bar
-       HIDDEN, so a 100vh hero is taller than the visible viewport on load
-       and the content sits partly under the chrome. svh is the small
-       (chrome-visible) height, which is the one that always fits. The vh
-       line is the fallback for engines without svh. */
-    min-height: calc(100vh - var(--topbar-h));
-    min-height: calc(100svh - var(--topbar-h));
-
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    position: relative;
-    padding-block: clamp(var(--sp-6), 5vh, var(--sp-9));
-}
-
-/* The scroll cue. Absolutely positioned, so it adds no height and cannot
-   push the split off-centre or shift anything. */
-.hero-scroll-cue {
-    position: absolute;
-    inset-block-end: var(--sp-5);
-    inset-inline-start: 50%;
-    translate: -50% 0;
-    /* Hidden by default. The stacked mobile column runs the full height of
-       the hero, so a centred cue lands ON the Sign up button — measured at a
-       23x38px overlap. Only the two-column layout has slack for it. */
-    display: none;
-    place-items: center;
-    width: var(--control-h);
-    height: var(--control-h);
-    border-radius: var(--r-pill);
-    color: var(--text-faint);
-    pointer-events: none;
-    animation: heroCue 2.6s var(--ease) infinite;
-}
-
-@keyframes heroCue {
-    0%, 100% { transform: translateY(0); opacity: 0.5; }
-    50%      { transform: translateY(0.375rem); opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .hero-scroll-cue { animation: none; opacity: 0.6; }
-}
-
-/* Shown only where the split is side-by-side AND the viewport is tall enough
-   to leave clear space beneath the content. */
-@media (min-width: 60rem) and (min-height: 40rem) {
-    .hero-scroll-cue { display: grid; }
-}
-
-/* ---- 4.1 The greeting ----
-   This is the page's <h1>: the first thing said, above the fold. The massive
-   "Welcome to PIA" in stage 2 is an <h2> — one h1 per document — but it
-   carries the display styling regardless of its level. */
-.hero-greeting {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: clamp(1.75rem, 4.2vw, 3rem);
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    text-wrap: balance;
-}
-
-.hero-greeting-accent {
-    display: block;
-    color: var(--accent);
-}
-
-/* ---- 4.2 The split ----
-   Mobile-first: one column. The 50/50 grid is opt-in at the wide breakpoint,
-   so narrow screens never pay for a rule they have to undo. */
-.hero-split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: clamp(var(--sp-6), 5vh, var(--sp-8));
-    align-items: center;
-}
-
-@media (min-width: 60rem) {
-    .hero-split {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: clamp(var(--sp-7), 4vw, var(--sp-9));
-    }
-}
-
-/* ---- 4.3 Left column: character info + auth ----
-   Deliberately NO surface — no background, no border, no shadow. The text
-   and the buttons sit straight on the page. */
-.hero-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--sp-4);
-    text-align: center;
-    /* On mobile the 3D goes above this block: seeing the character first,
-       then reading about it, is the natural order for a chooser. */
-    order: 1;
-}
-
-@media (min-width: 60rem) {
-    .hero-info { align-items: flex-start; text-align: start; }
-}
-
-.hero-eyebrow {
-    margin: 0;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--accent);
-}
-
-/* Reserved single line: the name changes as characters are switched, and a
-   fixed min-height keeps the column from resizing when it does. */
-.hero-character-name {
-    margin: 0;
-    min-height: 1.15em;
-    font-family: var(--font-display);
-    font-size: clamp(1.75rem, 4vw, 2.75rem);
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    color: var(--text);
-}
-
-/* Three lines are reserved, so swapping descriptions of similar length does
-   not move the buttons underneath. */
-.hero-character-desc {
-    margin: 0;
-    max-width: 42ch;
-    min-height: calc(3 * 1.65em);
-    font-size: clamp(1rem, 1.5vw, 1.0625rem);
-    line-height: 1.65;
-    color: var(--text-muted);
-}
-
-/* Switcher and auth buttons share one row, wrapping rather than crushing. */
-.hero-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: var(--sp-4);
-    margin-block-start: var(--sp-2);
-}
-
-@media (min-width: 60rem) {
-    .hero-actions { justify-content: flex-start; }
-}
-
-.hero-switcher {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    flex: 0 0 auto;
-}
-
-.hero-auth {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-    flex: 0 0 auto;
-}
-
-.switch-arrow {
-    width: var(--control-h-lg);
-    height: var(--control-h-lg);
-    flex: 0 0 var(--control-h-lg);
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-pill);
-    background: var(--bg-chip);
-    color: var(--text);
-    transition: background-color var(--t-base), color var(--t-base);
-}
-
-.switch-arrow:hover:not(:disabled) { background: var(--bg-chip-hover); }
-.switch-arrow:active:not(:disabled) { background: var(--bg-chip-hover); box-shadow: inset 0 2px 4px color-mix(in srgb, var(--bg-dark) 30%, transparent); }
-.switch-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.switch-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Dots are real buttons, not divs — each selects a character. */
-.switch-dots { display: flex; align-items: center; gap: var(--sp-2); }
-
-.switch-dot {
-    width: 0.625rem;
-    height: 0.625rem;
-    flex: 0 0 0.625rem;
-    padding: 0;
-    border-radius: var(--r-pill);
-    background: var(--track);
-    transition: background-color var(--t-base), box-shadow var(--t-base);
-}
-
-.switch-dot:hover { background: var(--track-hover); }
-.switch-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.switch-dot[aria-current="true"] { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-
-/* ---- 4.4 Right column: the 3D element ----
-   The column is only a positioning context for two layers: the glow behind,
-   the figure in front. It has no surface of its own. */
-.hero-visual {
-    position: relative;
-    isolation: isolate;              /* a self-contained stacking context */
-    display: grid;
-    place-items: center;
-    width: 100%;
-    order: 0;                        /* above the info on mobile */
-
-    /* Single source of truth for the centrepiece. The figure uses it and the
-       glow is derived from it, so the two can never drift apart at any
-       breakpoint. Mobile-first: the smaller value is the default, because a
-       3:4 box at full column width swallows a phone screen whole. */
-    --figure-w: min(72%, 17rem);
-}
-
-@media (min-width: 60rem) {
-    .hero-visual {
-        order: 1;                    /* right-hand column on desktop */
-        --figure-w: min(88%, 26rem);
-    }
-}
-
-/* A soft pool of primary light, and nothing else — no box, no border, no
-   card. color-mix() derives every stop from --color-primary, so the glow
-   follows the palette token instead of repeating a literal colour. The flat
-   fallback on the line above covers engines without color-mix(). */
-.hero-glow {
-    position: absolute;
-    z-index: 0;
-    inset-block-start: 50%;
-    inset-inline-start: 50%;
-    translate: -50% -50%;
-    width: calc(var(--figure-w) * 1.3);
-    aspect-ratio: 1;
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    background: radial-gradient(circle at 50% 45%,
-        color-mix(in srgb, var(--color-primary) 40%, transparent) 0%,
-        color-mix(in srgb, var(--color-primary) 20%, transparent) 38%,
-        color-mix(in srgb, var(--color-primary) 6%, transparent) 62%,
-        transparent 78%);
-    filter: blur(8px);
-    pointer-events: none;
-}
-
-/* THE CLS CONTRACT: fluid width, locked ratio. No background and no
-   overflow clipping — the model is meant to sit on the glow, not in a box. */
-.hero-figure {
-    position: relative;
-    z-index: 1;
-    width: var(--figure-w);
-    aspect-ratio: 3 / 4;
-    margin: 0;
-    display: grid;
-    place-items: center;
-}
-
-.hero-figure > canvas,
-.hero-figure > img,
-.hero-figure > video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-/* A still image or canvas retires the placeholder; model-viewer manages its
-   own poster slot, so it is deliberately not in this list. */
-.hero-figure:has(> canvas) .hero-skeleton:not([slot]),
-.hero-figure:has(> img) .hero-skeleton:not([slot]),
-.hero-figure:has(> video) .hero-skeleton:not([slot]) { display: none; }
-
-/* ---- 4.4a <model-viewer> ----
-   Sized here rather than by attribute for two reasons: the element is a
-   custom tag that lays out as INLINE until its module executes — which would
-   shift the page on a slow connection — and its default size is 300x150,
-   which would ignore the figure's ratio entirely. Explicit block dimensions
-   close both gaps before the script arrives. */
-.hero-figure > model-viewer {
-    position: absolute;
-    inset: 0;
-    display: block;
-    width: 100%;
-    height: 100%;
-
-    /* Transparent, so the glow behind it shows through in both themes. */
-    background-color: transparent;
-    --poster-color: transparent;
-    --progress-bar-color: var(--color-primary);
-    --progress-mask: transparent;
-}
-
-/* No focus ring on the viewer. camera-controls makes the element focusable,
-   which paints the UA's default highlight over the model. The real controls
-   (arrows, dots, buttons) keep their rings, so keyboard focus is still
-   visible everywhere it carries meaning. */
-.hero-figure > model-viewer:focus,
-.hero-figure > model-viewer:focus-visible,
-.hero-figure > model-viewer:focus-within,
-.hero-figure > model-viewer:active {
-    outline: none;
-    box-shadow: none;
-    -webkit-tap-highlight-color: transparent;
-}
-
-/* The poster fills the viewer, so the skeleton occupies exactly the box the
-   model will occupy — the swap is in place, with no blank frame. */
-.hero-figure > model-viewer > [slot="poster"] { position: absolute; inset: 0; }
-
-/* ---- 4.5 Loading and failure states ----
-   Both sit in the same box at the same inset, and neither carries a surface
-   — they read as part of the glow rather than as a card on top of it. */
-.hero-fallback[hidden] { display: none; }
-
-.hero-skeleton,
-.hero-fallback {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-3);
-    padding: var(--sp-5);
-    text-align: center;
-    background: transparent;
-}
-
-.hero-skeleton { animation: heroPulse 2.4s var(--ease) infinite; }
-
-@keyframes heroPulse {
-    0%, 100% { opacity: 0.62; }
-    50%      { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .hero-skeleton { animation: none; opacity: 0.85; }
-}
-
-.hero-skeleton-glyph {
-    display: grid;
-    place-items: center;
-    width: var(--control-h-lg);
-    height: var(--control-h-lg);
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
-}
-
-.hero-skeleton-label {
-    font-family: var(--font-display);
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--text-muted);
-}
-
-.hero-skeleton-spec {
-    font-size: 0.75rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-}
-
-/* -------------------------------------------- 4.6 STAGE 2: THE REVEAL -- */
-/* Sits directly below the 100vh hero. `position: relative` plus a page-level
-   z-index puts this whole section ABOVE the hero in paint order, so the
-   blurred glow behind the 3D element cannot bleed over this type as the user
-   scrolls past. */
-.reveal-stage {
-    position: relative;
-    z-index: var(--z-page);
-    /* Generous, so the jump out of a full-height hero has room to breathe
-       rather than landing straight on the type. */
-    padding-block: clamp(var(--sp-9), 16vh, 11rem);
-    background: var(--bg-body);
-}
-
-.reveal-stage-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--sp-4);
-    text-align: center;
-}
-
-.reveal-mark {
-    margin: 0;
-    font-family: var(--font-display);
-    line-height: 0.92;
-    text-wrap: balance;
-}
-
-.reveal-mark-lead {
-    display: block;
-    font-size: clamp(1.125rem, 3.2vw, 2rem);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.reveal-mark-word {
-    display: block;
-    font-size: clamp(4.5rem, 18vw, 12rem);
-    font-weight: 800;
-    letter-spacing: -0.055em;
-    color: var(--text);
-}
-
-.reveal-sub {
-    margin: 0;
-    max-width: 44ch;
-    font-size: clamp(1rem, 1.6vw, 1.1875rem);
-    color: var(--text-muted);
-    text-wrap: balance;
-}
-
-/* ------------------------------------------------------- 5. SURFACES --- */
-/* One reusable surface. Cards, panels and steps all use it — no near-
-   duplicate classes. */
-.panel {
-    background: var(--bg-surface);
-    border-radius: var(--r-xl);
-    box-shadow: var(--shadow-card);
-    padding: clamp(var(--sp-5), 3vw, var(--sp-7));
-}
-
-.panel-flush { padding: 0; overflow: hidden; }
-
-/* ------------------------------------------------- 6. MEDIA SLOTS ------ */
-/* Aspect-ratio is the CLS guarantee: the box is known before any image
-   exists, so dropping artwork in changes nothing about the layout. */
-.media {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-    border-radius: var(--r-xl);
-    background: var(--bg-field);
-    box-shadow: var(--shadow-card);
-}
-
-.media-wide { aspect-ratio: 16 / 10; }
-.media-tall { aspect-ratio: 4 / 5; }
-.media-round { border-radius: var(--r-pill); }
-
-.media-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-5);
-    text-align: center;
-    color: var(--text-faint);
-}
-
-.media-glyph {
-    width: 3rem;
-    height: 3rem;
-    border-radius: var(--r-lg);
-    display: grid;
-    place-items: center;
-    background: var(--bg-chip);
-    color: var(--text-muted);
-}
-
-.media-label { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
-.media-spec { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-
-/* Real artwork fills the slot and retires the placeholder chrome. */
-.media > img,
-.media > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.media:has(> img) .media-inner,
-.media:has(> video) .media-inner { display: none; }
-
-/* ------------------------------------------------------- 7. SECTIONS --- */
-.section-head {
-    max-width: 34ch;
-    margin-inline: auto;
-    margin-block-end: clamp(var(--sp-7), 5vh, var(--sp-9));
-    text-align: center;
-}
-
-.section-title {
-    font-size: clamp(1.625rem, 3.6vw, 2.75rem);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.12;
-    text-wrap: balance;
-}
-
-.section-sub {
-    margin-block-start: var(--sp-3);
-    font-size: clamp(0.9375rem, 1.3vw, 1.0625rem);
-    line-height: 1.6;
-    color: var(--text-muted);
-}
-
-/* One responsive grid primitive, reused by cards and steps alike. */
-.grid-auto {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    gap: clamp(var(--sp-4), 2.5vw, var(--sp-6));
-}
-
-.card-title { font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; margin-block-end: var(--sp-2); }
-.card-text { font-size: 0.9375rem; line-height: 1.65; color: var(--text-muted); }
-
-.step { text-align: center; }
-
-.step-num {
-    width: 2.75rem;
-    height: 2.75rem;
-    margin-inline: auto;
-    margin-block-end: var(--sp-4);
-    border-radius: var(--r-pill);
-    display: grid;
-    place-items: center;
-    background: var(--accent);
-    color: var(--on-accent);
-    font-size: 1rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-}
-
-/* ---- 7.1 Figures ---- */
-.figure-grid { display: grid; gap: clamp(var(--sp-5), 4vw, var(--sp-8)); text-align: center; }
-
-@media (min-width: 45rem) {
-    .figure-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-.figure-value {
-    display: block;
-    min-width: 3ch;                  /* counting digits never resize the box */
-    font-size: clamp(2.25rem, 6vw, 4rem);
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.04em;
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-}
-
-.figure-label { margin-block-start: var(--sp-3); font-size: 0.9375rem; color: var(--text-muted); }
-
-/* ---- 7.2 Closing call to action ---- */
-.cta { text-align: center; }
-.cta-actions {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
-    margin-block-start: clamp(var(--sp-6), 4vh, var(--sp-7));
-}
-
-/* --------------------------------------------------------- 8. FOOTER --- */
-.site-foot { padding-block: var(--sp-7) var(--sp-8); }
-
-.foot-inner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-3);
-    font-size: 0.8125rem;
-    color: var(--text-faint);
-    text-align: center;
-}
-
-/* -------------------------------------------------------- 9. REVEALS --- */
-/* Opacity and transform only — neither participates in layout, so the page
-   is fully laid out at first paint and animating cannot shift it. */
-/* The hidden state is scoped to .js — set pre-paint by the inline head
-   script. Without that gate a script failure would leave every reveal target
-   permanently at opacity 0, i.e. a blank page. */
-.js [data-reveal] {
-    opacity: 0;
-    transform: translate3d(0, var(--reveal-y, 1.25rem), 0);
-    transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
-                transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: var(--d, 0ms);
-    will-change: opacity, transform;
-}
-
-.js [data-reveal].is-in { opacity: 1; transform: none; }
-.js [data-reveal].is-done { will-change: auto; }
-
-/* Stage 2 gets a longer throw and a slower curve than the small in-page
-   reveals — it is the moment the section is built around. Neither property
-   participates in layout, so the travel cannot shift anything. */
-.js .reveal-mark {
-    --reveal-y: 50px;
-    transition-duration: 900ms;
-}
-
-.js .reveal-sub { --reveal-y: 28px; transition-duration: 760ms; }
-
-.nav-sentinel { position: absolute; inset-block-start: 0; inset-inline: 0; block-size: 1px; pointer-events: none; }
-
-/* ------------------------------- 10. AUTH DIALOG SUPPORT --------------- */
-/* The dialogs themselves come from global.css. Only the auth-specific bits
-   live here, and they exist to keep error UI from moving anything. */
-
-.auth-intro {
-    display: flex;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    margin-block-end: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-}
-
-.auth-intro .icon { flex: 0 0 1.125rem; color: var(--accent); margin-block-start: 1px; }
-.auth-intro-text { font-size: 0.8125rem; line-height: 1.6; color: var(--text-muted); }
-
-/* Present in the DOM at a fixed height from first paint. A server error
-   appearing changes colour and text only — never the dialog's size. */
-.auth-status {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-2);
-    min-height: 2.25rem;
-    margin-block-start: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-sm);
-    font-size: 0.8125rem;
-    line-height: 1.45;
-    background: transparent;
-    color: transparent;
-    transition: background-color var(--t-base), color var(--t-base);
-}
-
-.auth-status .icon { width: 0.9375rem; height: 0.9375rem; flex: 0 0 0.9375rem; margin-block-start: 2px; opacity: 0; }
-.auth-status.is-error { background: var(--danger-soft); color: var(--danger); }
-.auth-status.is-ok { background: var(--accent-soft); color: var(--accent); }
-.auth-status.is-error .icon,
-.auth-status.is-ok .icon { opacity: 1; }
-
-.auth-alt {
+    /* One solid rule under the bar, at the same weight as every other edge
+       on the page. */
+    border-block-end: var(--edge-w) solid var(--edge-soft);
+    background: color-mix(in srgb, var(--bg-body) 84%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+
+.nav-inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: var(--sp-3);
-    margin-block-start: var(--sp-3);
+    width: 100%;
+    padding-block: var(--sp-2);
+}
+
+.nav-mark {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text);
+}
+
+.nav-mark:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 4px; border-radius: var(--r-pop-sm); }
+
+/* The wordmark gets the coral underline rather than a colour swap — the
+   letters stay at full contrast while still reacting. */
+.nav-mark-word {
+    display: inline-block;
+    padding-block-end: 2px;
+    border-block-end: 3px solid transparent;
+    transition: border-color 160ms var(--ease-out-hard), transform 160ms var(--ease-pop);
+}
+
+.nav-mark:hover .nav-mark-word { border-block-end-color: var(--pop-coral); transform: translateY(-1px); }
+
+.nav-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
+
+.theme-toggle {
+    display: grid;
+    place-items: center;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    flex: 0 0 var(--tap-min);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: transform 140ms var(--ease-pop), box-shadow 140ms var(--ease-pop),
+                background-color 140ms var(--ease-out-hard);
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 transparent;
+}
+
+.theme-toggle:hover {
+    background: var(--bg-chip);
+    transform: translate(-1px, -1px);
+    box-shadow: var(--lift) var(--lift) 0 var(--pop-sky);
+}
+
+.theme-toggle:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--pop-sky); }
+.theme-toggle:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 3px; }
+.theme-toggle .icon-moon { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-mark:hover .nav-mark-word,
+    .theme-toggle:hover,
+    .theme-toggle:active { transform: none; }
+}
+
+
+/* ═══════════════════════════════════════════ 4. OFFLINE WIRE ══════════ */
+/* Fixed, so expanding it cannot reflow the document — the constraint is
+   "account for offline UX", not "shove the page down when the wifi drops". */
+.wire {
+    position: fixed;
+    inset-block-start: var(--topbar-h);
+    inset-inline: 0;
+    z-index: var(--z-banner);
+    display: flex;
+    justify-content: center;
+    padding: var(--sp-3) var(--gutter);
+    pointer-events: none;
+}
+
+.wire[hidden] { display: none; }
+
+.wire-text {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: var(--sp-3) var(--sp-5);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--pop-yellow);
+    color: var(--on-pop);
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--edge);
     font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: start;
+}
+
+.wire.is-error .wire-text { background: var(--pop-rose); color: var(--pop-void); }
+
+.wire-dot {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-radius: var(--r-pop-pill);
+    background: currentColor;
+    animation: wirePulse 1.6s var(--ease) infinite;
+}
+
+@keyframes wirePulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+
+/* ═══════════════════════════════════════════ 5. THE REEL ══════════════ */
+/* GEOMETRY — DO NOT CHANGE.
+   .reel's height IS the scrub range: .reel-stage pins to the viewport inside
+   it, .reel-flow is pulled back over the pinned frame, and landing.js maps
+   how far we are through .reel onto video.currentTime. The negative margin
+   and the 100svh heights are load-bearing for that maths. */
+.reel { position: relative; }
+
+.reel-stage {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-reel-video);
+    /* svh, not vh: on mobile vh is the height with the URL bar HIDDEN, so a
+       100vh stage is taller than the visible viewport and the frame sits
+       partly under the chrome. The vh line is the fallback. */
+    height: 100vh;
+    height: 100svh;
+    overflow: hidden;
+    background: var(--bg-body);
+}
+
+/* Fills the pinned box at every ratio, so the frame is at its final size
+   before a byte of video arrives. The poster paints first; the element fades
+   in over it once a frame is decodable.
+
+   Only partly desaturated now, not stripped to grey: the footage is blue
+   equations, and on an indigo ground a little of that blue left in reads as
+   part of the palette rather than as a second accent. */
+.reel-video {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-reel-video);
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: grayscale(0.45) brightness(0.55) contrast(1.08);
+    opacity: 0;
+    transition: opacity 700ms var(--ease-drift);
+}
+
+.reel-video.is-live { opacity: 1; }
+
+:root[data-theme="light"] .reel-video { filter: grayscale(0.5) brightness(1.45) contrast(0.95) invert(1); }
+
+/* Replaces the old grain tile. A soft indigo-to-lilac wash that pulls the
+   footage into the palette instead of scratching texture over it. */
+.reel-wash {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-reel-wash);
+    background:
+        radial-gradient(90% 70% at 78% 30%, color-mix(in srgb, var(--pop-lilac) 22%, transparent) 0%, transparent 62%),
+        radial-gradient(80% 60% at 15% 82%, color-mix(in srgb, var(--pop-sky) 16%, transparent) 0%, transparent 58%);
+    mix-blend-mode: soft-light;
+    pointer-events: none;
+}
+
+/* Contrast floor. Without it the copy sits on whatever the video happens to
+   be doing and WCAG contrast becomes a coin flip, frame to frame. The
+   gradient still runs left-to-right so the frame keeps some depth, but even
+   its shallowest stop holds the video to 30% — the acts alternate sides, so
+   the copy lands on that end every other section. */
+.reel-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-reel-scrim);
+    background:
+        linear-gradient(to right,
+            color-mix(in srgb, var(--bg-body) 93%, transparent) 0%,
+            color-mix(in srgb, var(--bg-body) 84%, transparent) 46%,
+            color-mix(in srgb, var(--bg-body) 70%, transparent) 100%);
+    pointer-events: none;
+}
+
+.reel-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-reel-vignette);
+    background: radial-gradient(120% 90% at 60% 45%,
+        transparent 40%,
+        color-mix(in srgb, var(--bg-body) 72%, transparent) 100%);
+    pointer-events: none;
+}
+
+/* Pulled back over the pinned frame. Margin, not transform: the sections
+   inside must still generate real scroll height. */
+.reel-flow {
+    position: relative;
+    z-index: var(--z-reel-copy);
+    margin-block-start: -100vh;
+    margin-block-start: -100svh;
+}
+
+/* One act = one viewport. min-height, never height: a section whose content
+   outgrows the viewport must grow, not clip. */
+.act {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    padding-block: calc(var(--topbar-h) + var(--sp-7)) var(--sp-8);
+}
+
+
+/* ═══════════════════════════════════════════ 6. ACT 1 · THE DROP ══════ */
+.act-drop { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
+
+.act-drop-inner { display: flex; flex-direction: column; align-items: flex-start; }
+
+.mono-tag-lead { margin-block-end: clamp(var(--sp-5), 4vh, var(--sp-8)); }
+
+/* Three lines, three indents. The stagger is the composition — a flush-left
+   block at this size reads as a wall. Still enormous, but no longer shouting
+   in all caps: sentence case at this scale is friendly rather than stern. */
+.drop-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 10.5vw, 8.5rem);
+    font-weight: 700;
+    line-height: 0.94;
+    letter-spacing: -0.04em;
+}
+
+.drop-title > span { display: block; }
+.drop-l2 { margin-inline-start: clamp(var(--sp-4), 6vw, 5rem); }
+.drop-l3 { margin-inline-start: clamp(var(--sp-2), 2.5vw, 2rem); }
+
+.drop-sub {
+    margin: clamp(var(--sp-6), 5vh, var(--sp-9)) 0 0;
+    max-width: 42ch;
+    /* Optically aligned under the second line, not the first. */
+    margin-inline-start: clamp(var(--sp-4), 6vw, 5rem);
+    font-size: clamp(1rem, 1.35vw, 1.125rem);
+    line-height: 1.7;
     color: var(--text-muted);
 }
 
-.link-btn {
-    padding: 0;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--accent);
-    border-radius: var(--r-xs);
-    transition: color var(--t-base);
+/* ---- 6.1 Marquee -------------------------------------------------------
+   Now a pill: inset from both edges, thick edge, fully rounded, sitting on a
+   coral shadow. Still CSS only — two identical runs slide as one track, and
+   when the first has moved exactly its own width the second is where it
+   started, so the loop has no seam. Nothing here is scroll-linked. */
+.marquee {
+    position: absolute;
+    inset-block-end: var(--sp-6);
+    inset-inline: var(--gutter);
+    max-width: 74rem;
+    margin-inline: auto;
+    overflow: hidden;
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--pop-panel);
+    box-shadow: var(--lift) var(--lift) 0 var(--pop-coral);
 }
 
-.link-btn:hover { color: var(--accent-strong); text-decoration: underline; }
-.link-btn:active { color: var(--accent-strong); }
-.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root[data-theme="light"] .marquee { background: var(--bg-surface); }
 
-/* ------------------------------------------------------ 11. RESPONSIVE - */
+.marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee 26s linear infinite;
+}
+
+.marquee-run {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-5);
+    padding-block: var(--sp-3);
+    padding-inline-end: var(--sp-5);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.26em;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+.marquee-run i { font-style: normal; color: var(--pop-coral); }
+
+@keyframes marquee {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(-50%, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .marquee-track { animation: none; }
+}
+
+
+/* ═══════════════════════════════════════════ 7. ACT 2 · THE SIX ═══════ */
+/* Each agent owns a colour. One declaration re-points --pop and the chips,
+   the display case, its shadow and its hover state all follow — which is
+   what stops six near-identical sections reading as one section repeated. */
+.act-agent:nth-of-type(2) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
+.act-agent:nth-of-type(3) { --pop: var(--pop-sky);    --pop-text: var(--sky-text); }
+.act-agent:nth-of-type(4) { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
+.act-agent:nth-of-type(5) { --pop: var(--pop-mint);   --pop-text: var(--mint-text); }
+.act-agent:nth-of-type(6) { --pop: var(--pop-lilac);  --pop-text: var(--lilac-text); }
+.act-agent:nth-of-type(7) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
+
+/* GEOMETRY — mobile-first: one column, copy first. The two-column stagger is
+   opt-in at the wide breakpoint, so narrow screens never pay for a rule they
+   have to undo. */
+.act-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(var(--sp-6), 5vh, var(--sp-9));
+    align-items: center;
+}
+
+@media (min-width: 62rem) {
+    .act-grid {
+        /* Not 50/50 and not the same way twice: odd acts lead with copy on a
+           wider left column, even acts flip the whole thing. */
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+        gap: clamp(var(--sp-8), 6vw, var(--sp-10));
+    }
+
+    /* The flip. `order` moves the boxes; the source order stays copy-first,
+       so the reading order and the tab order never change. */
+    .act-agent:nth-of-type(even) .act-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    }
+    .act-agent:nth-of-type(even) .agent-copy { order: 2; }
+    .act-agent:nth-of-type(even) .agent-slot { order: 1; }
+
+    /* Vertical stagger, in three different amounts so the rhythm does not
+       become its own grid. translate takes no part in layout, so none of
+       this can shift a line box. */
+    .act-agent:nth-of-type(3n+1) .agent-slot { translate: 0 clamp(var(--sp-4), 3vh, var(--sp-8)); }
+    .act-agent:nth-of-type(3n+2) .agent-slot { translate: 0 clamp(var(--sp-2), -2vh, var(--sp-6)); }
+    .act-agent:nth-of-type(3n+3) .agent-slot { translate: 0 clamp(var(--sp-6), 5vh, var(--sp-10)); }
+}
+
+.agent-copy { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* The massive block. Two words, two weights — the name is still the largest
+   thing in the act, but it has come out of all caps and lost the razor
+   tracking, which is most of what made it feel severe. */
+.agent-name {
+    margin: clamp(var(--sp-4), 2.5vh, var(--sp-6)) 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 8.5vw, 6.5rem);
+    line-height: 0.9;
+    letter-spacing: -0.045em;
+}
+
+.agent-name-a { display: block; font-weight: 500; color: var(--text-muted); }
+.agent-name-b { display: block; font-weight: 700; color: var(--text); }
+
+.agent-line {
+    margin: clamp(var(--sp-5), 3vh, var(--sp-7)) 0 0;
+    max-width: 24ch;
+    font-family: var(--font-display);
+    font-size: clamp(1.125rem, 1.9vw, 1.5rem);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+    color: var(--pop-text);
+}
+
+.agent-desc {
+    margin: var(--sp-4) 0 0;
+    max-width: 44ch;
+    font-size: clamp(0.9375rem, 1.2vw, 1.0625rem);
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+/* A spec card, not a wire table: rounded, edged, one solid shadow. */
+.agent-spec {
+    width: 100%;
+    max-width: 26rem;
+    margin: clamp(var(--sp-5), 3vh, var(--sp-7)) 0 0;
+    padding: var(--sp-2) var(--sp-5);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--pop);
+}
+
+.agent-spec-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding-block: var(--sp-3);
+}
+
+.agent-spec-row + .agent-spec-row { border-block-start: 2px dotted var(--edge-soft); }
+
+.agent-spec dt {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.agent-spec dd {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--text);
+    text-align: end;
+}
+
+/* ---- 7.1 The .glb display case -----------------------------------------
+   Was a wireframe box with a construction grid and corner ticks, which read
+   as "unfinished build". It is now a toy box: fat rounded edge, a warm pool
+   of the section's colour inside it, a dashed inner outline showing where
+   the model will stand, and two studs holding it together.
+
+   The ratio is still locked here, so mounting a renderer inside it later
+   changes nothing about the layout — that is the whole contract, and it is
+   the one thing about this element that did not change. */
+.agent-slot { width: 100%; }
+
+.model-canvas-wrapper {
+    position: relative;
+    width: 100%;
+    /* No fixed height anywhere: fluid width, locked ratio. */
+    aspect-ratio: 3 / 4;
+    max-height: 68svh;
+    max-width: 26rem;
+    margin-inline: auto;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-xl);
+    background:
+        radial-gradient(88% 58% at 50% 16%,
+            color-mix(in srgb, var(--pop) 34%, transparent) 0%,
+            color-mix(in srgb, var(--pop) 8%, transparent) 52%,
+            transparent 76%),
+        var(--bg-surface);
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop);
+    transition: transform 220ms var(--ease-pop), box-shadow 220ms var(--ease-pop);
+}
+
+/* Hover intent: landing.js adds .is-keen only after 150ms of sustained
+   hover, so brushing past the box does not make it jump. The case lifts up
+   off its shadow, the same gesture as a button but slower. */
+.agent-slot.is-keen .model-canvas-wrapper {
+    transform: translate(-3px, -3px);
+    box-shadow: 11px 11px 0 var(--pop);
+}
+
+/* Where the model will stand. Dashed and rounded — reads as "reserved for
+   something", which is true, rather than as a broken render. */
+.slot-shine {
+    position: absolute;
+    inset: var(--sp-4);
+    border: 2px dashed color-mix(in srgb, var(--edge) 34%, transparent);
+    border-radius: var(--r-pop-lg);
+    pointer-events: none;
+}
+
+/* Two studs holding the case together. */
+.slot-stud {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--pop);
+}
+
+.slot-stud-a { inset-block-start: var(--sp-4); inset-inline-start: var(--sp-4); }
+.slot-stud-b { inset-block-end: var(--sp-4); inset-inline-end: var(--sp-4); }
+
+.slot-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
+    text-align: center;
+}
+
+.slot-name {
+    padding: var(--sp-2) var(--sp-4);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--bg-body);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text);
+}
+
+.slot-ratio {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* ---- 7.2 The mounted model ---------------------------------------------
+   models.js appends a <model-viewer> into the case once the slot nears the
+   viewport, and flips .is-loading then .has-model on the wrapper. Nothing
+   below changes the wrapper's size: the 3:4 ratio is locked above and the
+   viewer is absolutely positioned inside it, so a model arriving — or
+   failing and being removed again — cannot move a single pixel of layout. */
+.model-canvas-wrapper > model-viewer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    /* Transparent, so the case's own coloured glow stays visible behind and
+       around the model rather than being covered by a black rectangle. */
+    background-color: transparent;
+    --poster-color: transparent;
+    --progress-mask: transparent;
+    /* The loading bar picks up the section's colour like everything else. */
+    --progress-bar-color: var(--pop);
+    /* Follow the case's rounded corner rather than squaring it off. */
+    border-radius: inherit;
+}
+
+/* camera-controls makes the element focusable, which paints the UA's default
+   highlight straight over the model. The real controls elsewhere on the page
+   keep their rings, so keyboard focus stays visible everywhere it means
+   something. */
+.model-canvas-wrapper > model-viewer:focus,
+.model-canvas-wrapper > model-viewer:focus-visible,
+.model-canvas-wrapper > model-viewer:focus-within {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* While the .glb is in flight the case keeps its label — models.js swaps the
+   caption to "loading…" — and breathes, so a slow connection reads as
+   working rather than stuck. */
+.model-canvas-wrapper.is-loading .slot-meta { animation: slotPulse 1.8s var(--ease-out-hard) infinite; }
+
+@keyframes slotPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+/* Loaded: the placeholder chrome retires. The studs stay — they are the
+   case's hardware, not part of the empty state, and they frame the model
+   rather than competing with it.
+
+   visibility, delayed by exactly the fade duration, is doing real work here
+   and is not a belt-and-braces opacity:0. An element at opacity 0 is still
+   in the accessibility tree, so without it a screen reader would read the
+   retired caption ("pia-open.glb, loading…") straight after the model's own
+   alt text. Delaying the visibility switch to the end of the transition lets
+   the fade play first. */
+.model-canvas-wrapper.has-model .slot-meta,
+.model-canvas-wrapper.has-model .slot-shine {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 420ms var(--ease-out-hard), visibility 0s 420ms;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .model-canvas-wrapper.is-loading .slot-meta { animation: none; opacity: 0.85; }
+    .model-canvas-wrapper.has-model .slot-meta,
+    .model-canvas-wrapper.has-model .slot-shine { transition: none; visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .agent-slot.is-keen .model-canvas-wrapper { transform: none; }
+}
+
+
+/* ═══════════════════════════════════════════ 8. SOLID GROUND ══════════ */
+/* Out of the reel. These sit above it in paint order and carry an opaque
+   ground, so the pinned video can never bleed under this type. */
+.band {
+    position: relative;
+    z-index: var(--z-page);
+    padding-block: var(--band-pad);
+    background: var(--bg-body);
+    border-block-start: var(--edge-w) solid var(--edge-soft);
+}
+
+.band-sdt { --pop: var(--pop-sky); --pop-text: var(--sky-text); }
+.band-caps { --pop: var(--pop-lilac); --pop-text: var(--lilac-text); }
+.band-finale { --pop: var(--pop-coral); --pop-text: var(--coral-text); }
+
+.band-head { max-width: 46rem; margin-block-end: clamp(var(--sp-8), 8vh, var(--sp-10)); }
+
+.band-head-split {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-5);
+    max-width: none;
+}
+
+.band-title {
+    margin: var(--sp-5) 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.875rem, 5.2vw, 4rem);
+    font-weight: 700;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+}
+
+.band-title-quiet { color: var(--text-muted); }
+
+.band-lede {
+    margin: var(--sp-6) 0 0;
+    max-width: 52ch;
+    font-size: clamp(1rem, 1.2vw, 1.125rem);
+    line-height: 1.75;
+    color: var(--text-muted);
+}
+
+/* ---- 8.1 SDT cards -----------------------------------------------------
+   Deliberately not a 3-up equal grid. Each card spans a different number of
+   tracks and starts on a different column, so the row never lines up — and
+   each carries a different shadow colour, so they read as three stickers
+   dropped on the page rather than three cells of a table. */
+.sdt-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-7);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+@media (min-width: 56rem) {
+    .sdt-list { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: clamp(var(--sp-7), 3vw, var(--sp-9)); }
+    .sdt-card:nth-child(1) { grid-column: 1 / span 5; }
+    .sdt-card:nth-child(2) { grid-column: 7 / span 6; margin-block-start: clamp(var(--sp-8), 7vh, var(--sp-10)); }
+    .sdt-card:nth-child(3) { grid-column: 3 / span 5; margin-block-start: clamp(var(--sp-4), 3vh, var(--sp-8)); }
+}
+
+.sdt-card:nth-child(1) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
+.sdt-card:nth-child(2) { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
+.sdt-card:nth-child(3) { --pop: var(--pop-mint);   --pop-text: var(--mint-text); }
+
+.sdt-card {
+    position: relative;
+    padding: clamp(var(--sp-6), 3vw, var(--sp-8));
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--lift) var(--lift) 0 var(--pop);
+    transition: transform 220ms var(--ease-pop), box-shadow 220ms var(--ease-pop);
+}
+
+.sdt-card.is-keen {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop);
+}
+
+/* A numbered badge on the corner of the sticker. */
+.sdt-num {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    margin-block-end: var(--sp-5);
+    padding-inline: var(--sp-3);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--pop);
+    color: var(--on-pop);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.sdt-name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.625rem, 2.6vw, 2.25rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+.sdt-body { margin: var(--sp-4) 0 0; font-size: 1rem; line-height: 1.7; color: var(--text-muted); }
+
+/* The "in PIA" line is the punchline of each card, so it gets its own tinted
+   panel rather than a rule and smaller type. */
+.sdt-note {
+    margin: var(--sp-6) 0 0;
+    padding: var(--sp-4);
+    border-radius: var(--r-pop);
+    background: color-mix(in srgb, var(--pop) 14%, transparent);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* ---- 8.2 Capability cards ---------------------------------------------
+   Was a column of hairline rows. Now six stickers on a staggered grid: even
+   cards sit lower than odd ones, so the wall never lines up straight. */
+.caps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+@media (min-width: 46rem) {
+    .caps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(var(--sp-6), 3vw, var(--sp-8)); }
+    /* The stagger. A margin, not a transform, because these cards are in
+       normal flow and the offset should push the grid row — it is applied at
+       every width above the breakpoint and never changes after paint, so it
+       cannot shift anything. */
+    .cap:nth-child(even) { margin-block-start: clamp(var(--sp-6), 5vh, var(--sp-9)); }
+}
+
+.cap:nth-child(6n+1) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
+.cap:nth-child(6n+2) { --pop: var(--pop-sky);    --pop-text: var(--sky-text); }
+.cap:nth-child(6n+3) { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
+.cap:nth-child(6n+4) { --pop: var(--pop-mint);   --pop-text: var(--mint-text); }
+.cap:nth-child(6n+5) { --pop: var(--pop-lilac);  --pop-text: var(--lilac-text); }
+.cap:nth-child(6n+6) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
+
+.cap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding: clamp(var(--sp-6), 3vw, var(--sp-7));
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--lift) var(--lift) 0 var(--pop);
+    transition: transform 220ms var(--ease-pop), box-shadow 220ms var(--ease-pop);
+}
+
+.cap.is-keen {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop);
+}
+
+.cap-num {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    margin-block-end: var(--sp-2);
+    padding-inline: var(--sp-3);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    background: var(--pop);
+    color: var(--on-pop);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.cap-name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2.2vw, 1.625rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+}
+
+.cap-text { margin: 0; max-width: 46ch; font-size: 0.9375rem; line-height: 1.7; color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+    .sdt-card.is-keen,
+    .cap.is-keen { transform: none; }
+}
+
+/* ---- 8.3 Finale --------------------------------------------------------
+   A standard, non-sticky viewport-height section. Nothing pinned, nothing
+   scrubbed — the page lands. */
+.band-finale {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.finale-inner { display: flex; flex-direction: column; align-items: flex-start; }
+
+.finale-title {
+    margin: clamp(var(--sp-5), 4vh, var(--sp-7)) 0 0;
+    max-width: 14ch;
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 10vw, 8rem);
+    font-weight: 700;
+    line-height: 0.94;
+    letter-spacing: -0.045em;
+}
+
+.finale-sub {
+    margin: clamp(var(--sp-6), 4vh, var(--sp-8)) 0 0;
+    max-width: 46ch;
+    font-size: clamp(1rem, 1.2vw, 1.125rem);
+    line-height: 1.75;
+    color: var(--text-muted);
+}
+
+.finale-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    margin-block-start: clamp(var(--sp-7), 5vh, var(--sp-9));
+}
+
+
+/* ═══════════════════════════════════════════ 9. FOOTER ════════════════ */
+.foot { border-block-start: var(--edge-w) solid var(--edge-soft); padding-block: var(--sp-7) var(--sp-8); }
+
+.foot-inner {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+}
+
+.foot-line { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+
+.foot-line-mono {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+
+/* ═══════════════════════════════════ 9B. AUTH DIALOGS, PLAYFUL ════════ */
+/* The three dialogs, their fields and their reserved error slots all come
+   from global.css and are NOT redefined here — auth.js's contract with them
+   is untouched. This block only re-skins the chrome to match the page.
+
+   Nothing below changes a box's SIZE. The reserved heights that stop a
+   server error from reflowing the dialog (.auth-status, .field-msg, the
+   fixed .input height) are inherited exactly as they are. */
+
+.overlay { padding: var(--gutter); }
+.overlay { background: color-mix(in srgb, var(--pop-void) 82%, transparent); }
+
+.modal {
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-xl);
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop-coral);
+}
+
+/* 2px inset edge replaces the filled well. border-box keeps the height at
+   --field-h, so the field does not grow and nudge the form. */
+.overlay .input,
+.overlay .select,
+.overlay .textarea {
+    border: var(--edge-w) solid var(--edge-soft);
+    border-radius: var(--r-pop);
+    background: var(--bg-field);
+    transition: border-color var(--t-base), box-shadow var(--t-base);
+}
+
+.overlay .input:hover,
+.overlay .select:hover { border-color: var(--edge); }
+
+/* Focus is an edge plus a sky-blue halo — and it stays a box-shadow, so it
+   draws OUTSIDE the border box and cannot change the field's height. */
+.overlay .input:focus,
+.overlay .select:focus,
+.overlay .textarea:focus {
+    border-color: var(--edge);
+    background: var(--bg-field);
+    box-shadow: 0 0 0 3px var(--pop-sky);
+}
+
+.overlay .input.is-invalid,
+.overlay .select.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+
+.overlay .auth-intro,
+.overlay .auth-status { border-radius: var(--r-pop); }
+
+/* global.css sizes .btn at --control-h (38px), which is under the 44px touch
+   floor this page holds itself to. min-height, not height: the button grows
+   to the floor and nothing else about the footer changes. Applied before any
+   interaction, so it cannot shift a dialog mid-use. */
+.overlay .btn {
+    min-height: var(--tap-min);
+    padding-inline: var(--sp-5);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    font-weight: 700;
+    box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--edge);
+    transition: transform 140ms var(--ease-pop), box-shadow 140ms var(--ease-pop),
+                background-color 140ms var(--ease-out-hard);
+}
+
+.overlay .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: var(--lift) var(--lift) 0 var(--edge); }
+.overlay .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--edge); }
+.overlay .btn:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 3px; }
+
+.overlay .btn-secondary { background: transparent; color: var(--text); }
+.overlay .btn-secondary:hover:not(:disabled) { background: var(--bg-chip); }
+
+.overlay .modal-close {
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    transition: background-color var(--t-base), transform 140ms var(--ease-pop);
+}
+
+.overlay .modal-close:hover { background: var(--pop-coral); color: var(--on-pop); }
+.overlay .modal-close:active { transform: translate(1px, 1px); }
+
+.overlay .auth-intro { border: var(--edge-w) solid var(--edge-soft); background: color-mix(in srgb, var(--pop-sky) 12%, transparent); }
+.overlay .auth-intro .icon { color: var(--sky-text); }
+
+/* "Link sent" is a success, and success is mint here — the page's primary
+   accent is yellow, which would read as a warning in that slot. */
+.overlay .auth-status.is-ok { background: color-mix(in srgb, var(--pop-mint) 16%, transparent); color: var(--mint-text); }
+
+.overlay .label {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.link-btn { font-weight: 700; color: var(--pop-text); }
+.link-btn:hover { color: var(--pop-text); }
+
+@media (prefers-reduced-motion: reduce) {
+    .overlay .btn:hover:not(:disabled),
+    .overlay .btn:active:not(:disabled),
+    .overlay .modal-close:active { transform: none; }
+}
+
+
+/* ═══════════════════════════════════════════ 10. SCROLL REVEALS ═══════ */
+/* CONTRACT WITH landing.js — DO NOT RENAME.
+   The script adds .is-in when a target enters the viewport and .is-done when
+   its transform transition ends. opacity + transform only: neither
+   participates in layout, so the page is fully laid out at first paint and
+   none of this can shift a thing.
+
+   The hidden state is scoped to .js, stamped on <html> pre-paint by
+   theme-boot.js. Without that gate a script failure would leave every target
+   permanently at opacity 0 — i.e. a blank page. */
+.js [data-reveal] {
+    opacity: 0;
+    transform: translate3d(0, var(--reveal-y, 1.75rem), 0);
+    transition: opacity 700ms var(--ease-drift), transform 700ms var(--ease-drift);
+    transition-delay: var(--d, 0ms);
+    will-change: opacity, transform;
+}
+
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+/* Released once the motion is done: leaving will-change on every node holds
+   GPU memory for the life of the page. */
+.js [data-reveal].is-done { will-change: auto; }
+
+/* Stagger within a block, set here rather than as inline style attributes so
+   the CSP never needs style-src-attr 'unsafe-inline'. */
+.js .agent-copy [data-reveal]:nth-child(1) { --d: 0ms; }
+.js .agent-copy [data-reveal]:nth-child(2) { --d: 90ms; }
+.js .agent-copy [data-reveal]:nth-child(3) { --d: 170ms; }
+.js .agent-copy [data-reveal]:nth-child(4) { --d: 240ms; }
+.js .agent-copy [data-reveal]:nth-child(5) { --d: 310ms; }
+.js .agent-slot[data-reveal] { --d: 120ms; --reveal-y: 2.5rem; }
+
+.js .sdt-card:nth-child(2) { --d: 110ms; }
+.js .sdt-card:nth-child(3) { --d: 220ms; }
+
+.js .cap:nth-child(2) { --d: 60ms; }
+.js .cap:nth-child(3) { --d: 120ms; }
+.js .cap:nth-child(4) { --d: 180ms; }
+.js .cap:nth-child(5) { --d: 240ms; }
+.js .cap:nth-child(6) { --d: 300ms; }
+
+/* ---- 10.1 Word-by-word lighting ----------------------------------------
+   landing.js splits [data-lit-words] and [data-scrub-words] headings into
+   .scrub-w spans and adds .is-lit — on a stagger for the <h1>, and tied to
+   scroll position for the finale. Colour only: the words never move, so a
+   long headline cannot reflow mid-scroll.
+
+   Unlit is a dimmed ink rather than a flat grey, so a half-lit headline
+   still reads as one sentence in two tones. */
+.scrub-w {
+    color: color-mix(in srgb, var(--text) 30%, transparent);
+    transition: color 300ms var(--ease-out-hard);
+}
+
+.scrub-w.is-lit { color: inherit; }
+
+/* The last line of the drop title lands in coral, and the finale in coral
+   too — the two moments the page raises its voice. */
+.drop-l3 .scrub-w.is-lit { color: var(--coral-text); }
+.finale-title .scrub-w.is-lit { color: inherit; }
+
+
+/* ═══════════════════════════════════════════ 11. MOTION PREFERENCE ════ */
+/* One block, at the end, so it wins. Reveals resolve to their final state,
+   continuous motion stops, and landing.js independently skips the scrub loop
+   — the video parks on its first frame. */
+@media (prefers-reduced-motion: reduce) {
+    .js [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .scrub-w { color: inherit !important; transition: none !important; }
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+
+/* ═══════════════════════════════════════════ 12. RESPONSIVE ═══════════ */
 /* Type and spacing already scale continuously with clamp(); these rules only
-   restack, and use min-width so the page is authored mobile-first. */
-@media (max-width: 45rem) {
-    .nav-link.hide-sm { display: none; }
-    .cta-actions .btn { flex: 1 1 100%; }
+   restack and re-weight. Authored mobile-first, so this is the narrow end. */
+@media (max-width: 48rem) {
+    /* The navbar wraps to two rows on a phone; the mark keeps its own line so
+       the three controls are not crushed to nothing. */
+    .nav-inner { justify-content: center; }
+    .nav-actions { flex: 1 1 100%; justify-content: center; }
+    .btn-pop,
+    .btn-pop-ghost { padding-inline: var(--sp-4); font-size: 0.8125rem; }
 
-    /* Switcher on its own line, then the two auth buttons side by side across
-       the full width, so the tap targets stay generous at narrow widths.
-       The explicit width is needed because .hero-info centres its children,
-       which would otherwise shrink this row to its content. */
-    .hero-actions { flex-direction: column; align-items: stretch; width: 100%; }
-    .hero-switcher { justify-content: center; }
-    .hero-auth { justify-content: center; }
-    .hero-auth .btn { flex: 1 1 0; }
+    /* Two navbar rows means a taller navbar to clear. */
+    .act { padding-block: calc(var(--topbar-h) * 2) var(--sp-9); }
+    .wire { inset-block-start: calc(var(--topbar-h) * 2); }
 
-    /* Stage 1 is meant to be read without scrolling. At the default rhythm
-       the stacked column runs ~115px past a 375x812 screen, putting the auth
-       buttons below the fold — the one thing that must stay visible. These
-       trims pull it back inside. Every one of them is spacing or type scale:
-       the figure keeps its locked ratio, so none of this can cause a shift. */
-    .hero { padding-block: var(--sp-5); }
-    .hero-split { gap: var(--sp-5); }
-    .hero-info { gap: var(--sp-3); }
-    .hero-visual { --figure-w: min(62%, 13.5rem); }
-    .hero-greeting { font-size: clamp(1.5rem, 6.4vw, 1.875rem); }
-    .hero-character-desc { line-height: 1.55; min-height: calc(3 * 1.55em); }
+    .drop-l2,
+    .drop-sub { margin-inline-start: 0; }
+
+    .marquee { inset-inline: var(--sp-4); inset-block-end: var(--sp-4); }
+    .marquee-run { letter-spacing: 0.18em; }
+
+    .band-head-split { display: block; }
+    .band-head-split .band-title { margin-block-start: var(--sp-4); }
+
+    .finale-actions { width: 100%; }
+    .finale-actions .btn-pop,
+    .finale-actions .btn-pop-ghost { flex: 1 1 100%; }
+}
+
+/* Short viewports (small phones, any phone in landscape): the display case is
+   the one block that can give up height without costing information. */
+@media (max-height: 44rem) {
+    .model-canvas-wrapper { max-height: 52svh; }
+    .act { padding-block: calc(var(--topbar-h) + var(--sp-5)) var(--sp-6); }
 }
