@@ -371,17 +371,17 @@ function renderSignOutControl(profile) {
         #pia-signout-control { display:flex; align-items:center; gap:.6rem; }
         #pia-signout-control.pia-signout-floating {
             position:fixed; top:.75rem; right:.75rem; z-index:9998;
-            background:rgba(15,23,42,.85); backdrop-filter:blur(6px);
-            border:1px solid rgba(255,255,255,.14); border-radius:999px;
-            padding:.35rem .5rem .35rem .9rem; box-shadow:0 6px 20px rgba(0,0,0,.28);
+            background:var(--glass); backdrop-filter:blur(12px);
+            -webkit-backdrop-filter:blur(12px); border-radius:var(--r-pill);
+            padding:.35rem .5rem .35rem 1rem; box-shadow:var(--shadow-md);
         }
-        #pia-signout-who { color:#e2e8f0; font-size:.78rem; line-height:1.15;
+        #pia-signout-who { color:var(--text); font-size:var(--fs-xs); line-height:1.2;
             white-space:nowrap; max-width:42vw; overflow:hidden; text-overflow:ellipsis; }
-        #pia-signout-who small { display:block; opacity:.6; font-size:.66rem; }
-        #pia-signout-btn { cursor:pointer; border:0; border-radius:999px;
-            padding:.4rem .85rem; font-size:.75rem; font-weight:700;
-            background:#dc2626; color:#fff; }
-        #pia-signout-btn:hover { background:#b91c1c; }
+        #pia-signout-who small { display:block; color:var(--text-faint); font-size:var(--fs-xs); }
+        #pia-signout-btn { cursor:pointer; border:0; border-radius:var(--r-pill);
+            padding:.5rem 1rem; font-size:var(--fs-xs); font-weight:700;
+            background:var(--bg-chip); color:var(--text); }
+        #pia-signout-btn:hover { background:var(--bg-chip-hover); }
         #pia-signout-btn:disabled { opacity:.6; cursor:default; }
     `;
     document.head.appendChild(style);
@@ -447,12 +447,12 @@ function startIdleWatchdog() {
 
         const modal = document.createElement('div');
         modal.id = 'pia-idle-modal';
-        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.72);backdrop-filter:blur(3px)';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:var(--z-boot);display:flex;align-items:center;justify-content:center;padding:1rem;background:color-mix(in srgb, var(--ink) 62%, transparent);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)';
         modal.innerHTML = `
-            <div style="max-width:22rem;width:88%;background:#0f172a;border:1px solid rgba(255,255,255,.14);border-radius:1rem;padding:1.5rem;text-align:center;color:#e2e8f0;box-shadow:0 20px 50px rgba(0,0,0,.5)">
-                <h3 style="margin:0 0 .5rem;font-size:1.05rem;font-weight:700">Nandiyan ka pa ba?</h3>
-                <p style="margin:0 0 1rem;font-size:.85rem;opacity:.75">Awtomatiko kang isa-sign out sa <strong id="pia-idle-count">${left}</strong> segundo para maprotektahan ang account mo sa PC na ito.</p>
-                <button id="pia-idle-stay" type="button" style="cursor:pointer;border:0;border-radius:.6rem;padding:.6rem 1.2rem;font-weight:700;background:#2563eb;color:#fff;width:100%">NANDITO PA AKO</button>
+            <div style="max-width:22rem;width:100%;background:var(--bg-surface);border-radius:var(--r-card);padding:var(--sp-7);text-align:center;color:var(--text);box-shadow:var(--shadow-lg)">
+                <h3 style="margin:0 0 .5rem;font-size:var(--fs-h4);font-weight:800;letter-spacing:-0.01em">Nandiyan ka pa ba?</h3>
+                <p style="margin:0 0 1.25rem;font-size:var(--fs-sm);line-height:1.6;color:var(--text-muted)">Awtomatiko kang isa-sign out sa <strong id="pia-idle-count" style="color:var(--text)">${left}</strong> segundo para maprotektahan ang account mo sa PC na ito.</p>
+                <button id="pia-idle-stay" type="button" style="cursor:pointer;border:0;border-radius:var(--r-pill);padding:.85rem 1.5rem;font-size:var(--fs-body);font-weight:700;background:var(--accent);color:var(--on-accent);width:100%">Nandito pa ako</button>
             </div>
         `;
         document.body.appendChild(modal);
@@ -554,7 +554,7 @@ function showRevokeModal(title, message) {
                 <h3 class="revoke-modal-title">${title}</h3>
                 <p class="text-secondary revoke-modal-desc">${message}</p>
                 <div class="revoke-modal-actions">
-                    <button id="revoke-modal-btn" class="btn-primary btn-lg btn-block">
+                    <button id="revoke-modal-btn" class="btn btn-primary btn-lg btn-block">
                         <span>Understood</span>
                     </button>
                 </div>

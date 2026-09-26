@@ -5,7 +5,10 @@
  * Vanilla JavaScript. Uses the shared `sb` client from assets/js/function.js.
  *
  * Three flows, all against the real backend:
- *   1. Sign in            — signInWithPassword, then role-based redirect
+ *   1. Sign in            — two doors: the student form, and "Admin sign in"
+ *                           for every staff account (teachers AND admins).
+ *                           Each accepts only its own kind of account; the
+ *                           redirect then routes by role
  *   2. Activate account   — signInWithOtp (magic link), never creates a user
  *   3. Reset password     — resetPasswordForEmail
  *
@@ -77,7 +80,15 @@
         void overlay.offsetWidth;
         overlay.classList.add('is-open');
 
-        var first = overlay.querySelector('input:not([type="hidden"]), select, textarea, button');
+        /* [data-autofocus] first, so the email field wins over anything that
+           precedes it in source order. When the email is already filled in
+           (carried over from another dialog) the password is the next thing
+           to type, so focus goes there instead. */
+        var first = overlay.querySelector('[data-autofocus]');
+        if (first && first.type === 'email' && first.value) {
+            first = overlay.querySelector('input[type="password"]') || first;
+        }
+        first = first || overlay.querySelector('input:not([type="hidden"]), select, textarea, button');
         if (first) { first.focus({ preventScroll: true }); }
     }
 
@@ -90,6 +101,15 @@
         overlay.style.zIndex = '';
         openLayers = openLayers.filter(function (layer) { return layer !== overlay; });
 
+        /* These are shared school laptops. A password left in a closed dialog
+           is one "show password" click away from the next person to sit down,
+           so it is wiped and re-masked the moment the dialog goes. The email
+           is kept — retyping it is friction, and it is not a secret. */
+        $$('input[type="password"], input[data-pw-shown]', overlay).forEach(function (input) {
+            input.value = '';
+        });
+        maskPasswords(overlay);
+
         setTimeout(function () {
             overlay.classList.remove('is-mounted');
             if (!openLayers.length) {
@@ -99,21 +119,57 @@
         }, 160);
     }
 
-    /* Switching between the three auth dialogs closes the current one first,
-       so the scroll lock and focus restore stay balanced. */
-    var AUTH_MODALS = { signin: 'modal-signin', activate: 'modal-activate', forgot: 'modal-forgot' };
+    /* Switching between the auth dialogs closes the current one first, so
+       the scroll lock and focus restore stay balanced.
+
+       "student" is an alias of "signin" for links INSIDE the dialogs:
+       offerResume() relabels every data-auth-open="signin" trigger for a
+       returning session, which is right for the page's entry points and
+       wrong for "Student sign in" inside the staff dialog. */
+    var AUTH_MODALS = {
+        signin: 'modal-signin',
+        student: 'modal-signin',
+        staff: 'modal-staff',
+        activate: 'modal-activate',
+        forgot: 'modal-forgot'
+    };
+
+    /* "Back to sign in" (data-auth-open="back") returns to whichever sign-in
+       the visitor actually came from. A teacher who clicked "Forgot
+       password?" in the staff dialog expects to land back in the staff
+       dialog, not on the student form. */
+    var lastSignin = 'signin';
 
     function openAuth(key) {
+        if (key === 'back') { key = lastSignin; }
+
         var id = AUTH_MODALS[key];
         if (!id) { return; }
+
+        if (id === 'modal-signin') { lastSignin = 'signin'; }
+        if (id === 'modal-staff') { lastSignin = 'staff'; }
 
         var current = openLayers[openLayers.length - 1];
         if (current && current.id !== id) {
             closeModal(current);
-            setTimeout(function () { openModal(id); }, 170);
+            setTimeout(function () { carryEmail(id); openModal(id); }, 170);
             return;
         }
+        carryEmail(id);
         openModal(id);
+    }
+
+    /* The last address typed into ANY auth dialog is offered to the next
+       one that opens with its email field empty — so a teacher sent from
+       the student form to the staff form, or a student sent to "Forgot
+       password?", does not have to type it twice. In memory only: nothing
+       is persisted, and the next visitor to this laptop starts clean. */
+    var lastEmail = '';
+
+    function carryEmail(id) {
+        var overlay = document.getElementById(id);
+        var field = overlay && $('input[type="email"]', overlay);
+        if (field && !field.value && lastEmail) { field.value = lastEmail; }
     }
 
     function initModals() {
@@ -121,6 +177,10 @@
             trigger.addEventListener('click', function () {
                 openAuth(trigger.getAttribute('data-auth-open'));
             });
+        });
+
+        $$('.overlay input[type="email"]').forEach(function (field) {
+            field.addEventListener('input', function () { lastEmail = normalizeEmail(field.value); });
         });
 
         $$('.overlay').forEach(function (overlay) {
@@ -180,19 +240,102 @@
 
     function clearStatus(id) { setStatus(id, '', null); }
 
+    /* aria-invalid rides along with the visual class, and every input names
+       its .field-msg in aria-describedby — so a screen reader hears the
+       error when it lands on the field, not just a red outline it cannot see. */
     function setFieldError(id, message) {
         var field = document.getElementById(id);
         var msg = $('[data-msg-for="' + id + '"]');
-        if (field) { field.classList.toggle('is-invalid', !!message); }
-        if (msg) { msg.textContent = message || ''; }
+        if (field) {
+            field.classList.toggle('is-invalid', !!message);
+            if (message) { field.setAttribute('aria-invalid', 'true'); } else { field.removeAttribute('aria-invalid'); }
+        }
+        if (msg) {
+            msg.classList.remove('is-hint');
+            msg.textContent = message || '';
+        }
         return !message;
     }
 
     function clearFormErrors(formId) {
         var form = document.getElementById(formId);
         if (!form) { return; }
-        $$('.field-msg', form).forEach(function (n) { n.textContent = ''; });
-        $$('.is-invalid', form).forEach(function (n) { n.classList.remove('is-invalid'); });
+        $$('.field-msg', form).forEach(function (n) { n.textContent = ''; n.classList.remove('is-hint'); });
+        $$('.is-invalid', form).forEach(function (n) {
+            n.classList.remove('is-invalid');
+            n.removeAttribute('aria-invalid');
+        });
+    }
+
+    /* Validate on submit, forgive on edit: the moment the visitor starts
+       fixing a flagged field, the flag comes off. Leaving it red while they
+       type the correction reads as the form still disagreeing with them. */
+    function initLiveClear() {
+        $$('.overlay form').forEach(function (form) {
+            form.addEventListener('input', function (event) {
+                var field = event.target;
+                if (field && field.id && field.classList.contains('is-invalid')) { setFieldError(field.id, ''); }
+            });
+        });
+    }
+
+    function focusFirstInvalid(formId) {
+        var bad = $('#' + formId + ' .is-invalid');
+        if (bad) { bad.focus(); }
+    }
+
+    /* ---- Show / hide password -------------------------------------------
+       A toggle button with a constant name ("Show password") and aria-pressed
+       for the state, rather than a label that flips: the flip makes a screen
+       reader announce "Hide password, pressed", which contradicts itself.
+       data-pw-shown marks a revealed field so closeModal() can still find it
+       and wipe it once its type is "text". */
+    function setPasswordShown(input, button, shown) {
+        input.type = shown ? 'text' : 'password';
+        if (shown) { input.setAttribute('data-pw-shown', ''); } else { input.removeAttribute('data-pw-shown'); }
+        button.setAttribute('aria-pressed', String(shown));
+    }
+
+    function maskPasswords(root) {
+        $$('[data-pw-toggle]', root).forEach(function (button) {
+            var input = document.getElementById(button.getAttribute('data-pw-toggle'));
+            if (input) { setPasswordShown(input, button, false); }
+        });
+    }
+
+    function initPasswordToggles() {
+        $$('[data-pw-toggle]').forEach(function (button) {
+            var input = document.getElementById(button.getAttribute('data-pw-toggle'));
+            if (!input) { return; }
+            button.addEventListener('click', function () {
+                setPasswordShown(input, button, input.type === 'password');
+            });
+        });
+    }
+
+    /* ---- Caps Lock --------------------------------------------------------
+       The single most common cause of "my password is wrong". Shown in the
+       field's reserved message slot, so it costs no layout, and only while
+       that slot has no real error to show. */
+    function setCapsHint(input, on) {
+        var msg = $('[data-msg-for="' + input.id + '"]');
+        if (!msg || input.classList.contains('is-invalid')) { return; }
+        if (!on && !msg.classList.contains('is-hint')) { return; }
+        msg.classList.toggle('is-hint', on);
+        msg.textContent = on ? 'Caps Lock is on.' : '';
+    }
+
+    function initCapsLock() {
+        $$('[data-pw-toggle]').forEach(function (button) {
+            var input = document.getElementById(button.getAttribute('data-pw-toggle'));
+            if (!input) { return; }
+            var check = function (event) {
+                if (event.getModifierState) { setCapsHint(input, event.getModifierState('CapsLock')); }
+            };
+            input.addEventListener('keydown', check);
+            input.addEventListener('keyup', check);
+            input.addEventListener('blur', function () { setCapsHint(input, false); });
+        });
     }
 
     /* Label swaps while the measured width is pinned, so footers never jump. */
@@ -242,31 +385,78 @@
 
     /* ============================================ 3. SIGN IN =========== */
 
-    /* Mirrors the flow the existing landing page uses, so both entry points
-       behave identically:
-         signInWithPassword → profiles lookup → role → device claim → redirect
+    /* Two areas — student, and staff (teacher or admin) — and one pipeline:
+         signInWithPassword → profiles lookup → role → AREA CHECK
+           → device claim → redirect
        The device claim is skipped for admins, matching enforceDeviceLimit's
        contract in function.js. */
-    async function handleSignIn(event) {
-        event.preventDefault();
-        clearFormErrors('signin-form');
-        clearStatus('signin-status');
 
-        var email = normalizeEmail($('#si-email').value);
-        var password = $('#si-password').value;
+    /* Anything that is not explicitly staff routes as a student, exactly as
+       the redirect below always has. Normalising once means the area check
+       and the redirect can never disagree about who someone is. */
+    function normalizeRole(raw) {
+        var role = String(raw || 'student').trim().toLowerCase();
+        return (role === 'admin' || role === 'teacher') ? role : 'student';
+    }
+
+    /* The area check. Teachers and admins share the staff door, so the only
+       wrong turns left are student-into-staff and staff-into-student — and
+       each message names the right door, which sits one link away. */
+    function areaMismatch(area, role) {
+        var isStaff = role === 'teacher' || role === 'admin';
+        if (area === 'staff' && !isStaff) {
+            return 'This is a student account. Use Student sign in instead.';
+        }
+        if (area === 'student' && isStaff) {
+            return 'This is a staff account. Use Admin sign in, below.';
+        }
+        return '';
+    }
+
+    /* Supabase's raw strings are written for developers. Rewritten for a
+       twelve-year-old, and still deliberately vague about WHICH half was
+       wrong — "incorrect email or password", never "no such user" — so the
+       form cannot be used to test whether an address is on the roster. */
+    function friendlyAuthError(error) {
+        var raw = String((error && error.message) || '');
+        if (/invalid login credentials/i.test(raw)) {
+            return 'Incorrect email or password. Check both and try again.';
+        }
+        if (/email not confirmed/i.test(raw)) {
+            return 'This account is not activated yet. Use Activate account first.';
+        }
+        if (/rate limit|too many/i.test(raw)) {
+            return 'Too many attempts. Wait a minute, then try again.';
+        }
+        return raw || 'Sign-in failed. Please try again.';
+    }
+
+    async function signIn(opts) {
+        clearFormErrors(opts.formId);
+        clearStatus(opts.statusId);
+
+        var email = normalizeEmail($('#' + opts.emailId).value);
+        var password = $('#' + opts.passwordId).value;
 
         var valid = true;
-        valid = setFieldError('si-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
-        valid = setFieldError('si-password', password ? '' : 'Password is required.') && valid;
-        if (!valid) { return; }
+        valid = setFieldError(opts.emailId, isEmail(email) ? '' : 'Enter a valid email address.') && valid;
+        valid = setFieldError(opts.passwordId, password ? '' : 'Password is required.') && valid;
+        if (!valid) {
+            focusFirstInvalid(opts.formId);
+            return;
+        }
 
-        var release = setBusy($('#si-submit'), 'Signing in…');
+        /* Re-mask before the request. Browsers only offer to save a password
+           that was submitted from a type="password" field. */
+        maskPasswords($('#' + opts.formId));
+
+        var release = setBusy($('#' + opts.submitId), 'Signing in…');
 
         try {
             var auth = await sb.auth.signInWithPassword({ email: email, password: password });
 
             if (auth.error) {
-                setStatus('signin-status', auth.error.message, 'error');
+                setStatus(opts.statusId, friendlyAuthError(auth.error), 'error');
                 return;
             }
 
@@ -277,13 +467,26 @@
                 /* An auth user with no profile row cannot be routed anywhere.
                    Sign back out rather than leaving a half-session behind. */
                 await sb.auth.signOut();
-                setStatus('signin-status',
+                setStatus(opts.statusId,
                     'This account is not set up yet. Please contact the study administrator.', 'error');
                 return;
             }
 
             var profile = profileRes.data;
-            var role = (profile.role || 'student').trim().toLowerCase();
+            var role = normalizeRole(profile.role);
+
+            /* BEFORE anything is stored or claimed: a sign-in through the
+               wrong area writes nothing to localStorage and never takes one
+               of the account's device slots. The area is a routing promise,
+               not the security boundary — row-level security is — but a
+               teacher in the student area should be told, not silently sent
+               somewhere they did not ask to go. */
+            var mismatch = areaMismatch(opts.area, role);
+            if (mismatch) {
+                await sb.auth.signOut();
+                setStatus(opts.statusId, mismatch, 'error');
+                return;
+            }
 
             try {
                 localStorage.setItem('pia_user_email', auth.data.user.email);
@@ -294,12 +497,12 @@
                 var check = await enforceDeviceLimit(auth.data.user.email, profile);
                 if (!check.allowed) {
                     await sb.auth.signOut();
-                    setStatus('signin-status', check.reason, 'error');
+                    setStatus(opts.statusId, check.reason, 'error');
                     return;
                 }
             }
 
-            setStatus('signin-status', 'Signed in. Taking you to your dashboard…', 'ok');
+            setStatus(opts.statusId, 'Signed in. Taking you to your dashboard…', 'ok');
 
             if (role === 'admin') {
                 window.location.replace('admin/html/admin-dashboard.html');
@@ -312,10 +515,36 @@
             }
         } catch (err) {
             console.error('Sign-in failed:', err);
-            setStatus('signin-status', 'Could not reach the server. Check your connection and try again.', 'error');
+            setStatus(opts.statusId, 'Could not reach the server. Check your connection and try again.', 'error');
         } finally {
             release();
         }
+    }
+
+    function handleStudentSignIn(event) {
+        event.preventDefault();
+        return signIn({
+            area: 'student',
+            formId: 'signin-form',
+            emailId: 'si-email',
+            passwordId: 'si-password',
+            submitId: 'si-submit',
+            statusId: 'signin-status'
+        });
+    }
+
+    /* One door for teachers and admins. The redirect below the area check
+       sends each to their own dashboard by the role on their profile. */
+    function handleStaffSignIn(event) {
+        event.preventDefault();
+        return signIn({
+            area: 'staff',
+            formId: 'staff-form',
+            emailId: 'st-email',
+            passwordId: 'st-password',
+            submitId: 'st-submit',
+            statusId: 'staff-status'
+        });
     }
 
     /* ============================================ 4. ACTIVATION ======== */
@@ -405,7 +634,11 @@
             try { role = localStorage.getItem('pia_user_role') || 'student'; } catch (err) { /* ignore */ }
 
             $$('[data-auth-open="signin"]').forEach(function (btn) {
-                btn.textContent = 'Continue to dashboard';
+                /* data-resume-label lets a tight spot (the phone navbar) ask
+                   for a shorter label than the default. Buttons with a
+                   .cta-label keep their icon: only the label is rewritten. */
+                var label = btn.querySelector('.cta-label') || btn;
+                label.textContent = btn.getAttribute('data-resume-label') || 'Continue to dashboard';
                 btn.addEventListener('click', function (event) {
                     event.stopImmediatePropagation();
                     if (role === 'admin') { window.location.replace('admin/html/admin-dashboard.html'); }
@@ -421,6 +654,11 @@
     function boot() {
         initModals();
 
+        /* Presentation-only field behaviour: works with or without a backend. */
+        initPasswordToggles();
+        initCapsLock();
+        initLiveClear();
+
         if (typeof sb === 'undefined' || !sb) {
             $$('[data-auth-open]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
@@ -430,7 +668,8 @@
             return;
         }
 
-        $('#signin-form').addEventListener('submit', handleSignIn);
+        $('#signin-form').addEventListener('submit', handleStudentSignIn);
+        $('#staff-form').addEventListener('submit', handleStaffSignIn);
         $('#activate-form').addEventListener('submit', handleActivate);
         $('#forgot-form').addEventListener('submit', handleForgot);
 

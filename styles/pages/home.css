@@ -24,7 +24,7 @@ body {
 .mobile-greeting-prefix {
     display: block;
     margin-bottom: 0.125rem;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -838,7 +838,7 @@ body {
 }
 
 .auth-forgot-link {
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--accent-primary);
     font-weight: 600;
 }
@@ -893,7 +893,7 @@ body {
 }
 
 .auth-resend-btn {
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--text-secondary);
     background: transparent;

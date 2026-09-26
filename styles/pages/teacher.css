@@ -12,7 +12,7 @@
 /* ------------------------------------------------------------- 1. TABLES */
 .table-wrap { overflow-x: auto; }
 
-.table { font-size: 13px; }
+.table { font-size: var(--fs-sm); }
 
 .table thead th {
     position: sticky;
@@ -22,7 +22,7 @@
     padding: 0 var(--sp-5);
     background: var(--bg-surface);
     text-align: left;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -38,7 +38,7 @@
 }
 
 .table tbody tr { transition: background-color var(--t-base); }
-.table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.012); }
+.table tbody tr:nth-child(even) { background: var(--stripe); }
 .table tbody tr:hover,
 .table tbody tr:nth-child(even):hover { background: var(--bg-surface-hover); }
 
@@ -46,7 +46,7 @@
 
 .cell-user { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .cell-name { display: block; font-weight: 600; line-height: 18px; }
-.cell-mail { display: block; font-size: 11.5px; line-height: 16px; color: var(--text-muted); }
+.cell-mail { display: block; font-size: var(--fs-xs); line-height: 16px; color: var(--text-muted); }
 
 .empty-cell {
     /* min-height, not height: the message wraps on narrow screens and the
@@ -70,7 +70,7 @@
     border-radius: var(--r-pill);
     background: var(--bg-chip);
     color: var(--text-muted);
-    font-size: 11.5px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -115,7 +115,7 @@
     background: var(--bg-chip);
     display: grid;
     place-items: center;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
 }
 
@@ -152,7 +152,7 @@ button.stat:hover { background: var(--bg-surface-hover); }
 button.stat.is-active { background: var(--accent-soft); }
 
 .stat-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
-.stat-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.stat-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
 
 .stat-glyph {
     width: 30px;
@@ -179,7 +179,7 @@ button.stat.is-active { background: var(--accent-soft); }
     font-variant-numeric: tabular-nums;
 }
 
-.stat-foot { min-height: 18px; font-size: 11.5px; color: var(--text-muted); }
+.stat-foot { min-height: 18px; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* ------------------------------------------------------- 5. FILTER TABS */
 .filter-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
@@ -190,7 +190,7 @@ button.stat.is-active { background: var(--accent-soft); }
     border-radius: var(--r-pill);
     background: var(--bg-field);
     color: var(--text-muted);
-    font-size: 12.5px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     white-space: nowrap;
     transition: background-color var(--t-base), color var(--t-base);
@@ -222,7 +222,7 @@ button.stat.is-active { background: var(--accent-soft); }
 }
 
 .state-title { font-size: 14px; font-weight: 600; }
-.state-desc { font-size: 12.5px; color: var(--text-muted); max-width: 42ch; }
+.state-desc { font-size: var(--fs-sm); color: var(--text-muted); max-width: 42ch; }
 
 .skeleton { border-radius: var(--r-xs); background: var(--bg-surface-hi); animation: skel 1.4s ease-in-out infinite; }
 @keyframes skel { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
@@ -251,7 +251,7 @@ body[data-boot="pending"] .toast-stack { visibility: hidden; }
 
 body:not([data-boot="pending"]) .boot-veil { opacity: 0; pointer-events: none; }
 body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
-.boot-text { font-size: 13px; color: var(--text-muted); }
+.boot-text { font-size: var(--fs-sm); color: var(--text-muted); }
 
 .error-banner {
     position: fixed;
@@ -267,7 +267,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     padding: var(--sp-2) var(--sp-5);
     background: var(--danger);
     color: var(--text-on-solid);
-    font-size: 12.5px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     text-align: center;
 }
@@ -338,7 +338,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     background: var(--bg-field);
 }
 
-.kv-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.kv-label { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
 .kv-value { margin-top: var(--sp-1); font-size: 15px; font-weight: 600; }
 
 /* ---------------------------------------------------------- 9. UTILITIES */

@@ -33,7 +33,8 @@ async function checkUserAndStage() {
     }
 
     if (canEnterStage(profile, 'ocean')) {
-        document.getElementById('waiting-title').textContent = "Waiting for OCEAN Test";
+        // Hindi binabanggit ang pangalan ng instrumento sa estudyante.
+        document.getElementById('waiting-title').textContent = "Waiting for the questionnaire";
         checkAndListen('stage_ocean', 'ocean-test.html');
     }
     else if (canEnterStage(profile, 'char')) {

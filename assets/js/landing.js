@@ -187,6 +187,116 @@
 
 
     /* ==================================================================== *
+     * 2B. HERO BACKGROUND VIDEO                                            *
+     * ==================================================================== *
+     * A plain loop, not a scrub — nothing here reads scroll position, so it
+     * adds no work to the frame loop above.
+     *
+     * The <video> ships with preload="none" and no autoplay attribute, so
+     * NOTHING is downloaded until this function decides to play. It plays
+     * only when all of these hold:
+     *   * the visitor has not paused it (a choice remembered per browser),
+     *   * they have not asked for reduced motion — unless they explicitly
+     *     pressed Play, which outranks the OS default,
+     *   * the connection is not in Save-Data or 2G mode,
+     *   * the hero is on screen and the tab is visible.
+     * The last two are resource rules, not preferences: a paused video
+     * costs no decode, no GPU and no battery while the visitor reads the
+     * rest of the page.
+     *
+     * Every failure path — autoplay refused (iOS Low Power Mode), every
+     * source unplayable, JS absent — leaves the poster in place. The poster
+     * is frame 0 of the loop, so success and failure look the same at rest. */
+
+    function initHeroVideo() {
+        var hero = $('#hero');
+        var video = $('#hero-video');
+        var toggle = $('#hero-video-toggle');
+        if (!hero || !video) { return; }
+
+        var conn = navigator.connection || {};
+        if (conn.saveData === true || /(^|-)2g$/.test(conn.effectiveType || '')) { return; }
+
+        var STORE = 'pia_hero_video';
+        var choice = null;
+        try { choice = localStorage.getItem(STORE); } catch (e) { /* private mode */ }
+
+        var userPaused = choice === 'paused' || (choice !== 'playing' && reduceMotion);
+        var onScreen = true;
+        var label = toggle ? $('[data-video-label]', toggle) : null;
+
+        /* The property, not only the attribute. Autoplay policy checks the
+           live muted state, and a muted attribute alone has been known not
+           to count when the element is touched by script first. */
+        video.muted = true;
+
+        function render() {
+            if (!toggle) { return; }
+            var paused = video.paused;
+            toggle.classList.toggle('is-paused', paused);
+            if (label) { label.textContent = paused ? 'Play background video' : 'Pause background video'; }
+        }
+
+        function sync() {
+            var want = !userPaused && onScreen && !document.hidden;
+
+            if (want && video.paused) {
+                var attempt = video.play();
+                /* A refused play() is not an error worth reporting — it is
+                   the browser saying "not now". The poster stays and the
+                   button offers Play. Swallowed here so the page's error
+                   boundary (section 8) does not mistake it for a crash. */
+                if (attempt && attempt.catch) { attempt.catch(render); }
+            } else if (!want && !video.paused) {
+                video.pause();
+            }
+        }
+
+        video.addEventListener('play', render);
+        video.addEventListener('pause', render);
+
+        /* Source errors fire on the <source> elements, not on the <video>.
+           Only the LAST one failing means nothing is left to try, and the
+           control would then be a button that does nothing. */
+        var sources = $$('source', video);
+        if (sources.length && toggle) {
+            sources[sources.length - 1].addEventListener('error', function () { toggle.hidden = true; });
+        }
+
+        if (toggle) {
+            toggle.hidden = false;
+            toggle.addEventListener('click', function () {
+                userPaused = !video.paused;
+                choice = userPaused ? 'paused' : 'playing';
+                try { localStorage.setItem(STORE, choice); } catch (e) { /* private mode */ }
+                sync();
+                render();
+            });
+        }
+
+        if ('IntersectionObserver' in window) {
+            new IntersectionObserver(function (entries) {
+                onScreen = entries[0].isIntersecting;
+                sync();
+            }).observe(hero);
+        }
+
+        document.addEventListener('visibilitychange', sync);
+
+        /* A reduced-motion switch made mid-visit pauses the loop, unless the
+           visitor had explicitly chosen to play it. */
+        if (motionQuery.addEventListener) {
+            motionQuery.addEventListener('change', function (event) {
+                if (event.matches && choice !== 'playing') { userPaused = true; sync(); }
+            });
+        }
+
+        render();
+        sync();
+    }
+
+
+    /* ==================================================================== *
      * 3. WORD-BY-WORD SCRUB                                                *
      * ==================================================================== *
      * Splits a heading into words and lights them one at a time as the
@@ -410,22 +520,33 @@
      * persist is attempted afterwards. In private mode the persist throws and
      * the theme still changes for this session, which is the right failure.  */
 
+    /* Two toggles share the job: the icon button in the bar and the labelled
+       switch in the phone sheet (the bar drops its own below 30rem). Every
+       [data-theme-toggle] flips the same attribute and all of them re-sync,
+       so the two can never show different states. */
     function initTheme() {
-        var toggle = $('#theme-toggle');
-        if (!toggle) { return; }
+        var toggles = $$('[data-theme-toggle]');
+        if (!toggles.length) { return; }
 
         function current() {
             return document.documentElement.getAttribute('data-theme') || 'dark';
         }
 
-        toggle.addEventListener('click', function () {
-            var next = current() === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            toggle.setAttribute('aria-pressed', String(next === 'dark'));
-            try { localStorage.setItem('pia_theme', next); } catch (e) { /* private mode */ }
+        function sync() {
+            var dark = String(current() === 'dark');
+            toggles.forEach(function (t) { t.setAttribute('aria-pressed', dark); });
+        }
+
+        toggles.forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                var next = current() === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                sync();
+                try { localStorage.setItem('pia_theme', next); } catch (e) { /* private mode */ }
+            });
         });
 
-        toggle.setAttribute('aria-pressed', String(current() === 'dark'));
+        sync();
     }
 
 
@@ -517,6 +638,7 @@
         initWordEntrance();
         initWordScrub();
         initScrub();
+        initHeroVideo();
         initHoverIntent();
         wake();
 

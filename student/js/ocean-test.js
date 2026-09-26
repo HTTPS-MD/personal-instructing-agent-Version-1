@@ -27,18 +27,11 @@ function isComplete() {
 // wala nang email na ipinapadala ang browser bilang parameter.
 let verifiedProfile = null;
 
-const questions = [
-    "Am the life of the party.", "Feel little concern for others.", "Am always prepared.", "Get stressed out easily.", "Have a rich vocabulary.",
-    "Don't talk a lot.", "Am interested in people.", "Leave my belongings around.", "Am relaxed most of the time.", "Have difficulty understanding abstract ideas.",
-    "Feel comfortable around people.", "Insult people.", "Pay attention to details.", "Worry about things.", "Have a vivid imagination.",
-    "Keep in the background.", "Sympathize with others' feelings.", "Make a mess of things.", "Seldom feel blue.", "Am not interested in abstract ideas.",
-    "Start conversations.", "Am not interested in other people's problems.", "Get chores done right away.", "Am easily disturbed.", "Have excellent ideas.",
-    "Have little to say.", "Have a soft heart.", "Often forget to put things back in their proper place.", "Get upset easily.", "Do not have a good imagination.",
-    "Talk to a lot of different people at parties.", "Am not really interested in others.", "Like order.", "Change my mood a lot.", "Am quick to understand things.",
-    "Don't like to draw attention to myself.", "Take time out for others.", "Shirk my duties.", "Have frequent mood swings.", "Use difficult words.",
-    "Don't mind being the center of attention.", "Feel others' emotions.", "Follow a schedule.", "Get irritated easily.", "Spend time reflecting on things.",
-    "Am quiet around strangers.", "Make people feel at ease.", "Am exacting in my work.", "Often feel blue.", "Am full of ideas."
-];
+// Ang 50 pahayag ng BFPT, galing sa assets/js/bfpt-items.js -- iisang listahan
+// para sa page na ito at sa results drawer ng admin. Na-tsek na item-by-item
+// laban sa 20260722_Table BFPT.pdf. POSISYON ang basehan ng scoring sa server
+// (sagot 1 = item 1), kaya hindi dapat baguhin ang pagkakasunod nito.
+const questions = window.PIA_BFPT.items;
 
 document.body.style.overflow = 'hidden';
 
@@ -213,8 +206,9 @@ function showPrivacyStep() {
         <h1 class="gate-title">A few questions about you</h1>
         <p class="gate-lede">
             There are 50 short statements, and there are no right or wrong answers —
-            just pick how well each one describes you. It takes about ten minutes, and
-            you can go back and change any answer before you submit.
+            read each one as starting with "I…" and choose how much you agree or
+            disagree. It takes about ten minutes, and you can go back and change any
+            answer before you submit.
         </p>
 
         <div class="privacy-box">
@@ -280,6 +274,15 @@ function initTestUI() {
     // Ang mga answer button ay may data-score na (dating inline onclick), kaya
     // isang delegated listener na lang ang kailangan.
     const list = document.getElementById('ocean-answer-list');
+
+    // Ang label ng bawat sagot ay galing sa scale ng BFPT sheet (1 = Disagree
+    // ... 5 = Agree), para iisa ang wording dito at sa admin drawer.
+    document.querySelectorAll('#ocean-answer-list button[data-score]').forEach(btn => {
+        const label = window.PIA_BFPT.labelFor(Number(btn.getAttribute('data-score')));
+        const slot = btn.querySelector('.answer-label');
+        if (label && slot) slot.textContent = label;
+    });
+
     if (list) {
         list.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-score]');
@@ -397,23 +400,17 @@ async function submitTestResults() {
         </div>
     `;
 
-    // SECURITY FIX (CRITICAL): wala nang scoring dito.
+    // Walang scoring dito, at walang resultang bumabalik dito.
     //
-    // Dati, ang browser ang kumu-compute ng E/A/C/N/O at direktang isinusulat
-    // ang is_ocean_done + ocean_* sa profiles. Ibig sabihin, kayang gawin ng
-    // kahit sinong estudyante ang buong personality profile nila nang hindi
-    // sinasagutan ang test -- at ang personality ang mismong independent
-    // variable ng thesis na ito. Ang paglipat lang ng WRITE sa isang RPC ay
-    // hindi sapat: pwede pa rin silang mag-POST ng gawa-gawang score.
-    //
-    // Kaya ang RAW na 50 sagot (1..5) na ang ipinapadala, at ang SERVER ang
-    // nag-i-score gamit ang IPIP-50 key (submit_ocean_results). Ang browser ay
-    // wala nang masabi tungkol sa resulta. Naitatago rin ng server ang
-    // per-item responses sa ocean_submissions -- dati, itinatapon ang mga ito,
-    // kaya imposible ang item analysis / Cronbach's alpha.
+    // Ang RAW na 50 sagot (1..5) lang ang ipinapadala. Ang server ang
+    // nag-i-score gamit ang scoring sheet ng BFPT (public.pia_bfpt_score,
+    // migration 0018) at itinatago ang resulta sa ocean_submissions -- na
+    // admin LAMANG ang nakakabasa. Ang ibinabalik ng RPC ay { next_stage }
+    // lang: walang score, trait o persona na umaabot sa browser ng
+    // estudyante, kahit sa network tab.
     if (!supabaseClient) return;
 
-    const { data, error } = await supabaseClient.rpc('submit_ocean_results', {
+    const { error } = await supabaseClient.rpc('submit_ocean_results', {
         p_responses: userResponses
     });
 
@@ -434,23 +431,10 @@ async function submitTestResults() {
     // muli kung babalik sila sa page na ito.
     clearOceanProgress();
 
-    testContainer.innerHTML = `
-        <div class="state-card">
-            <div class="modal-hero-glyph g-accent" style="margin:0 auto 20px">
-                <svg class="icon icon-lg"><use href="#i-check"></use></svg>
-            </div>
-            <h2>All done — thank you!</h2>
-            <p>Your answers are saved. Taking you to the next step…</p>
-        </div>
-    `;
-
-    // Ang server ang nagpasya kung saan sila susunod na pupunta.
-    const nextStage = data && data.next_stage;
-    const targetUrl = (STAGE_PAGES[nextStage] && STAGE_PAGES[nextStage].url) || 'waiting-room.html';
-
-    setTimeout(() => {
-        window.location.href = targetUrl;
-    }, 2000);
+    // Diretso sa simpleng thank-you screen. replace(), hindi href: ang Back
+    // button ay hindi dapat magbalik sa isang questionnaire na naisumite na.
+    // Ang thank-you page na ang bahala sa kung saan sila susunod.
+    window.location.replace('assessment-complete.html');
 }
 
 // ==========================================

@@ -162,9 +162,16 @@ begin
 
   -- ---------- ADMIN (dapat ALLOWED -- huwag masira ang dashboard) ----------
   if a is not null then
-    perform pg_temp.pia_try('admin: sulatan ang ocean_* ng student', 'ALLOWED', a, format(
-      $q$update public.profiles set ocean_o = 21, is_ocean_done = false,
+    -- Ang retake ng admin: completion flag + stage lang. Mula 0018, WALA nang
+    -- score sa profiles, kaya hindi na ito nagsusulat ng ocean_*.
+    perform pg_temp.pia_try('admin: retake OCEAN (flag + stage)', 'ALLOWED', a, format(
+      $q$update public.profiles set is_ocean_done = false,
           current_stage = 'OCEAN' where email = %L$q$, s));
+
+    -- 0018: bawal na ang score sa profiles para sa LAHAT, pati admin -- ang
+    -- resulta ay nasa ocean_submissions lang (admin-only ang pagbasa).
+    perform pg_temp.pia_try('admin: score sa profiles (0018: dapat BLOCKED)', 'BLOCKED', a, format(
+      $q$update public.profiles set ocean_o = 21 where email = %L$q$, s));
 
     perform pg_temp.pia_try('admin: batch scores', 'ALLOWED', a, format(
       $q$update public.profiles set pre_test_score = 55, post_test_score = 77 where email = %L$q$, s));

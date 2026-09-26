@@ -45,6 +45,26 @@ const EXPRESSION_ICONS = {
     excited: 'star'
 };
 
+// C4 -- Tang et al. (2025) found the pedagogical agent slightly DEPRESSED
+// transfer while emotional feedback RAISED engagement, and advised caution
+// "to avoid potential distractions during the learning process". So the agent
+// is not given constant visual weight: this map decides how loud it is
+// allowed to be for a given mood, and the CSS does the rest via
+// [data-agent-state] on .tut-workspace.
+//
+//   solving  -> desaturated, smaller, neutral bubble. The state the learner
+//               is in while actually thinking, i.e. while an agent hurts.
+//   correct  -> full colour + a short spring, mint bubble.
+//   retry    -> full colour, coral bubble. Never red.
+const EXPRESSION_STATES = {
+    idle: 'solving',
+    thinking: 'solving',
+    happy: 'correct',
+    excited: 'correct',
+    encouraging: 'retry',
+    concerned: 'retry'
+};
+
 const gameState = {
     email: null,
     sessionId: null, // server-issued game session (nagtatali sa attempt limits)
@@ -193,6 +213,9 @@ function setAgentExpression(mood) {
     const badge = document.getElementById('agent-expression-badge');
     if (!badge) return;
     const iconName = EXPRESSION_ICONS[mood] || EXPRESSION_ICONS.idle;
+
+    const workspace = document.getElementById('problem-screen');
+    if (workspace) workspace.dataset.agentState = EXPRESSION_STATES[mood] || 'solving';
 
     badge.innerHTML = `<i data-lucide="${iconName}" class="icon-sm"></i>`;
     badge.classList.remove('agent-expression-pulse');
@@ -358,10 +381,17 @@ function renderProblem() {
 
 function updateProgressUI() {
     const pct = Math.round((gameState.problemsAnswered / SESSION_TARGET) * 100);
-    document.getElementById('progress-bar-fill').style.width = `${pct}%`;
+    const fill = document.getElementById('progress-bar-fill');
+    fill.style.width = `${pct}%`;
+    fill.parentElement?.setAttribute('aria-valuenow', String(Math.round(pct)));
     document.getElementById('progress-label').textContent = `${gameState.problemsAnswered} / ${SESSION_TARGET} problems`;
-    document.getElementById('level-badge').textContent = `Level ${gameState.level}`;
+    document.getElementById('level-badge').textContent = gameState.level;
     document.getElementById('streak-count').textContent = gameState.consecutiveCorrect;
+
+    // A reward signal that is always on is not a reward signal -- the streak
+    // chip only goes sunny once there is a streak to celebrate.
+    document.getElementById('streak-chip')
+        ?.classList.toggle('is-hot', gameState.consecutiveCorrect >= 2);
 }
 
 function setAgentSpeech(text) {

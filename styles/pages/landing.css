@@ -42,109 +42,165 @@
 
 
 /* ═══════════════════════════════════════════ 1. PALETTE ═══════════════ */
-/* Deep indigo, never black. #000 on a screen this size is a hole; indigo has
-   a temperature, and it makes every accent sitting on it look warmer.
+/* THREE COLOURS. THAT IS THE WHOLE PAGE.
+   Every colour on the landing page is one of the three values below, or a
+   mix of them made with color-mix(). There is no fourth hue anywhere in this
+   file: no per-section accents, no per-tutor tints, no red for errors, no
+   green for success. Swap these three values and the page re-colours
+   completely, dark mode and dialogs included.
 
-   CONTRAST, measured on --pop-void:
-       --pop-ink   15.8:1     --pop-ink-2   8.3:1     --pop-ink-3  5.1:1
-       yellow      12.2:1     coral         6.3:1     sky          9.3:1
-       mint        10.7:1     lilac         8.6:1     rose         5.7:1
-   Every one clears WCAG AA for body text, which matters more here than
-   usual: the readers are twelve and half of them will be on a school laptop
-   with the brightness turned down. */
+   Replacing them has one rule. The accent has to do three jobs, and the
+   figures beside it are the reason this exact coral was chosen over the
+   one it replaced (#F2613F, which failed the first job at 2.98:1):
+       as LARGE TEXT on the light ground ............ 3.10:1  (needs 3)
+       as LARGE TEXT on the dark ground ............. 4.82:1  (needs 3)
+       as a BUTTON FILL under a dark label .......... 4.82:1  (needs 4.5)
+   A replacement accent must clear all three. Its small-text shade, the
+   muted and faint inks, and every surface are derived and re-check
+   themselves — but the ratios noted below were measured for these values. */
 :root {
-    /* ── Ground ── */
-    --pop-void: #12102B;        /* the page */
-    --pop-panel: #1C1942;       /* a card sitting on it */
-    --pop-panel-2: #262252;     /* a chip, or a card being hovered */
+    --palette-light: #FAF7E8;    /* warm cream: the light ground, dark mode's ink */
+    --palette-dark: #16241F;     /* pine-black: the ink, dark mode's ground       */
+    --palette-accent: #EE5E3A;   /* coral: actions, highlights, focus, errors     */
+}
 
-    /* ── Ink ── */
-    --pop-ink: #F4F1FF;
-    --pop-ink-2: #B3AED6;
-    --pop-ink-3: #8B85B8;
+/* ── Theme ──
+   Light is the default (theme-boot.js); dark mode simply swaps which of
+   the two neutrals is the ground and which is the ink. The accent stays.
+   14.95:1 between them either way. */
+:root { --bg: var(--palette-light); --fg: var(--palette-dark); color-scheme: light; }
+:root[data-theme="dark"] { --bg: var(--palette-dark); --fg: var(--palette-light); color-scheme: dark; }
 
-    /* ── The fun ── */
-    --pop-yellow: #FFD166;
-    --pop-yellow-2: #FFC13D;    /* pressed / hovered yellow */
-    --pop-coral: #FF6B5E;
-    --pop-sky: #5AC8FA;
-    --pop-mint: #5CE1A0;
-    --pop-lilac: #C4A7FF;
-    --pop-rose: #FF5470;        /* errors, and nothing else */
+/* ── Roles ──
+   Declared on `:root, :root[data-theme]` rather than `:root` alone. global.css
+   sets many of these same names inside :root[data-theme="dark"], which
+   outranks a bare :root; matching its specificity, and loading after it,
+   is what keeps its dark-mode colours off this page.
 
-    /* Accents used as TEXT need no darkening on the indigo ground — see the
-       table above. Light mode is a different story and overrides these. */
-    --coral-text: var(--pop-coral);
-    --sky-text: var(--pop-sky);
-    --yellow-text: var(--pop-yellow);
-    --mint-text: var(--pop-mint);
-    --lilac-text: var(--pop-lilac);
+   Mixing toward --fg works in BOTH themes from one declaration: in light
+   mode it darkens the cream, in dark mode it lightens the pine-black. */
+:root,
+:root[data-theme] {
+    /* Surfaces: a few percent of ink into the ground. */
+    --bg-main: var(--bg);
+    --bg-body: var(--bg);
+    --bg-surface: color-mix(in srgb, var(--fg) 4%, var(--bg));
+    --bg-surface-hi: var(--bg-surface);
+    --bg-surface-hover: color-mix(in srgb, var(--fg) 7%, var(--bg));
+    --bg-field: color-mix(in srgb, var(--fg) 6%, var(--bg));
+    --bg-inset-focus: var(--bg-field);
+    --bg-chip: color-mix(in srgb, var(--fg) 8%, var(--bg));
+    --bg-chip-hover: color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --track: color-mix(in srgb, var(--fg) 18%, var(--bg));
+    --track-hover: var(--palette-accent);
 
-    /* ── Role aliases. Everything below, and every global.css component this
-           page mounts, reads one of these. ── */
-    --bg-body: var(--pop-void);
-    --bg-surface: var(--pop-panel);
-    --bg-field: var(--pop-void);
-    --bg-chip: var(--pop-panel-2);
-    --bg-chip-hover: var(--pop-panel-2);
-    --bg-surface-hover: var(--pop-panel-2);
+    /* Ink. Measured on the ground / on --bg-surface, light | dark. */
+    --text: var(--fg);                                          /* 14.95 | 14.95 */
+    --text-primary: var(--text);
+    --text-main: var(--text);
+    --text-muted: color-mix(in srgb, var(--fg) 72%, var(--bg)); /*  6.16 / 5.59 | 8.35 */
+    --text-faint: color-mix(in srgb, var(--fg) 66%, var(--bg)); /*  5.05 / 4.58 | 7.21 */
+    --text-on-solid: var(--bg);
 
-    --text: var(--pop-ink);
-    --text-muted: var(--pop-ink-2);
-    --text-faint: var(--pop-ink-3);
+    /* The accent. The FILL keeps a dark label in both themes — that is the
+       4.82:1 pairing — so --on-accent is pinned to the palette's dark value,
+       not to the swapping --fg. Hover lightens rather than darkens, because
+       darkening would pull the fill toward its own label. */
+    --accent: var(--palette-accent);
+    --accent-strong: color-mix(in srgb, var(--palette-accent) 82%, var(--palette-light));  /* 5.84 under the label */
+    --accent-hover: var(--accent-strong);
+    --accent-soft: color-mix(in srgb, var(--palette-accent) 16%, transparent);
+    --accent-line: color-mix(in srgb, var(--palette-accent) 32%, transparent);
+    --on-accent: var(--palette-dark);
+    --on-primary: var(--on-accent);
+    --color-primary: var(--accent);
+    --color-primary-ink: var(--accent-text);
 
-    /* Yellow is the primary action, not coral. Two reasons: it is the loudest
-       thing on an indigo ground at 12.2:1, and it can never be confused with
-       the error colour — which coral, sitting two hue steps from rose, could
-       be. Coral gets the more fun job of being the decoration. */
-    --accent: var(--pop-yellow);
-    --accent-strong: var(--pop-yellow-2);
-    --accent-soft: color-mix(in srgb, var(--pop-yellow) 16%, transparent);
-    --on-accent: var(--pop-void);         /* 12.2:1 on the yellow fill */
+    /* The accent as SMALL TEXT — links, labels, error messages. Pulled
+       toward the ink: darker on cream (5.77:1, 5.13 on a field), lighter on
+       pine-black (7.34:1). */
+    --accent-text: color-mix(in srgb, var(--palette-accent) 62%, var(--fg));
 
-    --danger: var(--pop-rose);
-    --danger-strong: var(--pop-coral);
-    --danger-soft: color-mix(in srgb, var(--pop-rose) 15%, transparent);
-    --danger-line: color-mix(in srgb, var(--pop-rose) 55%, transparent);
-    --on-danger: var(--pop-void);
+    /* Errors are the accent, not a fourth colour. The alert icon and the
+       message text carry the meaning (WCAG 1.4.1 forbids colour alone
+       anyway); success is plain ink on a neutral tint with a check icon,
+       which keeps the two states apart without a green. */
+    --danger: var(--accent-text);
+    --danger-strong: var(--accent-text);
+    --danger-ink: var(--accent-text);
+    --color-danger: var(--accent-text);
+    --color-danger-ink: var(--accent-text);
+    --danger-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
+    --danger-line: color-mix(in srgb, var(--palette-accent) 45%, transparent);
+    --on-danger: var(--palette-dark);
 
-    /* ── The local accent ──
-       Set once here and re-pointed per section further down, so a single
-       declaration re-colours a card's border tint, its offset shadow, its
-       chips and its hover state together. This is what stops the page being
-       one colour repeated eleven times. */
-    --pop: var(--pop-coral);
-    --pop-text: var(--coral-text);
-    /* Ink that sits ON a --pop fill. Every accent in the set is light, so in
-       dark mode this is the ground and in light mode it is the body ink —
-       either way it is the darkest thing available and clears 11:1. */
-    --on-pop: var(--pop-void);
+    /* Depth: tints of the palette's dark value, never neutral black. */
+    --shadow-sm: 0 1px 2px color-mix(in srgb, var(--palette-dark) 6%, transparent);
+    --shadow-md: 0 8px 28px -12px color-mix(in srgb, var(--palette-dark) 18%, transparent);
+    --shadow-lg: 0 28px 64px -24px color-mix(in srgb, var(--palette-dark) 28%, transparent);
+    --shadow-card: 0 12px 28px -20px color-mix(in srgb, var(--palette-dark) 20%, transparent);
 
-    /* ── Edges ── */
-    --edge-w: 2px;
-    --edge: var(--pop-ink);
-    --edge-soft: color-mix(in srgb, var(--pop-ink) 26%, transparent);
+    /* ── Edges ──
+       A 1.5px tint of the accent: the shape reads as a distinct object
+       without the hard, high-contrast contour the curvature literature
+       argues against for an anxious-learner audience. */
+    --edge-w: 1.5px;
+    --edge: color-mix(in srgb, var(--palette-accent) 42%, transparent);
+    --edge-soft: color-mix(in srgb, var(--fg) 14%, transparent);
 
-    --r-pop-sm: 10px;
-    --r-pop: 16px;
-    --r-pop-lg: 24px;
-    --r-pop-xl: 32px;
+    /* Focus is the accent too: 3.10:1 on cream and 4.82:1 on pine-black,
+       both clear of the 3:1 WCAG 2.4.11 asks of a focus indicator. */
+    --focus: var(--palette-accent);
+}
+
+/* ── Guard ──
+   global.css still defines its own named hues (pine, mint, sunny, sky,
+   coral...) for the dashboards, and a few of its components reach for them
+   directly. On THIS page each one is folded back into the three colours, so
+   a global component that turns up here cannot smuggle in a fourth. */
+:root,
+:root[data-theme] {
+    --pine: var(--palette-accent);
+    --pine-deep: var(--accent-strong);
+    --pine-dim: var(--accent-strong);
+    --mint: var(--accent-soft);
+    --spring: var(--palette-accent);
+    --coral: var(--palette-accent);
+    --coral-soft: var(--accent-soft);
+    --coral-ink: var(--accent-text);
+    --sunny: var(--palette-accent);
+    --sunny-soft: var(--accent-soft);
+    --sunny-ink: var(--accent-text);
+    --sky: var(--bg-chip);
+    --cream: var(--bg);
+    --cream-deep: var(--bg-field);
+    --paper: var(--bg-surface);
+    --ink: var(--fg);
+    --ink-muted: var(--text-muted);
+    --ink-faint: var(--text-faint);
+    --warning: var(--palette-accent);
+    --warning-soft: var(--accent-soft);
+    --warning-ink: var(--accent-text);
+    --on-warning: var(--palette-dark);
+}
+
+/* ── Non-colour tokens ── theme-independent, declared once. */
+:root {
+    /* C2 — rounder than the previous pass at every step. */
+    --r-pop-sm: 12px;
+    --r-pop: 20px;
+    --r-pop-lg: 28px;
+    --r-pop-xl: 36px;
     --r-pop-pill: 999px;
 
     /* ── Depth ──
-       Solid, never blurred. The offset is the depth.
-
-       Only the DISTANCES are tokens. There is deliberately no composed
-       `--shadow-pop: var(--lift) var(--lift) 0 var(--pop)` here, because a
-       custom property substitutes its var() references at computed-value
-       time on the element that DECLARES it — so such a token would bake in
-       :root's coral and inherit that literal everywhere, and the per-section
-       --pop overrides below would silently do nothing to it. Every shadow is
-       therefore written out at the point of use, where --pop resolves
-       against the element that actually has it. */
-    --lift-sm: 3px;
-    --lift: 5px;
-    --lift-lg: 8px;
+       Still a solid offset rather than a blur — the sticker language is the
+       most kid-legible thing this page does. Only the DISTANCES are tokens:
+       a composed shadow token would bake in whatever colour it resolved to
+       on :root. */
+    --lift-sm: 2px;
+    --lift: 3px;
+    --lift-lg: 5px;
 
     /* ── Rhythm ── */
     --band-pad: clamp(var(--sp-9), 12vh, 9rem);
@@ -154,85 +210,18 @@
     --tap-min: 44px;
 
     /* ── Layer ladder ──
-       Every rung sits BELOW --z-sticky (30) so the navbar always wins, and
-       far below --z-overlay (100) so a dialog can never be trapped under the
-       pinned video. Top of the page down:
-           400  boot                (global)
-           350  skip link, offline wire
-           300  toasts              (global)
-           100  modals              (global)
-            30  navbar              (global --z-sticky)
-             4  reel copy
-             3  vignette
-             2  scrim
-             1  colour wash
-             0  video               */
+           400 boot · 350 skip link · 300 toasts · 100 modals · 30 navbar
+             4 reel copy · 3 vignette · 2 scrim · 1 wash · 0 video */
     --z-reel-video: 0;
     --z-reel-wash: 1;
     --z-reel-scrim: 2;
     --z-reel-vignette: 3;
     --z-reel-copy: 4;
 
-    /* ── Motion ──
-       --ease-pop overshoots very slightly, which is what makes a press feel
-       springy rather than mechanical. --ease-drift has a long tail, for
-       motion the user did not trigger. */
+    /* ── Motion ── */
     --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-out-hard: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-drift: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ─────────────────────────────────────────── LIGHT THEME ──────────────
-   Warm paper rather than white — the same reason the dark ground is indigo
-   rather than black. Only colour roles change; sizing, radii, depth and the
-   layer ladder are theme-independent and are not repeated.
-
-   The accents keep their exact values as FILLS, where indigo ink sits on
-   them at 11:1 or better. As TEXT on paper they would all fail, so each one
-   has a darkened sibling of the same hue below — the same trick global.css
-   uses for its green. Measured on --pop-paper:
-       coral-text 5.2:1   sky-text 5.3:1   yellow-text 5.6:1
-       mint-text  5.0:1   lilac-text 6.0:1                       */
-:root[data-theme="light"] {
-    --pop-paper: #FBF7F0;
-
-    --bg-body: var(--pop-paper);
-    --bg-surface: #FFFFFF;
-    --bg-field: var(--pop-paper);
-    --bg-chip: #F0EAFF;
-    --bg-chip-hover: #E4DAFF;
-    --bg-surface-hover: #F5F0FF;
-
-    --text: #1E1B4B;                      /* 15.0:1 on paper */
-    --text-muted: #4C4677;                /* 8.0:1 */
-    --text-faint: #6B6494;                /* 5.0:1 */
-
-    --coral-text: #C4301F;
-    --sky-text: #0B6E99;
-    --yellow-text: #8A5A00;
-    --mint-text: #0F7A4E;
-    --lilac-text: #6D3FD1;
-
-    --accent: var(--pop-yellow);
-    --accent-strong: var(--pop-yellow-2);
-    --accent-soft: color-mix(in srgb, var(--pop-yellow) 30%, transparent);
-    --on-accent: #1E1B4B;                 /* 11.1:1 on the yellow fill */
-
-    --danger: #D6224A;
-    --danger-strong: #B01739;
-    --danger-soft: color-mix(in srgb, #D6224A 12%, transparent);
-    --danger-line: color-mix(in srgb, #D6224A 45%, transparent);
-    --on-danger: var(--pop-paper);
-
-    --pop: var(--pop-coral);
-    --pop-text: var(--coral-text);
-    --on-pop: var(--text);
-
-    /* Ink borders on paper — the classic neo-brutalist edge. */
-    --edge: var(--text);
-    --edge-soft: color-mix(in srgb, var(--text) 22%, transparent);
-
-    color-scheme: light;
 }
 
 body {
@@ -243,20 +232,19 @@ body {
     overflow-x: clip;
 }
 
-/* Yellow highlighter, indigo ink. */
-::selection { background: var(--pop-yellow); color: var(--on-pop); }
+::selection { background: var(--accent); color: var(--on-accent); }
 
 /* Chunky and rounded, like everything else. */
-* { scrollbar-width: thin; scrollbar-color: var(--pop-coral) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--track) transparent; }
 *::-webkit-scrollbar { width: 12px; height: 12px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
-    background: var(--pop-coral);
+    background: var(--track);
     border: 3px solid transparent;
     border-radius: var(--r-pop-pill);
     background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background-color: var(--pop-yellow); background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--track-hover); background-clip: content-box; }
 
 
 /* ═══════════════════════════════════════════ 2. PRIMITIVES ════════════ */
@@ -273,7 +261,7 @@ body {
 
 .anchor { display: block; position: relative; inset-block-start: calc(var(--topbar-h) * -1); }
 
-/* Offscreen until focused, then a yellow sticker in the corner. Moved out of
+/* Offscreen until focused, then an accent sticker in the corner. Moved out of
    view with a transform rather than display:none, so it stays focusable. */
 .skip-link {
     position: fixed;
@@ -288,7 +276,7 @@ body {
     border-radius: var(--r-pop-pill);
     background: var(--accent);
     color: var(--on-accent);
-    font-size: 0.8125rem;
+    font-size: var(--fs-sm);
     font-weight: 700;
     box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--edge);
     transform: translateY(calc(-100% - var(--sp-6)));
@@ -376,7 +364,7 @@ body {
 }
 
 .btn-pop:focus-visible,
-.btn-pop-ghost:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 3px; }
+.btn-pop-ghost:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .btn-pop:disabled,
 .btn-pop-ghost:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
@@ -395,9 +383,167 @@ body {
     .btn-pop-ghost:active:not(:disabled) { transform: none; }
 }
 
+/* ---- 2.1b Signature CTA ---------------------------------------------------
+   The page's headline actions — Activate account, Sign in, Find my tutor —
+   in a more finished language than the sticker buttons above: layered soft
+   depth instead of a hard offset, a lit top edge, and a round glyph that
+   answers the pointer. One shape for both: label left, orb right, so a pair
+   reads as a set and is told apart by fill alone.
+
+   Still strictly the three palette colours. Every highlight is a mix toward
+   --palette-light, every shadow a mix toward --palette-dark or the accent.
+
+   overflow: hidden is what clips the sheen to the pill. It also clips the
+   .tap hit-area pseudo-element, which is harmless: at 60px tall the button
+   is already past the 44px touch floor on its own. */
+.cta {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    min-height: 3.75rem;
+    padding: 0.4375rem 0.4375rem 0.4375rem 1.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--r-pop-pill);
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform 320ms var(--ease-drift),
+                box-shadow 320ms var(--ease-drift),
+                background-color 220ms var(--ease-out-hard),
+                border-color 220ms var(--ease-out-hard);
+}
+
+.cta:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+.cta:active { transform: translateY(0) scale(0.985); transition-duration: 90ms; }
+
+/* The orb: 46px, sitting 7px in from the pill's end so its curve runs
+   concentric with the pill's. */
+.cta-orb {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 2.875rem;
+    height: 2.875rem;
+    border-radius: var(--r-pop-pill);
+    overflow: hidden;
+    transition: background-color 260ms var(--ease-out-hard),
+                color 260ms var(--ease-out-hard),
+                box-shadow 260ms var(--ease-out-hard);
+}
+
+.cta-orb .icon { width: 18px; height: 18px; transition: transform 460ms var(--ease-drift); }
+
+/* The arrow swap: on hover the arrow leaves through the right of the orb
+   while its twin arrives from the left — motion that says "go" without the
+   button itself moving sideways. */
+.cta-arrow-next { position: absolute; inset: 0; margin: auto; transform: translateX(-170%); }
+.cta:hover .cta-arrow:not(.cta-arrow-next) { transform: translateX(170%); }
+.cta:hover .cta-arrow-next { transform: translateX(0); }
+
+/* ---- Primary: solid accent ---- */
+.cta-primary {
+    color: var(--on-accent);
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--palette-accent) 86%, var(--palette-light)) 0%,
+        var(--palette-accent) 100%);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 45%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, var(--palette-dark) 12%, transparent),
+        0 1px 2px color-mix(in srgb, var(--palette-dark) 18%, transparent),
+        0 14px 30px -12px color-mix(in srgb, var(--palette-accent) 70%, transparent);
+}
+
+/* The label sits on 4.82:1 at the gradient's darkest stop and better above
+   it; the orb is the page's dark on its light — the strongest pair there is. */
+.cta-primary .cta-orb {
+    background: var(--palette-dark);
+    color: var(--palette-light);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--palette-light) 14%, transparent);
+}
+
+/* A band of light that sweeps across once per hover. Behind the label
+   (z-index -1 inside the isolated button), in front of the fill. */
+.cta-primary::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(105deg,
+        transparent 30%,
+        color-mix(in srgb, var(--palette-light) 38%, transparent) 50%,
+        transparent 70%);
+    transform: translateX(-110%);
+    transition: transform 900ms var(--ease-drift);
+    pointer-events: none;
+}
+
+.cta-primary:hover { transform: translateY(-2px); }
+.cta-primary:hover::before { transform: translateX(110%); }
+.cta-primary:hover {
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 50%, transparent),
+        inset 0 -2px 0 color-mix(in srgb, var(--palette-dark) 12%, transparent),
+        0 2px 4px color-mix(in srgb, var(--palette-dark) 16%, transparent),
+        0 22px 40px -14px color-mix(in srgb, var(--palette-accent) 80%, transparent);
+}
+
+/* ---- Secondary: frosted glass ----
+   It stands on moving video in the hero, so it carries its own frosted
+   ground and a hairline edge rather than relying on what is behind it. */
+.cta-quiet {
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg) 66%, transparent);
+    border-color: color-mix(in srgb, var(--fg) 16%, transparent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 28%, transparent),
+        0 10px 28px -16px color-mix(in srgb, var(--palette-dark) 45%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    backdrop-filter: blur(14px) saturate(1.3);
+}
+
+.cta-quiet .cta-orb {
+    background: color-mix(in srgb, var(--fg) 7%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
+    color: var(--text);
+}
+
+.cta-quiet:hover {
+    transform: translateY(-2px);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    border-color: color-mix(in srgb, var(--fg) 28%, transparent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 32%, transparent),
+        0 16px 34px -16px color-mix(in srgb, var(--palette-dark) 50%, transparent);
+}
+
+/* On hover the secondary's orb fills with the accent: a small reveal that
+   ties the pair together without promoting Sign in to a second primary. */
+.cta-quiet:hover .cta-orb { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+.cta-quiet:hover .cta-orb .icon { transform: translateX(2px); }
+
+@media (prefers-reduced-motion: reduce) {
+    .cta:hover,
+    .cta:active,
+    .cta:hover .cta-orb .icon,
+    .cta:hover .cta-arrow:not(.cta-arrow-next) { transform: none; }
+    .cta-arrow-next,
+    .cta-primary::before { display: none; }
+}
+
 /* ---- 2.2 Readout chips -------------------------------------------------
    Mono is still here, but it is no longer the voice of the page — it is a
-   label on a toy. Small, rounded, tinted with the section's own colour. */
+   label on a toy — a plain uppercase line. The numbered "00"–"09" badges
+   and the tutors' trait-letter chips that used to lead these labels are
+   both gone. */
 .mono-tag {
     display: flex;
     align-items: center;
@@ -405,31 +551,30 @@ body {
     gap: var(--sp-2);
     margin: 0;
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-muted);
 }
 
-.mono-idx,
-.mono-letter {
-    display: inline-grid;
-    place-items: center;
-    min-width: 1.75rem;
-    height: 1.75rem;
-    padding-inline: var(--sp-2);
-    border: var(--edge-w) solid var(--edge);
-    border-radius: var(--r-pop-pill);
-    background: color-mix(in srgb, var(--pop) 22%, transparent);
-    color: var(--pop-text);
-    font-variant-numeric: tabular-nums;
-}
-
-.mono-letter { padding-inline: 0; font-size: 0.75rem; font-weight: 700; }
-
 
 /* ═══════════════════════════════════════════ 3. FIXED NAVBAR ══════════ */
+/* TWO SURFACES
+   Over the hero the bar is fully transparent — no fill, no rule, no blur —
+   so the video runs edge to edge behind it. The hero's own scrim (section
+   6) carries a band under the bar that holds the wordmark and links at
+   contrast, and each CONTROL wears its own frosted fill, so a button's
+   legibility never depends on which frame the video happens to be on.
+
+   The moment the hero's copy would slide under the bar, nav.js adds
+   .is-solid and the bar takes the frosted ground it always had — so type
+   never scrolls beneath transparent chrome. The open phone sheet
+   forces the same, and so does a JS-less page, which cannot know where the
+   hero ends.
+
+   backdrop-filter is not in the transition list: `none` cannot interpolate
+   to blur(), so it snaps while the fill fades, which reads as one move. */
 .nav {
     position: fixed;
     inset-block-start: 0;
@@ -438,20 +583,38 @@ body {
     min-height: var(--topbar-h);
     display: flex;
     align-items: center;
+    border-block-end: var(--edge-w) solid transparent;
+    background: transparent;
+    transition: background-color 260ms var(--ease-out-hard),
+                border-color 260ms var(--ease-out-hard);
+}
+
+.nav.is-solid,
+.nav.is-open,
+:root:not(.js) .nav {
     /* One solid rule under the bar, at the same weight as every other edge
        on the page. */
-    border-block-end: var(--edge-w) solid var(--edge-soft);
+    border-block-end-color: var(--edge-soft);
     background: color-mix(in srgb, var(--bg-body) 84%, transparent);
     -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
 }
 
+/* GRID, NOT FLEX
+   With flex, the links were centred in whatever space the logo and the
+   controls LEFT OVER — and since the right-hand cluster is far wider than
+   the wordmark, "centred" landed well left of the middle of the screen.
+   A grid with two equal outer tracks centres the middle track on the
+   viewport itself, whatever sits either side of it.
+
+   Phone first: two tracks, logo and controls; the links live in the sheet,
+   which is absolutely positioned and so takes no cell. The three-track
+   layout is the opt-in at 64rem (section 3.6). */
 .nav-inner {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--sp-3);
+    column-gap: var(--sp-3);
     width: 100%;
     padding-block: var(--sp-2);
 }
@@ -459,6 +622,8 @@ body {
 .nav-mark {
     display: inline-flex;
     align-items: center;
+    justify-self: start;
+    gap: var(--sp-3);
     font-family: var(--font-display);
     font-size: 1.25rem;
     font-weight: 700;
@@ -466,7 +631,7 @@ body {
     color: var(--text);
 }
 
-.nav-mark:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 4px; border-radius: var(--r-pop-sm); }
+.nav-mark:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: var(--r-pop-sm); }
 
 /* The wordmark gets the coral underline rather than a colour swap — the
    letters stay at full contrast while still reacting. */
@@ -477,11 +642,36 @@ body {
     transition: border-color 160ms var(--ease-out-hard), transform 160ms var(--ease-pop);
 }
 
-.nav-mark:hover .nav-mark-word { border-block-end-color: var(--pop-coral); transform: translateY(-1px); }
+.nav-mark:hover .nav-mark-word { border-block-end-color: var(--accent); transform: translateY(-1px); }
 
-.nav-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); }
+/* The badge. It gives the left of the bar the visual mass the controls give
+   the right, so the centred links sit between two weights that match. */
+.nav-mark-badge {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.8rem;
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 40%, transparent),
+        0 6px 16px -8px color-mix(in srgb, var(--palette-accent) 75%, transparent);
+    transition: transform 280ms var(--ease-pop);
+}
 
-.theme-toggle {
+.nav-mark-badge .icon { width: 18px; height: 18px; }
+.nav-mark:hover .nav-mark-badge { transform: rotate(-10deg) scale(1.06); }
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    gap: var(--sp-2);
+}
+
+.theme-toggle,
+.nav-burger {
     display: grid;
     place-items: center;
     width: var(--tap-min);
@@ -497,22 +687,417 @@ body {
     box-shadow: var(--lift-sm) var(--lift-sm) 0 transparent;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.nav-burger:hover {
     background: var(--bg-chip);
     transform: translate(-1px, -1px);
-    box-shadow: var(--lift) var(--lift) 0 var(--pop-sky);
+    box-shadow: var(--lift) var(--lift) 0 var(--accent);
 }
 
-.theme-toggle:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--pop-sky); }
-.theme-toggle:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 3px; }
+.theme-toggle:active,
+.nav-burger:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--accent); }
+.theme-toggle:focus-visible,
+.nav-burger:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .theme-toggle .icon-moon { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 
+.nav-burger .icon-close { display: none; }
+.nav-burger[aria-expanded="true"] .icon-menu { display: none; }
+.nav-burger[aria-expanded="true"] .icon-close { display: block; }
+
+/* ---- 3.0 Sign in / Activate in the bar -----------------------------------
+   While the hero is on screen those two buttons stand beside the headline,
+   so the bar's copies stand down; once the hero's buttons have scrolled away
+   nav.js adds .has-auth and these come back, so signing in is never more
+   than one click from anywhere on the page.
+
+   visibility, not display: the buttons keep their space while hidden, so
+   the links beside them never shift sideways when they return. Gated on
+   .js — with no script there is nothing to bring them back. */
+.js .nav-auth { transition: opacity 200ms var(--ease-out-hard), visibility 0s linear 200ms; }
+.js .nav:not(.has-auth) .nav-auth { opacity: 0; visibility: hidden; }
+.js .nav.has-auth .nav-auth { transition-delay: 0s; }
+
+/* ---- 3.1 Over the video -------------------------------------------------
+   The frosted fill that lets a control sit on moving footage. Scoped to the
+   transparent state only; on the solid bar every control goes back to its
+   ordinary sticker styling. The hover rule is restated because this
+   selector outranks the buttons' own :hover. */
+.nav:not(.is-solid):not(.is-open) :is(.btn-pop-ghost, .theme-toggle, .nav-burger) {
+    background: color-mix(in srgb, var(--bg-body) 52%, transparent);
+    -webkit-backdrop-filter: blur(10px) saturate(1.3);
+    backdrop-filter: blur(10px) saturate(1.3);
+}
+
+.nav:not(.is-solid):not(.is-open) :is(.btn-pop-ghost, .theme-toggle, .nav-burger):hover {
+    background: color-mix(in srgb, var(--bg-body) 78%, transparent);
+}
+
+.nav:not(.is-solid):not(.is-open) :is(.nav-mark, .nav-link) {
+    text-shadow: 0 1px 14px color-mix(in srgb, var(--bg-body) 75%, transparent);
+}
+
+/* ---- 3.1b One finish across the bar -------------------------------------
+   The capsule of links is drawn with a hairline and soft depth, so every
+   control beside it is too: the sticker edge and hard offset shadow the
+   rest of the page uses would make the bar read as parts from two kits.
+   The navbar's Activate takes the hero primary's lit coral finish in a
+   compact size, so the same action looks the same wherever it appears. */
+.nav .theme-toggle,
+.nav .nav-burger,
+.nav-actions .btn-pop-ghost {
+    border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+    box-shadow: none;
+}
+
+.nav .theme-toggle:hover,
+.nav .nav-burger:hover,
+.nav-actions .btn-pop-ghost:hover:not(:disabled) {
+    background: var(--bg-chip);
+    border-color: color-mix(in srgb, var(--fg) 26%, transparent);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--palette-dark) 45%, transparent);
+}
+
+.nav-actions .btn-pop {
+    border: 1px solid transparent;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--palette-accent) 86%, var(--palette-light)) 0%,
+        var(--palette-accent) 100%);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 45%, transparent),
+        0 8px 18px -8px color-mix(in srgb, var(--palette-accent) 65%, transparent);
+}
+
+.nav-actions .btn-pop:hover:not(:disabled) {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--palette-accent) 80%, var(--palette-light)) 0%,
+        var(--palette-accent) 100%);
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 50%, transparent),
+        0 12px 24px -10px color-mix(in srgb, var(--palette-accent) 75%, transparent);
+}
+
+.nav .theme-toggle:active,
+.nav .nav-burger:active,
+.nav-actions .btn-pop:active:not(:disabled),
+.nav-actions .btn-pop-ghost:active:not(:disabled) {
+    transform: scale(0.97);
+    box-shadow: none;
+}
+
+/* ---- 3.2 Section links: the phone sheet (the default) -------------------
+   Mobile first, as the rest of the file is: the sheet is the base style and
+   the inline bar is the opt-in at 64rem, so a phone never pays for rules it
+   has to undo.
+
+   Closed means OUT of the accessibility tree and the tab order, not merely
+   transparent. visibility flips at the END of the fade out and at the START
+   of the fade in, so the motion always plays and a closed sheet can never
+   swallow a tap. */
+.nav-menu {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    max-height: calc(100vh - var(--topbar-h));
+    max-height: calc(100svh - var(--topbar-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-3) var(--gutter) var(--sp-7);
+    border-block-end: var(--edge-w) solid var(--edge-soft);
+    border-radius: 0 0 var(--r-pop-xl) var(--r-pop-xl);
+    background: var(--bg-surface);
+    /* The sticker language, pointed down: the sheet sits ON the page. */
+    box-shadow: 0 var(--lift-lg) 0 var(--accent);
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-0.75rem);
+    transition: opacity 180ms var(--ease-out-hard),
+                transform 260ms var(--ease-pop),
+                visibility 0s linear 260ms;
+}
+
+.nav.is-open .nav-menu {
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    transition-delay: 0s;
+}
+
+.nav-links {
+    display: flex;
+    flex-direction: column;
+}
+
+.nav-links > li + li { border-block-start: 2px dotted var(--edge-soft); }
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    min-height: 3.5rem;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pop);
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text);
+    transition: background-color 140ms var(--ease-out-hard);
+}
+
+.nav-link:hover { background: var(--bg-chip); }
+.nav-link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* The section in view, in the sheet: an accent bar on the leading edge. */
+.nav-link[aria-current] { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* ---- 3.3 Sheet extras --------------------------------------------------- */
+.nav-menu-extra {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    padding-block-start: var(--sp-5);
+    border-block-start: var(--edge-w) solid var(--edge-soft);
+}
+
+.nav-menu-group { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* Shown only at the widths where the bar has dropped its own copy. */
+.nav-menu-student,
+.nav-menu-theme { display: none; }
+
+/* The staff door, as the same quiet text link the sign-in dialog uses. */
+.nav-menu-note { font-size: var(--fs-sm); color: var(--text-muted); }
+
+.nav-menu-extra .btn-pop-ghost { width: 100%; min-height: 3rem; }
+
+/* A switch, not a second icon button: in a list of labelled rows an
+   unlabelled sun would be the one thing a twelve-year-old has to guess. */
+.nav-theme-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 3rem;
+    padding-inline: var(--sp-5) var(--sp-4);
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-pill);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--text);
+}
+
+.nav-theme-row:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+.nav-theme-switch {
+    position: relative;
+    width: 2.75rem;
+    height: 1.5rem;
+    border: var(--edge-w) solid var(--edge-soft);
+    border-radius: var(--r-pop-pill);
+    background: var(--bg-chip);
+    transition: background-color 180ms var(--ease-out-hard);
+}
+
+.nav-theme-switch > span {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 3px;
+    width: 1rem;
+    height: 1rem;
+    border-radius: var(--r-pop-pill);
+    background: var(--text-muted);
+    transform: translateY(-50%);
+    transition: transform 220ms var(--ease-pop), background-color 180ms var(--ease-out-hard);
+}
+
+.nav-theme-row[aria-pressed="true"] .nav-theme-switch { background: var(--accent); border-color: transparent; }
+.nav-theme-row[aria-pressed="true"] .nav-theme-switch > span {
+    background: var(--on-accent);
+    transform: translate(1.25rem, -50%);
+}
+
+/* ---- 3.4 Backdrop -------------------------------------------------------
+   One layer under the bar, so the bar and its sheet stay lit while the page
+   dims. A tap anywhere on it closes the sheet (nav.js). */
+.nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-sticky) - 1);
+    background: color-mix(in srgb, var(--palette-dark) 58%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 220ms var(--ease-out-hard), visibility 0s linear 220ms;
+}
+
+.nav-scrim.is-open { opacity: 1; visibility: visible; transition-delay: 0s; }
+
+/* ---- 3.5 What the bar keeps, by width -----------------------------------
+   Measured against the narrowest control set that still fits with the
+   gutter: below 30rem the icon theme toggle moves into the sheet (as the
+   labelled switch), below 25rem "Activate account" shortens to "Activate"
+   — the tail stays in the accessible name — and below 21.5rem Sign in
+   moves into the sheet as well. */
+@media (max-width: 29.99rem) {
+    .nav-actions .theme-toggle { display: none; }
+    .nav-menu-theme { display: flex; }
+}
+
+@media (max-width: 24.99rem) {
+    .nav-activate-tail {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 21.49rem) {
+    .nav-signin { display: none; }
+    .nav-menu-student { display: flex; }
+}
+
+/* ---- 3.6 Desktop: three tracks, links centred on the screen -------------
+   minmax(max-content, 1fr) on both outer tracks: while the logo and the
+   controls each fit in half of the leftover width — which the widths in
+   3.7 are chosen to guarantee — the two tracks are exactly equal and the
+   links sit dead centre. If a translation or a font ever made the controls
+   wider, the right track grows instead of overlapping the links; centring
+   degrades by a few pixels rather than breaking.
+
+   64rem, not 60: below it the links, the logo and the full control cluster
+   cannot all fit with the links truly centred, so the hamburger keeps them. */
+@media (min-width: 64rem) {
+    .nav-inner {
+        grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+        column-gap: var(--sp-4);
+    }
+
+    .nav-actions { grid-column: 3; }
+
+    .nav-menu {
+        position: static;
+        grid-column: 2;
+        flex-direction: row;
+        justify-content: center;
+        max-height: none;
+        overflow: visible;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+        visibility: visible;
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    /* The capsule. The links used to float as bare words, and that was the
+       "something missing" — nothing held them together or marked the
+       centre of the bar. One pill gives them a home. */
+    .nav-links {
+        flex-direction: row;
+        gap: 2px;
+        padding: 4px;
+        border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+        border-radius: var(--r-pop-pill);
+        background: color-mix(in srgb, var(--fg) 4%, transparent);
+    }
+
+    .nav-links > li + li { border: 0; }
+
+    .nav-link {
+        min-height: 2.5rem;
+        padding-inline: var(--sp-4);
+        border-radius: var(--r-pop-pill);
+        font-family: var(--font-body);
+        font-size: 0.9375rem;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+    }
+
+    .nav-link:hover { background: color-mix(in srgb, var(--fg) 7%, transparent); }
+
+    /* The section in view becomes a raised segment inside the capsule. Only
+       ever set past the hero, so it only appears on the solid bar. */
+    .nav-link[aria-current] {
+        background: var(--bg);
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent),
+            0 2px 6px -2px color-mix(in srgb, var(--palette-dark) 22%, transparent);
+    }
+
+    /* Over the video the capsule turns to frosted glass, like the controls. */
+    .nav:not(.is-solid):not(.is-open) .nav-links {
+        background: color-mix(in srgb, var(--bg-body) 50%, transparent);
+        border-color: color-mix(in srgb, var(--fg) 14%, transparent);
+        -webkit-backdrop-filter: blur(12px) saturate(1.3);
+        backdrop-filter: blur(12px) saturate(1.3);
+    }
+
+    .nav-menu-extra,
+    .nav-burger,
+    .nav-scrim { display: none; }
+
+    /* 3.7 — the control cluster's budget. Tighter padding on the two
+       account buttons, and "Activate" without its tail until 72rem, keep
+       the cluster within its half-track so the centring holds exactly.
+       The tail stays in the accessible name throughout. */
+    .nav-actions .btn-pop,
+    .nav-actions .btn-pop-ghost { padding-inline: var(--sp-4); }
+}
+
+@media (min-width: 64rem) and (max-width: 71.99rem) {
+    .nav-activate-tail {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}
+
+/* No JS: no hamburger to open anything, so the links become a plain
+   wrapped row under the wordmark and the sheet chrome falls away. */
+:root:not(.js) .nav-inner { grid-template-columns: minmax(0, 1fr) auto; }
+:root:not(.js) .nav-burger,
+:root:not(.js) .nav-menu-extra { display: none; }
+:root:not(.js) .nav-menu {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-height: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+}
+:root:not(.js) .nav-links { flex-direction: row; flex-wrap: wrap; }
+:root:not(.js) .nav-links > li + li { border: 0; }
+:root:not(.js) .nav-link { min-height: var(--tap-min); font-size: var(--fs-sm); }
+
 @media (prefers-reduced-motion: reduce) {
     .nav-mark:hover .nav-mark-word,
     .theme-toggle:hover,
-    .theme-toggle:active { transform: none; }
+    .theme-toggle:active,
+    .nav-burger:hover,
+    .nav-burger:active { transform: none; }
+    .nav-menu { transform: none; }
 }
 
 
@@ -540,15 +1125,17 @@ body {
     padding: var(--sp-3) var(--sp-5);
     border: var(--edge-w) solid var(--edge);
     border-radius: var(--r-pop-pill);
-    background: var(--pop-yellow);
-    color: var(--on-pop);
+    /* Offline is information, not alarm: an ink strip. A crash is the one
+       state that earns the accent fill. Two states, still three colours. */
+    background: var(--fg);
+    color: var(--bg);
     box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--edge);
-    font-size: 0.8125rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     text-align: start;
 }
 
-.wire.is-error .wire-text { background: var(--pop-rose); color: var(--pop-void); }
+.wire.is-error .wire-text { background: var(--accent); color: var(--on-accent); }
 
 .wire-dot {
     width: 9px;
@@ -587,9 +1174,11 @@ body {
    before a byte of video arrives. The poster paints first; the element fades
    in over it once a frame is decodable.
 
-   Only partly desaturated now, not stripped to grey: the footage is blue
-   equations, and on an indigo ground a little of that blue left in reads as
-   part of the palette rather than as a second accent. */
+   Fully desaturated: the footage is blue equations, and blue is not one of
+   the page's three colours. Stripped to grey, it takes its warmth from the
+   accent wash layered over it (.reel-wash). The hero's classroom video is
+   different — it is the page's photograph, not its decoration, and keeps
+   its own colour. */
 .reel-video {
     position: absolute;
     inset: 0;
@@ -597,24 +1186,23 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: grayscale(0.45) brightness(0.55) contrast(1.08);
+    filter: grayscale(1) brightness(0.55) contrast(1.08);
     opacity: 0;
     transition: opacity 700ms var(--ease-drift);
 }
 
 .reel-video.is-live { opacity: 1; }
 
-:root[data-theme="light"] .reel-video { filter: grayscale(0.5) brightness(1.45) contrast(0.95) invert(1); }
+:root[data-theme="light"] .reel-video { filter: grayscale(1) brightness(1.45) contrast(0.95) invert(1); }
 
-/* Replaces the old grain tile. A soft indigo-to-lilac wash that pulls the
-   footage into the palette instead of scratching texture over it. */
+/* One soft pool of the accent, blended in, so the equations footage takes
+   the palette's warmth instead of its own blue. */
 .reel-wash {
     position: absolute;
     inset: 0;
     z-index: var(--z-reel-wash);
     background:
-        radial-gradient(90% 70% at 78% 30%, color-mix(in srgb, var(--pop-lilac) 22%, transparent) 0%, transparent 62%),
-        radial-gradient(80% 60% at 15% 82%, color-mix(in srgb, var(--pop-sky) 16%, transparent) 0%, transparent 58%);
+        radial-gradient(90% 70% at 78% 30%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 62%);
     mix-blend-mode: soft-light;
     pointer-events: none;
 }
@@ -669,9 +1257,124 @@ body {
 
 
 /* ═══════════════════════════════════════════ 6. ACT 1 · THE DROP ══════ */
-.act-drop { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
+.act-drop {
+    /* Its own stacking context, so the media layer's negative z-index puts
+       it under the copy — and never under the pinned reel stage behind. */
+    isolation: isolate;
+}
 
-.act-drop-inner { display: flex; flex-direction: column; align-items: flex-start; }
+/* Room for the video control pinned to the bottom corner. Doubled class so
+   it outranks every .act padding rule below, including the responsive ones. */
+.act.act-drop { padding-block-end: calc(var(--sp-6) + 3rem + var(--sp-6)); }
+
+/* Copy on the left, the account actions on the right of it. Mobile first:
+   one column, the buttons stacked full-width under the subline. The
+   side-by-side layout is the opt-in at 60rem, where the widest headline
+   line plus the button column still clears the gutter. */
+.act-drop-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+}
+
+.hero-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+
+.hero-cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-7);
+}
+
+/* 15rem basis: two fit side by side on a tablet, and on a phone they wrap
+   to a full-width stack before either label has to squeeze. */
+.hero-cta .cta { flex: 1 1 15rem; }
+
+@media (min-width: 60rem) {
+    .act-drop-inner {
+        grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 17.5rem);
+        column-gap: clamp(var(--sp-7), 5vw, var(--sp-10));
+        /* Centred on the copy block, which the headline dominates — so the
+           buttons sit level with "Grade 7", beside the welcome itself. */
+        align-items: center;
+    }
+
+    .hero-cta { flex-direction: column; flex-wrap: nowrap; margin-block-start: 0; }
+    .hero-cta .cta { flex: 0 0 auto; width: 100%; }
+}
+
+/* ---- 6.0 The background video -------------------------------------------
+   Opaque from the first paint: the pinned scrub stage sits directly behind
+   the hero, and nothing of it may show while the poster is still arriving.
+   Once the visitor scrolls, the hero lifts away and reveals that stage —
+   the curtain is the transition. */
+.hero-media {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background: var(--bg-body);
+}
+
+.hero-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* The camera pans left to right. Weighting the crop a little left keeps
+       the blackboard in frame on a portrait phone. */
+    object-position: 42% 50%;
+}
+
+/* THE CONTRAST FLOOR
+   Mixed from --bg-body, so it is pine-black in dark mode and cream in light
+   mode: the theme toggle visibly re-lights the hero instead of doing nothing
+   while the visitor is looking at it. Three layers:
+     1. a band under the navbar, for the transparent bar's wordmark;
+     2. the copy side, heaviest on the left under the headline and the
+        small-print subline, easing off so the room shows on the right;
+     3. a floor along the bottom edge, under the video control.
+   Sized against the WORST pixel, not a typical one. Measured by drawing
+   eight frames of the loop at the real object-fit geometry, applying these
+   exact layers in the page's computed three-colour palette, and taking the
+   lowest contrast under any glyph box:
+                          needs   dark   light   (1024x768 / 375x812)
+       subline            4.5:1   6.69   6.34    / 6.41  6.57
+       tag line           4.5:1   10.15  7.76    / 8.82  6.77
+       headline           3:1     8.47   10.75   / 7.69  9.73
+       headline, coral    3:1     3.94   3.51    / 3.65  3.84
+   The coral line in light mode is the tightest margin on the page. Lighten
+   any stop here, or change --palette-accent, and re-measure that one first. */
+.hero-scrim {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to bottom,
+            color-mix(in srgb, var(--bg-body) 72%, transparent) 0,
+            transparent calc(var(--topbar-h) * 2.2)),
+        linear-gradient(100deg,
+            color-mix(in srgb, var(--bg-body) 92%, transparent) 0%,
+            color-mix(in srgb, var(--bg-body) 86%, transparent) 42%,
+            color-mix(in srgb, var(--bg-body) 70%, transparent) 64%,
+            color-mix(in srgb, var(--bg-body) 22%, transparent) 100%),
+        linear-gradient(to top,
+            color-mix(in srgb, var(--bg-body) 78%, transparent) 0,
+            transparent 30%);
+}
+
+/* The copy on video gets a soft halo of its own ground colour — invisible
+   on a calm frame, a quiet backstop on a busy one. The subline is lifted
+   from --text-muted toward --text for the same reason: muted grey is tuned
+   for a flat ground, and this one moves. */
+.act-drop .mono-tag-lead,
+.act-drop .drop-title,
+.act-drop .drop-sub {
+    text-shadow: 0 1px 24px color-mix(in srgb, var(--bg-body) 70%, transparent);
+}
+
+.act-drop .mono-tag-lead,
+.act-drop .drop-sub { color: color-mix(in srgb, var(--text) 86%, var(--bg-body)); }
 
 .mono-tag-lead { margin-block-end: clamp(var(--sp-5), 4vh, var(--sp-8)); }
 
@@ -701,240 +1404,465 @@ body {
     color: var(--text-muted);
 }
 
-/* ---- 6.1 Marquee -------------------------------------------------------
-   Now a pill: inset from both edges, thick edge, fully rounded, sitting on a
-   coral shadow. Still CSS only — two identical runs slide as one track, and
-   when the first has moved exactly its own width the second is where it
-   started, so the loop has no seam. Nothing here is scroll-linked. */
-.marquee {
+/* ---- 6.1 Video control ---------------------------------------------------
+   Alone in the bottom corner now that the "scroll to dive" strip is gone.
+   [hidden] is restated because display:grid would otherwise override the UA
+   rule and show a control landing.js has not armed. */
+.hero-video-toggle {
     position: absolute;
     inset-block-end: var(--sp-6);
-    inset-inline: var(--gutter);
-    max-width: 74rem;
-    margin-inline: auto;
-    overflow: hidden;
+    inset-inline-end: var(--gutter);
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
     border: var(--edge-w) solid var(--edge);
     border-radius: var(--r-pop-pill);
-    background: var(--pop-panel);
-    box-shadow: var(--lift) var(--lift) 0 var(--pop-coral);
+    background: var(--bg-surface);
+    color: var(--text);
+    box-shadow: var(--lift) var(--lift) 0 var(--accent);
+    cursor: pointer;
+    transition: transform 140ms var(--ease-pop), box-shadow 140ms var(--ease-pop);
 }
 
-:root[data-theme="light"] .marquee { background: var(--bg-surface); }
+.hero-video-toggle[hidden] { display: none; }
 
-.marquee-track {
-    display: flex;
-    width: max-content;
-    animation: marquee 26s linear infinite;
+.hero-video-toggle:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--accent);
 }
 
-.marquee-run {
+.hero-video-toggle:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--accent); }
+.hero-video-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.hero-video-toggle .icon { width: 18px; height: 18px; }
+.hero-video-toggle .icon-play,
+.hero-video-toggle.is-paused .icon-pause { display: none; }
+.hero-video-toggle.is-paused .icon-play { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-video-toggle:hover,
+    .hero-video-toggle:active { transform: none; }
+}
+
+
+/* ═══════════════════════════════════════════ 7. ACT 2 · MEET THE TUTORS  */
+/* A SHOWCASE, NOT A MENU
+   The previous pass borrowed a shooter's character-select screen: a letter
+   rail, a stage and a spec column in three hard columns, plus a "lock in"
+   button — for a choice students never actually make here (a few questions
+   after sign-in do the matching). This pass is built for what the section
+   really does: let a twelve-year-old compare six teaching styles.
+
+     1. a centred header that says what they are looking at;
+     2. a row of six tutor tabs — icon, name, strength — so all six are
+        visible and comparable at once;
+     3. one large card for whoever is selected: the figure on the left, the
+        description on the right.
+
+   Tutors are named for their teaching STRENGTH and wear icons, never the
+   trait letters, which between them spelled the questionnaire's name.
+
+   One accent, as everywhere: the selected tab is the coral one. Curves stay
+   generous (C2) — pill tabs, a 36px card. */
+.select-shell {
     display: flex;
+    flex-direction: column;
+    gap: clamp(var(--sp-6), 4vh, var(--sp-8));
+    width: 100%;
+}
+
+/* ---- 7.1 Header --------------------------------------------------------- */
+.select-head {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--sp-5);
-    padding-block: var(--sp-3);
-    padding-inline-end: var(--sp-5);
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.26em;
-    white-space: nowrap;
+    gap: var(--sp-3);
+    max-width: 46rem;
+    margin-inline: auto;
+    text-align: center;
+}
+
+.select-head .mono-tag { justify-content: center; }
+
+.select-title {
+    max-width: 22ch;
+    font-family: var(--font-display);
+    font-size: clamp(1.875rem, 3.8vw, 3.25rem);
+    font-weight: 800;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+    color: var(--text);
+}
+
+.select-lede {
+    max-width: 48ch;
+    font-size: clamp(1rem, 1.2vw, 1.125rem);
+    line-height: 1.65;
     color: var(--text-muted);
 }
 
-.marquee-run i { font-style: normal; color: var(--pop-coral); }
-
-@keyframes marquee {
-    from { transform: translate3d(0, 0, 0); }
-    to   { transform: translate3d(-50%, 0, 0); }
+/* ---- 7.2 The tutor row -------------------------------------------------
+   Phone first: a horizontal strip that scrolls and snaps, running edge to
+   edge past the gutter so the next tutor peeks in and says "swipe". From
+   64rem, six equal columns: every tutor visible, nothing to scroll. */
+.roster {
+    display: flex;
+    gap: var(--sp-3);
+    margin-inline: calc(var(--gutter) * -1);
+    padding: var(--sp-1) var(--gutter) var(--sp-3);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .marquee-track { animation: none; }
+.roster::-webkit-scrollbar { display: none; }
+
+.roster-item {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-height: 3.75rem;
+    padding: var(--sp-2) var(--sp-5) var(--sp-2) var(--sp-2);
+    border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+    border-radius: var(--r-pop-pill);
+    background: var(--bg-surface);
+    text-align: start;
+    cursor: pointer;
+    scroll-snap-align: start;
+    box-shadow: 0 6px 18px -14px color-mix(in srgb, var(--palette-dark) 40%, transparent);
+    transition: transform 240ms var(--ease-drift),
+                box-shadow 240ms var(--ease-drift),
+                border-color 200ms var(--ease-out-hard);
 }
 
+.roster-item:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--fg) 22%, transparent);
+    box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--palette-dark) 45%, transparent);
+}
 
-/* ═══════════════════════════════════════════ 7. ACT 2 · THE SIX ═══════ */
-/* Each agent owns a colour. One declaration re-points --pop and the chips,
-   the display case, its shadow and its hover state all follow — which is
-   what stops six near-identical sections reading as one section repeated. */
-.act-agent:nth-of-type(2) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
-.act-agent:nth-of-type(3) { --pop: var(--pop-sky);    --pop-text: var(--sky-text); }
-.act-agent:nth-of-type(4) { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
-.act-agent:nth-of-type(5) { --pop: var(--pop-mint);   --pop-text: var(--mint-text); }
-.act-agent:nth-of-type(6) { --pop: var(--pop-lilac);  --pop-text: var(--lilac-text); }
-.act-agent:nth-of-type(7) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
+.roster-item:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
-/* GEOMETRY — mobile-first: one column, copy first. The two-column stagger is
-   opt-in at the wide breakpoint, so narrow screens never pay for a rule they
-   have to undo. */
-.act-grid {
+.roster-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--r-pop-pill);
+    background: var(--bg-chip);
+    color: var(--accent-text);
+    transition: background-color 200ms var(--ease-out-hard), color 200ms var(--ease-out-hard);
+}
+
+.roster-icon .icon { width: 20px; height: 20px; }
+
+.roster-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.roster-name {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+.roster-strength {
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Selected: the one coral thing in the row. The label pairs are the
+   palette's measured ones — dark on the accent fill (4.82:1), and the icon
+   as the page's light on its dark. Colour snaps rather than fades: a
+   selection that lags reads as a missed tap. */
+.roster-item[aria-selected="true"] {
+    border-color: transparent;
+    background: var(--accent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--palette-light) 40%, transparent),
+        0 14px 28px -14px color-mix(in srgb, var(--palette-accent) 75%, transparent);
+}
+
+.roster-item[aria-selected="true"] .roster-name,
+.roster-item[aria-selected="true"] .roster-strength { color: var(--on-accent); }
+.roster-item[aria-selected="true"] .roster-icon { background: var(--palette-dark); color: var(--palette-light); }
+
+@media (min-width: 64rem) {
+    .roster {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        margin-inline: 0;
+        padding: var(--sp-1) 0 var(--sp-2);
+        overflow: visible;
+    }
+
+    /* Stacked: icon over name over strength, like a row of name cards. */
+    .roster-item {
+        flex-direction: column;
+        justify-content: center;
+        gap: var(--sp-2);
+        padding: var(--sp-5) var(--sp-3) var(--sp-4);
+        border-radius: var(--r-pop-lg);
+        text-align: center;
+    }
+
+    .roster-icon { width: 3rem; height: 3rem; }
+    .roster-text { align-items: center; }
+}
+
+/* ---- 7.3 The showcase card ----------------------------------------------
+   One sticker-edged card holding the figure and the description, so the
+   pair reads as a single profile. Stacked on a phone; side by side from
+   56rem. */
+.select-board {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: clamp(var(--sp-6), 5vh, var(--sp-9));
-    align-items: center;
+    overflow: hidden;
+    border: var(--edge-w) solid var(--edge);
+    border-radius: var(--r-pop-xl);
+    background: var(--bg-surface);
+    box-shadow: var(--lift) var(--lift) 0 var(--accent);
 }
 
-@media (min-width: 62rem) {
-    .act-grid {
-        /* Not 50/50 and not the same way twice: odd acts lead with copy on a
-           wider left column, even acts flip the whole thing. */
-        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-        gap: clamp(var(--sp-8), 6vw, var(--sp-10));
-    }
-
-    /* The flip. `order` moves the boxes; the source order stays copy-first,
-       so the reading order and the tab order never change. */
-    .act-agent:nth-of-type(even) .act-grid {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-    }
-    .act-agent:nth-of-type(even) .agent-copy { order: 2; }
-    .act-agent:nth-of-type(even) .agent-slot { order: 1; }
-
-    /* Vertical stagger, in three different amounts so the rhythm does not
-       become its own grid. translate takes no part in layout, so none of
-       this can shift a line box. */
-    .act-agent:nth-of-type(3n+1) .agent-slot { translate: 0 clamp(var(--sp-4), 3vh, var(--sp-8)); }
-    .act-agent:nth-of-type(3n+2) .agent-slot { translate: 0 clamp(var(--sp-2), -2vh, var(--sp-6)); }
-    .act-agent:nth-of-type(3n+3) .agent-slot { translate: 0 clamp(var(--sp-6), 5vh, var(--sp-10)); }
+@media (min-width: 56rem) {
+    .select-board { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
 }
 
-.agent-copy { display: flex; flex-direction: column; align-items: flex-start; }
+/* The figure's side: a pool of the accent rising from the floor, and the
+   tutor's name ghosted behind the figure — decoration, hidden from
+   assistive tech, because the real name is in the panel beside it. */
+.stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: clamp(18rem, 44vh, 30rem);
+    padding: var(--sp-6);
+    background:
+        radial-gradient(70% 55% at 50% 100%,
+            color-mix(in srgb, var(--accent) 26%, transparent) 0%,
+            color-mix(in srgb, var(--accent) 6%, transparent) 60%,
+            transparent 80%),
+        color-mix(in srgb, var(--fg) 3%, var(--bg));
+    overflow: hidden;
+}
 
-/* The massive block. Two words, two weights — the name is still the largest
-   thing in the act, but it has come out of all caps and lost the razor
-   tracking, which is most of what made it feel severe. */
-.agent-name {
-    margin: clamp(var(--sp-4), 2.5vh, var(--sp-6)) 0 0;
+.stage-ghost {
+    position: absolute;
+    inset-block-start: clamp(0.75rem, 3vh, 2rem);
+    inset-inline: 0;
+    text-align: center;
     font-family: var(--font-display);
-    font-size: clamp(2.75rem, 8.5vw, 6.5rem);
+    font-size: clamp(3.5rem, 9vw, 7.5rem);
+    font-weight: 800;
     line-height: 0.9;
+    letter-spacing: -0.05em;
+    color: color-mix(in srgb, var(--text) 7%, transparent);
+    pointer-events: none;
+    user-select: none;
+}
+
+.stage-figure {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: grid;
+    place-items: center;
+}
+
+/* Hidden figures still exist in the DOM. models.js observes every
+   .model-canvas-wrapper, a display:none box can never intersect, and so
+   each model is fetched the first time its tutor is actually shown. */
+.stage-figure[hidden] { display: none; }
+
+/* ---- 7.4 The profile ---------------------------------------------------- */
+.detail {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: clamp(var(--sp-6), 4vw, var(--sp-9));
+}
+
+.detail-panel[hidden] { display: none; }
+
+.detail-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    animation: detailIn 360ms var(--ease-drift) both;
+}
+
+@keyframes detailIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.detail-panel:focus-visible { outline: 3px solid var(--focus); outline-offset: 6px; border-radius: var(--r-pop); }
+
+/* The strength, first: it is the tutor's reason for existing. */
+.detail-strength {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-3);
+    border-radius: var(--r-pop-pill);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+}
+
+.detail-strength .icon { width: 16px; height: 16px; }
+
+.detail-name {
+    margin-block-start: var(--sp-4);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 4.8vw, 3.75rem);
+    line-height: 0.92;
     letter-spacing: -0.045em;
 }
 
-.agent-name-a { display: block; font-weight: 500; color: var(--text-muted); }
-.agent-name-b { display: block; font-weight: 700; color: var(--text); }
+.detail-name-a { display: block; font-size: 0.42em; font-weight: 600; letter-spacing: 0.02em; color: var(--text-muted); }
+.detail-name-b { display: block; margin-block-start: var(--sp-1); font-weight: 800; color: var(--text); }
 
-.agent-line {
-    margin: clamp(var(--sp-5), 3vh, var(--sp-7)) 0 0;
-    max-width: 24ch;
+.detail-line {
+    margin-block-start: var(--sp-4);
+    max-width: 26ch;
     font-family: var(--font-display);
-    font-size: clamp(1.125rem, 1.9vw, 1.5rem);
-    font-weight: 600;
+    font-size: clamp(1.125rem, 1.6vw, 1.3125rem);
+    font-weight: 700;
     line-height: 1.3;
     letter-spacing: -0.02em;
-    color: var(--pop-text);
+    color: var(--text);
 }
 
-.agent-desc {
-    margin: var(--sp-4) 0 0;
+.detail-desc {
+    margin-block-start: var(--sp-3);
     max-width: 44ch;
-    font-size: clamp(0.9375rem, 1.2vw, 1.0625rem);
-    line-height: 1.7;
+    font-size: var(--fs-body);
+    line-height: 1.65;
     color: var(--text-muted);
 }
 
-/* A spec card, not a wire table: rounded, edged, one solid shadow. */
-.agent-spec {
+/* Two stat tiles, side by side. */
+.detail-spec {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
     width: 100%;
-    max-width: 26rem;
-    margin: clamp(var(--sp-5), 3vh, var(--sp-7)) 0 0;
-    padding: var(--sp-2) var(--sp-5);
-    border: var(--edge-w) solid var(--edge);
-    border-radius: var(--r-pop-lg);
-    background: var(--bg-surface);
-    box-shadow: var(--lift-sm) var(--lift-sm) 0 var(--pop);
+    margin: var(--sp-6) 0 0;
 }
 
-.agent-spec-row {
+.detail-spec-row {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-4);
-    padding-block: var(--sp-3);
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+    border-radius: var(--r-pop);
+    background: var(--bg);
 }
 
-.agent-spec-row + .agent-spec-row { border-block-start: 2px dotted var(--edge-soft); }
-
-.agent-spec dt {
+.detail-spec dt {
     font-family: var(--font-mono);
-    font-size: 0.625rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-faint);
 }
 
-.agent-spec dd {
+.detail-spec dd {
     margin: 0;
-    font-size: 0.9375rem;
+    font-size: var(--fs-body);
     font-weight: 700;
+    line-height: 1.3;
     color: var(--text);
-    text-align: end;
 }
 
-/* ---- 7.1 The .glb display case -----------------------------------------
-   Was a wireframe box with a construction grid and corner ticks, which read
-   as "unfinished build". It is now a toy box: fat rounded edge, a warm pool
-   of the section's colour inside it, a dashed inner outline showing where
-   the model will stand, and two studs holding it together.
+/* ---- 7.5 Foot ----------------------------------------------------------- */
+.select-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    text-align: center;
+}
 
-   The ratio is still locked here, so mounting a renderer inside it later
-   changes nothing about the layout — that is the whole contract, and it is
-   the one thing about this element that did not change. */
-.agent-slot { width: 100%; }
+.select-foot .cta { min-width: 16rem; }
 
+.select-note {
+    max-width: 44ch;
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .roster-item { transition: none; }
+    .roster-item:hover { transform: none; }
+    .detail-panel { animation: none; }
+}
+
+/* ---- 7.7 The .glb display case -----------------------------------------
+   Restored with the select rebuild, not reinvented: models.js has a hard
+   contract with these class names and with the locked ratio, and the six
+   scrolling acts this replaced are gone but the loader is untouched.
+
+   THE RATIO LOCK IS THE CONTRACT. .model-canvas-wrapper is sized before any
+   script runs, and the mounted <model-viewer> is absolutely positioned
+   inside it — so a model arriving, or failing, moves nothing on the page.
+   That is the one thing about this element that must never change.
+
+   It sits on the stage inside the showcase card, which already provides
+   the edge and the accent pool, so the case itself carries neither. */
 .model-canvas-wrapper {
     position: relative;
     width: 100%;
-    /* No fixed height anywhere: fluid width, locked ratio. */
     aspect-ratio: 3 / 4;
-    max-height: 68svh;
-    max-width: 26rem;
+    max-height: 38svh;
+    max-width: 18rem;
     margin-inline: auto;
     display: grid;
     place-items: center;
     overflow: hidden;
-    border: var(--edge-w) solid var(--edge);
     border-radius: var(--r-pop-xl);
-    background:
-        radial-gradient(88% 58% at 50% 16%,
-            color-mix(in srgb, var(--pop) 34%, transparent) 0%,
-            color-mix(in srgb, var(--pop) 8%, transparent) 52%,
-            transparent 76%),
-        var(--bg-surface);
-    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop);
-    transition: transform 220ms var(--ease-pop), box-shadow 220ms var(--ease-pop);
 }
 
-/* Hover intent: landing.js adds .is-keen only after 150ms of sustained
-   hover, so brushing past the box does not make it jump. The case lifts up
-   off its shadow, the same gesture as a button but slower. */
-.agent-slot.is-keen .model-canvas-wrapper {
-    transform: translate(-3px, -3px);
-    box-shadow: 11px 11px 0 var(--pop);
+@media (min-width: 64rem) {
+    .model-canvas-wrapper { max-height: 40svh; }
 }
 
-/* Where the model will stand. Dashed and rounded — reads as "reserved for
-   something", which is true, rather than as a broken render. */
+/* Dashed inner outline showing where the model will stand. */
 .slot-shine {
     position: absolute;
-    inset: var(--sp-4);
-    border: 2px dashed color-mix(in srgb, var(--edge) 34%, transparent);
+    inset: var(--sp-3);
+    border: 2px dashed color-mix(in srgb, var(--text) 14%, transparent);
     border-radius: var(--r-pop-lg);
     pointer-events: none;
 }
 
-/* Two studs holding the case together. */
-.slot-stud {
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border: var(--edge-w) solid var(--edge);
+/* The tutor's icon, large, standing in for the figure until its model
+   arrives — so a "coming soon" case still says who it belongs to. */
+.slot-icon {
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    margin-block-end: var(--sp-2);
     border-radius: var(--r-pop-pill);
-    background: var(--pop);
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--palette-accent) 75%, transparent);
 }
 
-.slot-stud-a { inset-block-start: var(--sp-4); inset-inline-start: var(--sp-4); }
-.slot-stud-b { inset-block-end: var(--sp-4); inset-inline-end: var(--sp-4); }
+.slot-icon .icon { width: 30px; height: 30px; }
 
 .slot-meta {
     display: flex;
@@ -946,32 +1874,21 @@ body {
 }
 
 .slot-name {
-    padding: var(--sp-2) var(--sp-4);
-    border: var(--edge-w) solid var(--edge);
-    border-radius: var(--r-pop-pill);
-    background: var(--bg-body);
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
     color: var(--text);
 }
 
 .slot-ratio {
     font-family: var(--font-mono);
-    font-size: 0.625rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--text-muted);
 }
 
-/* ---- 7.2 The mounted model ---------------------------------------------
-   models.js appends a <model-viewer> into the case once the slot nears the
-   viewport, and flips .is-loading then .has-model on the wrapper. Nothing
-   below changes the wrapper's size: the 3:4 ratio is locked above and the
-   viewer is absolutely positioned inside it, so a model arriving — or
-   failing and being removed again — cannot move a single pixel of layout. */
 .model-canvas-wrapper > model-viewer {
     position: absolute;
     inset: 0;
@@ -979,22 +1896,15 @@ body {
     display: block;
     width: 100%;
     height: 100%;
-
-    /* Transparent, so the case's own coloured glow stays visible behind and
+    /* Transparent, so the stage's coloured pool stays visible behind and
        around the model rather than being covered by a black rectangle. */
     background-color: transparent;
     --poster-color: transparent;
     --progress-mask: transparent;
-    /* The loading bar picks up the section's colour like everything else. */
-    --progress-bar-color: var(--pop);
-    /* Follow the case's rounded corner rather than squaring it off. */
+    --progress-bar-color: var(--accent);
     border-radius: inherit;
 }
 
-/* camera-controls makes the element focusable, which paints the UA's default
-   highlight straight over the model. The real controls elsewhere on the page
-   keep their rings, so keyboard focus stays visible everywhere it means
-   something. */
 .model-canvas-wrapper > model-viewer:focus,
 .model-canvas-wrapper > model-viewer:focus-visible,
 .model-canvas-wrapper > model-viewer:focus-within {
@@ -1002,29 +1912,22 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* While the .glb is in flight the case keeps its label — models.js swaps the
-   caption to "loading…" — and breathes, so a slow connection reads as
-   working rather than stuck. */
 .model-canvas-wrapper.is-loading .slot-meta { animation: slotPulse 1.8s var(--ease-out-hard) infinite; }
 
 @keyframes slotPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
 
-/* Loaded: the placeholder chrome retires. The studs stay — they are the
-   case's hardware, not part of the empty state, and they frame the model
-   rather than competing with it.
-
-   visibility, delayed by exactly the fade duration, is doing real work here
-   and is not a belt-and-braces opacity:0. An element at opacity 0 is still
-   in the accessibility tree, so without it a screen reader would read the
-   retired caption ("pia-open.glb, loading…") straight after the model's own
-   alt text. Delaying the visibility switch to the end of the transition lets
-   the fade play first. */
+/* Loaded: the placeholder chrome retires.
+   visibility, delayed by exactly the fade duration, is doing real work and is
+   not a belt-and-braces opacity:0. An element at opacity 0 is still in the
+   accessibility tree, so without it a screen reader would read the retired
+   caption ("pia-open.glb, loading…") straight after the model's own alt
+   text. Delaying the visibility switch to the end of the transition lets the
+   fade play first. */
 .model-canvas-wrapper.has-model .slot-meta,
 .model-canvas-wrapper.has-model .slot-shine {
     opacity: 0;
     visibility: hidden;
-    transition: opacity 420ms var(--ease-out-hard), visibility 0s 420ms;
-    pointer-events: none;
+    transition: opacity 260ms var(--ease-out-hard), visibility 0s linear 260ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1032,11 +1935,6 @@ body {
     .model-canvas-wrapper.has-model .slot-meta,
     .model-canvas-wrapper.has-model .slot-shine { transition: none; visibility: hidden; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-    .agent-slot.is-keen .model-canvas-wrapper { transform: none; }
-}
-
 
 /* ═══════════════════════════════════════════ 8. SOLID GROUND ══════════ */
 /* Out of the reel. These sit above it in paint order and carry an opaque
@@ -1049,9 +1947,6 @@ body {
     border-block-start: var(--edge-w) solid var(--edge-soft);
 }
 
-.band-sdt { --pop: var(--pop-sky); --pop-text: var(--sky-text); }
-.band-caps { --pop: var(--pop-lilac); --pop-text: var(--lilac-text); }
-.band-finale { --pop: var(--pop-coral); --pop-text: var(--coral-text); }
 
 .band-head { max-width: 46rem; margin-block-end: clamp(var(--sp-8), 8vh, var(--sp-10)); }
 
@@ -1086,9 +1981,9 @@ body {
 
 /* ---- 8.1 SDT cards -----------------------------------------------------
    Deliberately not a 3-up equal grid. Each card spans a different number of
-   tracks and starts on a different column, so the row never lines up — and
-   each carries a different shadow colour, so they read as three stickers
-   dropped on the page rather than three cells of a table. */
+   tracks and starts on a different column, so the row never lines up, and
+   the three read as stickers dropped on the page rather than three cells of
+   a table. */
 .sdt-list {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1105,9 +2000,6 @@ body {
     .sdt-card:nth-child(3) { grid-column: 3 / span 5; margin-block-start: clamp(var(--sp-4), 3vh, var(--sp-8)); }
 }
 
-.sdt-card:nth-child(1) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
-.sdt-card:nth-child(2) { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
-.sdt-card:nth-child(3) { --pop: var(--pop-mint);   --pop-text: var(--mint-text); }
 
 .sdt-card {
     position: relative;
@@ -1115,31 +2007,13 @@ body {
     border: var(--edge-w) solid var(--edge);
     border-radius: var(--r-pop-xl);
     background: var(--bg-surface);
-    box-shadow: var(--lift) var(--lift) 0 var(--pop);
+    box-shadow: var(--lift) var(--lift) 0 var(--accent);
     transition: transform 220ms var(--ease-pop), box-shadow 220ms var(--ease-pop);
 }
 
 .sdt-card.is-keen {
     transform: translate(-3px, -3px);
-    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop);
-}
-
-/* A numbered badge on the corner of the sticker. */
-.sdt-num {
-    display: inline-grid;
-    place-items: center;
-    min-width: 2.5rem;
-    height: 2.5rem;
-    margin-block-end: var(--sp-5);
-    padding-inline: var(--sp-3);
-    border: var(--edge-w) solid var(--edge);
-    border-radius: var(--r-pop-pill);
-    background: var(--pop);
-    color: var(--on-pop);
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--accent);
 }
 
 .sdt-name {
@@ -1158,7 +2032,7 @@ body {
     margin: var(--sp-6) 0 0;
     padding: var(--sp-4);
     border-radius: var(--r-pop);
-    background: color-mix(in srgb, var(--pop) 14%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     font-size: 0.875rem;
     line-height: 1.6;
     font-weight: 600;
@@ -1186,12 +2060,6 @@ body {
     .cap:nth-child(even) { margin-block-start: clamp(var(--sp-6), 5vh, var(--sp-9)); }
 }
 
-.cap:nth-child(6n+1) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
-.cap:nth-child(6n+2) { --pop: var(--pop-sky);    --pop-text: var(--sky-text); }
-.cap:nth-child(6n+3) { --pop: var(--pop-yellow); --pop-text: var(--yellow-text); }
-.cap:nth-child(6n+4) { --pop: var(--pop-mint);   --pop-text: var(--mint-text); }
-.cap:nth-child(6n+5) { --pop: var(--pop-lilac);  --pop-text: var(--lilac-text); }
-.cap:nth-child(6n+6) { --pop: var(--pop-coral);  --pop-text: var(--coral-text); }
 
 .cap {
     display: flex;
@@ -1202,30 +2070,13 @@ body {
     border: var(--edge-w) solid var(--edge);
     border-radius: var(--r-pop-xl);
     background: var(--bg-surface);
-    box-shadow: var(--lift) var(--lift) 0 var(--pop);
+    box-shadow: var(--lift) var(--lift) 0 var(--accent);
     transition: transform 220ms var(--ease-pop), box-shadow 220ms var(--ease-pop);
 }
 
 .cap.is-keen {
     transform: translate(-3px, -3px);
-    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop);
-}
-
-.cap-num {
-    display: inline-grid;
-    place-items: center;
-    min-width: 2.25rem;
-    height: 2.25rem;
-    margin-block-end: var(--sp-2);
-    padding-inline: var(--sp-3);
-    border: var(--edge-w) solid var(--edge);
-    border-radius: var(--r-pop-pill);
-    background: var(--pop);
-    color: var(--on-pop);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--accent);
 }
 
 .cap-name {
@@ -1282,6 +2133,21 @@ body {
     margin-block-start: clamp(var(--sp-7), 5vh, var(--sp-9));
 }
 
+/* Matched widths, so the pair reads as one row of equals. */
+.finale-actions .cta { min-width: 17rem; }
+
+/* Staff are not this page's audience, but they do arrive through it. One
+   quiet line under the student CTAs, so they never have to hunt. */
+.finale-staff {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-start: var(--sp-6);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
 
 /* ═══════════════════════════════════════════ 9. FOOTER ════════════════ */
 .foot { border-block-start: var(--edge-w) solid var(--edge-soft); padding-block: var(--sp-7) var(--sp-8); }
@@ -1296,9 +2162,24 @@ body {
 
 .foot-line { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
 
+.foot-staff {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-3);
+}
+
+.foot-staff-label {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
 .foot-line-mono {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-faint);
@@ -1315,12 +2196,12 @@ body {
    fixed .input height) are inherited exactly as they are. */
 
 .overlay { padding: var(--gutter); }
-.overlay { background: color-mix(in srgb, var(--pop-void) 82%, transparent); }
+.overlay { background: color-mix(in srgb, var(--palette-dark) 82%, transparent); }
 
 .modal {
     border: var(--edge-w) solid var(--edge);
     border-radius: var(--r-pop-xl);
-    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--pop-coral);
+    box-shadow: var(--lift-lg) var(--lift-lg) 0 var(--accent);
 }
 
 /* 2px inset edge replaces the filled well. border-box keeps the height at
@@ -1337,14 +2218,14 @@ body {
 .overlay .input:hover,
 .overlay .select:hover { border-color: var(--edge); }
 
-/* Focus is an edge plus a sky-blue halo — and it stays a box-shadow, so it
+/* Focus is an edge plus an accent halo — and it stays a box-shadow, so it
    draws OUTSIDE the border box and cannot change the field's height. */
 .overlay .input:focus,
 .overlay .select:focus,
 .overlay .textarea:focus {
     border-color: var(--edge);
     background: var(--bg-field);
-    box-shadow: 0 0 0 3px var(--pop-sky);
+    box-shadow: 0 0 0 3px var(--accent);
 }
 
 .overlay .input.is-invalid,
@@ -1352,6 +2233,10 @@ body {
 
 .overlay .auth-intro,
 .overlay .auth-status { border-radius: var(--r-pop); }
+
+/* global.css shades the dialog footer with pure black. Same falloff, but
+   tinted from the palette's dark value so no fourth colour sneaks in. */
+.overlay .modal-foot { box-shadow: 0 -12px 20px -20px color-mix(in srgb, var(--palette-dark) 90%, transparent); }
 
 /* global.css sizes .btn at --control-h (38px), which is under the 44px touch
    floor this page holds itself to. min-height, not height: the button grows
@@ -1370,7 +2255,7 @@ body {
 
 .overlay .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: var(--lift) var(--lift) 0 var(--edge); }
 .overlay .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--edge); }
-.overlay .btn:focus-visible { outline: 3px solid var(--pop-sky); outline-offset: 3px; }
+.overlay .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .overlay .btn-secondary { background: transparent; color: var(--text); }
 .overlay .btn-secondary:hover:not(:disabled) { background: var(--bg-chip); }
@@ -1381,32 +2266,114 @@ body {
     transition: background-color var(--t-base), transform 140ms var(--ease-pop);
 }
 
-.overlay .modal-close:hover { background: var(--pop-coral); color: var(--on-pop); }
+.overlay .modal-close:hover { background: var(--accent); color: var(--on-accent); }
 .overlay .modal-close:active { transform: translate(1px, 1px); }
 
-.overlay .auth-intro { border: var(--edge-w) solid var(--edge-soft); background: color-mix(in srgb, var(--pop-sky) 12%, transparent); }
-.overlay .auth-intro .icon { color: var(--sky-text); }
+.overlay .auth-intro { border: var(--edge-w) solid var(--edge-soft); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.overlay .auth-intro .icon { color: var(--accent-text); }
 
-/* "Link sent" is a success, and success is mint here — the page's primary
-   accent is yellow, which would read as a warning in that slot. */
-.overlay .auth-status.is-ok { background: color-mix(in srgb, var(--pop-mint) 16%, transparent); color: var(--mint-text); }
+/* "Link sent" is a success. Errors already own the accent, so success is
+   plain ink on a neutral tint, told apart by its check icon and its words —
+   no green needed, and none allowed. */
+.overlay .auth-status.is-ok { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--text); }
 
 .overlay .label {
     font-family: var(--font-mono);
-    font-size: 0.625rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-muted);
 }
 
-.link-btn { font-weight: 700; color: var(--pop-text); }
-.link-btn:hover { color: var(--pop-text); }
+.link-btn { font-weight: 700; color: var(--accent-text); }
+.link-btn:hover { color: var(--accent-text); }
 
 @media (prefers-reduced-motion: reduce) {
     .overlay .btn:hover:not(:disabled),
     .overlay .btn:active:not(:disabled),
     .overlay .modal-close:active { transform: none; }
 }
+
+
+/* ═══════════════════════════════════════════ 9C. SIGN-IN DIALOGS ══════ */
+/* Deliberately plain. The first pass split the dialog into a student form
+   and a staff panel with two role cards, and it read as a control room to a
+   twelve-year-old. Now: one form, one button, and two quiet text links
+   underneath — "Activate your account" and "Admin sign in" — styled exactly
+   alike, so the staff door is present without competing for attention.
+   Teachers and admins share that one door; auth.js routes each to their
+   own dashboard by role. */
+
+.portal-form { display: flex; flex-direction: column; }
+
+/* The form's one action, full width directly under the fields. */
+.overlay .portal-submit {
+    width: 100%;
+    min-height: 3rem;
+    margin-block-start: var(--sp-2);
+    font-size: var(--fs-body);
+}
+
+/* The quiet links. A dotted rule separates them from the form so they read
+   as "other ways in", not as part of the sign-in itself. */
+.portal-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+    padding-block-start: var(--sp-4);
+    border-block-start: 2px dotted var(--edge-soft);
+}
+
+.portal-note {
+    font-size: var(--fs-sm);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* Label on the left, "Forgot password?" on the right: where every major
+   sign-in form has trained people to look for it. The link's hit area is
+   held to 32px tall so it cannot reach down over the password field 8px
+   below; 32px still clears WCAG 2.5.8's 24px minimum. */
+.label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+}
+
+.label-row .link-btn { font-size: var(--fs-xs); }
+.label-row .link-btn::after { height: max(100%, 32px); }
+
+/* Caps Lock and similar nudges share the error slot but not its colour: a
+   hint is not a mistake. */
+.overlay .field-msg.is-hint { color: var(--text-muted); }
+
+/* ---- 9C.1 Show-password toggle --------------------------------------------
+   Inside the field's right edge, a full 44px wide and the field's full
+   height. The field is padded to match, so a long password never runs
+   underneath the button. */
+.pw-wrap { position: relative; }
+.overlay .pw-wrap .input { padding-inline-end: 3.25rem; }
+
+.pw-toggle {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 2px;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    border-radius: var(--r-pop);
+    color: var(--text-muted);
+    transition: color var(--t-base);
+}
+
+.pw-toggle:hover { color: var(--text); }
+.pw-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: -4px; }
+.pw-toggle .icon { width: 18px; height: 18px; }
+.pw-toggle .icon-eye-off,
+.pw-toggle[aria-pressed="true"] .icon-eye { display: none; }
+.pw-toggle[aria-pressed="true"] .icon-eye-off { display: block; }
 
 
 /* ═══════════════════════════════════════════ 10. SCROLL REVEALS ═══════ */
@@ -1434,12 +2401,13 @@ body {
 
 /* Stagger within a block, set here rather than as inline style attributes so
    the CSP never needs style-src-attr 'unsafe-inline'. */
-.js .agent-copy [data-reveal]:nth-child(1) { --d: 0ms; }
-.js .agent-copy [data-reveal]:nth-child(2) { --d: 90ms; }
-.js .agent-copy [data-reveal]:nth-child(3) { --d: 170ms; }
-.js .agent-copy [data-reveal]:nth-child(4) { --d: 240ms; }
-.js .agent-copy [data-reveal]:nth-child(5) { --d: 310ms; }
-.js .agent-slot[data-reveal] { --d: 120ms; --reveal-y: 2.5rem; }
+/* The select screen reveals as three beats -- head, board, commit -- rather
+   than the five-line stagger the six scrolling acts used. Those selectors
+   named .agent-copy and .agent-slot, which no longer exist in the DOM. */
+.js .select-head [data-reveal] { --d: 0ms; }
+.js .roster[data-reveal] { --d: 90ms; }
+.js .select-board[data-reveal] { --d: 170ms; --reveal-y: 2.5rem; }
+.js .select-foot[data-reveal] { --d: 240ms; }
 
 .js .sdt-card:nth-child(2) { --d: 110ms; }
 .js .sdt-card:nth-child(3) { --d: 220ms; }
@@ -1450,6 +2418,9 @@ body {
 .js .cap:nth-child(5) { --d: 240ms; }
 .js .cap:nth-child(6) { --d: 300ms; }
 
+/* The staff line under the finale CTAs arrives a beat after them. */
+.js .finale-staff[data-reveal] { --d: 120ms; }
+
 /* ---- 10.1 Word-by-word lighting ----------------------------------------
    landing.js splits [data-lit-words] and [data-scrub-words] headings into
    .scrub-w spans and adds .is-lit — on a stagger for the <h1>, and tied to
@@ -1459,7 +2430,7 @@ body {
    Unlit is a dimmed ink rather than a flat grey, so a half-lit headline
    still reads as one sentence in two tones. */
 .scrub-w {
-    color: color-mix(in srgb, var(--text) 30%, transparent);
+    color: color-mix(in srgb, var(--text) 52%, transparent);
     transition: color 300ms var(--ease-out-hard);
 }
 
@@ -1467,7 +2438,7 @@ body {
 
 /* The last line of the drop title lands in coral, and the finale in coral
    too — the two moments the page raises its voice. */
-.drop-l3 .scrub-w.is-lit { color: var(--coral-text); }
+.drop-l3 .scrub-w.is-lit { color: var(--accent-text); }
 .finale-title .scrub-w.is-lit { color: inherit; }
 
 
@@ -1493,29 +2464,42 @@ body {
 /* Type and spacing already scale continuously with clamp(); these rules only
    restack and re-weight. Authored mobile-first, so this is the narrow end. */
 @media (max-width: 48rem) {
-    /* The navbar wraps to two rows on a phone; the mark keeps its own line so
-       the three controls are not crushed to nothing. */
-    .nav-inner { justify-content: center; }
-    .nav-actions { flex: 1 1 100%; justify-content: center; }
+    /* The navbar no longer wraps to two rows on a phone — the section links
+       live in the hamburger sheet — so one bar height is all there is to
+       clear, and the offline strip sits directly under it. */
     .btn-pop,
-    .btn-pop-ghost { padding-inline: var(--sp-4); font-size: 0.8125rem; }
+    .btn-pop-ghost { padding-inline: var(--sp-4); font-size: var(--fs-sm); }
 
-    /* Two navbar rows means a taller navbar to clear. */
-    .act { padding-block: calc(var(--topbar-h) * 2) var(--sp-9); }
-    .wire { inset-block-start: calc(var(--topbar-h) * 2); }
+    .act { padding-block: calc(var(--topbar-h) + var(--sp-6)) var(--sp-9); }
+    .act.act-drop { padding-block-end: calc(var(--sp-4) + 3rem + var(--sp-6)); }
 
     .drop-l2,
     .drop-sub { margin-inline-start: 0; }
 
-    .marquee { inset-inline: var(--sp-4); inset-block-end: var(--sp-4); }
-    .marquee-run { letter-spacing: 0.18em; }
+    /* The desktop clamp bottoms out at 40px on a phone, which left
+       "Welcome Grade 7 Students!" using barely half the screen. 15vw fills
+       the column (56px at 375) and still fits "Students!" at 320. */
+    .drop-title { font-size: clamp(2.75rem, 15vw, 4.5rem); }
+
+    /* A portrait phone crops the frame down to its bright middle, and the
+       copy runs the full width, so there is no dark side to lean on. An
+       even top-to-bottom wash replaces the side gradient; measured figures
+       are in the THE CONTRAST FLOOR note in section 6. */
+    .hero-scrim {
+        background:
+            linear-gradient(to bottom,
+                color-mix(in srgb, var(--bg-body) 84%, transparent) 0%,
+                color-mix(in srgb, var(--bg-body) 78%, transparent) 45%,
+                color-mix(in srgb, var(--bg-body) 90%, transparent) 100%);
+    }
+
+    .hero-video-toggle { inset-inline-end: var(--sp-4); inset-block-end: var(--sp-4); }
 
     .band-head-split { display: block; }
     .band-head-split .band-title { margin-block-start: var(--sp-4); }
 
     .finale-actions { width: 100%; }
-    .finale-actions .btn-pop,
-    .finale-actions .btn-pop-ghost { flex: 1 1 100%; }
+    .finale-actions .cta { flex: 1 1 100%; }
 }
 
 /* Short viewports (small phones, any phone in landscape): the display case is

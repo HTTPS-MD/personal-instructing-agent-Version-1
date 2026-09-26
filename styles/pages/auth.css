@@ -66,7 +66,7 @@
 
 .auth-greeting {
     min-height: 30px;                 /* reserved: filled from the profile */
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--accent);
 }
@@ -100,8 +100,8 @@
 
 .auth-identity .icon { flex: 0 0 18px; color: var(--text-faint); }
 .auth-identity-text { min-width: 0; }
-.auth-identity-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
-.auth-identity-value { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-identity-label { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.auth-identity-value { font-size: var(--fs-sm); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Always present at a fixed height. A server error appearing can never push
    the password fields or the submit button down the page. */
@@ -117,7 +117,7 @@
     margin-bottom: 0;
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-sm);
-    font-size: 12.5px;
+    font-size: var(--fs-sm);
     line-height: 1.5;
     background: transparent;
     color: transparent;
@@ -170,13 +170,13 @@
 .auth-show-row input:checked + .auth-show-box { background: var(--accent); }
 .auth-show-row input:checked + .auth-show-box .icon { opacity: 1; }
 .auth-show-row input:focus-visible + .auth-show-box { box-shadow: 0 0 0 3px var(--accent-soft); }
-.auth-show-text { font-size: 13px; color: var(--text-muted); }
+.auth-show-text { font-size: var(--fs-sm); color: var(--text-muted); }
 
 .auth-submit { height: 50px; font-size: 15px; font-weight: 700; }
 
 .auth-hint {
     margin-top: var(--sp-5);
-    font-size: 12px;
+    font-size: var(--fs-sm);
     line-height: 1.6;
     color: var(--text-faint);
     text-align: center;

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>Waiting Room — PIA</title>
+    <title>Thank You — PIA</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -18,13 +18,21 @@
     <link rel="stylesheet" href="../../styles/pages/student-journey.css">
 </head>
 
-<!-- requireStudentSession() removes `opacity-0` once the session is verified. -->
+<!-- Where a student lands the moment the questionnaire is submitted.
+
+     Deliberately says nothing about the result: no score, no trait, no
+     tutor. There is nothing here to leak even by accident — the results are
+     stored only where an admin can read them (migration 0018), and the
+     submission itself returns no score to the browser.
+
+     assessment-complete.js removes `opacity-0` once the session is verified
+     and the questionnaire is confirmed done. -->
 <body class="opacity-0">
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
-            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.1 1.9"/></symbol>
-            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+            <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></symbol>
             <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
         </defs>
     </svg>
@@ -36,12 +44,10 @@
             <div class="journey-shell journey-bar-inner">
                 <div class="journey-brand">
                     <span class="journey-mark" aria-hidden="true">PIA</span>
-                    <!-- Four stages, always visible, so a waiting student can see
-                         both where they are and what is still to come. -->
                     <div class="stage-rail hide-sm" aria-label="Your progress through the study">
-                        <span class="stage-node is-current"><span class="pip"></span>Waiting</span>
+                        <span class="stage-node is-done"><span class="pip"></span>Waiting</span>
                         <span class="stage-sep"></span>
-                        <span class="stage-node"><span class="pip"></span>Test</span>
+                        <span class="stage-node is-done"><span class="pip"></span>Test</span>
                         <span class="stage-sep"></span>
                         <span class="stage-node"><span class="pip"></span>Tutor</span>
                         <span class="stage-sep"></span>
@@ -60,24 +66,23 @@
 
         <main class="journey-main">
             <div class="journey-shell">
-                <div class="wait-card">
-                    <div class="wait-orb" aria-hidden="true">
-                        <svg class="icon"><use href="#i-clock"></use></svg>
+                <div class="gate-wrap">
+                    <div class="gate-glyph">
+                        <svg class="icon icon-lg"><use href="#i-check"></use></svg>
                     </div>
 
-                    <!-- waiting-room.js swaps both of these between three stage
-                         variants. Their heights are reserved in the stylesheet
-                         so the note and button below never move. -->
-                    <h1 class="wait-title" id="waiting-title">Waiting for your teacher</h1>
-                    <p class="wait-desc" id="waiting-desc">
-                        This stage isn't open yet. Keep this page open — it will move you
-                        forward automatically the moment your teacher starts it.
+                    <h1 class="gate-title">Thank you for completing the assessment</h1>
+                    <p class="gate-lede">
+                        Your answers have been saved. There is nothing else you need to do here.
                     </p>
 
-                    <div class="wait-note">
-                        <svg class="icon"><use href="#i-info"></use></svg>
-                        <p>You don't need to refresh or do anything. If you close this page,
-                            just sign in again and you'll come right back here.</p>
+                    <!-- The waiting room is the safe default; the script points
+                         this at the student's actual next step once it knows it. -->
+                    <div class="gate-actions">
+                        <a href="waiting-room.html" class="btn btn-primary btn-block" id="btn-continue">
+                            Continue
+                            <svg class="icon"><use href="#i-arrow-right"></use></svg>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -85,10 +90,8 @@
     </div>
 
     <script src="../../assets/js/function.js"></script>
-    <script src="../js/waiting-room.js"></script>
+    <script src="../js/assessment-complete.js"></script>
     <script>
-        // The only control on the page. On a shared lab PC an abandoned session
-        // means the next student's answers land in this student's row.
         document.getElementById('signout-btn').addEventListener('click', function () {
             if (typeof executeForceLogout === 'function') { executeForceLogout(); }
         });

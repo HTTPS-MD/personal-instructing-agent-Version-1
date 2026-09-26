@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light dark">
     <title>Personality Questionnaire — PIA</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/student-journey.css">
@@ -87,22 +87,25 @@
                                 <p class="question-counter" id="question-counter">Question 1 of 50</p>
                                 <p class="question-text" id="question-text">—</p>
 
-                                <!-- One delegated listener reads data-score. -->
+                                <!-- One delegated listener reads data-score. The labels are
+                                     the BFPT sheet's own 1-5 scale; ocean-test.js rewrites
+                                     each .answer-label from PIA_BFPT.scale, so this markup
+                                     and the admin results view cannot drift apart. -->
                                 <div class="answer-list" id="ocean-answer-list">
                                     <button type="button" class="ocean-answer-btn" data-score="1">
-                                        <span class="dial" aria-hidden="true"></span>Very inaccurate
+                                        <span class="dial" aria-hidden="true"></span><span class="answer-label">Disagree</span>
                                     </button>
                                     <button type="button" class="ocean-answer-btn" data-score="2">
-                                        <span class="dial" aria-hidden="true"></span>Moderately inaccurate
+                                        <span class="dial" aria-hidden="true"></span><span class="answer-label">Slightly disagree</span>
                                     </button>
                                     <button type="button" class="ocean-answer-btn" data-score="3">
-                                        <span class="dial" aria-hidden="true"></span>Neither accurate nor inaccurate
+                                        <span class="dial" aria-hidden="true"></span><span class="answer-label">Neutral</span>
                                     </button>
                                     <button type="button" class="ocean-answer-btn" data-score="4">
-                                        <span class="dial" aria-hidden="true"></span>Moderately accurate
+                                        <span class="dial" aria-hidden="true"></span><span class="answer-label">Slightly agree</span>
                                     </button>
                                     <button type="button" class="ocean-answer-btn" data-score="5">
-                                        <span class="dial" aria-hidden="true"></span>Very accurate
+                                        <span class="dial" aria-hidden="true"></span><span class="answer-label">Agree</span>
                                     </button>
                                 </div>
 
@@ -187,6 +190,8 @@
     </div>
 
     <script src="../../assets/js/function.js"></script>
+    <!-- The 50 statements and the 1-5 scale. Must load before ocean-test.js. -->
+    <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/ocean-test.js"></script>
     <script>
         document.getElementById('signout-btn').addEventListener('click', function () {

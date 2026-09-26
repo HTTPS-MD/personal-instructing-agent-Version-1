@@ -55,155 +55,234 @@ a { color: inherit; text-decoration: none; }
 /* Display face for headings and anything that reads as a title. */
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    font-weight: 800;
+    line-height: var(--lh-tight);
+    letter-spacing: -0.03em;
 }
+
+h1 { font-size: var(--fs-h1); }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+h4 { font-size: var(--fs-h4); }
+h5, h6 { font-size: var(--fs-body); letter-spacing: -0.01em; }
 
 :focus { outline: none; }
 
 :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: var(--r-xs);
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    /* Follows the shape it is tracing rather than boxing it — an angular
+       focus ring on a pill button would reintroduce exactly the contour C2
+       removes. */
+    border-radius: inherit;
 }
 
 /* --------------------------------------------------------------- 2. TOKENS */
 /* ============================================================================
-   COLOUR SYSTEM
+   PIA DESIGN SYSTEM v3 — "Bright Room"
    ---------------------------------------------------------------------------
-   The six specified variables are canonical and hold their exact values:
+   A light, warm, curvilinear system for Grade 7 learners, built by harmonising
+   a preschool/childcare visual language (cream ground, deep pine green,
+   coral and sunny accents, generous rounding) with four empirical constraints
+   that are NOT negotiable. Each constraint is annotated at the token that
+   enforces it, so a reviewer can trace any pixel back to its source.
 
-       --bg-main             #121212   the dark-mode ground
-       --bg-surface          #1A1A1A   every raised surface on that ground
-       --text-primary        #F3F4F6   body and heading text
-       --text-muted          #9CA3AF   secondary text
-       --accent-green        #22C55E   every primary action, active state
-       --accent-green-hover  #16A34A   the hover/pressed shade of that green
+   C1  TYPOGRAPHY — Inter, body text at 12 pt.
+       Možina, Kovačević & Možina (2024), Appl. Sci. 14(3), 1281.
+       The study tested a sans-serif at 8 / 10 / 12 pt and recommends a face
+       with (a) minimal difference in letter stroke width, (b) a higher
+       x-height and (c) moderate counter size, at >= 10 pt. Inter satisfies
+       all three. 12 pt is the largest size the study validated, so it is the
+       conservative choice inside the tested range. NOTE: the study measured
+       INK ON PAPER; the translation to screen is exact only because CSS
+       defines 1 pt as 1/72 in and 1 px as 1/96 in, so 12 pt === 16 px.
+       Enforced by --fs-body. No text token in this system falls below
+       --fs-xs (13.5 px ~ 10.1 pt), i.e. the study's 10 pt floor holds
+       system-wide, not just for body copy.
 
-   Everything else in the file is either a neutral stepped off those two
-   greys or an alias, so there is exactly one place to change a colour. No
-   rule anywhere in the system may write a raw hex value — only this block
-   and the light-theme block below hold literals.
+   C2  CURVATURE — pill buttons, 12 px cards.
+       Chuquichambi, Vartanian, Skov, Corradi, Nadal, Silvia & Munar (2022),
+       Ann. N.Y. Acad. Sci. 1518(1), 151-165. Meta-analysis of 61 studies /
+       309 effect sizes: Hedges' g = 0.39 for preference of curvilinear over
+       angular contour. Curvilinear contour is read as an absence of threat;
+       angular contour recruits the amygdala (Bar & Neta). In a maths tutor —
+       where anxiety is the thing being designed against — every contour the
+       learner meets is curved. The meta-analysis also reports that the effect
+       is STRONGEST under brief presentation / snap judgement, which is why
+       rounding is heaviest on the fast-glance surfaces (buttons, chips,
+       avatars) and moderate on surfaces that are read slowly (cards, at the
+       specified 12 px). Enforced by --r-pill and --r-card.
 
-   TWO ADDITIONS, and the reason for each.
+   C3  SPLIT ATTENTION — integrated spatial format.
+       Ouwehand, Lespiau, Tricot & Paas (2025), Educ. Sci. 15(4), 458.
+       Essential information split across separate sources raises extraneous
+       load; an integrated format lowers it (and, per Mugisha & Arguel in the
+       same issue, specifically lowers INTRINSIC load for procedural tasks).
+       Enforced in layout, not here — see styles/pages/tutoring.css.
 
-   1. --text-faint (#7A8290). The spec gives two text tones; decorative
-      labels (specs, captions, counters) need a third that still clears AA.
-      It is the same cool-grey family as --text-muted, measured at 4.76:1 on
-      --bg-main — not a new hue.
-   2. --color-primary-ink / --color-danger-ink. #22C55E behind white text is
-      2.28:1 and, as TEXT on a light ground, 2.18:1 — both fail AA. As a
-      FILL it is fine in either theme provided the label is near-black
-      (8.1:1), which is how every button here uses it. So the spec value is
-      untouched for fills, and a darker shade of the SAME hue is used only
-      where the green becomes text on the light theme.
+   C4  AGENT + EMOTIONAL FEEDBACK.
+       Tang, Jiang, Liu & Li (2025), Front. Psychol. 16, 1610550. 2x2
+       factorial, online formative assessment. Emotional feedback SIGNIFICANTLY
+       raised engagement; the pedagogical agent on its own slightly DEPRESSED
+       transfer scores, and the authors advise caution "to avoid potential
+       distractions during the learning process". The design consequence is
+       asymmetric and deliberate: the agent is visually quiet while the
+       learner is solving, and only becomes salient at the feedback moment.
+       Enforced by --agent-* tokens and the [data-agent-state] rules.
 
-   CONTRAST, measured on --bg-main:
-       --text-primary  16.6:1      --text-muted   7.3:1
-       --text-faint     4.8:1      --accent-green 8.1:1
-       --bg-main on an --accent-green fill: 8.1:1
+   COLOUR — sampled from the reference composition, then corrected for WCAG.
+   Measured ratios are recorded beside each token. The two grounds are the
+   cream page and the white card; every text role clears AA on both.
    ==========================================================================*/
 :root {
-    /* --- The specified palette, verbatim --- */
-    --bg-main: #121212;
-    --bg-surface: #1A1A1A;
-    --text-primary: #F3F4F6;
-    --text-muted: #9CA3AF;
-    --accent-green: #22C55E;
-    --accent-green-hover: #16A34A;
+    /* --- Raw palette ------------------------------------------------------
+       The only literals in the system. Everything below is a role that points
+       at one of these, so re-theming is a change in this block alone. */
+    --pine: #0A6E56;           /* brand green — hero grounds, primary fills   */
+    --pine-deep: #075942;      /* pressed / deeper hero                       */
+    --pine-dim: #0E8468;       /* hover lift on a pine fill                   */
+    --cream: #FAF7E8;          /* the page. warm, low-glare, not white        */
+    --cream-deep: #F3EFDA;     /* inset wells on the cream ground             */
+    --paper: #FFFFFF;          /* raised card surface                         */
+    --mint: #D8F2E9;           /* soft positive tint                          */
+    --sky: #DCEFF5;            /* soft neutral-cool tint                      */
+    --coral: #F2613F;          /* accent + "not yet" — warm, never punitive   */
+    --coral-soft: #FDE8E1;
+    --coral-ink: #A83607;      /* 5.57:1 on --coral-soft, 6.11:1 on cream     */
+    --sunny: #F5C518;          /* hints, streaks, reward                      */
+    --sunny-soft: #FDF3D0;
+    --sunny-ink: #92610A;      /* sunny as TEXT — 4.96:1 on cream             */
+    --spring: #1FA971;         /* CORRECT. distinct from --pine by luminance  */
+    --ink: #16241F;            /* near-black, green-cast so it sits in family */
+    --ink-muted: #4A5A54;
+    --ink-faint: #5C6B65;
 
-    /* Light mode is not covered by the spec; it needs one ground of its own.
-       Everything else in that theme is derived from these same six. */
-    --bg-light: #F8FAFC;
+    /* --- Roles: ground & surface ------------------------------------------ */
+    --bg-main: var(--cream);
+    --bg-body: var(--cream);
+    --bg-surface: var(--paper);
+    --bg-surface-hi: var(--paper);
+    --bg-surface-hover: #F6F3E4;
+    --bg-field: var(--cream-deep);       /* inset well, reads below the card  */
+    --bg-inset-focus: var(--paper);
+    --bg-chip: var(--cream-deep);
+    --bg-chip-hover: #EAE5CC;
+    --track: #E4DFC6;
+    --track-hover: #CFC9AC;
 
-    /* --- Role aliases. Every consumer in the system reads one of these, so
-           re-pointing a role is a one-line change and no page stylesheet
-           ever names a literal. --- */
-    --bg-dark: var(--bg-main);
-    --color-primary: var(--accent-green);
-    --color-danger: #EF4444;
+    /* --- Roles: text — ratios measured on --cream / --paper --------------- */
+    --text-primary: var(--ink);
+    --text-main: var(--ink);
+    --text: var(--ink);                  /* 14.95:1 / 16.08:1  AAA            */
+    --text-muted: var(--ink-muted);      /*  6.78:1 /  7.29:1  AA             */
+    --text-faint: var(--ink-faint);      /*  5.21:1 /  5.61:1  AA             */
+    --text-on-solid: var(--cream);
 
-    /* --- Dark mode is the default --- */
-    --text-main: var(--text-primary);
+    /* --- Roles: primary ---------------------------------------------------
+       The pine FILL takes cream text (5.78:1). Pine as TEXT on cream is
+       5.78:1 and on paper 6.22:1, so the same value serves both and there is
+       no second "ink" shade to keep in sync. */
+    --color-primary: var(--pine);
+    --color-primary-ink: var(--pine);
+    --accent: var(--pine);
+    --accent-strong: var(--pine-deep);
+    --accent-hover: var(--pine-dim);
+    --accent-soft: var(--mint);
+    --accent-line: rgba(10, 110, 86, 0.24);
+    --on-primary: var(--cream);
+    --on-accent: var(--cream);
 
-    /* Green/red as TEXT are legible on the near-black ground as-is: 8.1 and
-       4.9. Only the light theme has to darken them. */
-    --color-primary-ink: var(--color-primary);
-    --color-danger-ink: var(--color-danger);
+    /* --- Roles: semantic --------------------------------------------------
+       The original palette note in this repo is preserved on purpose: green
+       is the "correct / progress / safe" signal and re-colouring it would
+       undo the anxiety argument. What changes is that green now has to do two
+       jobs — brand AND correctness — so they are separated by luminance:
+       --pine is the dark structural green, --spring the bright reward green.
 
-    /* Labels sitting ON a primary/danger fill. */
-    --on-primary: var(--bg-main);          /* 8.1:1 */
-    --on-danger: var(--bg-light);          /* 4.87:1 */
+       RED IS GONE from the learner-facing surface. A wrong answer is --coral
+       on --coral-soft, framed as "not yet"; true red survives only as
+       --danger for destructive admin actions (delete a section, remove a
+       student), which no Grade 7 learner ever sees. */
+    --color-correct: var(--spring);
+    --correct-soft: var(--mint);
+    --correct-ink: #0C6642;              /* 5.94:1 on mint, 7.01:1 on paper   */
 
-    /* --- Neutrals: one grey ladder stepped off --bg-main and --bg-surface.
-           Ordered dark to light, so "which is on top" is readable here. --- */
-    --bg-body: var(--bg-main);
-    --bg-field: #0C0C0C;                   /* inset — recedes below the ground */
-    --bg-inset-focus: #0F0F0F;
-    --bg-surface-hi: #212121;
-    --bg-surface-hover: #232323;
-    --bg-chip: #262626;
-    --bg-chip-hover: #303030;
-    --track: #3A3A3A;
-    --track-hover: #4D4D4D;
+    --color-retry: var(--coral);
+    --retry-soft: var(--coral-soft);
+    --retry-ink: var(--coral-ink);
 
-    /* --- Text --- */
-    --text: var(--text-main);
-    --text-faint: #7A8290;                 /* 4.8:1 — labels and decoration */
-    --text-on-solid: var(--bg-light);
+    --info-soft: var(--sky);
+    --info-ink: #2B5A6B;                 /*  6.38:1 on --sky                  */
 
-    /* --- Aliases, so every existing consumer keeps working --- */
-    --accent: var(--color-primary);
-    --accent-strong: var(--accent-green-hover);
-    --accent-soft: rgba(34, 197, 94, 0.14);
-    --accent-line: rgba(34, 197, 94, 0.32);
-    --on-accent: var(--on-primary);
+    --warning: var(--sunny);
+    --warning-soft: var(--sunny-soft);
+    --warning-line: rgba(146, 97, 10, 0.28);
+    --warning-ink: var(--sunny-ink);
+    --on-warning: var(--ink);            /*  9.86:1 — near-black on sunny     */
 
-    --danger: var(--color-danger);
-    --danger-strong: #DC2626;
-    --danger-soft: rgba(239, 68, 68, 0.14);
-    --danger-line: rgba(239, 68, 68, 0.32);
+    /* Destructive only. Admin surfaces, never the tutoring surface. */
+    --color-danger: #DC2626;
+    --danger: #DC2626;
+    --danger-strong: #B91C1C;
+    --danger-ink: #B91C1C;
+    --color-danger-ink: #B91C1C;
+    --danger-soft: #FDE7E7;
+    --danger-line: rgba(185, 28, 28, 0.26);
+    --on-danger: var(--paper);
 
-    /* Amber, kept strictly for "needs attention" states. */
-    --warning: #F59E0B;
-    --warning-soft: rgba(245, 158, 11, 0.14);
-    --warning-line: rgba(245, 158, 11, 0.30);
-    --on-warning: var(--bg-main);
+    --glass: rgba(255, 255, 255, 0.78);
+    --glass-edge: rgba(22, 36, 31, 0.08);
 
-    /* Translucent surface for glass panels. */
-    --glass: rgba(26, 26, 26, 0.72);
-    --glass-edge: rgba(243, 244, 246, 0.08);
+    /* Zebra striping. A white overlay is invisible on a white table, so the
+       stripe is always a tint of the theme's own ink. */
+    --stripe: rgba(22, 36, 31, 0.028);
 
-    /* --- Elevation. Neutral black, not a tinted navy: on a #121212 ground a
-           blue-tinted shadow reads as a colour cast. --- */
-    --shadow-edge: 8px 0 24px -20px rgba(0, 0, 0, 0.9);
-    --shadow-under: 0 10px 20px -18px rgba(0, 0, 0, 0.9);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
-    --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.7);
-    --glow-primary: 0 0 60px -12px rgba(34, 197, 94, 0.55);
+    /* --- Elevation ---------------------------------------------------------
+       Warm-tinted, never neutral black: a grey shadow on a cream ground reads
+       as dirt. Soft and wide — a hard shadow reintroduces the crisp edge that
+       C2 is trying to remove. */
+    --shadow-edge: 8px 0 24px -20px rgba(22, 36, 31, 0.20);
+    --shadow-under: 0 10px 20px -18px rgba(22, 36, 31, 0.22);
+    --shadow-sm: 0 1px 2px rgba(22, 36, 31, 0.06);
+    --shadow-card: 0 1px 2px rgba(22, 36, 31, 0.04), 0 12px 28px -20px rgba(22, 36, 31, 0.18);
+    --shadow-md: 0 8px 28px -12px rgba(22, 36, 31, 0.16);
+    --shadow-lg: 0 28px 64px -24px rgba(22, 36, 31, 0.26);
+    --glow-primary: 0 0 60px -14px rgba(10, 110, 86, 0.35);
+    --glow-correct: 0 0 0 4px var(--mint);
 
-    color-scheme: dark;
+    color-scheme: light;
 
     /* --- Stacking ladder --- */
-    --z-behind: 0;           /* depth typography, sits under the centrepiece */
+    --z-behind: 0;
     --z-page: 1;
     --z-sticky: 30;
     --z-scrim: 39;
     --z-rail: 60;
-    --z-overlay: 100;        /* modals + drawers (JS increments per layer) */
+    --z-overlay: 100;
     --z-toast: 300;
     --z-banner: 350;
     --z-boot: 400;
 
-    /* --- Radii --- */
-    --r-xs: 6px;
-    --r-sm: 8px;
-    --r-md: 10px;
-    --r-lg: 14px;
-    --r-xl: 18px;
-    --r-2xl: 28px;
+    /* --- Radii — C2 --------------------------------------------------------
+       Two values carry the mandate and must not be edited casually:
+
+           --r-card  12px    every card, per specification
+           --r-pill  999px   every button, per specification
+
+       The rest of the ramp exists so that nested shapes stay concentric
+       (an inner radius should be outer minus padding, or the corner reads
+       as a dent). None of it is angular: the smallest radius in the system
+       is 8 px, and nothing anywhere is allowed a 0 radius. */
+    --r-card: 12px;
     --r-pill: 999px;
+
+    --r-xs: 8px;
+    --r-sm: 10px;
+    --r-md: 12px;
+    --r-lg: 12px;          /* legacy consumers of --r-lg ARE cards → 12px     */
+    --r-xl: 20px;
+    --r-2xl: 28px;
+    --r-blob: 42% 58% 54% 46% / 48% 44% 56% 52%;   /* decorative shapes only  */
 
     /* --- Spacing scale (4px base) --- */
     --sp-1: 4px;
@@ -217,114 +296,146 @@ h1, h2, h3, h4, h5, h6 {
     --sp-9: 48px;
     --sp-10: 64px;
 
-    /* --- Control sizing. Fixed on purpose: a control whose height depends on
-           its content is the main cause of layout shift. Layout containers
-           stay fluid; controls do not. --- */
+    /* --- Control sizing ----------------------------------------------------
+       Raised from the previous ramp because the body size moved 14 → 16 px:
+       a 38 px control around 16 px text has no optical breathing room, and a
+       pill with too little horizontal padding stops reading as a pill. */
     --rail-w: 76px;
     --rail-w-open: 264px;
     --rail-pad: 8px;
     --rail-icon: calc(var(--rail-w) - (var(--rail-pad) * 2));
-    --topbar-h: 64px;
-    --control-h: 38px;
-    --control-h-lg: 42px;
-    --field-h: 42px;
-    --row-h: 56px;
-    --icon-btn: 36px;
+    --topbar-h: 68px;
+    --control-h: 44px;
+    --control-h-lg: 52px;
+    --field-h: 48px;
+    --row-h: 60px;
+    --icon-btn: 44px;      /* also the 44px minimum touch target              */
 
-    /* --- Motion --- */
-    /* Bare easing curve. The --t-* tokens below are transition SHORTHANDS
-       (duration + curve), so they cannot be dropped into an animation's
-       easing slot — var(--ease) is the one to use there. */
-    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    /* --- Motion ------------------------------------------------------------
+       Soft overshoot rather than a linear settle. Curvature is a shape claim;
+       easing is the same claim in time, and a gently overshooting curve reads
+       as friendly where a sharp stop reads as mechanical. */
+    --ease: cubic-bezier(0.34, 1.32, 0.48, 1);
+    --ease-flat: cubic-bezier(0.4, 0, 0.2, 1);
 
-    --t-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
-    --t-base: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    --t-layout: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-fast: 140ms var(--ease-flat);
+    --t-base: 200ms var(--ease-flat);
+    --t-layout: 260ms var(--ease-flat);
+    --t-bounce: 380ms var(--ease);
 
-    /* --- Typography --- */
-    /* Space Grotesk for anything that reads as a title, Inter for everything
-       else. 'Inter Fallback' below is metrics-matched to Inter, so the
-       webfont swap changes the letterforms without changing the line boxes
-       — i.e. display:swap costs no layout shift. It stands in for the
-       display face too: it is far closer to Space Grotesk's metrics than a
-       bare Arial is. */
-    --font-display: 'Space Grotesk', 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-body: 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --font: var(--font-body);            /* alias for existing consumers */
+    /* --- Typography — C1 ---------------------------------------------------
+       Inter everywhere, display and body. The reference composition uses two
+       faces, but the specification names one, and Inter at weight 800 with
+       tightened tracking covers the display job without a second webfont —
+       which also removes a render-blocking request from the critical path.
 
-    /* Monospace accent, for data only: indices, ratios, asset names, specs.
-       Deliberately a system stack — it costs no network request, and every
-       platform already ships a good one. */
+       'Inter Fallback' is metrics-matched (see the @font-face below), so the
+       webfont swap changes letterforms without moving line boxes. */
+    --font-display: 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-body: var(--font-display);
+    --font: var(--font-display);
     --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+
+    /* THE MANDATED VALUE. 12 pt === 16 px exactly (12 × 96/72).
+       Do not express this as a rem multiple — a user agent whose root size is
+       not 16 px would silently break the specification. */
+    --fs-body: 16px;       /* 12.0 pt — body copy, inputs, buttons            */
+    --fs-lg: 18px;         /* 13.5 pt — lead paragraphs                       */
+    --fs-sm: 14px;         /* 10.5 pt — secondary text, captions              */
+    --fs-xs: 13.5px;       /* 10.1 pt — the floor. labels, chips, meta        */
+
+    --fs-h1: 44px;
+    --fs-h2: 32px;
+    --fs-h3: 24px;
+    --fs-h4: 20px;
+
+    /* Line height is the other half of legibility: 1.6 on body gives the
+       ~2.5 mm interline the reading-speed literature wants at this size. */
+    --lh-body: 1.6;
+    --lh-tight: 1.25;
 
     --scrollbar-w: 0px;
 }
 
-/* ------------------------------------------------------------ LIGHT THEME --
-   Only colour roles change. Sizing, spacing, radii, motion and the stacking
-   ladder are theme-independent and are not repeated.
+/* ------------------------------------------------------------- DARK THEME --
+   Retained as an alternate, not the default. Only colour roles flip; sizing,
+   spacing, radii, motion and the stacking ladder are theme-independent and
+   are not repeated. The cream/pine identity survives the flip: the ground
+   becomes a deep pine-black rather than a neutral grey, so the system reads
+   as the same product with the lights off.
 
-   The six spec variables above are the PALETTE and keep their literal values
-   in both themes; --text-main, --bg-body and the rest are the ROLES, and
-   those are what flip here. So a rule that reads var(--text) is correct in
-   either theme, and a rule that reads var(--text-primary) is not. Always
-   read the role. */
-:root[data-theme="light"] {
-    --text-main: var(--bg-main);
+   Always read the ROLE (--text, --bg-surface). A rule that reads a raw
+   palette literal (--cream, --pine) is correct in one theme only. */
+:root[data-theme="dark"] {
+    --bg-main: #0C1512;
+    --bg-body: #0C1512;
+    --bg-surface: #13201B;
+    --bg-surface-hi: #182823;
+    --bg-surface-hover: #1C2E28;
+    --bg-field: #0A110E;
+    --bg-inset-focus: #0F1915;
+    --bg-chip: #1C2E28;
+    --bg-chip-hover: #244038;
+    --track: #24352F;
+    --track-hover: #365046;
 
-    /* The green FILL stays the specified value — near-black on green is
-       8.1:1 even on a light page. Only green-as-TEXT needs the deeper
-       shade, and it is the same hue, not a new colour. */
-    --color-primary-ink: #15803D;          /* 4.79:1 on --bg-light */
-    --color-danger-ink: #DC2626;           /* 4.62:1 on --bg-light */
-    --on-primary: var(--bg-main);
-    --on-danger: var(--bg-light);
+    --text-primary: #EEF3EF;
+    --text-main: #EEF3EF;
+    --text: #EEF3EF;
+    --text-muted: #AFC0B8;               /*  7.52:1 on --bg-chip              */
+    --text-faint: #93A79E;               /*  5.62:1 on --bg-chip              */
+    --text-on-solid: #0C1512;
 
-    /* The same neutral grey ladder as dark mode, inverted. */
-    --bg-body: var(--bg-light);
-    --bg-surface: #FFFFFF;
-    --bg-field: #F1F2F4;
-    --bg-surface-hi: #FFFFFF;
-    --bg-surface-hover: #F1F2F4;
-    --bg-chip: #E4E5E8;
-    --bg-chip-hover: #D4D6DA;
-    --bg-inset-focus: #FFFFFF;
-    --track: #D4D6DA;
-    --track-hover: #9CA3AF;
+    --color-primary: #2FBF8F;
+    --color-primary-ink: #2FBF8F;
+    --accent: #2FBF8F;
+    --accent-strong: #23A176;
+    --accent-hover: #46D4A5;
+    --accent-soft: rgba(47, 191, 143, 0.16);
+    --accent-line: rgba(47, 191, 143, 0.30);
+    --on-primary: #0C1512;
+    --on-accent: #0C1512;
 
-    --text: var(--text-main);
-    --text-muted: #4B5563;                 /* 8.0:1 on the light ground */
-    --text-faint: #6B7280;                 /* 4.8:1 */
-    --text-on-solid: var(--bg-light);
+    --color-correct: #34D399;
+    --correct-soft: rgba(52, 211, 153, 0.16);
+    --correct-ink: #34D399;
 
-    --accent: var(--color-primary);
-    --accent-strong: #16A34A;
-    --accent-soft: rgba(34, 197, 94, 0.16);
-    --accent-line: rgba(21, 128, 61, 0.30);
-    --on-accent: var(--on-primary);
+    --color-retry: #FB8C68;
+    --retry-soft: rgba(251, 140, 104, 0.16);
+    --retry-ink: #FB8C68;
 
-    --danger: var(--color-danger);
-    --danger-strong: #DC2626;
-    --danger-soft: rgba(239, 68, 68, 0.12);
-    --danger-line: rgba(220, 38, 38, 0.28);
+    --info-soft: rgba(125, 199, 220, 0.16);
+    --info-ink: #8FD2E4;                 /*  7.12:1 on --info-soft            */
 
-    --warning: #B45309;
-    --warning-soft: rgba(180, 83, 9, 0.12);
-    --warning-line: rgba(180, 83, 9, 0.28);
-    --on-warning: var(--bg-light);
+    --warning: var(--sunny);
+    --warning-soft: rgba(245, 197, 24, 0.16);
+    --warning-line: rgba(245, 197, 24, 0.30);
+    --warning-ink: #F5C518;
+    --on-warning: #0C1512;
 
-    --glass: rgba(255, 255, 255, 0.72);
-    --glass-edge: rgba(18, 18, 18, 0.08);
+    --danger: #F87171;
+    --danger-strong: #EF4444;
+    --danger-ink: #F87171;
+    --color-danger: #F87171;
+    --color-danger-ink: #F87171;
+    --danger-soft: rgba(248, 113, 113, 0.14);
+    --danger-line: rgba(248, 113, 113, 0.30);
+    --on-danger: #0C1512;
 
-    --shadow-edge: 8px 0 24px -20px rgba(18, 18, 18, 0.24);
-    --shadow-under: 0 10px 20px -18px rgba(18, 18, 18, 0.26);
-    --shadow-sm: 0 1px 2px rgba(18, 18, 18, 0.08);
-    --shadow-card: 0 1px 2px rgba(18, 18, 18, 0.06), 0 10px 28px -18px rgba(18, 18, 18, 0.20);
-    --shadow-md: 0 8px 24px rgba(18, 18, 18, 0.12);
-    --shadow-lg: 0 24px 64px rgba(18, 18, 18, 0.22);
-    --glow-primary: 0 0 60px -12px rgba(34, 197, 94, 0.4);
+    --glass: rgba(19, 32, 27, 0.76);
+    --glass-edge: rgba(238, 243, 239, 0.08);
+    --stripe: rgba(238, 243, 239, 0.022);
 
-    color-scheme: light;
+    --shadow-edge: 8px 0 24px -20px rgba(0, 0, 0, 0.9);
+    --shadow-under: 0 10px 20px -18px rgba(0, 0, 0, 0.9);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -20px rgba(0, 0, 0, 0.8);
+    --shadow-md: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 28px 64px -24px rgba(0, 0, 0, 0.7);
+    --glow-primary: 0 0 60px -14px rgba(47, 191, 143, 0.45);
+    --glow-correct: 0 0 0 4px rgba(52, 211, 153, 0.24);
+
+    color-scheme: dark;
 }
 
 /* Metrics-matched local stand-in for Inter. Overrides are the standard
@@ -342,8 +453,9 @@ h1, h2, h3, h4, h5, h6 {
 /* ----------------------------------------------------------------- 3. BASE */
 body {
     font-family: var(--font-body);
-    font-size: 14px;
-    line-height: 1.5;
+    /* C1 — 12 pt === 16 px. The single most load-bearing line in the file. */
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
     color: var(--text);
     background: var(--bg-body);
     -webkit-font-smoothing: antialiased;
@@ -369,7 +481,7 @@ body {
 .icon-lg { width: 24px; height: 24px; }
 
 .eyebrow {
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -410,9 +522,12 @@ body {
     justify-content: center;
     gap: var(--sp-2);
     height: var(--control-h);
-    padding: 0 var(--sp-4);
-    border-radius: var(--r-md);
-    font-size: 13px;
+    /* C2 — fully rounded, per specification. The horizontal padding is
+       deliberately generous: a pill whose caps are wider than its side
+       padding reads as a lozenge with the label jammed into it. */
+    padding: 0 var(--sp-5);
+    border-radius: var(--r-pill);
+    font-size: var(--fs-sm);
     font-weight: 600;
     letter-spacing: -0.005em;
     white-space: nowrap;
@@ -449,8 +564,8 @@ body {
 }
 .btn-danger-soft:hover:not(:disabled) { background: rgba(255, 71, 87, 0.18); }
 
-.btn-sm { height: 30px; padding: 0 var(--sp-3); font-size: 12px; border-radius: var(--r-sm); }
-.btn-lg { height: var(--control-h-lg); padding: 0 var(--sp-5); }
+.btn-sm { height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-xs); border-radius: var(--r-pill); }
+.btn-lg { height: var(--control-h-lg); padding: 0 var(--sp-7); font-size: var(--fs-body); }
 .btn-block { width: 100%; }
 
 .btn-icon {
@@ -460,7 +575,7 @@ body {
     height: var(--icon-btn);
     flex: 0 0 var(--icon-btn);
     padding: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pill);
     color: var(--text-muted);
     transition: background-color var(--t-base), color var(--t-base);
 }
@@ -474,7 +589,7 @@ body {
 .field { display: flex; flex-direction: column; gap: var(--sp-2); }
 
 .label {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     color: var(--text-muted);
     letter-spacing: 0.01em;
@@ -488,10 +603,12 @@ body {
     width: 100%;
     height: var(--field-h);
     padding: 0 var(--sp-4);
-    border-radius: var(--r-md);
+    border-radius: var(--r-card);
     background: var(--bg-field);
     color: var(--text);
-    font-size: 13.5px;
+    /* C1 again — and at exactly 16px iOS Safari stops zooming the viewport
+       when the field takes focus, so the mandate pays for itself twice. */
+    font-size: var(--fs-body);
     transition: box-shadow var(--t-base), background-color var(--t-base);
 }
 
@@ -509,7 +626,7 @@ body {
 .select:focus,
 .textarea:focus {
     background: var(--bg-inset-focus);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 .input:disabled,
@@ -526,16 +643,16 @@ body {
     appearance: none;
     -webkit-appearance: none;
     padding-right: var(--sp-8);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5A54' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right var(--sp-4) center;
 }
 
 /* Error text slot is always reserved: showing a message never shifts a form. */
 .field-msg {
-    min-height: 16px;
-    font-size: 11.5px;
-    line-height: 16px;
+    min-height: 18px;
+    font-size: var(--fs-xs);
+    line-height: 18px;
     color: var(--danger);
 }
 
@@ -559,7 +676,7 @@ body {
 .search .input {
     height: var(--control-h);
     padding-left: var(--sp-8);
-    font-size: 13px;
+    font-size: var(--fs-sm);
 }
 
 /* Checkbox — drawn from scratch to a fixed 18px box. */
@@ -590,8 +707,8 @@ body {
 .check input:checked + .check-box .icon { opacity: 1; }
 .check input:focus-visible + .check-box { box-shadow: 0 0 0 3px var(--accent-soft); }
 
-.check-text { font-size: 13px; line-height: 1.45; }
-.check-text small { display: block; color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
+.check-text { font-size: var(--fs-sm); line-height: 1.45; }
+.check-text small { display: block; color: var(--text-muted); font-size: var(--fs-xs); margin-top: 2px; }
 
 /* Toggle switch — 44×24 track, 18px knob, 13px travel. */
 .switch { position: relative; display: inline-flex; flex: 0 0 auto; cursor: pointer; }
@@ -625,9 +742,11 @@ body {
 /* Cards are separated from the page by ELEVATION, not by an outline. The
    hairline that remains is barely off-surface and only resolves the edge at
    close range; the shadow ramp does the actual work of lifting the card. */
+/* C2 — 12px, per specification. --r-card is the mandated token; --r-lg
+   is an alias kept for existing consumers and points at the same value. */
 .card {
     background: var(--bg-surface);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-card);
     box-shadow: var(--shadow-card);
 }
 
@@ -642,14 +761,14 @@ body {
 .card-head-text { min-width: 0; flex: 1 1 auto; }
 
 .card-title {
-    font-size: 14.5px;
+    font-size: 17px;
     font-weight: 700;
     letter-spacing: -0.01em;
 }
 
 .card-sub {
     margin-top: 2px;
-    font-size: 12.5px;
+    font-size: var(--fs-sm);
     color: var(--text-muted);
 }
 
@@ -699,7 +818,7 @@ button.stat.is-active { background: var(--accent-soft); }
 }
 
 .stat-label {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
@@ -724,7 +843,7 @@ button.stat.is-active { background: var(--accent-soft); }
 .stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
 
 .stat-value {
-    font-size: 30px;
+    font-size: var(--fs-h2);
     font-weight: 700;
     line-height: 36px;
     letter-spacing: -0.03em;
@@ -735,7 +854,7 @@ button.stat.is-active { background: var(--accent-soft); }
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    font-size: 11.5px;
+    font-size: var(--fs-xs);
     color: var(--text-muted);
     min-height: 18px;
 }
@@ -768,7 +887,7 @@ button.stat.is-active { background: var(--accent-soft); }
     border-radius: var(--r-pill);
     background: var(--bg-chip);
     color: var(--text-muted);
-    font-size: 11.5px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -792,7 +911,7 @@ button.stat.is-active { background: var(--accent-soft); }
     height: 30px;
     padding: 0 var(--sp-3);
     border-radius: var(--r-sm);
-    font-size: 12.5px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
@@ -885,8 +1004,8 @@ button.stat.is-active { background: var(--accent-soft); }
 
 .modal-head > .modal-close { order: 3; }
 
-.modal-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
-.modal-sub { margin-top: var(--sp-1); font-size: 12.5px; color: var(--text-muted); }
+.modal-title { font-size: var(--fs-h4); font-weight: 700; letter-spacing: -0.01em; }
+.modal-sub { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* The close control: fixed box, subtle bordered surface, nested safely. */
 .modal-close {
@@ -929,7 +1048,7 @@ button.stat.is-active { background: var(--accent-soft); }
 }
 
 .modal-foot-split { justify-content: space-between; }
-.modal-foot-note { font-size: 11.5px; color: var(--text-muted); }
+.modal-foot-note { font-size: var(--fs-xs); color: var(--text-muted); }
 .modal-foot-actions { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
 
 /* Narrow screens: the title and the close button keep the first row to
@@ -962,8 +1081,8 @@ button.stat.is-active { background: var(--accent-soft); }
 }
 
 .modal-hero-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
-.modal-hero-title { font-size: 16px; font-weight: 700; }
-.modal-hero-text { font-size: 13px; color: var(--text-muted); line-height: 1.6; max-width: 44ch; }
+.modal-hero-title { font-size: var(--fs-h4); font-weight: 700; }
+.modal-hero-text { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; max-width: 44ch; }
 
 /* Form grid inside modals */
 .form-grid { display: grid; gap: var(--sp-4); }
@@ -973,7 +1092,7 @@ button.stat.is-active { background: var(--accent-soft); }
 
 /* Sections are separated by breathing room, not a rule. */
 .form-section + .form-section { margin-top: var(--sp-8); }
-.form-section-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); margin-bottom: var(--sp-4); }
+.form-section-title { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); margin-bottom: var(--sp-4); }
 
 /* Radio cards for group assignment */
 .choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
@@ -993,8 +1112,8 @@ button.stat.is-active { background: var(--accent-soft); }
 
 .choice input { position: absolute; opacity: 0; width: 0; height: 0; }
 .choice:hover { }
-.choice-title { font-size: 13px; font-weight: 600; }
-.choice-desc { margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.choice-title { font-size: var(--fs-sm); font-weight: 600; }
+.choice-desc { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
 .choice:has(input:checked) { background: var(--accent-soft); }
 .choice:has(input:checked) .choice-title { color: var(--accent); }
 .choice:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -1041,7 +1160,7 @@ button.stat.is-active { background: var(--accent-soft); }
 }
 
 .auth-intro .icon { flex: 0 0 1.125rem; color: var(--accent); margin-top: 1px; }
-.auth-intro-text { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+.auth-intro-text { font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted); }
 
 /* In the DOM at a fixed height from first paint, transparent until it has
    something to say. */
@@ -1053,7 +1172,7 @@ button.stat.is-active { background: var(--accent-soft); }
     margin-top: var(--sp-2);
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-sm);
-    font-size: 13px;
+    font-size: var(--fs-sm);
     line-height: 1.45;
     background: transparent;
     color: transparent;
@@ -1073,7 +1192,7 @@ button.stat.is-active { background: var(--accent-soft); }
     flex-wrap: wrap;
     gap: var(--sp-3);
     margin-top: var(--sp-3);
-    font-size: 13px;
+    font-size: var(--fs-sm);
     color: var(--text-muted);
 }
 
@@ -1083,7 +1202,7 @@ button.stat.is-active { background: var(--accent-soft); }
 .link-btn {
     position: relative;
     padding: 0;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--accent);
     border-radius: var(--r-xs);
@@ -1148,8 +1267,8 @@ button.stat.is-active { background: var(--accent-soft); }
 .toast-accent .icon { color: var(--accent); }
 .toast-danger .icon { color: var(--danger); }
 .toast-text { flex: 1 1 auto; min-width: 0; }
-.toast-title { font-size: 13px; font-weight: 600; }
-.toast-desc { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.toast-title { font-size: var(--fs-sm); font-weight: 600; }
+.toast-desc { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* Body lock: the scrollbar width is substituted as padding so opening a
    modal cannot shift the page horizontally. */
@@ -1164,4 +1283,95 @@ body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
         animation-duration: 1ms !important;
         animation-iteration-count: 1 !important;
     }
+}
+
+/* ------------------------------------------ 16. JS-INJECTED GLOBAL OVERLAYS
+   assets/js/function.js runs on all nine pages and builds two overlays at
+   runtime: the session-revoke dialog (forced logout when a device claim is
+   withdrawn) and the idle-timeout warning.
+
+   Their styles used to live in styles/components.css, which only ever
+   shipped on the tutoring page — so on the other eight pages this security
+   dialog rendered as unstyled block elements. They belong in the shared
+   system, which is here. Re-themed onto the current tokens on the way in;
+   the class names are the contract with function.js and are unchanged.
+   ==========================================================================*/
+.solid-card {
+    position: relative;
+    background: var(--bg-surface);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-lg);
+}
+
+.text-secondary { color: var(--text-muted); }
+.text-danger { color: var(--danger-ink); }
+.text-accent { color: var(--color-primary-ink); }
+.font-mono { font-family: var(--font-mono); }
+
+.revoke-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-boot);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-4);
+    opacity: 0;
+    background: color-mix(in srgb, var(--ink) 62%, transparent);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    transition: opacity var(--t-layout);
+}
+
+.revoke-modal-overlay.revoke-modal-visible { opacity: 1; }
+
+.revoke-modal-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    width: 100%;
+    max-width: 24rem;
+    padding: var(--sp-7);
+    text-align: center;
+    transform: scale(0.96);
+    transition: transform var(--t-layout);
+}
+
+.revoke-modal-box.revoke-modal-box-visible { transform: scale(1); }
+
+.revoke-modal-icon-wrap {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto;
+    border-radius: var(--r-pill);
+    background: var(--danger-soft);
+}
+
+/* Not uppercased. The previous rule set this in caps with wide tracking,
+   which costs legibility at the exact moment the user most needs to read it. */
+.revoke-modal-title {
+    font-size: var(--fs-h4);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+
+.revoke-modal-desc {
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+}
+
+.revoke-modal-actions { padding-top: var(--sp-2); }
+
+.spin { animation: spin 1s linear infinite; }
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spin { animation: none; }
 }

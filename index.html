@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark light">
+    <meta name="color-scheme" content="light dark">
     <meta name="description"
         content="PIA pairs a Grade 7 maths student with one of six tutor agents, matched to how they actually think.">
 
@@ -61,11 +61,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <!-- The poster is the first thing painted inside the sticky stage, so it is
-         the page's LCP candidate. Preloaded to bring it forward; the <video>
-         itself is not preloaded, because the poster is what the user sees until
+    <!-- The hero poster is the first image painted, under the headline, so it
+         is the page's LCP candidate. It is frame 0 of the hero loop, which is
+         what makes the hand-over to the playing video invisible. The scrub
+         reel's own poster is no longer preloaded: the hero now covers it until
          the first scroll. -->
-    <link rel="preload" as="image" href="assets/images/scrub-poster.jpg" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/images/hero-classroom-poster.jpg" fetchpriority="high">
 
     <!-- Fetched as a PRELOAD, not as a stylesheet, and promoted to a real
          stylesheet by theme-boot.js once it has arrived.
@@ -84,10 +85,10 @@
          The <noscript> copy keeps the fonts for a JS-less visitor, who has no
          scripts to block in the first place. -->
     <link rel="preload" as="style" id="font-css"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
     <noscript>
         <link rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
     </noscript>
 
     <script src="assets/js/theme-boot.js"></script>
@@ -168,6 +169,61 @@
             <symbol id="i-moon" viewBox="0 0 24 24">
                 <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" />
             </symbol>
+            <!-- One glyph per tutor. They replace the single letters the
+                 roster used to show, which between them spelled out the
+                 name of the questionnaire behind the matching. -->
+            <symbol id="i-compass" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8.75" />
+                <path d="m15.4 8.6-2.1 4.7-4.7 2.1 2.1-4.7 4.7-2.1Z" />
+            </symbol>
+            <symbol id="i-lens" viewBox="0 0 24 24">
+                <circle cx="10.5" cy="10.5" r="6.25" />
+                <path d="m15.2 15.2 5.3 5.3" />
+                <path d="M8 10.5a2.5 2.5 0 0 1 2.5-2.5" />
+            </symbol>
+            <symbol id="i-bolt" viewBox="0 0 24 24">
+                <path d="M13.2 2.8 5 13.4h6.1l-1.3 7.8 8.2-10.6h-6.1l1.3-7.8Z" />
+            </symbol>
+            <symbol id="i-heart" viewBox="0 0 24 24">
+                <path d="M12 19.8s-7.6-4.5-7.6-10a4.3 4.3 0 0 1 7.6-2.7 4.3 4.3 0 0 1 7.6 2.7c0 5.5-7.6 10-7.6 10Z" />
+            </symbol>
+            <symbol id="i-anchor" viewBox="0 0 24 24">
+                <circle cx="12" cy="5.4" r="2.1" />
+                <path d="M12 7.5v13.3M8.2 11h7.6" />
+                <path d="M4.6 13.6A7.4 7.4 0 0 0 12 20.8a7.4 7.4 0 0 0 7.4-7.2" />
+            </symbol>
+            <symbol id="i-level" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8.75" />
+                <path d="M7.8 12h8.4" />
+            </symbol>
+            <symbol id="i-login" viewBox="0 0 24 24">
+                <path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14" />
+                <path d="m10 8 4 4-4 4M14 12H4" />
+            </symbol>
+            <symbol id="i-spark" viewBox="0 0 24 24">
+                <path d="M12 3.2c.5 4.3 1.9 6.8 8.8 8.8-6.9 2-8.3 4.5-8.8 8.8-.5-4.3-1.9-6.8-8.8-8.8 6.9-2 8.3-4.5 8.8-8.8Z"
+                    fill="currentColor" stroke="none" />
+            </symbol>
+            <symbol id="i-menu" viewBox="0 0 24 24">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+            </symbol>
+            <symbol id="i-eye" viewBox="0 0 24 24">
+                <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+                <circle cx="12" cy="12" r="3" />
+            </symbol>
+            <symbol id="i-eye-off" viewBox="0 0 24 24">
+                <path d="M3 3l18 18" />
+                <path d="M10.6 5.6c.46-.07.93-.1 1.4-.1 6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.9 3.7M6.6 6.6C3.9 8.3 2.5 12 2.5 12S6 18.5 12 18.5c1.8 0 3.3-.5 4.6-1.2" />
+                <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+            </symbol>
+            <symbol id="i-pause" viewBox="0 0 24 24">
+                <rect x="6.5" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none" />
+                <rect x="13.9" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none" />
+            </symbol>
+            <symbol id="i-play" viewBox="0 0 24 24">
+                <path d="M8 5.6v12.8a1 1 0 0 0 1.53.85l10.1-6.4a1 1 0 0 0 0-1.7L9.53 4.75A1 1 0 0 0 8 5.6Z"
+                    fill="currentColor" stroke="none" />
+            </symbol>
         </defs>
     </svg>
 
@@ -181,16 +237,84 @@
         </p>
     </div>
 
-    <!-- ==================================================== FIXED NAVBAR -->
+    <!-- ==================================================== FIXED NAVBAR
+         Transparent while only the hero video is under it, solid the moment
+         the hero's copy would slide beneath it — nav.js flips .is-solid from
+         an IntersectionObserver, so there is no second scroll listener.
+
+         ONE link list, two presentations: inline in the bar from 64rem up, a
+         drop-down sheet behind the hamburger below that. The sheet sits
+         BETWEEN the wordmark and the actions in source order, so desktop tab
+         order matches what is on screen; on mobile nav.js moves focus into
+         the sheet when it opens. -->
     <header class="nav" id="nav">
         <div class="shell nav-inner">
+            <!-- The badge gives the left of the bar the visual weight the
+                 right side's controls have, so the centred links sit between
+                 two things of similar mass instead of between a word and a
+                 cluster. -->
             <a class="tap nav-mark" href="#top">
+                <span class="nav-mark-badge" aria-hidden="true"><svg class="icon">
+                        <use href="#i-spark"></use>
+                    </svg></span>
                 <span class="nav-mark-word">PIA</span>
                 <span class="sr-only">— Personal Instructing Agent, back to top</span>
             </a>
 
+            <nav class="nav-menu" id="nav-menu" aria-label="Page sections">
+                <ul class="nav-links">
+                    <li><a class="nav-link" href="#agent-select">Tutors</a></li>
+                    <li><a class="nav-link" href="#why-pia">Why PIA</a></li>
+                    <li><a class="nav-link" href="#features">Features</a></li>
+                    <li><a class="nav-link" href="#get-started">Get started</a></li>
+                </ul>
+
+                <!-- Sheet-only. Never shown in the desktop bar, where the
+                     sign-in dialog already carries the staff entry points. -->
+                <div class="nav-menu-extra">
+                    <!-- Only below 21.5rem, where the bar drops its own Sign in. -->
+                    <div class="nav-menu-group nav-menu-student">
+                        <button type="button" class="tap btn-pop-ghost" data-auth-open="signin">Sign in</button>
+                    </div>
+
+                    <!-- One staff door for teachers and admins alike, as the
+                         same quiet text link the sign-in dialog uses. -->
+                    <p class="nav-menu-note">
+                        Teacher or admin?
+                        <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                    </p>
+
+                    <!-- Only below 30rem, where the bar drops its own toggle.
+                         A real toggle button: the visible text IS the name,
+                         and aria-pressed carries the state. -->
+                    <div class="nav-menu-group nav-menu-theme">
+                        <button type="button" class="tap nav-theme-row" data-theme-toggle aria-pressed="false">
+                            <span class="nav-theme-text">Dark mode</span>
+                            <span class="nav-theme-switch" aria-hidden="true"><span></span></span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
             <div class="nav-actions">
-                <button type="button" class="tap theme-toggle" id="theme-toggle"
+                <!-- .nav-auth: hidden while the hero's own Sign in / Activate
+                     buttons are on screen beside the headline, back once they
+                     scroll away (nav.js). data-resume-label: auth.js swaps this
+                     label for a returning session, and "Continue to dashboard"
+                     does not fit a phone bar. -->
+                <button type="button" class="tap btn-pop-ghost nav-signin nav-auth" data-auth-open="signin"
+                    data-resume-label="Dashboard">Sign in</button>
+                <!-- The tail is visually hidden on small phones but stays in the
+                     accessible name, so the name still contains the visible
+                     label (WCAG 2.5.3). Wrapped in one span so the button's
+                     flex gap is not inserted between "Activate" and the tail. -->
+                <button type="button" class="tap btn-pop nav-activate nav-auth" data-auth-open="activate">
+                    <span>Activate<span class="nav-activate-tail"> account</span></span>
+                </button>
+                <!-- Last before the hamburger: while the two buttons above are
+                     standing down (they keep their space), the toggle holds the
+                     far edge instead of floating beside an empty gap. -->
+                <button type="button" class="tap theme-toggle" id="theme-toggle" data-theme-toggle
                     aria-label="Switch between light and dark mode">
                     <svg class="icon icon-sun" aria-hidden="true">
                         <use href="#i-sun"></use>
@@ -199,11 +323,23 @@
                         <use href="#i-moon"></use>
                     </svg>
                 </button>
-                <button type="button" class="tap btn-pop-ghost" data-auth-open="signin">Sign in</button>
-                <button type="button" class="tap btn-pop" data-auth-open="activate">Activate account</button>
+                <button type="button" class="tap nav-burger" id="nav-burger" aria-controls="nav-menu"
+                    aria-expanded="false" aria-label="Menu">
+                    <svg class="icon icon-menu" aria-hidden="true">
+                        <use href="#i-menu"></use>
+                    </svg>
+                    <svg class="icon icon-close" aria-hidden="true">
+                        <use href="#i-x"></use>
+                    </svg>
+                </button>
             </div>
         </div>
     </header>
+
+    <!-- Backdrop for the mobile sheet. A sibling of the header, not a child:
+         the solid navbar uses backdrop-filter, which makes it the containing
+         block for fixed descendants, so a child could never cover the page. -->
+    <div class="nav-scrim" id="nav-scrim" aria-hidden="true"></div>
 
     <main id="main" tabindex="-1">
         <span id="top" class="anchor" aria-hidden="true"></span>
@@ -234,354 +370,438 @@
 
             <div class="reel-flow">
 
-                <!-- ------------------------------------ 1. THE DROP ------ -->
-                <section class="act act-drop" aria-labelledby="drop-title">
+                <!-- ------------------------------------ 1. THE DROP ------
+                     The hero. Its own looping video sits UNDER the copy and
+                     OVER the pinned scrub stage, so scrolling lifts the hero
+                     away like a curtain and reveals the equations behind it.
+                     The reel's geometry is untouched: the hero is still the
+                     first act of .reel-flow, so the scrub range is unchanged. -->
+                <section class="act act-drop" id="hero" aria-labelledby="drop-title">
+
+                    <!-- Decorative, so hidden from assistive tech entirely.
+
+                         No autoplay attribute and preload="none": nothing is
+                         downloaded until landing.js decides to play, which it
+                         skips for reduced motion and Save-Data. Without JS
+                         the poster is the hero, which is the right failure.
+
+                         The loop is a ping-pong re-encode of the original
+                         AdobeStock pan with eased turnarounds, so it never
+                         jump-cuts: 4.5 MB at 1080p and 2.2 MB at 720p, against
+                         19.5 MB for the 4K source, which is still listed last
+                         as a fallback. It is an MP4 container despite the
+                         .mov name, hence type="video/mp4" — declaring
+                         video/quicktime would make Chrome and Firefox skip it. -->
+                    <div class="hero-media" aria-hidden="true">
+                        <video class="hero-video" id="hero-video" poster="assets/images/hero-classroom-poster.jpg"
+                            muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback
+                            tabindex="-1">
+                            <source src="assets/videos/hero-classroom-720.mp4" type="video/mp4"
+                                media="(max-width: 48rem)">
+                            <source src="assets/videos/hero-classroom-1080.mp4" type="video/mp4">
+                            <source src="assets/videos/AdobeStock_1646385409.mov" type="video/mp4">
+                        </video>
+                        <span class="hero-scrim"></span>
+                    </div>
+
+                    <!-- Copy on the left, the two account buttons on the right of
+                         the headline from 60rem up; stacked under it below that. -->
                     <div class="shell act-drop-inner">
-                        <p class="mono-tag mono-tag-lead" data-reveal>
-                            <span class="mono-idx">00</span> Personal Instructing Agent
-                        </p>
-
-                        <!-- Asymmetric on purpose: three lines, three different
-                             indents, the last one carrying the accent.
-
-                             data-lit-words, NOT data-scrub-words. This heading
-                             is already on screen at load, so tying it to scroll
-                             would leave the last word — the actual question —
-                             greyed out until the visitor scrolled. It gets a
-                             one-time staggered entrance instead; the scroll
-                             scrub is for headings that genuinely arrive. -->
-                        <h1 class="drop-title" id="drop-title" data-lit-words>
-                            <span class="drop-l1">What kind</span>
-                            <span class="drop-l2">of thinker</span>
-                            <span class="drop-l3">are you?</span>
-                        </h1>
-
-                        <p class="drop-sub" data-reveal>
-                            Six tutor agents. One of them already teaches the way you think.
-                            Ten minutes to find out which.
-                        </p>
-                    </div>
-
-                    <!-- CSS-only marquee. The track is duplicated so the loop
-                         has no seam; the copy is hidden from assistive tech and
-                         the strip carries its own label instead. -->
-                    <div class="marquee" role="note" aria-label="Scroll to continue">
-                        <div class="marquee-track">
-                            <span class="marquee-run">
-                                [ SCROLL TO DIVE ]<i>*</i>[ SCROLL TO DIVE ]<i>*</i>[ SCROLL TO DIVE ]<i>*</i>[ SCROLL
-                                TO DIVE ]<i>*</i>
-                            </span>
-                            <span class="marquee-run" aria-hidden="true">
-                                [ SCROLL TO DIVE ]<i>*</i>[ SCROLL TO DIVE ]<i>*</i>[ SCROLL TO DIVE ]<i>*</i>[ SCROLL
-                                TO DIVE ]<i>*</i>
-                            </span>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- ------------------------------------ 2.1 PIA OPEN ------- -->
-                <section class="act act-agent" id="agent-pia-open" aria-labelledby="t-pia-open">
-                    <div class="shell act-grid">
-
-                        <div class="agent-copy">
-                            <p class="mono-tag" data-reveal>
-                                <span class="mono-idx">01</span>
-                                <span class="mono-letter" aria-hidden="true">O</span>
-                                Openness
+                        <div class="hero-copy">
+                            <!-- data-nav-edge: the navbar turns solid the moment
+                                 this line would slide under it (nav.js). -->
+                            <p class="mono-tag mono-tag-lead" data-reveal data-nav-edge>
+                                Personal Instructing Agent
                             </p>
 
-                            <h2 class="agent-name" id="t-pia-open" data-reveal>
-                                <span class="agent-name-a">PIA</span>
-                                <span class="agent-name-b">Open</span>
-                            </h2>
+                            <!-- Asymmetric on purpose: three lines, three different
+                                 indents, the last one carrying the accent.
 
-                            <p class="agent-line" data-reveal>Explores the idea before the method.</p>
-                            <p class="agent-desc" data-reveal>Starts with why a rule exists, then shows you how to use
-                                it. Good if a formula feels arbitrary until you know where it came from.</p>
+                                 data-lit-words, NOT data-scrub-words. This heading
+                                 is already on screen at load, so tying it to scroll
+                                 would leave the last word greyed out until the
+                                 visitor scrolled. It gets a one-time staggered
+                                 entrance instead; the scroll scrub is for headings
+                                 that genuinely arrive. -->
+                            <h1 class="drop-title" id="drop-title" data-lit-words>
+                                <span class="drop-l1">Welcome</span>
+                                <span class="drop-l2">Grade 7</span>
+                                <span class="drop-l3">Students!</span>
+                            </h1>
 
-                            <dl class="agent-spec" data-reveal>
-                                <div class="agent-spec-row">
-                                    <dt>Pace</dt>
-                                    <dd>Flexible</dd>
-                                </div>
-                                <div class="agent-spec-row">
-                                    <dt>Best for</dt>
-                                    <dd>Abstract thinkers</dd>
-                                </div>
-                            </dl>
+                            <p class="drop-sub" data-reveal>
+                                Six tutor agents. One of them already teaches the way you think.
+                                Ten minutes to find out which.
+                            </p>
                         </div>
 
-                        <!-- Reserved 3:4 box for this agent's .glb. Empty by
-                             design: the ratio is locked in CSS, so mounting a
-                             renderer here later cannot move anything. -->
-                        <div class="agent-slot" data-reveal data-hover-intent>
-                            <div class="model-canvas-wrapper" data-model="pia-open" role="img"
-                                aria-label="3D model of PIA Open — not yet available">
-                                <span class="slot-shine" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-a" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-b" aria-hidden="true"></span>
-                                <span class="slot-meta">
-                                    <span class="slot-name">pia-open.glb</span>
-                                    <span class="slot-ratio">3 : 4 &middot; coming soon</span>
+                        <!-- The page's two account actions, beside the welcome.
+                             While these are on screen the navbar hides its own
+                             copies; nav.js brings those back once these scroll
+                             away (#hero-cta is what it watches). -->
+                        <!-- The primary action leads: a first visit starts with
+                             activation, and a returning student's eye finds
+                             "Sign in" one row down with its own distinct icon.
+                             Both share one shape — label left, round glyph
+                             right — so the pair reads as a set, told apart by
+                             fill: solid accent for the primary, frosted glass
+                             for the secondary. -->
+                        <div class="hero-cta" id="hero-cta" data-reveal>
+                            <button type="button" class="tap cta cta-primary" data-auth-open="activate">
+                                <span class="cta-label">Activate account</span>
+                                <span class="cta-orb" aria-hidden="true">
+                                    <svg class="icon cta-arrow">
+                                        <use href="#i-arrow-right"></use>
+                                    </svg>
+                                    <svg class="icon cta-arrow cta-arrow-next">
+                                        <use href="#i-arrow-right"></use>
+                                    </svg>
                                 </span>
+                            </button>
+                            <button type="button" class="tap cta cta-quiet" data-auth-open="signin">
+                                <span class="cta-label">Sign in</span>
+                                <span class="cta-orb" aria-hidden="true">
+                                    <svg class="icon">
+                                        <use href="#i-login"></use>
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- WCAG 2.2.2: motion that starts on its own and runs longer
+                         than five seconds needs a way to stop it. [hidden] until
+                         landing.js takes charge of the video, so a JS-less
+                         visitor never sees a dead control. -->
+                    <button type="button" class="tap hero-video-toggle" id="hero-video-toggle" hidden>
+                        <svg class="icon icon-pause" aria-hidden="true">
+                            <use href="#i-pause"></use>
+                        </svg>
+                        <svg class="icon icon-play" aria-hidden="true">
+                            <use href="#i-play"></use>
+                        </svg>
+                        <span class="sr-only" data-video-label>Play background video</span>
+                    </button>
+                </section>
+
+                <!-- ------------------------------- 2.1 MEET THE TUTORS -------
+                     A showcase, not a menu. Students never pick their tutor
+                     here — a few questions after sign-in do the matching — so
+                     the section's job is to make six teaching styles easy to
+                     compare: a row of tutors across the top, one large card
+                     below showing whoever is selected.
+
+                     Each tutor is named for the STRENGTH of their teaching,
+                     never for the trait behind it, and wears an icon rather
+                     than a letter. The old letters spelled out the name of the
+                     questionnaire; nothing visible here does now.
+
+                     Markup is a real ARIA tablist (agent-select.js), so the
+                     row is operable with arrow keys and announces the swap.
+                     All six stages and panels live in the DOM, toggled with
+                     [hidden] — which is what lets models.js lazy-load each 3D
+                     model the first time its tutor is shown. The internal
+                     ids (data-agent, data-model) are unchanged: they are the
+                     keys the rest of the system and the .glb files use, and
+                     none of them is ever rendered. -->
+                <section class="act act-select" id="agent-select" aria-labelledby="select-title">
+                    <div class="shell select-shell">
+
+                        <header class="select-head">
+                            <p class="mono-tag" data-reveal>Meet your tutors</p>
+                            <h2 class="select-title" id="select-title" data-reveal>Six tutors. One already
+                                teaches the way you think.</h2>
+                            <p class="select-lede" data-reveal>Each one explains maths in its own style. Tap
+                                through them all &mdash; you don&rsquo;t have to choose.</p>
+                        </header>
+
+                        <div class="roster" role="tablist" aria-label="Tutors" data-reveal>
+                            <button type="button" class="roster-item" role="tab" id="tab-pia-open"
+                                aria-controls="panel-pia-open" aria-selected="true" tabindex="0"
+                                data-agent="pia-open">
+                                <span class="roster-icon" aria-hidden="true"><svg class="icon">
+                                        <use href="#i-compass"></use>
+                                    </svg></span>
+                                <span class="roster-text">
+                                    <span class="roster-name">Explorer</span>
+                                    <span class="roster-strength">Finds the why</span>
+                                </span>
+                            </button>
+                            <button type="button" class="roster-item" role="tab" id="tab-pia-conscientious"
+                                aria-controls="panel-pia-conscientious" aria-selected="false" tabindex="-1"
+                                data-agent="pia-conscientious">
+                                <span class="roster-icon" aria-hidden="true"><svg class="icon">
+                                        <use href="#i-lens"></use>
+                                    </svg></span>
+                                <span class="roster-text">
+                                    <span class="roster-name">Detective</span>
+                                    <span class="roster-strength">Every detail</span>
+                                </span>
+                            </button>
+                            <button type="button" class="roster-item" role="tab" id="tab-pia-extravert"
+                                aria-controls="panel-pia-extravert" aria-selected="false" tabindex="-1"
+                                data-agent="pia-extravert">
+                                <span class="roster-icon" aria-hidden="true"><svg class="icon">
+                                        <use href="#i-bolt"></use>
+                                    </svg></span>
+                                <span class="roster-text">
+                                    <span class="roster-name">Spark</span>
+                                    <span class="roster-strength">High energy</span>
+                                </span>
+                            </button>
+                            <button type="button" class="roster-item" role="tab" id="tab-pia-agreeable"
+                                aria-controls="panel-pia-agreeable" aria-selected="false" tabindex="-1"
+                                data-agent="pia-agreeable">
+                                <span class="roster-icon" aria-hidden="true"><svg class="icon">
+                                        <use href="#i-heart"></use>
+                                    </svg></span>
+                                <span class="roster-text">
+                                    <span class="roster-name">Ally</span>
+                                    <span class="roster-strength">Endless patience</span>
+                                </span>
+                            </button>
+                            <button type="button" class="roster-item" role="tab" id="tab-pia-calm"
+                                aria-controls="panel-pia-calm" aria-selected="false" tabindex="-1"
+                                data-agent="pia-calm">
+                                <span class="roster-icon" aria-hidden="true"><svg class="icon">
+                                        <use href="#i-anchor"></use>
+                                    </svg></span>
+                                <span class="roster-text">
+                                    <span class="roster-name">Anchor</span>
+                                    <span class="roster-strength">Calm &amp; steady</span>
+                                </span>
+                            </button>
+                            <button type="button" class="roster-item" role="tab" id="tab-pia-neutral"
+                                aria-controls="panel-pia-neutral" aria-selected="false" tabindex="-1"
+                                data-agent="pia-neutral">
+                                <span class="roster-icon" aria-hidden="true"><svg class="icon">
+                                        <use href="#i-level"></use>
+                                    </svg></span>
+                                <span class="roster-text">
+                                    <span class="roster-name">Neutral</span>
+                                    <span class="roster-strength">Just the maths</span>
+                                </span>
+                            </button>
+                        </div>
+
+                        <div class="select-board" data-reveal>
+                            <div class="stage">
+                                <span class="stage-ghost" id="stage-ghost" aria-hidden="true">Explorer</span>
+                                <div class="stage-figure" data-figure="pia-open">
+                                    <div class="model-canvas-wrapper" data-model="pia-open" role="img"
+                                        aria-label="3D model of PIA Explorer &mdash; not yet available">
+                                        <span class="slot-shine" aria-hidden="true"></span>
+                                        <span class="slot-meta">
+                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
+                                                    <use href="#i-compass"></use>
+                                                </svg></span>
+                                            <span class="slot-name">PIA Explorer</span>
+                                            <span class="slot-ratio">3D model coming soon</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="stage-figure" data-figure="pia-conscientious" hidden>
+                                    <div class="model-canvas-wrapper" data-model="pia-conscientious" role="img"
+                                        aria-label="3D model of PIA Detective &mdash; not yet available">
+                                        <span class="slot-shine" aria-hidden="true"></span>
+                                        <span class="slot-meta">
+                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
+                                                    <use href="#i-lens"></use>
+                                                </svg></span>
+                                            <span class="slot-name">PIA Detective</span>
+                                            <span class="slot-ratio">3D model coming soon</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="stage-figure" data-figure="pia-extravert" hidden>
+                                    <div class="model-canvas-wrapper" data-model="pia-extravert" role="img"
+                                        aria-label="3D model of PIA Spark &mdash; not yet available">
+                                        <span class="slot-shine" aria-hidden="true"></span>
+                                        <span class="slot-meta">
+                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
+                                                    <use href="#i-bolt"></use>
+                                                </svg></span>
+                                            <span class="slot-name">PIA Spark</span>
+                                            <span class="slot-ratio">3D model coming soon</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="stage-figure" data-figure="pia-agreeable" hidden>
+                                    <div class="model-canvas-wrapper" data-model="pia-agreeable" role="img"
+                                        aria-label="3D model of PIA Ally &mdash; not yet available">
+                                        <span class="slot-shine" aria-hidden="true"></span>
+                                        <span class="slot-meta">
+                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
+                                                    <use href="#i-heart"></use>
+                                                </svg></span>
+                                            <span class="slot-name">PIA Ally</span>
+                                            <span class="slot-ratio">3D model coming soon</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="stage-figure" data-figure="pia-calm" hidden>
+                                    <div class="model-canvas-wrapper" data-model="pia-calm" role="img"
+                                        aria-label="3D model of PIA Anchor &mdash; not yet available">
+                                        <span class="slot-shine" aria-hidden="true"></span>
+                                        <span class="slot-meta">
+                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
+                                                    <use href="#i-anchor"></use>
+                                                </svg></span>
+                                            <span class="slot-name">PIA Anchor</span>
+                                            <span class="slot-ratio">3D model coming soon</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="stage-figure" data-figure="pia-neutral" hidden>
+                                    <div class="model-canvas-wrapper" data-model="pia-neutral" role="img"
+                                        aria-label="3D model of PIA Neutral &mdash; not yet available">
+                                        <span class="slot-shine" aria-hidden="true"></span>
+                                        <span class="slot-meta">
+                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
+                                                    <use href="#i-level"></use>
+                                                </svg></span>
+                                            <span class="slot-name">PIA Neutral</span>
+                                            <span class="slot-ratio">3D model coming soon</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="detail">
+                                <div class="detail-panel" id="panel-pia-open" role="tabpanel"
+                                    aria-labelledby="tab-pia-open" tabindex="0">
+                                    <p class="detail-strength">
+                                        <svg class="icon" aria-hidden="true">
+                                            <use href="#i-compass"></use>
+                                        </svg>
+                                        Always finds the “why”
+                                    </p>
+                                    <h3 class="detail-name">
+                                        <span class="detail-name-a">PIA</span>
+                                        <span class="detail-name-b">Explorer</span>
+                                    </h3>
+                                    <p class="detail-line">Explores the idea before the method.</p>
+                                    <p class="detail-desc">Starts with why a rule exists, then shows you how to use it. Good if a formula feels arbitrary until you know where it came from.</p>
+                                    <dl class="detail-spec">
+                                        <div class="detail-spec-row"><dt>Pace</dt><dd>Flexible</dd></div>
+                                        <div class="detail-spec-row"><dt>Best for</dt><dd>Abstract thinkers</dd></div>
+                                    </dl>
+                                </div>
+                                <div class="detail-panel" id="panel-pia-conscientious" role="tabpanel"
+                                    aria-labelledby="tab-pia-conscientious" tabindex="0" hidden>
+                                    <p class="detail-strength">
+                                        <svg class="icon" aria-hidden="true">
+                                            <use href="#i-lens"></use>
+                                        </svg>
+                                        Never misses a detail
+                                    </p>
+                                    <h3 class="detail-name">
+                                        <span class="detail-name-a">PIA</span>
+                                        <span class="detail-name-b">Detective</span>
+                                    </h3>
+                                    <p class="detail-line">Same order. Every single time.</p>
+                                    <p class="detail-desc">Works every problem through the same numbered steps. Nothing skipped, nothing assumed, and no shortcut you did not ask for.</p>
+                                    <dl class="detail-spec">
+                                        <div class="detail-spec-row"><dt>Pace</dt><dd>Steady</dd></div>
+                                        <div class="detail-spec-row"><dt>Best for</dt><dd>Detail-oriented learners</dd></div>
+                                    </dl>
+                                </div>
+                                <div class="detail-panel" id="panel-pia-extravert" role="tabpanel"
+                                    aria-labelledby="tab-pia-extravert" tabindex="0" hidden>
+                                    <p class="detail-strength">
+                                        <svg class="icon" aria-hidden="true">
+                                            <use href="#i-bolt"></use>
+                                        </svg>
+                                        Keeps the energy up
+                                    </p>
+                                    <h3 class="detail-name">
+                                        <span class="detail-name-a">PIA</span>
+                                        <span class="detail-name-b">Spark</span>
+                                    </h3>
+                                    <p class="detail-line">Short questions. Fast turns.</p>
+                                    <p class="detail-desc">Keeps the rally going with quick prompts and quick checks, and moves on the moment a topic clicks. Built to outrun boredom.</p>
+                                    <dl class="detail-spec">
+                                        <div class="detail-spec-row"><dt>Pace</dt><dd>Fast</dd></div>
+                                        <div class="detail-spec-row"><dt>Best for</dt><dd>Active participants</dd></div>
+                                    </dl>
+                                </div>
+                                <div class="detail-panel" id="panel-pia-agreeable" role="tabpanel"
+                                    aria-labelledby="tab-pia-agreeable" tabindex="0" hidden>
+                                    <p class="detail-strength">
+                                        <svg class="icon" aria-hidden="true">
+                                            <use href="#i-heart"></use>
+                                        </svg>
+                                        Patient every single time
+                                    </p>
+                                    <h3 class="detail-name">
+                                        <span class="detail-name-a">PIA</span>
+                                        <span class="detail-name-b">Ally</span>
+                                    </h3>
+                                    <p class="detail-line">Asks how it&#39;s going. Means it.</p>
+                                    <p class="detail-desc">Checks in often and never marks you wrong. Ask the same thing five times and the fifth answer is as patient as the first.</p>
+                                    <dl class="detail-spec">
+                                        <div class="detail-spec-row"><dt>Pace</dt><dd>Relaxed</dd></div>
+                                        <div class="detail-spec-row"><dt>Best for</dt><dd>Collaborative learners</dd></div>
+                                    </dl>
+                                </div>
+                                <div class="detail-panel" id="panel-pia-calm" role="tabpanel"
+                                    aria-labelledby="tab-pia-calm" tabindex="0" hidden>
+                                    <p class="detail-strength">
+                                        <svg class="icon" aria-hidden="true">
+                                            <use href="#i-anchor"></use>
+                                        </svg>
+                                        Calm, and never in a rush
+                                    </p>
+                                    <h3 class="detail-name">
+                                        <span class="detail-name-a">PIA</span>
+                                        <span class="detail-name-b">Anchor</span>
+                                    </h3>
+                                    <p class="detail-line">No timers. No streaks. No rush.</p>
+                                    <p class="detail-desc">Slow and repetitive on purpose. Nothing on screen counts down and nothing compares you to the person sitting next to you.</p>
+                                    <dl class="detail-spec">
+                                        <div class="detail-spec-row"><dt>Pace</dt><dd>Slow</dd></div>
+                                        <div class="detail-spec-row"><dt>Best for</dt><dd>Cautious learners</dd></div>
+                                    </dl>
+                                </div>
+                                <div class="detail-panel" id="panel-pia-neutral" role="tabpanel"
+                                    aria-labelledby="tab-pia-neutral" tabindex="0" hidden>
+                                    <p class="detail-strength">
+                                        <svg class="icon" aria-hidden="true">
+                                            <use href="#i-level"></use>
+                                        </svg>
+                                        Straight to the maths
+                                    </p>
+                                    <h3 class="detail-name">
+                                        <span class="detail-name-a">PIA</span>
+                                        <span class="detail-name-b">Neutral</span>
+                                    </h3>
+                                    <p class="detail-line">The baseline. On purpose.</p>
+                                    <p class="detail-desc">No personality applied at all. This is what the other five are measured against, which is the only reason it exists.</p>
+                                    <dl class="detail-spec">
+                                        <div class="detail-spec-row"><dt>Pace</dt><dd>Balanced</dd></div>
+                                        <div class="detail-spec-row"><dt>Best for</dt><dd>The control group</dd></div>
+                                    </dl>
+                                </div>
                             </div>
                         </div>
 
-                    </div>
-                </section>
-
-                <!-- ------------------------------------ 2.2 PIA STRUCTURE ------- -->
-                <section class="act act-agent" id="agent-pia-conscientious" aria-labelledby="t-pia-conscientious">
-                    <div class="shell act-grid">
-
-                        <div class="agent-copy">
-                            <p class="mono-tag" data-reveal>
-                                <span class="mono-idx">02</span>
-                                <span class="mono-letter" aria-hidden="true">C</span>
-                                Conscientiousness
-                            </p>
-
-                            <h2 class="agent-name" id="t-pia-conscientious" data-reveal>
-                                <span class="agent-name-a">PIA</span>
-                                <span class="agent-name-b">Structure</span>
-                            </h2>
-
-                            <p class="agent-line" data-reveal>Same order. Every single time.</p>
-                            <p class="agent-desc" data-reveal>Works every problem through the same numbered steps.
-                                Nothing skipped, nothing assumed, and no shortcut you did not ask for.</p>
-
-                            <dl class="agent-spec" data-reveal>
-                                <div class="agent-spec-row">
-                                    <dt>Pace</dt>
-                                    <dd>Steady</dd>
-                                </div>
-                                <div class="agent-spec-row">
-                                    <dt>Best for</dt>
-                                    <dd>Detail-oriented learners</dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        <!-- Reserved 3:4 box for this agent's .glb. Empty by
-                             design: the ratio is locked in CSS, so mounting a
-                             renderer here later cannot move anything. -->
-                        <div class="agent-slot" data-reveal data-hover-intent>
-                            <div class="model-canvas-wrapper" data-model="pia-conscientious" role="img"
-                                aria-label="3D model of PIA Structure — not yet available">
-                                <span class="slot-shine" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-a" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-b" aria-hidden="true"></span>
-                                <span class="slot-meta">
-                                    <span class="slot-name">pia-conscientious.glb</span>
-                                    <span class="slot-ratio">3 : 4 &middot; coming soon</span>
+                        <!-- The questionnaire is described by what it does for
+                             the student, not by name. -->
+                        <div class="select-foot" data-reveal>
+                            <button type="button" class="tap cta cta-primary" data-auth-open="signin">
+                                <span class="cta-label">Find my tutor</span>
+                                <span class="cta-orb" aria-hidden="true">
+                                    <svg class="icon cta-arrow">
+                                        <use href="#i-arrow-right"></use>
+                                    </svg>
+                                    <svg class="icon cta-arrow cta-arrow-next">
+                                        <use href="#i-arrow-right"></use>
+                                    </svg>
                                 </span>
-                            </div>
+                            </button>
+                            <p class="select-note">No need to pick. A few quick questions about how you like to
+                                learn will match you with yours.</p>
                         </div>
-
-                    </div>
-                </section>
-
-                <!-- ------------------------------------ 2.3 PIA DYNAMIC ------- -->
-                <section class="act act-agent" id="agent-pia-extravert" aria-labelledby="t-pia-extravert">
-                    <div class="shell act-grid">
-
-                        <div class="agent-copy">
-                            <p class="mono-tag" data-reveal>
-                                <span class="mono-idx">03</span>
-                                <span class="mono-letter" aria-hidden="true">E</span>
-                                Extraversion
-                            </p>
-
-                            <h2 class="agent-name" id="t-pia-extravert" data-reveal>
-                                <span class="agent-name-a">PIA</span>
-                                <span class="agent-name-b">Dynamic</span>
-                            </h2>
-
-                            <p class="agent-line" data-reveal>Short questions. Fast turns.</p>
-                            <p class="agent-desc" data-reveal>Keeps the rally going with quick prompts and quick checks,
-                                and moves on the moment a topic clicks. Built to outrun boredom.</p>
-
-                            <dl class="agent-spec" data-reveal>
-                                <div class="agent-spec-row">
-                                    <dt>Pace</dt>
-                                    <dd>Fast</dd>
-                                </div>
-                                <div class="agent-spec-row">
-                                    <dt>Best for</dt>
-                                    <dd>Active participants</dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        <!-- Reserved 3:4 box for this agent's .glb. Empty by
-                             design: the ratio is locked in CSS, so mounting a
-                             renderer here later cannot move anything. -->
-                        <div class="agent-slot" data-reveal data-hover-intent>
-                            <div class="model-canvas-wrapper" data-model="pia-extravert" role="img"
-                                aria-label="3D model of PIA Dynamic — not yet available">
-                                <span class="slot-shine" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-a" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-b" aria-hidden="true"></span>
-                                <span class="slot-meta">
-                                    <span class="slot-name">pia-extravert.glb</span>
-                                    <span class="slot-ratio">3 : 4 &middot; coming soon</span>
-                                </span>
-                            </div>
-                        </div>
-
-                    </div>
-                </section>
-
-                <!-- ------------------------------------ 2.4 PIA EMPATH ------- -->
-                <section class="act act-agent" id="agent-pia-agreeable" aria-labelledby="t-pia-agreeable">
-                    <div class="shell act-grid">
-
-                        <div class="agent-copy">
-                            <p class="mono-tag" data-reveal>
-                                <span class="mono-idx">04</span>
-                                <span class="mono-letter" aria-hidden="true">A</span>
-                                Agreeableness
-                            </p>
-
-                            <h2 class="agent-name" id="t-pia-agreeable" data-reveal>
-                                <span class="agent-name-a">PIA</span>
-                                <span class="agent-name-b">Empath</span>
-                            </h2>
-
-                            <p class="agent-line" data-reveal>Asks how it's going. Means it.</p>
-                            <p class="agent-desc" data-reveal>Checks in often and never marks you wrong. Ask the same
-                                thing five times and the fifth answer is as patient as the first.</p>
-
-                            <dl class="agent-spec" data-reveal>
-                                <div class="agent-spec-row">
-                                    <dt>Pace</dt>
-                                    <dd>Relaxed</dd>
-                                </div>
-                                <div class="agent-spec-row">
-                                    <dt>Best for</dt>
-                                    <dd>Collaborative learners</dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        <!-- Reserved 3:4 box for this agent's .glb. Empty by
-                             design: the ratio is locked in CSS, so mounting a
-                             renderer here later cannot move anything. -->
-                        <div class="agent-slot" data-reveal data-hover-intent>
-                            <div class="model-canvas-wrapper" data-model="pia-agreeable" role="img"
-                                aria-label="3D model of PIA Empath — not yet available">
-                                <span class="slot-shine" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-a" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-b" aria-hidden="true"></span>
-                                <span class="slot-meta">
-                                    <span class="slot-name">pia-agreeable.glb</span>
-                                    <span class="slot-ratio">3 : 4 &middot; coming soon</span>
-                                </span>
-                            </div>
-                        </div>
-
-                    </div>
-                </section>
-
-                <!-- ------------------------------------ 2.5 PIA STABLE ------- -->
-                <section class="act act-agent" id="agent-pia-calm" aria-labelledby="t-pia-calm">
-                    <div class="shell act-grid">
-
-                        <div class="agent-copy">
-                            <p class="mono-tag" data-reveal>
-                                <span class="mono-idx">05</span>
-                                <span class="mono-letter" aria-hidden="true">N</span>
-                                Neuroticism &middot; low
-                            </p>
-
-                            <h2 class="agent-name" id="t-pia-calm" data-reveal>
-                                <span class="agent-name-a">PIA</span>
-                                <span class="agent-name-b">Stable</span>
-                            </h2>
-
-                            <p class="agent-line" data-reveal>No timers. No streaks. No rush.</p>
-                            <p class="agent-desc" data-reveal>Slow and repetitive on purpose. Nothing on screen counts
-                                down and nothing compares you to the person sitting next to you.</p>
-
-                            <dl class="agent-spec" data-reveal>
-                                <div class="agent-spec-row">
-                                    <dt>Pace</dt>
-                                    <dd>Slow</dd>
-                                </div>
-                                <div class="agent-spec-row">
-                                    <dt>Best for</dt>
-                                    <dd>Cautious learners</dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        <!-- Reserved 3:4 box for this agent's .glb. Empty by
-                             design: the ratio is locked in CSS, so mounting a
-                             renderer here later cannot move anything. -->
-                        <div class="agent-slot" data-reveal data-hover-intent>
-                            <div class="model-canvas-wrapper" data-model="pia-calm" role="img"
-                                aria-label="3D model of PIA Stable — not yet available">
-                                <span class="slot-shine" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-a" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-b" aria-hidden="true"></span>
-                                <span class="slot-meta">
-                                    <span class="slot-name">pia-calm.glb</span>
-                                    <span class="slot-ratio">3 : 4 &middot; coming soon</span>
-                                </span>
-                            </div>
-                        </div>
-
-                    </div>
-                </section>
-
-                <!-- ------------------------------------ 2.6 PIA NEUTRAL ------- -->
-                <section class="act act-agent" id="agent-pia-neutral" aria-labelledby="t-pia-neutral">
-                    <div class="shell act-grid">
-
-                        <div class="agent-copy">
-                            <p class="mono-tag" data-reveal>
-                                <span class="mono-idx">06</span>
-                                <span class="mono-letter" aria-hidden="true">&mdash;</span>
-                                Control baseline
-                            </p>
-
-                            <h2 class="agent-name" id="t-pia-neutral" data-reveal>
-                                <span class="agent-name-a">PIA</span>
-                                <span class="agent-name-b">Neutral</span>
-                            </h2>
-
-                            <p class="agent-line" data-reveal>The baseline. On purpose.</p>
-                            <p class="agent-desc" data-reveal>No personality applied at all. This is what the other five
-                                are measured against, which is the only reason it exists.</p>
-
-                            <dl class="agent-spec" data-reveal>
-                                <div class="agent-spec-row">
-                                    <dt>Pace</dt>
-                                    <dd>Balanced</dd>
-                                </div>
-                                <div class="agent-spec-row">
-                                    <dt>Best for</dt>
-                                    <dd>The control group</dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        <!-- Reserved 3:4 box for this agent's .glb. Empty by
-                             design: the ratio is locked in CSS, so mounting a
-                             renderer here later cannot move anything. -->
-                        <div class="agent-slot" data-reveal data-hover-intent>
-                            <div class="model-canvas-wrapper" data-model="pia-neutral" role="img"
-                                aria-label="3D model of PIA Neutral — not yet available">
-                                <span class="slot-shine" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-a" aria-hidden="true"></span>
-                                <span class="slot-stud slot-stud-b" aria-hidden="true"></span>
-                                <span class="slot-meta">
-                                    <span class="slot-name">pia-neutral.glb</span>
-                                    <span class="slot-ratio">3 : 4 &middot; coming soon</span>
-                                </span>
-                            </div>
-                        </div>
-
                     </div>
                 </section>
             </div><!-- /.reel-flow -->
@@ -591,11 +811,11 @@
         <!-- Out of the reel and onto solid ground. Three cards, three
              different widths and three different vertical offsets — a grid
              that does not line up is the whole point of the section. -->
-        <section class="band band-sdt" aria-labelledby="sdt-title">
+        <section class="band band-sdt" id="why-pia" aria-labelledby="sdt-title">
             <div class="shell">
                 <header class="band-head">
                     <p class="mono-tag" data-reveal>
-                        <span class="mono-idx">07</span> Self-determination theory
+                        Self-determination theory
                     </p>
                     <h2 class="band-title" id="sdt-title" data-reveal>
                         Three things have to be true<br>
@@ -611,7 +831,6 @@
 
                 <ol class="sdt-list">
                     <li class="sdt-card" data-reveal data-hover-intent>
-                        <span class="sdt-num" aria-hidden="true">01</span>
                         <h3 class="sdt-name">Autonomy</h3>
                         <p class="sdt-body">
                             You pick the tutor. You ask for the hint, or you don't. Nothing
@@ -621,7 +840,6 @@
                     </li>
 
                     <li class="sdt-card" data-reveal data-hover-intent>
-                        <span class="sdt-num" aria-hidden="true">02</span>
                         <h3 class="sdt-name">Competence</h3>
                         <p class="sdt-body">
                             Problems land just past what you can already do. Far enough to be
@@ -631,7 +849,6 @@
                     </li>
 
                     <li class="sdt-card" data-reveal data-hover-intent>
-                        <span class="sdt-num" aria-hidden="true">03</span>
                         <h3 class="sdt-name">Relatedness</h3>
                         <p class="sdt-body">
                             Someone on the other side is paying attention. Not scoring you —
@@ -646,46 +863,40 @@
         <!-- ======================================== 4. WHAT PIA CAN DO ---- -->
         <!-- A list, not a card grid: numbered rows divided by hairlines, so
              the eye runs down one column instead of scanning a matrix. -->
-        <section class="band band-caps" aria-labelledby="caps-title">
+        <section class="band band-caps" id="features" aria-labelledby="caps-title">
             <div class="shell">
                 <header class="band-head band-head-split">
                     <p class="mono-tag" data-reveal>
-                        <span class="mono-idx">08</span> Capabilities
+                        Capabilities
                     </p>
                     <h2 class="band-title" id="caps-title" data-reveal>What PIA can do</h2>
                 </header>
 
                 <ul class="caps">
                     <li class="cap" data-reveal data-hover-intent>
-                        <span class="cap-num" aria-hidden="true">01</span>
                         <h3 class="cap-name">Explains it again, differently</h3>
                         <p class="cap-text">If the first route doesn't land there's a second and a third. Same answer,
                             different way in.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <span class="cap-num" aria-hidden="true">02</span>
                         <h3 class="cap-name">Moves at your speed</h3>
                         <p class="cap-text">Difficulty tracks what you just did, so nobody waits and nobody drowns.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <span class="cap-num" aria-hidden="true">03</span>
                         <h3 class="cap-name">Never runs a clock</h3>
                         <p class="cap-text">No timers, no streak you can break, no leaderboard. Nothing on screen is
                             counting down.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <span class="cap-num" aria-hidden="true">04</span>
                         <h3 class="cap-name">Keeps your working private</h3>
                         <p class="cap-text">Your teacher sees that you're progressing. They don't see every wrong turn
                             you took.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <span class="cap-num" aria-hidden="true">05</span>
                         <h3 class="cap-name">Runs on the school laptops</h3>
                         <p class="cap-text">A browser and a login. Nothing to install and nothing to carry home.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <span class="cap-num" aria-hidden="true">06</span>
                         <h3 class="cap-name">Picks up where you stopped</h3>
                         <p class="cap-text">Close the tab mid-problem. It's still there, mid-problem, when you come
                             back.</p>
@@ -695,10 +906,10 @@
         </section>
 
         <!-- ============================================== 5. FINAL CTA ---- -->
-        <section class="band band-finale" aria-labelledby="cta-title">
+        <section class="band band-finale" id="get-started" aria-labelledby="cta-title">
             <div class="shell finale-inner">
                 <p class="mono-tag" data-reveal>
-                    <span class="mono-idx">09</span> Enrolment
+                    Enrolment
                 </p>
 
                 <h2 class="finale-title" id="cta-title" data-scrub-words>
@@ -710,15 +921,34 @@
                     Use your school email — if it isn't recognised yet, ask your teacher.
                 </p>
 
+                <!-- The same pair as the hero, in the same style: one design for
+                     one pair of actions, wherever it appears. -->
                 <div class="finale-actions" data-reveal>
-                    <button type="button" class="tap btn-pop btn-xl" data-auth-open="activate">
-                        Activate account
-                        <svg class="icon" aria-hidden="true">
-                            <use href="#i-arrow-right"></use>
-                        </svg>
+                    <button type="button" class="tap cta cta-primary" data-auth-open="activate">
+                        <span class="cta-label">Activate account</span>
+                        <span class="cta-orb" aria-hidden="true">
+                            <svg class="icon cta-arrow">
+                                <use href="#i-arrow-right"></use>
+                            </svg>
+                            <svg class="icon cta-arrow cta-arrow-next">
+                                <use href="#i-arrow-right"></use>
+                            </svg>
+                        </span>
                     </button>
-                    <button type="button" class="tap btn-pop-ghost btn-xl" data-auth-open="signin">Sign in</button>
+                    <button type="button" class="tap cta cta-quiet" data-auth-open="signin">
+                        <span class="cta-label">Sign in</span>
+                        <span class="cta-orb" aria-hidden="true">
+                            <svg class="icon">
+                                <use href="#i-login"></use>
+                            </svg>
+                        </span>
+                    </button>
                 </div>
+
+                <p class="finale-staff" data-reveal>
+                    Teacher or admin?
+                    <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                </p>
             </div>
         </section>
     </main>
@@ -726,6 +956,10 @@
     <footer class="foot">
         <div class="shell foot-inner">
             <p class="foot-line">PIA System &middot; Personal Instructing Agent</p>
+            <p class="foot-line foot-staff">
+                <span class="foot-staff-label">Staff</span>
+                <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+            </p>
             <p class="foot-line foot-line-mono">University of the East &middot; Grade 7 mathematics &middot; 2026</p>
         </div>
     </footer>
@@ -738,12 +972,22 @@
          .field-msg slot under every input plus a fixed-height .auth-status
          row — errors appear without moving a single control.
          ===================================================================== -->
-    <div class="overlay" id="modal-signin" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+    <!-- One form, one button, two quiet links. The first pass split this
+         dialog into a student form and a staff panel with role cards, and it
+         read as a control room. Staff now have a single text link, styled
+         exactly like "Activate your account", into their own dialog below.
+
+         The student form still accepts student accounts only: a teacher or
+         admin who signs in here is pointed to "Admin sign in" and signed
+         back out, never silently redirected (auth.js). That is a routing
+         guarantee, not the security boundary — row-level security is. -->
+    <div class="overlay" id="modal-signin" role="dialog" aria-modal="true" aria-labelledby="signin-title"
+        aria-describedby="signin-sub">
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="signin-title">Sign in</h2>
-                    <p class="modal-sub">Use the school email address your account was created with.</p>
+                    <p class="modal-sub" id="signin-sub">Use the school email your account was created with.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon">
@@ -753,40 +997,142 @@
             </header>
 
             <div class="modal-body">
-
-                <form id="signin-form" novalidate>
+                <form id="signin-form" class="portal-form" novalidate>
                     <div class="form-grid">
                         <div class="field">
                             <label class="label" for="si-email">School email</label>
-                            <input class="input" type="email" id="si-email" autocomplete="username"
-                                placeholder="maria.santos@student.ue.edu.ph">
-                            <p class="field-msg" data-msg-for="si-email"></p>
+                            <input class="input" type="email" id="si-email" name="email" autocomplete="username"
+                                inputmode="email" autocapitalize="off" spellcheck="false"
+                                placeholder="maria.santos@student.ue.edu.ph" aria-describedby="si-email-msg"
+                                data-autofocus>
+                            <p class="field-msg" id="si-email-msg" data-msg-for="si-email"></p>
                         </div>
                         <div class="field">
-                            <label class="label" for="si-password">Password</label>
-                            <input class="input" type="password" id="si-password" autocomplete="current-password"
-                                placeholder="••••••••">
-                            <p class="field-msg" data-msg-for="si-password"></p>
+                            <div class="label-row">
+                                <label class="label" for="si-password">Password</label>
+                                <button type="button" class="link-btn" data-auth-open="forgot">Forgot
+                                    password?</button>
+                            </div>
+                                <div class="pw-wrap">
+                                    <input class="input" type="password" id="si-password" name="password"
+                                        autocomplete="current-password" enterkeyhint="go" placeholder="••••••••"
+                                        aria-describedby="si-password-msg">
+                                    <button type="button" class="pw-toggle" data-pw-toggle="si-password"
+                                        aria-label="Show password" aria-pressed="false">
+                                        <svg class="icon icon-eye" aria-hidden="true">
+                                            <use href="#i-eye"></use>
+                                        </svg>
+                                        <svg class="icon icon-eye-off" aria-hidden="true">
+                                            <use href="#i-eye-off"></use>
+                                        </svg>
+                                    </button>
+                                </div>
+                            <p class="field-msg" id="si-password-msg" data-msg-for="si-password"></p>
                         </div>
                     </div>
 
-                    <div class="auth-alt">
-                        <button type="button" class="link-btn" data-auth-open="forgot">Forgot password?</button>
-                        <button type="button" class="link-btn" data-auth-open="activate">Need to activate?</button>
+                    <button class="btn btn-primary portal-submit" type="submit" id="si-submit">Sign in</button>
+
+                    <p class="auth-status" id="signin-status" role="status">
+                        <svg class="icon">
+                            <use href="#i-alert"></use>
+                        </svg>
+                        <span data-status-text></span>
+                    </p>
+
+                    <div class="portal-links">
+                        <p class="portal-note">
+                            First time here?
+                            <button type="button" class="link-btn" data-auth-open="activate">Activate your
+                                account</button>
+                        </p>
+                        <p class="portal-note">
+                            Teacher or admin?
+                            <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                        </p>
                     </div>
                 </form>
-                <p class="auth-status" id="signin-status" role="status">
-                    <svg class="icon">
-                        <use href="#i-alert"></use>
-                    </svg>
-                    <span data-status-text></span>
-                </p>
             </div>
+        </div>
+    </div>
 
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" data-modal-close>Cancel</button>
-                <button class="btn btn-primary" type="submit" form="signin-form" id="si-submit">Sign in</button>
-            </footer>
+    <!-- =====================================================================
+         MODAL · ADMIN SIGN IN
+         One door for every staff account. Teachers and admins both sign in
+         here and auth.js sends each to their own dashboard by the role on
+         their profile — there is no role to pick, so nothing to get wrong.
+         Titled "Admin sign in" to match the link that opens it; the subtitle
+         tells teachers it is theirs too.
+         ===================================================================== -->
+    <div class="overlay" id="modal-staff" role="dialog" aria-modal="true" aria-labelledby="staff-title"
+        aria-describedby="staff-sub">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="staff-title">Admin sign in</h2>
+                    <p class="modal-sub" id="staff-sub">For teachers and administrators.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon">
+                        <use href="#i-x"></use>
+                    </svg>
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <form id="staff-form" class="portal-form" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label class="label" for="st-email">Staff email</label>
+                            <input class="input" type="email" id="st-email" name="email" autocomplete="username"
+                                inputmode="email" autocapitalize="off" spellcheck="false"
+                                placeholder="name@ue.edu.ph" aria-describedby="st-email-msg" data-autofocus>
+                            <p class="field-msg" id="st-email-msg" data-msg-for="st-email"></p>
+                        </div>
+                        <div class="field">
+                            <div class="label-row">
+                                <label class="label" for="st-password">Password</label>
+                                <button type="button" class="link-btn" data-auth-open="forgot">Forgot
+                                    password?</button>
+                            </div>
+                                <div class="pw-wrap">
+                                    <input class="input" type="password" id="st-password" name="password"
+                                        autocomplete="current-password" enterkeyhint="go" placeholder="••••••••"
+                                        aria-describedby="st-password-msg">
+                                    <button type="button" class="pw-toggle" data-pw-toggle="st-password"
+                                        aria-label="Show password" aria-pressed="false">
+                                        <svg class="icon icon-eye" aria-hidden="true">
+                                            <use href="#i-eye"></use>
+                                        </svg>
+                                        <svg class="icon icon-eye-off" aria-hidden="true">
+                                            <use href="#i-eye-off"></use>
+                                        </svg>
+                                    </button>
+                                </div>
+                            <p class="field-msg" id="st-password-msg" data-msg-for="st-password"></p>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary portal-submit" type="submit" id="st-submit">Sign in</button>
+
+                    <p class="auth-status" id="staff-status" role="status">
+                        <svg class="icon">
+                            <use href="#i-alert"></use>
+                        </svg>
+                        <span data-status-text></span>
+                    </p>
+
+                    <!-- "student", not "signin": auth.js relabels every
+                         data-auth-open="signin" trigger for a returning session,
+                         and this is navigation between dialogs, not an entry point. -->
+                    <div class="portal-links">
+                        <p class="portal-note">
+                            Not staff?
+                            <button type="button" class="link-btn" data-auth-open="student">Student sign in</button>
+                        </p>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -834,7 +1180,7 @@
             </div>
 
             <footer class="modal-foot modal-foot-split">
-                <button type="button" class="link-btn" data-auth-open="signin">Back to sign in</button>
+                <button type="button" class="link-btn" data-auth-open="back">Back to sign in</button>
                 <div class="modal-foot-actions">
                     <button class="btn btn-primary" type="submit" form="activate-form" id="ac-submit">
                         <svg class="icon">
@@ -881,7 +1227,7 @@
             </div>
 
             <footer class="modal-foot modal-foot-split">
-                <button type="button" class="link-btn" data-auth-open="signin">Back to sign in</button>
+                <button type="button" class="link-btn" data-auth-open="back">Back to sign in</button>
                 <div class="modal-foot-actions">
                     <button class="btn btn-primary" type="submit" form="forgot-form" id="fp-submit">
                         <svg class="icon">
@@ -896,16 +1242,30 @@
 
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
-    <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
-
     <script defer src="assets/js/function.js"></script>
     <script defer src="assets/js/auth.js"></script>
     <script defer src="assets/js/landing.js"></script>
 
+    <!-- The navbar: transparent-to-solid state, the mobile sheet and the
+         scrollspy. Separate on the same rule as agent-select.js below — it
+         owns the header and nothing else owns it. After auth.js on purpose:
+         its sheet-closing click listener runs in the capture phase, so it
+         wins regardless, but the order documents the dependency. -->
+    <script defer src="assets/js/nav.js"></script>
+
+    <!-- Act 2's character-select rail. Separate from landing.js on the same
+         rule everything else here follows: it owns the roster and nothing
+         owns it. Removing it leaves a static, fully readable roster. -->
+    <script defer src="assets/js/agent-select.js"></script>
+
     <!-- 3D agent models. Independent of everything above: it mounts a viewer
-         into the six .model-canvas-wrapper slots and touches nothing else. The
+         into the .model-canvas-wrapper slots and touches nothing else. The
          935 KB renderer is NOT loaded here — models.js imports it dynamically,
-         and only once a slot is within a screen of the viewport. With no
+         and only once a slot is within a screen of the viewport.
+
+         On the select screen only ONE slot is visible at a time, and a
+         display:none box cannot intersect — so an agent's model is fetched
+         the first time that agent is selected, not on first paint. With no
          models listed as available it makes no request at all. -->
     <script defer src="assets/js/models.js"></script>
 </body>

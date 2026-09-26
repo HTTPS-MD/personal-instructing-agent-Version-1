@@ -43,7 +43,16 @@
        Uncomment an id once its .glb is sitting in assets/models/.
        Everything commented out stays a "coming soon" case, silently. */
     var AVAILABLE = [
-        // 'pia-open',
+        'pia-open'
+
+        /* The five below have no .glb in assets/models/ yet. Listing an id
+           whose file does not exist is not free: the slot fires a request,
+           takes the 404, and settles on "could not load" — an ERROR state,
+           shown to a visitor, for a model that was simply never delivered.
+           Commented out they cost nothing at all (no request) and the slot
+           keeps its "coming soon" display case, which is the honest reading.
+
+           Uncomment each one as its file lands. */
         // 'pia-conscientious',
         // 'pia-extravert',
         // 'pia-agreeable',
@@ -71,7 +80,7 @@
        An absolute url satisfies both, and survives this folder being moved
        or the site being served from a subpath. */
     var HERE = (document.currentScript && document.currentScript.src) ||
-               (window.location.origin + '/assets/js/models.js');
+        (window.location.origin + '/assets/js/models.js');
     var VENDOR = new URL('vendor/', HERE).href;
 
     var RENDERER = VENDOR + 'model-viewer.min.js';

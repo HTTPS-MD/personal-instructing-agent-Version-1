@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light dark">
     <meta name="description" content="PIA System — Admin Console for the Personal Instructing Agent research platform.">
     <title>Admin Console — PIA System</title>
 
@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/shell.css">
@@ -1318,7 +1318,9 @@
                 </div>
 
                 <div>
-                    <p class="eyebrow" style="margin-bottom:16px">OCEAN trait profile</p>
+                    <!-- Filled by renderTraits() from ocean_submissions, the only
+                         place results exist and readable by admins alone. -->
+                    <p class="eyebrow" style="margin-bottom:16px">Assessment results · BFPT</p>
                     <div id="drawer-traits"></div>
                 </div>
 
@@ -1377,6 +1379,8 @@
          registerChannel, executeForceLogout, normalizeOceanScore …) -->
     <script src="../../assets/js/function.js"></script>
     <script src="../../assets/js/shell.js"></script>
+    <!-- The 50 statements and the 1-5 scale, for the drawer's answer list. -->
+    <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/admin-dashboard.js"></script>
 </body>
 

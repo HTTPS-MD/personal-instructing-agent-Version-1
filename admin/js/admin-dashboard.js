@@ -49,11 +49,8 @@
         return Number.isFinite(n) ? n : fallback;
     };
 
+    /* Each BFPT trait scores 0-40; the drawer shows raw scores out of this. */
     var OCEAN_MAX = (typeof OCEAN_SCORE_MAX !== 'undefined') ? OCEAN_SCORE_MAX : 40;
-    var toOceanPct = (typeof normalizeOceanScore === 'function') ? normalizeOceanScore : function (raw) {
-        var n = parseFloat(raw);
-        return Number.isFinite(n) ? Math.round((n / OCEAN_MAX) * 100) : null;
-    };
 
     function debounce(fn, wait) {
         var timer = null;
@@ -574,10 +571,15 @@
     /* ================================================ 4. DATA LAYER ===== */
 
     /* Columns the overview aggregates need. Selecting the exact set rather
-       than '*' keeps active_devices the only array we pull, and keeps OCEAN
-       item-level answers out of the response entirely. */
+       than '*' keeps active_devices the only array we pull.
+
+       Completion is read from is_ocean_done, never inferred from a score:
+       since migration 0018 profiles carries no assessment score for anyone.
+       The results themselves live only in ocean_submissions (admin-only),
+       and are fetched where they are shown — the student drawer and the
+       CSV export. */
     var COHORT_COLUMNS = 'full_name, email, section, group_type, status, current_stage, is_in_game,' +
-        ' stage_started_at, active_devices, ocean_o, pre_test_score, post_test_score';
+        ' stage_started_at, active_devices, is_ocean_done, pre_test_score, post_test_score';
 
     /* One pass over the cohort powers the KPI tiles, the pipeline, live
        sessions, section health and the section card counts. The study is a
@@ -736,7 +738,7 @@
     function renderKpis() {
         var cohort = state.cohort;
         var total = cohort.length;
-        var oceanDone = cohort.filter(function (s) { return s.ocean_o !== null && s.ocean_o !== undefined; }).length;
+        var oceanDone = cohort.filter(function (s) { return s.is_ocean_done === true; }).length;
         var online = cohort.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
         var inactive = cohort.filter(function (s) { return (s.status || '') !== 'active'; }).length;
 
@@ -889,7 +891,7 @@
 
         container.innerHTML = state.sections.map(function (section) {
             var members = state.cohort.filter(function (s) { return s.section === section.name; });
-            var done = members.filter(function (s) { return s.ocean_o !== null && s.ocean_o !== undefined; }).length;
+            var done = members.filter(function (s) { return s.is_ocean_done === true; }).length;
             var share = pct(done, members.length);
             return '' +
                 '<div>' +
@@ -919,7 +921,7 @@
         grid.innerHTML = state.sections.map(function (section) {
             var members = state.cohort.filter(function (s) { return s.section === section.name; });
             var online = members.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
-            var done = members.filter(function (s) { return s.ocean_o !== null && s.ocean_o !== undefined; }).length;
+            var done = members.filter(function (s) { return s.is_ocean_done === true; }).length;
 
             var stack = members.slice(0, 4).map(function (s) {
                 return '<span class="avatar">' + esc(initialsOf(s.full_name, s.email)) + '</span>';
@@ -1272,38 +1274,115 @@
         openModal('drawer-student');
     }
 
-    /* Raw OCEAN sums are out of OCEAN_SCORE_MAX (40); normalizeOceanScore in
-       function.js converts them to the percentages shown here. */
-    function renderTraits(s) {
-        var traits = [
-            ['Openness', s.ocean_o],
-            ['Conscientiousness', s.ocean_c],
-            ['Extraversion', s.ocean_e],
-            ['Agreeableness', s.ocean_a],
-            ['Neuroticism', s.ocean_n]
-        ];
+    /* ---- Assessment results (BFPT) ------------------------------------
+       Results live ONLY in ocean_submissions. Its one RLS policy admits an
+       admin with a current session (migration 0018); a student or teacher
+       asking the same question gets zero rows. profiles carries no score for
+       anyone, so the drawer and the CSV export fetch results from here
+       rather than reading them off the roster row. */
+    var BFPT = window.PIA_BFPT || null;
+    var BFPT_COLUMNS = 'email, responses, ocean_e, ocean_a, ocean_c, ocean_n, ocean_o,' +
+        ' submitted_at, scoring_key, source';
 
-        var hasAny = traits.some(function (pair) { return toOceanPct(pair[1]) !== null; });
+    /* The document's order and its names for the five traits. */
+    var BFPT_TRAITS = [
+        { key: 'ocean_e', name: 'Extroversion' },
+        { key: 'ocean_a', name: 'Agreeableness' },
+        { key: 'ocean_c', name: 'Conscientiousness' },
+        { key: 'ocean_n', name: 'Neuroticism' },
+        { key: 'ocean_o', name: 'Openness to Experience' }
+    ];
 
-        if (!hasAny) {
-            $('#drawer-traits').innerHTML = '<div class="notice">' + icon('info') +
-                '<div><p class="notice-title">No OCEAN result yet</p>' +
-                '<p class="notice-text">This participant has not completed the Big Five Inventory.</p></div></div>';
+    function noticeHtml(iconName, title, text) {
+        return '<div class="notice">' + icon(iconName) + '<div><p class="notice-title">' + esc(title) +
+            '</p><p class="notice-text">' + esc(text) + '</p></div></div>';
+    }
+
+    function formatStamp(iso) {
+        var d = new Date(iso);
+        return isNaN(d.getTime()) ? '—'
+            : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    /* Newest first, so rows[0] is the result that counts; the rest are the
+       history a retake leaves behind. */
+    async function fetchResults(email) {
+        var query = sb.from('ocean_submissions').select(BFPT_COLUMNS);
+        if (email) { query = query.eq('email', email); }
+        return query
+            .order('submitted_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(5000);
+    }
+
+    async function renderTraits(s) {
+        var box = $('#drawer-traits');
+        box.innerHTML = '<p class="state-desc">Loading results…</p>';
+
+        var res = await fetchResults(s.email);
+
+        /* The admin may have opened another student while this was loading. */
+        if (state.activeStudent !== s) { return; }
+
+        if (res.error) {
+            box.innerHTML = noticeHtml('alert', 'Could not load results',
+                friendlyDbError(res.error, 'Unknown database error.'));
             return;
         }
 
-        $('#drawer-traits').innerHTML = traits.map(function (pair) {
-            var value = toOceanPct(pair[1]);
-            var shown = value === null ? 'n/a' : value + '%';
+        var rows = res.data || [];
+        if (!rows.length) {
+            box.innerHTML = noticeHtml('info', 'No result yet', s.is_ocean_done
+                ? 'Marked complete, but no stored result was found. Allow a retake to collect one.'
+                : 'This participant has not completed the questionnaire.');
+            return;
+        }
+
+        var r = rows[0];
+
+        var scores = BFPT_TRAITS.map(function (t) {
+            var v = r[t.key];
+            var width = v == null ? 0 : Math.max(0, Math.min(100, (v / OCEAN_MAX) * 100));
             return '' +
                 '<div class="trait">' +
                 '<div class="trait-top">' +
-                '<span class="trait-name">' + pair[0] + '</span>' +
-                '<span class="trait-val tnum">' + shown + '</span>' +
+                '<span class="trait-name">' + esc(t.name) + '</span>' +
+                '<span class="trait-val tnum">' + (v == null ? 'n/a'
+                    : esc(v) + '<span class="trait-of"> / ' + OCEAN_MAX + '</span>') + '</span>' +
                 '</div>' +
-                '<div class="bar"><div class="bar-fill" style="width:' + (value || 0) + '%"></div></div>' +
+                '<div class="bar"><div class="bar-fill" style="width:' + width + '%"></div></div>' +
                 '</div>';
         }).join('');
+
+        var meta = 'Submitted ' + esc(formatStamp(r.submitted_at)) +
+            (rows.length > 1 ? ' · latest of ' + rows.length + ' attempts' : '') +
+            ' · scored with the BFPT sheet';
+
+        /* Scored as the sheet is written, N runs opposite to its own prose
+           definition. Said beside the number, where it is read. */
+        var nNote = '<p class="bfpt-note"><b>How N is scored:</b> exactly as the BFPT sheet specifies. ' +
+            'Its N formula adds “Am relaxed most of the time” and “Seldom feel blue” and subtracts the ' +
+            'eight stress items, so a higher N here reflects calmer answers.</p>';
+
+        var answers;
+        if (Array.isArray(r.responses) && r.responses.length === 50) {
+            answers = '<details class="bfpt-answers"><summary>All 50 answers</summary><ol class="bfpt-answer-list">' +
+                r.responses.map(function (v, i) {
+                    var text = BFPT ? BFPT.items[i] : 'Item ' + (i + 1);
+                    var label = BFPT ? BFPT.labelFor(v) : null;
+                    return '<li>' +
+                        '<span class="bfpt-n tnum">' + (i + 1) + '</span>' +
+                        '<span class="bfpt-q">' + esc(text) + '</span>' +
+                        '<span class="bfpt-a">' + (label ? esc(label) + ' · ' : '') + '<b class="tnum">' + esc(v) + '</b></span>' +
+                        '</li>';
+                }).join('') +
+                '</ol></details>';
+        } else {
+            answers = '<p class="bfpt-meta">Item answers were not kept for this result — it predates ' +
+                'answer storage and was carried over from the old profile record.</p>';
+        }
+
+        box.innerHTML = scores + '<p class="bfpt-meta">' + meta + '</p>' + nNote + answers;
     }
 
     function initDrawerActions() {
@@ -1378,20 +1457,22 @@
     /* ---- Retakes ---- */
 
     async function allowRetakeOcean(email) {
+        /* A retake no longer erases anything: the new submission is appended
+           to ocean_submissions and becomes the current result, and the old
+           one stays in the history. profiles holds no score to clear. */
         var ok = await confirmAction({
             title: 'Allow OCEAN retake',
-            heading: 'Clear the OCEAN result for ' + email + '?',
-            message: 'The five trait scores are erased and the student is sent back to the ' +
-                'OCEAN stage. The previous result cannot be recovered.',
-            confirmLabel: 'Clear and allow retake'
+            heading: 'Send ' + email + ' back to the questionnaire?',
+            message: 'They can answer all 50 items again. Their current result stays in the ' +
+                'results history, and the new submission becomes the current result once they finish.',
+            confirmLabel: 'Allow retake'
         });
         if (!ok) { return; }
 
         var res = await sb.from('profiles').update({
             is_ocean_done: false,
             current_stage: 'OCEAN',
-            stage_started_at: new Date().toISOString(),
-            ocean_o: null, ocean_c: null, ocean_e: null, ocean_a: null, ocean_n: null
+            stage_started_at: new Date().toISOString()
         }).eq('email', email);
 
         if (res.error) {
@@ -2687,20 +2768,49 @@
         return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
     }
 
-    /* Exports the cohort summary already in memory — no extra round trip, and
-       what you download is exactly what the dashboard is showing. */
-    function exportCohortCsv() {
+    /* Exports the cohort summary already in memory, joined to each student's
+       CURRENT assessment result (their newest submission) and its 50 item
+       answers — the raw data for scale reliability and item analysis. The
+       results are fetched fresh from ocean_submissions, the only place they
+       exist, so this is the one export that needs a round trip. */
+    async function exportCohortCsv() {
         if (!state.cohort.length) {
             toastErr('Nothing to export', 'The cohort has not loaded yet.');
             return;
         }
 
-        var headers = ['full_name', 'email', 'section', 'group_type', 'status',
-            'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'ocean_o'];
+        var res = await fetchResults(null);
+        if (res.error) {
+            toastErr('Export failed', friendlyDbError(res.error, 'Could not read the assessment results.'));
+            return;
+        }
+
+        var latest = {};
+        var attempts = {};
+        (res.data || []).forEach(function (row) {
+            var key = String(row.email || '').toLowerCase();
+            attempts[key] = (attempts[key] || 0) + 1;
+            if (!latest[key]) { latest[key] = row; }   // rows arrive newest first
+        });
+
+        var base = ['full_name', 'email', 'section', 'group_type', 'status',
+            'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'is_ocean_done'];
+        var scores = ['ocean_e', 'ocean_a', 'ocean_c', 'ocean_n', 'ocean_o'];
+        var items = [];
+        for (var i = 1; i <= 50; i++) { items.push('item_' + (i < 10 ? '0' : '') + i); }
+
+        var headers = base.concat(scores, ['ocean_submitted_at', 'ocean_attempts', 'ocean_scoring_key'], items);
 
         var lines = [headers.join(',')];
         state.cohort.forEach(function (row) {
-            lines.push(headers.map(function (key) { return toCsvValue(row[key]); }).join(','));
+            var key = String(row.email || '').toLowerCase();
+            var result = latest[key] || {};
+            var answers = Array.isArray(result.responses) ? result.responses : [];
+            var values = base.map(function (k) { return row[k]; })
+                .concat(scores.map(function (k) { return result[k]; }))
+                .concat([result.submitted_at, attempts[key] || 0, result.scoring_key])
+                .concat(items.map(function (_, idx) { return answers[idx]; }));
+            lines.push(values.map(toCsvValue).join(','));
         });
 
         var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -2715,7 +2825,8 @@
         link.remove();
         URL.revokeObjectURL(url);
 
-        toastOk('Export ready', state.cohort.length + ' rows written to pia-cohort-' + stamp + '.csv.');
+        toastOk('Export ready', state.cohort.length + ' rows written to pia-cohort-' + stamp +
+            '.csv, with each student’s current assessment result.');
     }
 
     /* ============================================ 15. BOOT SEQUENCE ===== */

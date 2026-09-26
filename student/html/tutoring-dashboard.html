@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Tutoring Session — PIA</title>
+
     <!-- ROUTE GUARD (stage 1 of 2): cheap fail-fast lang ito, HINDI security.
          Ang tunay na verification ay ang enforceStudentStage() sa page JS, na
          tumutugma sa totoong Supabase Auth session. Nakatago ang body
@@ -19,117 +22,154 @@
             if (!hasToken) window.location.replace('../../index.html');
         })();
     </script>
+
+    <script src="../../assets/js/theme-boot.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="../../styles/tokens.css">
-    <link rel="stylesheet" href="../../styles/base.css">
-    <link rel="stylesheet" href="../../styles/components.css">
-    <link rel="stylesheet" href="../../styles/pages/student.css">
+
+    <!-- C1 — Inter only. The rest of the app used to pull Space Grotesk for
+         display as well; the specification names one face, and dropping the
+         second also drops a render-blocking request from the critical path. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+
+    <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/tutoring.css">
-    <title>Tutoring Session - PIA System</title>
 </head>
 
 <body class="opacity-0">
 
-    <nav class="site-nav">
-        <div class="site-nav-inner">
-            <a href="../../index.html" class="site-nav-logo"><img src="../../assets/images/logo.png"
-                    alt="PIA Logo"></a>
-            <div class="flex-row gap-md">
-                <span class="site-nav-label hide-mobile">Math Tutoring Session</span>
-                <button id="back-to-dashboard-btn" class="btn-secondary btn-sm">
+    <div class="tut">
+        <div class="tut-ambient" aria-hidden="true"></div>
+
+        <!-- ===================================================== TOP BAR -->
+        <header class="tut-bar">
+            <div class="tut-shell tut-bar-inner">
+                <div class="tut-brand">
+                    <span class="tut-mark">PIA</span>
+                    <span class="tut-stage hide-sm">
+                        <span class="dot"></span>
+                        Math Tutoring Session
+                    </span>
+                </div>
+
+                <button id="back-to-dashboard-btn" class="btn btn-secondary btn-sm" type="button">
                     <i data-lucide="log-out" class="icon-sm"></i> Exit
                 </button>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <main class="content-container tutoring-main">
+        <main class="tut-shell tut-main">
 
-        <!-- ============ GAMIFICATION BAR (top) ============ -->
-        <div class="solid-card card-padded tutoring-progress-bar">
-            <div class="tutoring-progress-info">
-                <div class="flex-between">
-                    <span class="protocol-label">Session Progress</span>
-                    <span id="progress-label" class="tutoring-progress-count">0 / 10 problems</span>
-                </div>
-                <div class="progress-track">
-                    <div id="progress-bar-fill" class="progress-track-fill" style="width: 0%;"></div>
-                </div>
-            </div>
-            <div class="tutoring-progress-stats">
-                <div class="stat-chip">
-                    <span class="stat-chip-label">Level</span>
-                    <span id="level-badge" class="stat-chip-value">Level 1</span>
-                </div>
-                <div class="stat-chip">
-                    <span class="stat-chip-label">Streak</span>
-                    <span id="streak-count" class="stat-chip-value">0</span>
-                </div>
-                <div id="medals-container" class="flex-row gap-xs"></div>
-            </div>
-        </div>
-
-        <!-- ============ PROBLEM SCREEN ============ -->
-        <div id="problem-screen" class="tutoring-layout">
-
-            <!-- Kaliwa: Agent Avatar + Speech Bubble (6 expression states) -->
-            <div class="solid-card card-padded tutoring-agent-panel">
-                <div id="agent-avatar-wrap" class="agent-avatar-wrap agent-trait-neutral">
-                    <img id="agent-avatar-img" src="../../assets/images/char-1.png" alt="Tutor Agent"
-                        class="agent-avatar-img">
-                    <span id="agent-expression-badge" class="agent-expression-badge">
-                        <i data-lucide="smile" class="icon-sm"></i>
-                    </span>
-                </div>
-                <div id="agent-speech-bubble" class="agent-speech-bubble">
-                    Kaya mo 'yan! Isulat ang value ni x.
-                </div>
-            </div>
-
-            <!-- Gitna: Active Math Problem -->
-            <div class="solid-card card-padded-lg tutoring-problem-panel">
-                <span class="protocol-label">Algebraic Expressions</span>
-                <p id="problem-instruction" class="tutoring-instruction">Solve for x.</p>
-                <p id="problem-expression" class="tutoring-expression">Loading...</p>
-
-                <div class="tutoring-input-row">
-                    <input id="answer-input" type="text" inputmode="text" autocomplete="off" placeholder="hal. x = 5"
-                        class="form-input tutoring-answer-input">
-                    <button id="submit-answer-btn" class="btn-primary btn-lg">Submit</button>
+            <!-- ================================================= SESSION HUD -->
+            <section class="tut-hud" aria-label="Session progress">
+                <div class="tut-hud-progress">
+                    <div class="tut-hud-row">
+                        <span class="tut-eyebrow">Session Progress</span>
+                        <span id="progress-label" class="tut-hud-count">0 / 10 problems</span>
+                    </div>
+                    <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                        aria-valuenow="0" aria-label="Problems completed">
+                        <div id="progress-bar-fill" class="progress-track-fill" style="width: 0%;"></div>
+                    </div>
                 </div>
 
-                <div id="feedback-panel" class="feedback-panel hidden"></div>
+                <div class="tut-hud-stats">
+                    <div class="stat-chip">
+                        <span class="stat-chip-label">Level</span>
+                        <span id="level-badge" class="stat-chip-value">1</span>
+                    </div>
+                    <div class="stat-chip" id="streak-chip">
+                        <span class="stat-chip-label">Streak</span>
+                        <span id="streak-count" class="stat-chip-value">0</span>
+                    </div>
+                    <div id="medals-container" class="tut-medals"></div>
+                </div>
+            </section>
 
-                <div class="tutoring-hint-row">
-                    <button id="show-hint-btn" class="btn-secondary btn-sm">Show Hint</button>
-                </div>
-                <div id="hint-panel" class="hint-panel hidden"></div>
-            </div>
-        </div>
+            <!-- ================================================== WORKSPACE --
+                 C3: ONE card. The agent rail carries identity only; every piece
+                 of text the learner has to integrate — what the agent said, the
+                 problem, the field, the feedback — lives in .tut-work, in that
+                 reading order, with no card edge between any two of them.
 
-        <!-- ============ SESSION SUMMARY SCREEN ============ -->
-        <div id="summary-screen" class="solid-card card-padded-lg tutoring-summary hidden">
-            <span class="tutoring-summary-emoji">🎉</span>
-            <h2 class="tutoring-summary-title">Session Complete!</h2>
-            <div class="tutoring-summary-stats">
-                <div class="dashboard-award-card">
-                    <span class="tutoring-summary-value" id="summary-accuracy">0%</span>
-                    <span class="tutoring-summary-label">Accuracy</span>
+                 C4: data-agent-state is stamped here by setAgentExpression().
+                 It starts at "solving" so the agent is already quiet on the
+                 very first problem. -->
+            <section id="problem-screen" class="tut-workspace" data-agent-state="solving">
+
+                <div class="tut-agent">
+                    <div id="agent-avatar-wrap" class="agent-avatar-wrap agent-trait-neutral">
+                        <img id="agent-avatar-img" src="../../assets/images/char-1.png" alt=""
+                            class="agent-avatar-img">
+                        <span id="agent-expression-badge" class="agent-expression-badge" aria-hidden="true">
+                            <i data-lucide="smile" class="icon-sm"></i>
+                        </span>
+                    </div>
+                    <span class="agent-name">Your tutor</span>
                 </div>
-                <div class="dashboard-award-card">
-                    <span class="tutoring-summary-value" id="summary-level">Level 1</span>
-                    <span class="tutoring-summary-label">Highest Level</span>
+
+                <div class="tut-work">
+                    <!-- aria-live: the agent's line is announced to a screen
+                         reader when it changes, which is the non-visual
+                         equivalent of the adjacency C3 buys for sighted users. -->
+                    <p id="agent-speech-bubble" class="agent-speech-bubble" aria-live="polite">
+                        Kaya mo 'yan! Isulat ang value ni x.
+                    </p>
+
+                    <span class="tut-problem-label">Algebraic Expressions</span>
+                    <p id="problem-instruction" class="tut-instruction">Solve for x.</p>
+                    <p id="problem-expression" class="tut-expression">Loading…</p>
+
+                    <div class="tut-input-row">
+                        <label class="sr-only" for="answer-input">Your answer</label>
+                        <input id="answer-input" type="text" inputmode="text" autocomplete="off"
+                            placeholder="hal. x = 5" class="input tut-answer-input">
+                        <button id="submit-answer-btn" class="btn btn-primary btn-lg" type="button">Submit</button>
+                    </div>
+
+                    <!-- Feedback lands HERE — one saccade below the field that
+                         produced it, inside the same card as the problem it is
+                         about. Moving this element outside .tut-work re-creates
+                         the split-attention penalty C3 exists to remove. -->
+                    <div id="feedback-panel" class="feedback-panel hidden" role="status" aria-live="polite"></div>
+
+                    <div class="tut-hint-row">
+                        <button id="show-hint-btn" class="btn btn-secondary btn-sm" type="button">Show Hint</button>
+                        <span class="tut-hint-note">Asking for a hint is part of solving it.</span>
+                    </div>
+                    <div id="hint-panel" class="hint-panel hidden"></div>
                 </div>
-                <div class="dashboard-award-card">
-                    <span class="tutoring-summary-value" id="summary-correct">0 / 0</span>
-                    <span class="tutoring-summary-label">Correct</span>
+            </section>
+
+            <!-- ============================================ SESSION SUMMARY -->
+            <section id="summary-screen" class="tut-summary hidden">
+                <span class="tut-summary-badge" aria-hidden="true">🎉</span>
+                <h2 class="tut-summary-title">Session complete!</h2>
+                <p class="tut-summary-sub">Tapos na natin ang session na ito. Narito ang naabot mo.</p>
+
+                <div class="tut-summary-stats">
+                    <div class="tut-summary-stat">
+                        <span class="tut-summary-value" id="summary-accuracy">0%</span>
+                        <span class="tut-summary-label">Accuracy</span>
+                    </div>
+                    <div class="tut-summary-stat">
+                        <span class="tut-summary-value" id="summary-level">Level 1</span>
+                        <span class="tut-summary-label">Highest Level</span>
+                    </div>
+                    <div class="tut-summary-stat">
+                        <span class="tut-summary-value" id="summary-correct">0 / 0</span>
+                        <span class="tut-summary-label">Correct</span>
+                    </div>
                 </div>
-            </div>
-            <p class="tutoring-summary-medals">Medals earned: <span id="summary-medals" class="text-primary">None yet</span></p>
-            <button onclick="backToDashboard()" class="btn-primary btn-lg">Back to Dashboard</button>
-        </div>
-    </main>
+
+                <p class="tut-summary-medals">Medals earned: <span id="summary-medals">None yet</span></p>
+                <button onclick="backToDashboard()" class="btn btn-primary btn-lg" type="button">Back to Dashboard</button>
+            </section>
+        </main>
+    </div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/math-problems.js"></script>

@@ -26,15 +26,18 @@
 (function () {
     'use strict';
 
-    var theme = 'dark';
+    /* Light is the default. The system's ground is warm cream and its identity
+       lives there; dark is the alternate. A dark-mode visitor must never see a
+       cream flash, which is why this still runs before first paint. */
+    var theme = 'light';
 
     try {
         var saved = localStorage.getItem('pia_theme');
         if (saved === 'light' || saved === 'dark') {
             /* An explicit choice always beats the operating system. */
             theme = saved;
-        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-            theme = 'light';
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            theme = 'dark';
         }
     } catch (e) {
         /* Private mode with storage disabled — fall through to the default. */
