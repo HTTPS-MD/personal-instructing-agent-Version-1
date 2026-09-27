@@ -779,34 +779,207 @@
 
     /* ============================================ 6. BOOT ============== */
 
-    /* Someone already signed in should not have to type their password again
-       just because they landed on the marketing page. */
+    /* ---- 6.1 A visitor who is already signed in ---------------------------
+       Student, teacher or admin, the page stops pitching and greets them:
+         - every Sign in becomes "Continue to dashboard", routed by role, and
+           in the hero and finale it is promoted to the primary button;
+         - "Activate account" and every "Admin sign in" disappear (landing.css
+           7.1b, keyed on data-session);
+         - the kicker reads "Personal Instructing Agent" and the headline
+           becomes "Good / Morning, / <first name>".
+       theme-boot.js guessed before paint (data-session="pending"); this
+       confirms the guess or withdraws it. */
+
+    /* Remembered per email, so the greeting is written the moment the
+       session is confirmed rather than after the profile round trip.
+       executeForceLogout() clears localStorage, so it leaves with the user. */
+    var GREETING_NAME_KEY = 'pia_greeting_name';
+
+    /* Same boundaries as the dashboards' own greetings. */
+    function partOfDay() {
+        var hour = new Date().getHours();
+        return hour < 12 ? 'Morning' : (hour < 18 ? 'Afternoon' : 'Evening');
+    }
+
+    /* "JUAN" from an all-caps roster is not shouted back: "Juan". */
+    function tidyWord(word) {
+        if (word.length < 2 || word !== word.toUpperCase() || word === word.toLowerCase()) { return word; }
+        return word.toLowerCase().replace(/(^|[-'])(\S)/g, function (m, sep, ch) { return sep + ch.toUpperCase(); });
+    }
+
+    var STAFF_TITLE = /^(dr|prof|mr|mrs|ms|mx|sir|ma'?am|engr|atty)\.?$/i;
+
+    /* The first word of the display name: "Juan Miguel Dela Cruz" → Juan.
+       Two roster formats would break a plain split, so they are handled:
+         "Dela Cruz, Juan"  surname first → the given name after the comma;
+         "Dr. Maria Reyes"  a title keeps the surname → "Dr. Reyes", exactly
+                            how the admin and teacher dashboards address them.
+       No name on file: the email's first part ("juan.delacruz@…" → Juan). */
+    function greetingName(fullName, email) {
+        var name = String(fullName || '').trim();
+        var comma = name.indexOf(',');
+        if (comma !== -1) { name = name.slice(comma + 1).trim() || name.slice(0, comma).trim(); }
+
+        var words = name.split(/\s+/).filter(Boolean);
+        if (!words.length) {
+            var local = String(email || '').split('@')[0].split(/[._+\-]/)[0];
+            if (!local) { return 'there'; }
+            return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase();
+        }
+
+        words = words.map(tidyWord);
+        if (words.length > 1 && STAFF_TITLE.test(words[0])) {
+            return words[0] + ' ' + words[words.length - 1];
+        }
+        return words[0];
+    }
+
+    /* The staircase is sized so "Instructing" fills the column. "Afternoon,"
+       or a long name can run wider, so measure and scale down just enough —
+       never up. Re-run on resize and once the webfonts land. */
+    function fitGreeting() {
+        var title = $('#drop-title');
+        if (!title || !title.classList.contains('is-greeting')) { return; }
+
+        title.style.fontSize = '';
+
+        /* Not everything scales in step with the type (the staircase indents
+           are in container units, the volt box's tilt adds a sliver), so one
+           proportional step can land just short. A few passes settle it. */
+        for (var pass = 0; pass < 4; pass++) {
+            var room = title.clientWidth;
+            var need = title.scrollWidth;
+            if (need <= room + 1) { break; }
+            var size = parseFloat(window.getComputedStyle(title).fontSize);
+            title.style.fontSize = Math.floor(size * (room / need) * 0.97) + 'px';
+        }
+    }
+
+    var fitWired = false;
+
+    function wireGreetingFit() {
+        if (fitWired) { return; }
+        fitWired = true;
+
+        var queued = false;
+        window.addEventListener('resize', function () {
+            if (queued) { return; }
+            queued = true;
+            window.requestAnimationFrame(function () { queued = false; fitGreeting(); });
+        });
+        if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fitGreeting); }
+    }
+
+    /* Rebuilds the three lines with the .scrub-w word spans landing.js lights,
+       then lights them on the same stagger as the page's entrance. Text is
+       set through textContent only, never innerHTML: the name comes from the
+       database. */
+    function writeGreeting(name) {
+        var title = $('#drop-title');
+        if (!title) { return; }
+
+        var lines = [
+            ['drop-l1', 'Good'],
+            ['drop-l2', partOfDay() + ','],
+            ['drop-l3', name]
+        ];
+
+        title.textContent = '';
+        lines.forEach(function (line, n) {
+            /* A space between the block lines keeps the accessible name
+               "Good Morning, Juan" rather than "GoodMorning,Juan". */
+            if (n) { title.appendChild(document.createTextNode(' ')); }
+            var row = document.createElement('span');
+            row.className = line[0];
+            line[1].split(/\s+/).forEach(function (word, i) {
+                if (i) { row.appendChild(document.createTextNode(' ')); }
+                var w = document.createElement('span');
+                w.className = 'scrub-w';
+                w.textContent = word;
+                row.appendChild(w);
+            });
+            title.appendChild(row);
+        });
+        title.classList.add('is-greeting');
+
+        var kicker = $('.hero-kicker');
+        if (kicker) { kicker.textContent = 'Personal Instructing Agent'; }
+
+        fitGreeting();
+        wireGreetingFit();
+        document.documentElement.setAttribute('data-greeted', '');
+
+        var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        $$('.scrub-w', title).forEach(function (w, i) {
+            if (still) { w.classList.add('is-lit'); return; }
+            setTimeout(function () { w.classList.add('is-lit'); }, 120 + i * 55);
+        });
+    }
+
     async function offerResume() {
-        if (typeof sb === 'undefined' || !sb) { return; }
+        var root = document.documentElement;
+        var session = null;
 
         try {
-            var session = await sb.auth.getSession();
-            if (!session.data.session) { return; }
-
-            var role = 'student';
-            try { role = localStorage.getItem('pia_user_role') || 'student'; } catch (err) { /* ignore */ }
-
-            $$('[data-auth-open="signin"]').forEach(function (btn) {
-                /* data-resume-label lets a tight spot (the phone navbar) ask
-                   for a shorter label than the default. Buttons with a
-                   .cta-label keep their icon: only the label is rewritten. */
-                var label = btn.querySelector('.cta-label') || btn;
-                label.textContent = btn.getAttribute('data-resume-label') || 'Continue to dashboard';
-                btn.addEventListener('click', function (event) {
-                    event.stopImmediatePropagation();
-                    if (role === 'admin') { window.location.replace('admin/html/admin-dashboard.html'); }
-                    else if (role === 'teacher') { window.location.replace('teacher/html/teacher-dashboard.html'); }
-                    else { window.location.replace('student/html/waiting-room.html'); }
-                }, true);
-            });
+            session = (await sb.auth.getSession()).data.session;
         } catch (err) {
-            /* No session, or storage unavailable — leave the page as it is. */
+            /* Storage unavailable — treat as signed out. */
         }
+
+        if (!session) {
+            /* The pre-paint guess was stale (signed out in another tab, an
+               expired session): hand back the normal page. */
+            root.removeAttribute('data-session');
+            return;
+        }
+        root.setAttribute('data-session', 'in');
+
+        var email = (session.user && session.user.email) || '';
+        var role = 'student';
+        try { role = localStorage.getItem('pia_user_role') || 'student'; } catch (err) { /* ignore */ }
+
+        $$('[data-auth-open="signin"]').forEach(function (btn) {
+            /* data-resume-label lets a tight spot (the phone navbar) ask
+               for a shorter label than the default. Buttons with a
+               .cta-label keep their icon: only the label is rewritten. */
+            var label = btn.querySelector('.cta-label') || btn;
+            label.textContent = btn.getAttribute('data-resume-label') || 'Continue to dashboard';
+            btn.addEventListener('click', function (event) {
+                event.stopImmediatePropagation();
+                if (role === 'admin') { window.location.replace('admin/html/admin-dashboard.html'); }
+                else if (role === 'teacher') { window.location.replace('teacher/html/teacher-dashboard.html'); }
+                else { window.location.replace('student/html/waiting-room.html'); }
+            }, true);
+        });
+
+        /* With Activate gone, the hero's and finale's pair is down to one
+           button, so it takes the primary style and a forward arrow. */
+        $$('.hero-cta .cta-quiet[data-auth-open="signin"], .finale-actions .cta-quiet[data-auth-open="signin"]')
+            .forEach(function (btn) {
+                btn.classList.remove('cta-quiet');
+                btn.classList.add('cta-primary');
+                var glyph = btn.querySelector('.cta-orb use');
+                if (glyph) { glyph.setAttribute('href', '#i-arrow-right'); }
+            });
+
+        var shown = '';
+        try {
+            var cached = JSON.parse(localStorage.getItem(GREETING_NAME_KEY) || 'null');
+            if (cached && cached.email === email && cached.name) {
+                shown = cached.name;
+                writeGreeting(shown);
+            }
+        } catch (err) { /* nothing cached */ }
+
+        var name = shown;
+        try {
+            var res = await sb.from('profiles').select('full_name').eq('email', email).maybeSingle();
+            if (res.data && res.data.full_name) { name = greetingName(res.data.full_name, email); }
+        } catch (err) { /* offline: keep the cached name, or fall back below */ }
+        if (!name) { name = greetingName('', email); }
+
+        if (name !== shown) { writeGreeting(name); }
+        try { localStorage.setItem(GREETING_NAME_KEY, JSON.stringify({ email: email, name: name })); } catch (err) { /* ignore */ }
     }
 
     function boot() {
@@ -818,6 +991,9 @@
         initLiveClear();
 
         if (typeof sb === 'undefined' || !sb) {
+            /* Without the SDK the session cannot be confirmed: show the
+               ordinary signed-out page rather than a half-greeting. */
+            document.documentElement.removeAttribute('data-session');
             $$('[data-auth-open]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     toast('Server\u2019s not answering', 'The database didn\u2019t pick up. Refresh and try again.', 'danger');

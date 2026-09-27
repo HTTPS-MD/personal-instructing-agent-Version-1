@@ -43,6 +43,25 @@
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.add('js');
 
+    /* A signed-in visitor, guessed before paint. supabase-js keeps the
+       session in localStorage as sb-<project>-auth-token. The landing page
+       reads this to greet the visitor instead of pitching to them — it hides
+       "Activate account", and holds the headline back so the default title
+       never flashes before the greeting. auth.js then confirms the guess
+       (data-session="in") or withdraws it. A hint for presentation only:
+       nothing is unlocked on its strength, every page still checks the
+       session itself. */
+    try {
+        for (var i = 0; i < localStorage.length; i++) {
+            if (/^sb-.+-auth-token$/.test(localStorage.key(i) || '')) {
+                document.documentElement.setAttribute('data-session', 'pending');
+                break;
+            }
+        }
+    } catch (e) {
+        /* Storage blocked — the page simply starts signed out. */
+    }
+
     /* ── WEBFONTS ─────────────────────────────────────────────────────────
        THE ONE PLACE A FONT FILE IS NAMED. To change a typeface, edit this
        URL and the matching --font-display / --font-body / --font-mono tokens

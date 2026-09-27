@@ -995,6 +995,52 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     color: color-mix(in srgb, var(--text) 88%, var(--bg-body));
 }
 
+/* ---- 7.1b Signed in ---------------------------------------------------------
+   theme-boot.js stamps <html data-session="pending"> before paint when this
+   browser holds a session; auth.js confirms it ("in") or removes it. Any
+   role — student, teacher, admin — gets the same page:
+
+   - No way into an account they already have: every "Activate account" and
+     every staff "Admin sign in" goes (hamburger sheet, finale, footer). The
+     Sign in buttons stay; auth.js relabels them "Continue to dashboard".
+   - The headline and kicker wait, invisible but keeping their space, for
+     auth.js to write the greeting, so "Personal Instructing Agent" never
+     flashes before "Good Morning, Juan". If auth.js never answers (the SDK
+     blocked), the hold lifts itself after 2.5s and the default shows.
+
+   :root raises these above the nav and hero rules that set the same
+   elements' display at various widths. */
+:root[data-session] [data-auth-open="activate"],
+:root[data-session] [data-auth-open="staff"],
+:root[data-session] .nav-menu-note,
+:root[data-session] .finale-staff,
+:root[data-session] .foot-staff { display: none; }
+
+/* From 30rem up the staff note was the sheet's only extra (the theme switch
+   and Sign in live in the bar there), so without it the whole section goes,
+   rule line included, instead of leaving an empty ruled strip. */
+@media (min-width: 30rem) {
+    :root[data-session] .nav-menu-extra { display: none; }
+}
+
+:root[data-session]:not([data-greeted]) .hero-kicker,
+:root[data-session]:not([data-greeted]) .drop-title {
+    visibility: hidden;
+    animation: sessionHold 0s linear 2.5s forwards;
+}
+
+@keyframes sessionHold { to { visibility: visible; } }
+
+/* The greeting reuses the three-line staircase: "Good" steps in, the time
+   of day sits flush, and the NAME is the punchline in the volt box. The
+   name never breaks (a double-barrelled "Maria-Clara" stays one sticker);
+   auth.js shrinks the type instead, and only when a line would otherwise
+   overflow the column. The cap matters: without it the headline box would
+   grow to fit an unbreakable name, and there would be no overflow for
+   auth.js to measure. */
+.drop-title.is-greeting { max-width: 100%; min-width: 0; }
+.drop-title.is-greeting .drop-l3 { white-space: nowrap; }
+
 /* ---- 7.2 The cast ------------------------------------------------------------
    Six cutouts. Phone: a 3 x 2 grid, each card tilted a little. Tablet: one
    row of six. Desktop: a collage beside the copy — two rows, the second
