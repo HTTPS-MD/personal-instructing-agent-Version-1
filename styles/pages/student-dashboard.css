@@ -32,9 +32,10 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background:
-        radial-gradient(56rem 38rem at 10% -12%, rgba(5, 196, 107, 0.06), transparent 60%),
-        radial-gradient(44rem 32rem at 94% 4%, rgba(79, 168, 147, 0.045), transparent 62%);
+    /* The brand's film grain, not a glow: a soft coloured blob is exactly
+       the generic decoration the brief bans. */
+    background-image: var(--grain);
+    background-size: 11.25rem 11.25rem;
 }
 
 .learn > *:not(.learn-ambient) { position: relative; z-index: 1; }
@@ -57,8 +58,6 @@
     display: flex;
     align-items: center;
     background: var(--glass);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
     box-shadow: var(--shadow-under);
 }
 
@@ -182,6 +181,7 @@
 }
 
 .fact-value {
+    font-family: var(--font-mono);
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -259,7 +259,7 @@
 }
 
 .progress-label { font-size: var(--fs-sm); font-weight: 600; }
-.progress-count { font-size: var(--fs-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+.progress-count { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .progress-stats {
     display: flex;
@@ -270,6 +270,7 @@
 .pstat { font-size: var(--fs-sm); color: var(--text-muted); }
 .pstat b {
     display: block;
+    font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 700;
     color: var(--text);
@@ -296,15 +297,18 @@
 /* The equation is the largest element on the page by a wide margin, and the
    min-height holds the row steady whether it reads "3x = 21" or
    "2(3x - 1) = 5(x + 4)". */
+/* The equation is set in the mono face: every digit and operator on its own
+   fixed advance, so "x + 7 = 23" reads as maths, not as a sentence. */
 .problem-expression {
     min-height: 92px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: var(--sp-4) 0 var(--sp-2);
+    font-family: var(--font-mono);
     font-size: clamp(30px, 5.4vw, 46px);
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.04em;
     text-align: center;
     font-variant-numeric: tabular-nums;
     word-break: break-word;
@@ -444,17 +448,39 @@
 /* The speech bubble has a fixed height for three lines. The agent changes what
    it says after every answer; without the reservation the whole right column
    would breathe in and out on each submission. */
+/* The tutor talks in a speech bubble, pointing up at the portrait — the
+   landing page's comic vocabulary, with C2's rounded corners. It stays
+   quiet while the learner solves (C4): a tinted well and a hairline ring,
+   no colour until the feedback moment. */
 .agent-speech {
+    position: relative;
     min-height: 78px;
     display: flex;
     align-items: center;
+    margin-top: var(--sp-3);
     padding: var(--sp-3) var(--sp-4);
     border-radius: var(--r-md);
     background: var(--bg-field);
+    box-shadow: inset 0 0 0 1px var(--line-soft);
     font-size: 13.5px;
     line-height: 1.55;
     text-align: left;
     color: var(--text);
+}
+
+.agent-speech::before {
+    content: "";
+    position: absolute;
+    top: -7px;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    border-top-left-radius: 3px;
+    background: var(--bg-field);
+    border-top: 1px solid var(--line-soft);
+    border-left: 1px solid var(--line-soft);
+    transform: rotate(45deg);
 }
 
 /* --------------------------------------------------- 6. SUMMARY SCREEN */

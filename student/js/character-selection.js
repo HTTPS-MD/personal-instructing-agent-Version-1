@@ -160,3 +160,63 @@ if (supabaseClient) {
         )
         .subscribe());
 }
+
+// Every control on the page is wired here, not with onclick="" attributes:
+// the site's Content-Security-Policy (_headers) forbids inline script, and an
+// inline handler counts as inline script. One delegated listener serves the
+// six tutor cards and every button that carries data-action.
+const ACTIONS = {
+    confirm: openConfirmModal,
+    continue: goToDashboard,
+    close: closeConfirmModal,
+    lock: finalLockIn
+};
+
+document.addEventListener('click', (event) => {
+    const card = event.target.closest('.persona-card');
+    if (card) { previewCharacter(card); return; }
+
+    const control = event.target.closest('[data-action]');
+    if (!control || control.disabled) return;
+    const run = ACTIONS[control.getAttribute('data-action')];
+    if (run) run();
+});
+
+// Persona art fallback. A missing illustration marks its container with
+// the persona's initials; CSS then renders a tinted monogram in place of
+// the broken image. Wired before first paint so nothing flashes.
+(function wireArtFallback() {
+    function monogram(name) {
+        return (name || 'PIA').replace(/^PIA\s*/i, '').slice(0, 2).toUpperCase() || 'PIA';
+    }
+
+    document.querySelectorAll('.persona-card').forEach(function (card) {
+        var img = card.querySelector('img');
+        var box = card.querySelector('.persona-thumb');
+        if (!img || !box) { return; }
+        img.addEventListener('error', function () {
+            box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
+        }, { once: true });
+        if (img.complete && img.naturalWidth === 0) {
+            box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
+        }
+    });
+
+    var preview = document.querySelector('.preview-portrait');
+    var previewImg = document.getElementById('preview-bg-img');
+    function markPreview() {
+        // Derive the monogram from the SELECTED card, never from the
+        // preview heading — before a pick that heading is placeholder
+        // copy ("No one chosen yet"), which produced a stray "NO".
+        var chosen = document.querySelector('.persona-card.selected');
+        preview.setAttribute('data-mono',
+            chosen ? monogram(chosen.getAttribute('data-name')) : '·');
+    }
+    previewImg.addEventListener('error', markPreview);
+    // previewCharacter() swaps the src; re-arm the check after each swap.
+    new MutationObserver(function () {
+        preview.removeAttribute('data-mono');
+        if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
+    }).observe(previewImg, { attributes: true, attributeFilter: ['src'] });
+    if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
+})();

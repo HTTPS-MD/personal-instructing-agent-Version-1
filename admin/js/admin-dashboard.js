@@ -3021,7 +3021,13 @@
         $('#admin-name').textContent = name;
         $('#admin-email').textContent = email;
         $('#admin-initials').textContent = initialsOf(name, email);
-        $('#overview-greeting').textContent = greeting + ', ' + name.split(' ')[0];
+        /* "Dr. Reyes" greeted as "Good morning, Dr." read as a typo. An
+           honorific keeps the surname with it; otherwise the first name. */
+        var parts = name.split(/\s+/);
+        var short = /^(dr|prof|mr|mrs|ms|mx|sir|ma'?am|engr|atty)\.?$/i.test(parts[0]) && parts[1]
+            ? parts[0] + ' ' + parts[parts.length - 1]
+            : parts[0];
+        $('#overview-greeting').textContent = greeting + ', ' + short;
     }
 
     function initForms() {

@@ -24,9 +24,10 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background:
-        radial-gradient(56rem 38rem at 12% -10%, rgba(5, 196, 107, 0.075), transparent 60%),
-        radial-gradient(44rem 32rem at 92% 6%, rgba(79, 168, 147, 0.055), transparent 62%);
+    /* The brand's film grain, not a glow: a soft coloured blob is exactly
+       the generic decoration the brief bans. */
+    background-image: var(--grain);
+    background-size: 11.25rem 11.25rem;
 }
 
 .auth-page > * { position: relative; z-index: 1; }

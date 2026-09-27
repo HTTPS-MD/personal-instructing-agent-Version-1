@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
+
+    <!-- Before first paint: the stored theme (dark by default) goes on
+         <html> so there is never a flash of the wrong one. -->
+    <script src="../../assets/js/theme-boot.js"></script>
     <title>Choose Your Tutor — PIA</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -12,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@700&display=swap">
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/student-journey.css">
@@ -51,7 +55,7 @@
 
                 <div class="journey-bar-right">
                     <span class="pick-status" id="status-text">CHOOSING</span>
-                    <button class="btn btn-secondary" id="signout-btn">
+                    <button class="btn btn-secondary" id="signout-btn" data-signout>
                         <svg class="icon"><use href="#i-logout"></use></svg>
                         Sign out
                     </button>
@@ -72,7 +76,7 @@
                         </div>
 
                         <div class="persona-grid">
-                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                            <button type="button" class="persona-card"
                                 data-character="pia-open"
                                 data-name="PIA Open"
                                 data-role="Conceptual"
@@ -88,7 +92,7 @@
                                 <span class="persona-name">PIA Open</span>
                                 <span class="persona-role">Conceptual</span>
                             </button>
-                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                            <button type="button" class="persona-card"
                                 data-character="pia-conscientious"
                                 data-name="PIA Structure"
                                 data-role="Disciplined"
@@ -104,7 +108,7 @@
                                 <span class="persona-name">PIA Structure</span>
                                 <span class="persona-role">Disciplined</span>
                             </button>
-                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                            <button type="button" class="persona-card"
                                 data-character="pia-extravert"
                                 data-name="PIA Dynamic"
                                 data-role="High-energy"
@@ -120,7 +124,7 @@
                                 <span class="persona-name">PIA Dynamic</span>
                                 <span class="persona-role">High-energy</span>
                             </button>
-                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                            <button type="button" class="persona-card"
                                 data-character="pia-agreeable"
                                 data-name="PIA Empath"
                                 data-role="Supportive"
@@ -136,7 +140,7 @@
                                 <span class="persona-name">PIA Empath</span>
                                 <span class="persona-role">Supportive</span>
                             </button>
-                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                            <button type="button" class="persona-card"
                                 data-character="pia-calm"
                                 data-name="PIA Stable"
                                 data-role="Stress-free"
@@ -152,7 +156,7 @@
                                 <span class="persona-name">PIA Stable</span>
                                 <span class="persona-role">Stress-free</span>
                             </button>
-                            <button type="button" class="persona-card" onclick="previewCharacter(this)"
+                            <button type="button" class="persona-card"
                                 data-character="pia-neutral"
                                 data-name="PIA Neutral"
                                 data-role="Balanced"
@@ -183,7 +187,7 @@
                         <span class="preview-role" id="preview-role">Pick a tutor</span>
                         <p class="preview-name" id="preview-name">No one chosen yet</p>
                         <p class="preview-desc" id="preview-desc">
-                            Tap any of the tutors on the left and their teaching style will show up here.
+                            Tap any tutor and their teaching style shows up here.
                         </p>
 
                         <!-- Present from first paint with em-dash placeholders. Revealing
@@ -208,12 +212,12 @@
 
                         <div class="preview-actions">
                             <button class="btn btn-primary btn-block" id="lock-in-btn"
-                                onclick="openConfirmModal()" disabled>
+                                data-action="confirm" disabled>
                                 <svg class="icon"><use href="#i-check"></use></svg>
                                 Lock in this tutor
                             </button>
                             <button class="btn btn-primary btn-block" id="continue-btn"
-                                onclick="goToDashboard()" style="display:none">
+                                data-action="continue" style="display:none">
                                 Continue to my session
                             </button>
                         </div>
@@ -235,7 +239,7 @@
                     <h2 class="modal-title" id="confirm-heading">Lock in your tutor?</h2>
                     <p class="modal-sub">You keep this tutor for the whole study.</p>
                 </div>
-                <button class="modal-close" onclick="closeConfirmModal()" aria-label="Close">
+                <button class="modal-close" data-action="close" aria-label="Close">
                     <svg class="icon"><use href="#i-x"></use></svg>
                 </button>
             </header>
@@ -254,58 +258,14 @@
             </div>
 
             <footer class="modal-foot">
-                <button class="btn btn-secondary" onclick="closeConfirmModal()">Let me look again</button>
-                <button class="btn btn-primary" onclick="finalLockIn()">Yes, lock it in</button>
+                <button class="btn btn-secondary" data-action="close">Let me look again</button>
+                <button class="btn btn-primary" data-action="lock">Yes, lock it in</button>
             </footer>
         </div>
     </div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/character-selection.js"></script>
-    <script>
-        document.getElementById('signout-btn').addEventListener('click', function () {
-            if (typeof executeForceLogout === 'function') { executeForceLogout(); }
-        });
-
-        // Persona art fallback. A missing illustration marks its container with
-        // the persona's initials; CSS then renders a tinted monogram in place of
-        // the broken image. Wired before first paint so nothing flashes.
-        (function wireArtFallback() {
-            function monogram(name) {
-                return (name || 'PIA').replace(/^PIA\s*/i, '').slice(0, 2).toUpperCase() || 'PIA';
-            }
-
-            document.querySelectorAll('.persona-card').forEach(function (card) {
-                var img = card.querySelector('img');
-                var box = card.querySelector('.persona-thumb');
-                if (!img || !box) { return; }
-                img.addEventListener('error', function () {
-                    box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
-                }, { once: true });
-                if (img.complete && img.naturalWidth === 0) {
-                    box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
-                }
-            });
-
-            var preview = document.querySelector('.preview-portrait');
-            var previewImg = document.getElementById('preview-bg-img');
-            function markPreview() {
-                // Derive the monogram from the SELECTED card, never from the
-                // preview heading — before a pick that heading is placeholder
-                // copy ("No one chosen yet"), which produced a stray "NO".
-                var chosen = document.querySelector('.persona-card.selected');
-                preview.setAttribute('data-mono',
-                    chosen ? monogram(chosen.getAttribute('data-name')) : '·');
-            }
-            previewImg.addEventListener('error', markPreview);
-            // previewCharacter() swaps the src; re-arm the check after each swap.
-            new MutationObserver(function () {
-                preview.removeAttribute('data-mono');
-                if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
-            }).observe(previewImg, { attributes: true, attributeFilter: ['src'] });
-            if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
-        })();
-    </script>
 </body>
 
 </html>

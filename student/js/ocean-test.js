@@ -223,7 +223,7 @@ function showPrivacyStep() {
         </div>
 
         <div class="gate-actions">
-            <button type="button" onclick="startTestDirectly()" class="btn btn-primary btn-block">
+            <button type="button" data-action="start" class="btn btn-primary btn-block">
                 I understand — start
             </button>
             <a href="waiting-room.html" class="btn btn-secondary btn-block">Not right now</a>
@@ -421,7 +421,7 @@ async function submitTestResults() {
                 <p>${escapeHTML(error.message)}</p>
                 <p style="margin-top:12px">Your answers are still saved on this computer, so
                    nothing is lost — try again.</p>
-                <button onclick="window.location.reload()" class="btn btn-primary">Try again</button>
+                <button type="button" data-action="reload" class="btn btn-primary">Try again</button>
             </div>
         `;
         return;
@@ -552,3 +552,15 @@ function setupExitGuard() {
 }
 
 checkAccessAndInit();
+
+// Buttons rendered from the templates above carry data-action rather than an
+// onclick="" attribute: the site's Content-Security-Policy (_headers) forbids
+// inline script, and an inline handler counts as one. One delegated listener
+// covers every render, so nothing has to be re-wired after innerHTML swaps.
+document.addEventListener('click', (event) => {
+    const control = event.target.closest('[data-action]');
+    if (!control || control.disabled) return;
+    const action = control.getAttribute('data-action');
+    if (action === 'start') startTestDirectly();
+    else if (action === 'reload') window.location.reload();
+});

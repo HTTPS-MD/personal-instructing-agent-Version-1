@@ -1,28 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
+
+    <!-- Before first paint: the stored theme (dark by default) goes on
+         <html> so there is never a flash of the wrong one. -->
+    <script src="../../assets/js/theme-boot.js"></script>
     <title>Teacher Console — PIA System</title>
 
-    <script>
-        function enforceAuthGuard() {
-            if (!localStorage.getItem('pia_user_email')) {
-                window.location.replace('../../index.html');
-            }
-        }
-        enforceAuthGuard();
-        window.addEventListener('pageshow', function (e) { if (e.persisted) { enforceAuthGuard(); } });
-    </script>
+    <script src="../../assets/js/page-guard.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@700&display=swap">
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/shell.css">

@@ -287,9 +287,8 @@
     height: var(--topbar-h);
     flex: 0 0 var(--topbar-h);
     padding: 0 var(--sp-6);
-    background: var(--glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    /* Solid, not frosted: the brand has no blur anywhere. */
+    background: var(--bg-surface);
     box-shadow: var(--shadow-under);
 }
 
@@ -412,7 +411,7 @@
     inset: 0;
     z-index: var(--z-scrim);
     display: none;
-    background: rgba(7, 10, 8, 0.62);
+    background: color-mix(in srgb, var(--palette-ink) 70%, transparent);
     opacity: 0;
     transition: opacity var(--t-base);
 }
@@ -434,16 +433,20 @@
        workspace reclaims the reserved 76px because nothing is pinned there. */
     .workspace { margin-left: 0; }
 
+    /* No shadow while parked off-canvas: the drawer's hard offset shadow
+       sits OUTSIDE its box, so translateX(-100%) left a violet strip down
+       the left edge of every tablet and phone screen. It is drawn only
+       once the drawer is actually open. */
     .sidebar {
         width: var(--rail-w-open);
         transform: translateX(-100%);
         transition: transform var(--t-layout);
-        box-shadow: var(--shadow-lg);
+        box-shadow: none;
     }
 
     /* Hover expansion is meaningless here — the drawer is always full width. */
-    .app[data-rail="expanded"] .sidebar { width: var(--rail-w-open); }
-    .app[data-mobile-nav="open"] .sidebar { transform: translateX(0); }
+    .app[data-rail="expanded"] .sidebar { width: var(--rail-w-open); box-shadow: none; }
+    .app[data-mobile-nav="open"] .sidebar { transform: translateX(0); box-shadow: var(--shadow-lg); }
 
     /* Labels are always visible in the drawer. */
     .rail-reveal { opacity: 1; pointer-events: auto; }
@@ -454,7 +457,10 @@
 @media (max-width: 768px) {
     .main { padding: var(--sp-5) var(--sp-4) var(--sp-8); }
     .topbar { padding: 0 var(--sp-4); }
-    .grid-2, .grid-3, .grid-4, .funnel, .kv-grid { grid-template-columns: minmax(0, 1fr); }
+    /* Stat tiles keep two per row on a tablet: one column of four 132px
+       tiles was a screen and a half of scrolling before the roster. They
+       drop to one column only on a phone (below). */
+    .grid-2, .grid-3, .kv-grid { grid-template-columns: minmax(0, 1fr); }
     .form-grid-2, .form-grid-3, .choice-grid, .gate-foot { grid-template-columns: minmax(0, 1fr); }
     .form-span-2 { grid-column: span 1; }
     .search { flex: 1 1 100%; }
@@ -472,4 +478,16 @@
     .toast-stack { right: var(--sp-4); left: var(--sp-4); bottom: var(--sp-4); width: auto; }
     .page-actions { width: 100%; }
     .page-actions .btn { flex: 1 1 auto; }
+
+    /* A card head holding a search field: the title keeps the full width and
+       the search drops beneath it, instead of the title being squeezed into
+       a three-line column beside it. */
+    .card-head { flex-wrap: wrap; }
+    .card-head-text { flex: 1 1 12rem; }
+    .card-head .card-tools:has(.search) { flex: 1 1 100%; }
+    .card-head .search { flex: 1 1 auto; min-width: 0; }
+}
+
+@media (max-width: 30rem) {
+    .grid-4, .funnel { grid-template-columns: minmax(0, 1fr); }
 }

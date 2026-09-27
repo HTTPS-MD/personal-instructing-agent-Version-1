@@ -79,7 +79,8 @@
 .status-badge-inactive { background: var(--warning-soft); color: var(--warning); }
 .status-badge-offline { background: var(--bg-chip); color: var(--text-muted); }
 
-.learning-smooth { background: var(--warning-soft); color: var(--warning); }
+/* "Doing fine" is good news: the correct status colour (volt), not amber. */
+.learning-smooth { background: var(--correct-soft); color: var(--correct-ink); }
 .learning-struggling { background: var(--danger-soft); color: var(--danger); }
 
 .learning-badge .icon { width: 13px; height: 13px; }

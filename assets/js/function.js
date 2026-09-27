@@ -403,12 +403,12 @@ function renderSignOutControl(profile) {
         #pia-signout-control { display:flex; align-items:center; gap:.6rem; }
         #pia-signout-control.pia-signout-floating {
             position:fixed; top:.75rem; right:.75rem; z-index:9998;
-            background:var(--glass); backdrop-filter:blur(12px);
-            -webkit-backdrop-filter:blur(12px); border-radius:var(--r-pill);
+            background:var(--bg-surface); border-radius:var(--r-pill);
             padding:.35rem .5rem .35rem 1rem; box-shadow:var(--shadow-md);
         }
         #pia-signout-who { color:var(--text); font-size:var(--fs-xs); line-height:1.2;
             white-space:nowrap; max-width:42vw; overflow:hidden; text-overflow:ellipsis; }
+        #pia-signout-who.pia-signout-inline { max-width:26vw; text-align:right; }
         #pia-signout-who small { display:block; color:var(--text-faint); font-size:var(--fs-xs); }
         #pia-signout-btn { cursor:pointer; border:0; border-radius:var(--r-pill);
             padding:.5rem 1rem; font-size:var(--fs-xs); font-weight:700;
@@ -417,6 +417,25 @@ function renderSignOutControl(profile) {
         #pia-signout-btn:disabled { opacity:.6; cursor:default; }
     `;
     document.head.appendChild(style);
+
+    // May sariling Sign out button na ang header ng page ([data-signout], o
+    // ang #signout-btn ng dashboard). Dati, lumulutang pa rin ang pangalawang
+    // control sa kanang itaas -- nakapatong sa mismong button na iyon at sa
+    // anumang katabi nito (hal. ang "CHOOSING" pill). Ngayon ang pangalan lang
+    // ang idinadagdag, katabi ng button ng page -- nananatili ang identity
+    // check nang walang dobleng control. Ang dashboard ay may sarili nang
+    // #who-name, kaya wala nang idinadagdag doon.
+    const own = document.querySelector('[data-signout], #signout-btn');
+    if (own) {
+        if (!document.getElementById('who-name') && !document.getElementById('pia-signout-who')) {
+            const who = document.createElement('span');
+            who.id = 'pia-signout-who';
+            who.className = 'pia-signout-inline';
+            who.innerHTML = `<small>Naka-sign in:</small>${escapeHTML(name)}`;
+            own.parentNode.insertBefore(who, own);
+        }
+        return;
+    }
 
     const wrap = document.createElement('div');
     wrap.id = 'pia-signout-control';
@@ -790,4 +809,15 @@ document.addEventListener("DOMContentLoaded", () => {
     validateDeviceOnLoad();
     watchDeviceSession();
     setupStudentRealtimeStageSync();
+
+    // Ang Sign out button ng bawat student page ([data-signout]). Dating inline
+    // <script> sa bawat page -- inilipat dito para ang CSP (_headers) ay
+    // makapagbawal ng inline script sa buong site. Sa shared lab PC, ang
+    // naiwang session ay nangangahulugang sa row ng estudyanteng ito
+    // mapupunta ang sagot ng susunod.
+    document.querySelectorAll('[data-signout]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (typeof executeForceLogout === 'function') executeForceLogout();
+        });
+    });
 });

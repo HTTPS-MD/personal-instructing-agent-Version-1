@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
+
+    <!-- Before first paint: the stored theme (dark by default) goes on
+         <html> so there is never a flash of the wrong one. -->
+    <script src="../../assets/js/theme-boot.js"></script>
     <meta name="description" content="PIA System — Admin Console for the Personal Instructing Agent research platform.">
     <title>Admin Console — PIA System</title>
 
@@ -15,22 +19,7 @@
          check is the server-side role lookup in admin-dashboard.js, which
          verifies profiles.role = 'admin' against the live session.
          --------------------------------------------------------------------- -->
-    <script>
-        function enforceAuthGuard() {
-            const userEmail = localStorage.getItem('pia_user_email');
-            if (!userEmail) {
-                window.location.replace('../../index.html');
-            }
-        }
-        enforceAuthGuard();
-
-        // bfcache restores (Back button) do not re-run scripts, so re-check.
-        window.addEventListener('pageshow', function (event) {
-            if (event.persisted) {
-                enforceAuthGuard();
-            }
-        });
-    </script>
+    <script src="../../assets/js/page-guard.js"></script>
 
     <!-- Supabase JS v2 — defines window.supabase, which function.js turns into
          the shared `sb` client. Must load before function.js. -->
@@ -40,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@700&display=swap">
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/shell.css">

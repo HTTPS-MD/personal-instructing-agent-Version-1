@@ -48,9 +48,10 @@ body.opacity-0 { opacity: 0; }
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background:
-        radial-gradient(56rem 38rem at 10% -12%, rgba(5, 196, 107, 0.06), transparent 60%),
-        radial-gradient(44rem 32rem at 94% 4%, rgba(79, 168, 147, 0.045), transparent 62%);
+    /* The brand's film grain, not a glow: a soft coloured blob is exactly
+       the generic decoration the brief bans. */
+    background-image: var(--grain);
+    background-size: 11.25rem 11.25rem;
 }
 
 .journey > *:not(.journey-ambient) { position: relative; z-index: 1; }
@@ -80,8 +81,6 @@ body.opacity-0 { opacity: 0; }
     display: flex;
     align-items: center;
     background: var(--glass);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
     box-shadow: var(--shadow-under);
 }
 
@@ -394,24 +393,29 @@ body.opacity-0 { opacity: 0; }
     padding: 0 var(--sp-5);
     border-radius: var(--r-md);
     background: var(--bg-field);
+    /* The row is the control, so its edge must reach 3:1 (WCAG 1.4.11). A
+       ring, not a border: it adds no size. */
+    box-shadow: inset 0 0 0 1px var(--line-soft);
     color: var(--text);
     font-size: 14.5px;
     font-weight: 600;
     text-align: left;
-    transition: background-color var(--t-base), color var(--t-base);
+    transition: background-color var(--t-base), color var(--t-base), box-shadow var(--t-base);
 }
 
-.ocean-answer-btn:hover { background: var(--bg-chip); }
+.ocean-answer-btn:hover { background: var(--bg-chip); box-shadow: inset 0 0 0 1px var(--line); }
 
 .ocean-answer-btn .dial {
     width: 20px;
     height: 20px;
     flex: 0 0 20px;
     border-radius: 50%;
-    background: var(--bg-chip);
+    background: var(--bg-surface);
+    /* The dial is the radio's state indicator: its ring clears 3:1. */
+    box-shadow: inset 0 0 0 1.5px var(--line);
     display: grid;
     place-items: center;
-    transition: background-color var(--t-base);
+    transition: background-color var(--t-base), box-shadow var(--t-base);
 }
 
 .ocean-answer-btn .dial::after {
@@ -423,8 +427,8 @@ body.opacity-0 { opacity: 0; }
     transition: background-color var(--t-base);
 }
 
-.ocean-answer-btn.is-selected { background: var(--accent-soft); color: var(--accent); }
-.ocean-answer-btn.is-selected .dial { background: var(--accent); }
+.ocean-answer-btn.is-selected { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.ocean-answer-btn.is-selected .dial { background: var(--accent); box-shadow: none; }
 .ocean-answer-btn.is-selected .dial::after { background: var(--on-accent); }
 
 .test-nav {

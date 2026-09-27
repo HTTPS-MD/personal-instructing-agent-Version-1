@@ -9,13 +9,15 @@
        <link rel="stylesheet" href="/styles/pages/admin.css">
 
    House rules enforced throughout:
-     * No borders. Anywhere. Separation is surface tone, shadow and spacing.
-     * No blue. Every neutral is a true grey stepped off #121212; the only
-       hues in the system are the green accent and the semantic red/amber.
+     * No blur. Separation is surface tone and a 1px ring drawn as a
+       box-shadow, which adds no size — so a ring can never shift a layout.
+       Things that float (modals, toasts) sit on a hard violet offset.
+     * Four colours of identity (ink, paper, violet, volt) and four of status
+       (correct, not-yet, warning, danger). Status colours mean status only.
+     * C2 curvature stays: every button is a pill, every card 12px.
      * Fixed control heights and reserved message slots, so no state change
        can reflow a layout.
-     * Transitions cap at 200ms and animate colour/opacity only — nothing
-       scales or moves on hover.
+     * Transitions cap at 200ms.
    ==========================================================================*/
 
 /* ---------------------------------------------------------------- 1. RESET */
@@ -55,9 +57,9 @@ a { color: inherit; text-decoration: none; }
 /* Display face for headings and anything that reads as a title. */
 h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: 700;
     line-height: var(--lh-tight);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.035em;
 }
 
 h1 { font-size: var(--fs-h1); }
@@ -79,176 +81,173 @@ h5, h6 { font-size: var(--fs-body); letter-spacing: -0.01em; }
 
 /* --------------------------------------------------------------- 2. TOKENS */
 /* ============================================================================
-   PIA DESIGN SYSTEM v3 — "Bright Room"
+   PIA DESIGN SYSTEM v4 — "Ink & Neon", classroom edition
    ---------------------------------------------------------------------------
-   A light, warm, curvilinear system for Grade 7 learners, built by harmonising
-   a preschool/childcare visual language (cream ground, deep pine green,
-   coral and sunny accents, generous rounding) with four empirical constraints
-   that are NOT negotiable. Each constraint is annotated at the token that
-   enforces it, so a reviewer can trace any pixel back to its source.
+   The brand the landing page wears — a near-black ink ground, newsprint
+   paper, neon violet and acid volt — carried into the dashboards. What the
+   dashboards keep is the evidence base below: the landing page is allowed to
+   be sharp and loud; the rooms where a Grade 7 student actually does maths
+   are not. Each constraint is annotated at the token that enforces it.
 
-   C1  TYPOGRAPHY — Inter, body text at 12 pt.
-       Možina, Kovačević & Možina (2024), Appl. Sci. 14(3), 1281.
-       The study tested a sans-serif at 8 / 10 / 12 pt and recommends a face
-       with (a) minimal difference in letter stroke width, (b) a higher
-       x-height and (c) moderate counter size, at >= 10 pt. Inter satisfies
-       all three. 12 pt is the largest size the study validated, so it is the
-       conservative choice inside the tested range. NOTE: the study measured
-       INK ON PAPER; the translation to screen is exact only because CSS
-       defines 1 pt as 1/72 in and 1 px as 1/96 in, so 12 pt === 16 px.
-       Enforced by --fs-body. No text token in this system falls below
-       --fs-xs (13.5 px ~ 10.1 pt), i.e. the study's 10 pt floor holds
-       system-wide, not just for body copy.
+   C1  TYPOGRAPHY — body text at 12 pt, in Inter.
+       Možina, Kovačević & Možina (2024), Appl. Sci. 14(3), 1281. A sans-serif
+       with (a) minimal stroke contrast, (b) a high x-height and (c) moderate
+       counters, at >= 10 pt; 12 pt is the largest size the study validated.
+       Inter satisfies all three, so READING type is still Inter at 16px
+       (12 pt === 16 px exactly: CSS fixes 1 pt = 1/72 in, 1 px = 1/96 in).
+       Space Grotesk is display-only (headings, big numerals); JetBrains Mono
+       is for numbers, equations, timestamps and data tables. No text token
+       falls below --fs-xs (13.5 px ~ 10.1 pt), the study's floor.
 
-   C2  CURVATURE — pill buttons, 12 px cards.
+   C2  CURVATURE — pill buttons, 12 px cards. UNCHANGED BY THE REBRAND.
        Chuquichambi, Vartanian, Skov, Corradi, Nadal, Silvia & Munar (2022),
-       Ann. N.Y. Acad. Sci. 1518(1), 151-165. Meta-analysis of 61 studies /
-       309 effect sizes: Hedges' g = 0.39 for preference of curvilinear over
-       angular contour. Curvilinear contour is read as an absence of threat;
-       angular contour recruits the amygdala (Bar & Neta). In a maths tutor —
-       where anxiety is the thing being designed against — every contour the
-       learner meets is curved. The meta-analysis also reports that the effect
-       is STRONGEST under brief presentation / snap judgement, which is why
-       rounding is heaviest on the fast-glance surfaces (buttons, chips,
-       avatars) and moderate on surfaces that are read slowly (cards, at the
-       specified 12 px). Enforced by --r-pill and --r-card.
+       Ann. N.Y. Acad. Sci. 1518(1), 151-165: Hedges' g = 0.39 preference for
+       curvilinear over angular contour, strongest at a glance. In a maths
+       tutor, where anxiety is the thing designed against, every contour the
+       learner meets stays curved. Enforced by --r-pill and --r-card. The
+       rebrand's edges (a 1px ring and a hard offset) follow the curve rather
+       than squaring it — box-shadow takes the element's radius.
 
    C3  SPLIT ATTENTION — integrated spatial format.
        Ouwehand, Lespiau, Tricot & Paas (2025), Educ. Sci. 15(4), 458.
-       Essential information split across separate sources raises extraneous
-       load; an integrated format lowers it (and, per Mugisha & Arguel in the
-       same issue, specifically lowers INTRINSIC load for procedural tasks).
-       Enforced in layout, not here — see styles/pages/tutoring.css.
+       Enforced in layout, not here.
 
    C4  AGENT + EMOTIONAL FEEDBACK.
-       Tang, Jiang, Liu & Li (2025), Front. Psychol. 16, 1610550. 2x2
-       factorial, online formative assessment. Emotional feedback SIGNIFICANTLY
-       raised engagement; the pedagogical agent on its own slightly DEPRESSED
-       transfer scores, and the authors advise caution "to avoid potential
-       distractions during the learning process". The design consequence is
-       asymmetric and deliberate: the agent is visually quiet while the
-       learner is solving, and only becomes salient at the feedback moment.
-       Enforced by --agent-* tokens and the [data-agent-state] rules.
+       Tang, Jiang, Liu & Li (2025), Front. Psychol. 16, 1610550. The agent is
+       visually quiet while the learner solves and salient at feedback.
 
-   COLOUR — sampled from the reference composition, then corrected for WCAG.
-   Measured ratios are recorded beside each token. The two grounds are the
-   cream page and the white card; every text role clears AA on both.
+   COLOUR
+   Two neutrals (ink, paper) and two brand hues (violet, volt) are the only
+   colours used for identity and decoration. Four STATUS colours exist and
+   are used for status only — never decoration: correct (volt), not-yet
+   (coral — a wrong answer is framed as "not yet", never punitive red),
+   warning (amber) and danger (red, admin destructive actions only; no
+   learner ever sees it). Every ratio below is WCAG 2.x, measured.
+
+   DEPTH
+   No blur anywhere. Separation is a 1px ring (--line-soft) and, for things
+   that float (modals, toasts), a hard violet offset. Rings are box-shadows,
+   so they add no size and cannot shift a layout.
    ==========================================================================*/
 :root {
-    /* --- Raw palette ------------------------------------------------------
-       The only literals in the system. Everything below is a role that points
-       at one of these, so re-theming is a change in this block alone. */
-    --pine: #0A6E56;           /* brand green — hero grounds, primary fills   */
-    --pine-deep: #075942;      /* pressed / deeper hero                       */
-    --pine-dim: #0E8468;       /* hover lift on a pine fill                   */
-    --cream: #FAF7E8;          /* the page. warm, low-glare, not white        */
-    --cream-deep: #F3EFDA;     /* inset wells on the cream ground             */
-    --paper: #FFFFFF;          /* raised card surface                         */
-    --mint: #D8F2E9;           /* soft positive tint                          */
-    --sky: #DCEFF5;            /* soft neutral-cool tint                      */
-    --coral: #F2613F;          /* accent + "not yet" — warm, never punitive   */
-    --coral-soft: #FDE8E1;
-    --coral-ink: #A83607;      /* 5.57:1 on --coral-soft, 6.11:1 on cream     */
-    --sunny: #F5C518;          /* hints, streaks, reward                      */
-    --sunny-soft: #FDF3D0;
-    --sunny-ink: #92610A;      /* sunny as TEXT — 4.96:1 on cream             */
-    --spring: #1FA971;         /* CORRECT. distinct from --pine by luminance  */
-    --ink: #16241F;            /* near-black, green-cast so it sits in family */
-    --ink-muted: #4A5A54;
-    --ink-faint: #5C6B65;
+    /* --- Raw palette: the only literals in the system ---------------------- */
+    --palette-ink: #0E0B16;
+    --palette-paper: #F4F1EA;
+    --palette-violet: #A259FF;
+    --palette-volt: #D4FF3A;
 
-    /* --- Roles: ground & surface ------------------------------------------ */
-    --bg-main: var(--cream);
-    --bg-body: var(--cream);
-    --bg-surface: var(--paper);
-    --bg-surface-hi: var(--paper);
-    --bg-surface-hover: #F6F3E4;
-    --bg-field: var(--cream-deep);       /* inset well, reads below the card  */
-    --bg-inset-focus: var(--paper);
-    --bg-chip: var(--cream-deep);
-    --bg-chip-hover: #EAE5CC;
-    --track: #E4DFC6;
-    --track-hover: #CFC9AC;
+    --status-coral: #F2613F;
+    --status-coral-ink: #A83607;
+    --status-coral-dark: #FB8C68;
+    --status-amber: #F5C518;
+    --status-red: #DC2626;
+    --status-red-ink: #B91C1C;
+    --status-red-dark: #F87171;
 
-    /* --- Roles: text — ratios measured on --cream / --paper --------------- */
-    --text-primary: var(--ink);
-    --text-main: var(--ink);
-    --text: var(--ink);                  /* 14.95:1 / 16.08:1  AAA            */
-    --text-muted: var(--ink-muted);      /*  6.78:1 /  7.29:1  AA             */
-    --text-faint: var(--ink-faint);      /*  5.21:1 /  5.61:1  AA             */
-    --text-on-solid: var(--cream);
+    /* --- LIGHT: newsprint. Ratios on ground / surface / chip. ------------- */
+    --bg-main: color-mix(in srgb, var(--palette-ink) 5%, var(--palette-paper));
+    --bg-body: var(--bg-main);
+    --bg-surface: var(--palette-paper);
+    --bg-surface-hi: var(--palette-paper);
+    --bg-surface-hover: color-mix(in srgb, var(--palette-ink) 4%, var(--palette-paper));
+    --bg-field: color-mix(in srgb, var(--palette-ink) 6%, var(--palette-paper));
+    --bg-inset-focus: var(--palette-paper);
+    --bg-chip: color-mix(in srgb, var(--palette-ink) 9%, var(--palette-paper));
+    --bg-chip-hover: color-mix(in srgb, var(--palette-ink) 14%, var(--palette-paper));
+    --track: color-mix(in srgb, var(--palette-ink) 22%, var(--palette-paper));
+    --track-hover: color-mix(in srgb, var(--palette-ink) 38%, var(--palette-paper));
 
-    /* --- Roles: primary ---------------------------------------------------
-       The pine FILL takes cream text (5.78:1). Pine as TEXT on cream is
-       5.78:1 and on paper 6.22:1, so the same value serves both and there is
-       no second "ink" shade to keep in sync. */
-    --color-primary: var(--pine);
-    --color-primary-ink: var(--pine);
-    --accent: var(--pine);
-    --accent-strong: var(--pine-deep);
-    --accent-hover: var(--pine-dim);
-    --accent-soft: var(--mint);
-    --accent-line: rgba(10, 110, 86, 0.24);
-    --on-primary: var(--cream);
-    --on-accent: var(--cream);
+    --text: var(--palette-ink);                                                   /* 15.60 / 17.27 / 14.24 */
+    --text-primary: var(--text);
+    --text-main: var(--text);
+    --text-muted: color-mix(in srgb, var(--palette-ink) 74%, var(--palette-paper)); /* 7.31 / 8.10 / 6.68 */
+    --text-faint: color-mix(in srgb, var(--palette-ink) 66%, var(--palette-paper)); /* 5.40 / 5.98 / 4.93 */
+    --text-on-solid: var(--palette-paper);
 
-    /* --- Roles: semantic --------------------------------------------------
-       The original palette note in this repo is preserved on purpose: green
-       is the "correct / progress / safe" signal and re-colouring it would
-       undo the anxiety argument. What changes is that green now has to do two
-       jobs — brand AND correctness — so they are separated by luminance:
-       --pine is the dark structural green, --spring the bright reward green.
+    /* Lines. --line clears the 3:1 WCAG 1.4.11 asks of a control boundary on
+       a surface (3.03); --line-soft only divides what is already separate. */
+    --line: color-mix(in srgb, var(--palette-ink) 45%, var(--palette-paper));
+    --line-soft: color-mix(in srgb, var(--palette-ink) 13%, var(--palette-paper));
 
-       RED IS GONE from the learner-facing surface. A wrong answer is --coral
-       on --coral-soft, framed as "not yet"; true red survives only as
-       --danger for destructive admin actions (delete a section, remove a
-       student), which no Grade 7 learner ever sees. */
-    --color-correct: var(--spring);
-    --correct-soft: var(--mint);
-    --correct-ink: #0C6642;              /* 5.94:1 on mint, 7.01:1 on paper   */
+    /* Violet does double duty — fill AND text — so in light mode it is the
+       deep shade: 6.03 / 6.67 / 5.51 as text, 5.71 on its own soft tint, and
+       a paper label on the fill at 6.67. */
+    --accent: color-mix(in srgb, var(--palette-violet) 62%, var(--palette-ink));
+    --accent-strong: color-mix(in srgb, var(--palette-violet) 52%, var(--palette-ink));
+    --accent-hover: var(--accent-strong);
+    --accent-soft: color-mix(in srgb, var(--palette-violet) 14%, transparent);
+    --accent-line: color-mix(in srgb, var(--palette-violet) 40%, transparent);
+    --on-accent: var(--palette-paper);
+    --on-primary: var(--on-accent);
+    --color-primary: var(--accent);
+    --color-primary-ink: var(--accent);
 
-    --color-retry: var(--coral);
-    --retry-soft: var(--coral-soft);
-    --retry-ink: var(--coral-ink);
+    --volt: var(--palette-volt);
+    --on-volt: var(--palette-ink);                                                /* 16.85 */
 
-    --info-soft: var(--sky);
-    --info-ink: #2B5A6B;                 /*  6.38:1 on --sky                  */
+    /* Status. Correct is volt — as a FILL under ink, or as the olive text
+       shade (5.06). Not-yet is coral, framed as "not yet". */
+    --color-correct: color-mix(in srgb, var(--palette-volt) 40%, var(--palette-ink));
+    --correct-soft: color-mix(in srgb, var(--palette-volt) 30%, transparent);
+    --correct-ink: color-mix(in srgb, var(--palette-volt) 40%, var(--palette-ink));
 
-    --warning: var(--sunny);
-    --warning-soft: var(--sunny-soft);
-    --warning-line: rgba(146, 97, 10, 0.28);
-    --warning-ink: var(--sunny-ink);
-    --on-warning: var(--ink);            /*  9.86:1 — near-black on sunny     */
+    --color-retry: var(--status-coral);
+    --retry-soft: color-mix(in srgb, var(--status-coral) 14%, transparent);
+    --retry-ink: var(--status-coral-ink);
 
-    /* Destructive only. Admin surfaces, never the tutoring surface. */
-    --color-danger: #DC2626;
-    --danger: #DC2626;
-    --danger-strong: #B91C1C;
-    --danger-ink: #B91C1C;
-    --color-danger-ink: #B91C1C;
-    --danger-soft: #FDE7E7;
-    --danger-line: rgba(185, 28, 28, 0.26);
-    --on-danger: var(--paper);
+    --info-soft: var(--accent-soft);
+    --info-ink: var(--accent);
 
-    --glass: rgba(255, 255, 255, 0.78);
-    --glass-edge: rgba(22, 36, 31, 0.08);
+    /* Amber as text is the deep shade (5.44 on paper); fills use the soft. */
+    --warning: color-mix(in srgb, var(--status-amber) 45%, var(--palette-ink));
+    --warning-soft: color-mix(in srgb, var(--status-amber) 18%, transparent);
+    --warning-line: color-mix(in srgb, var(--status-amber) 40%, transparent);
+    --warning-ink: var(--warning);
+    --on-warning: var(--palette-ink);
 
-    /* Zebra striping. A white overlay is invisible on a white table, so the
-       stripe is always a tint of the theme's own ink. */
-    --stripe: rgba(22, 36, 31, 0.028);
+    --color-danger: var(--status-red-ink);
+    --danger: var(--status-red-ink);
+    --danger-strong: color-mix(in srgb, var(--status-red-ink) 82%, var(--palette-ink));
+    --danger-ink: var(--status-red-ink);
+    --color-danger-ink: var(--status-red-ink);
+    --danger-soft: color-mix(in srgb, var(--status-red) 11%, transparent);
+    --danger-line: color-mix(in srgb, var(--status-red) 35%, transparent);
+    --on-danger: var(--palette-paper);
 
-    /* --- Elevation ---------------------------------------------------------
-       Warm-tinted, never neutral black: a grey shadow on a cream ground reads
-       as dirt. Soft and wide — a hard shadow reintroduces the crisp edge that
-       C2 is trying to remove. */
-    --shadow-edge: 8px 0 24px -20px rgba(22, 36, 31, 0.20);
-    --shadow-under: 0 10px 20px -18px rgba(22, 36, 31, 0.22);
-    --shadow-sm: 0 1px 2px rgba(22, 36, 31, 0.06);
-    --shadow-card: 0 1px 2px rgba(22, 36, 31, 0.04), 0 12px 28px -20px rgba(22, 36, 31, 0.18);
-    --shadow-md: 0 8px 28px -12px rgba(22, 36, 31, 0.16);
-    --shadow-lg: 0 28px 64px -24px rgba(22, 36, 31, 0.26);
-    --glow-primary: 0 0 60px -14px rgba(10, 110, 86, 0.35);
-    --glow-correct: 0 0 0 4px var(--mint);
+    --glass: color-mix(in srgb, var(--bg-surface) 94%, transparent);
+    --glass-edge: var(--line-soft);
+    --stripe: color-mix(in srgb, var(--palette-ink) 3%, transparent);
+
+    /* Depth: rings and hard offsets. No blur. */
+    --shadow-edge: 1px 0 0 var(--line-soft);
+    --shadow-under: 0 1px 0 var(--line-soft);
+    --shadow-sm: 0 0 0 1px var(--line-soft);
+    --shadow-card: 0 0 0 1px var(--line-soft);
+    --shadow-md: 0 0 0 1px var(--line), 0.25rem 0.25rem 0 var(--accent-line);
+    --shadow-lg: 0 0 0 1px var(--line), 0.375rem 0.375rem 0 var(--accent-line);
+    --glow-primary: 0 0 0 3px var(--accent-soft);
+    --glow-correct: 0 0 0 4px var(--correct-soft);
+
+    /* Legacy palette names, folded into the new roles for any consumer that
+       still reads them directly. Read the ROLE in new code. */
+    --pine: var(--accent);
+    --pine-deep: var(--accent-strong);
+    --pine-dim: var(--accent-strong);
+    --cream: var(--bg-main);
+    --cream-deep: var(--bg-field);
+    --paper: var(--bg-surface);
+    --mint: var(--correct-soft);
+    --sky: var(--accent-soft);
+    --coral: var(--status-coral);
+    --coral-soft: var(--retry-soft);
+    --coral-ink: var(--retry-ink);
+    --sunny: var(--status-amber);
+    --sunny-soft: var(--warning-soft);
+    --sunny-ink: var(--warning);
+    --spring: var(--color-correct);
+    --ink: var(--text);
+    --ink-muted: var(--text-muted);
+    --ink-faint: var(--text-faint);
 
     color-scheme: light;
 
@@ -263,26 +262,20 @@ h5, h6 { font-size: var(--fs-body); letter-spacing: -0.01em; }
     --z-banner: 350;
     --z-boot: 400;
 
-    /* --- Radii — C2 --------------------------------------------------------
-       Two values carry the mandate and must not be edited casually:
-
-           --r-card  12px    every card, per specification
-           --r-pill  999px   every button, per specification
-
-       The rest of the ramp exists so that nested shapes stay concentric
-       (an inner radius should be outer minus padding, or the corner reads
-       as a dent). None of it is angular: the smallest radius in the system
-       is 8 px, and nothing anywhere is allowed a 0 radius. */
+    /* --- Radii — C2. Do not edit casually. ---------------------------------
+           --r-card  12px    every card
+           --r-pill  999px   every button
+       The rest keep nested shapes concentric. Nothing here is 0. */
     --r-card: 12px;
     --r-pill: 999px;
 
     --r-xs: 8px;
     --r-sm: 10px;
     --r-md: 12px;
-    --r-lg: 12px;          /* legacy consumers of --r-lg ARE cards → 12px     */
+    --r-lg: 12px;
     --r-xl: 20px;
     --r-2xl: 28px;
-    --r-blob: 42% 58% 54% 46% / 48% 44% 56% 52%;   /* decorative shapes only  */
+    --r-blob: 42% 58% 54% 46% / 48% 44% 56% 52%;
 
     /* --- Spacing scale (4px base) --- */
     --sp-1: 4px;
@@ -297,9 +290,7 @@ h5, h6 { font-size: var(--fs-body); letter-spacing: -0.01em; }
     --sp-10: 64px;
 
     /* --- Control sizing ----------------------------------------------------
-       Raised from the previous ramp because the body size moved 14 → 16 px:
-       a 38 px control around 16 px text has no optical breathing room, and a
-       pill with too little horizontal padding stops reading as a pill. */
+       44px is also the minimum touch target. */
     --rail-w: 76px;
     --rail-w-open: 264px;
     --rail-pad: 8px;
@@ -309,12 +300,9 @@ h5, h6 { font-size: var(--fs-body); letter-spacing: -0.01em; }
     --control-h-lg: 52px;
     --field-h: 48px;
     --row-h: 60px;
-    --icon-btn: 44px;      /* also the 44px minimum touch target              */
+    --icon-btn: 44px;
 
-    /* --- Motion ------------------------------------------------------------
-       Soft overshoot rather than a linear settle. Curvature is a shape claim;
-       easing is the same claim in time, and a gently overshooting curve reads
-       as friendly where a sharp stop reads as mechanical. */
+    /* --- Motion --- */
     --ease: cubic-bezier(0.34, 1.32, 0.48, 1);
     --ease-flat: cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -323,130 +311,141 @@ h5, h6 { font-size: var(--fs-body); letter-spacing: -0.01em; }
     --t-layout: 260ms var(--ease-flat);
     --t-bounce: 380ms var(--ease);
 
-    /* --- Typography — C1 ---------------------------------------------------
-       Inter everywhere, display and body. The reference composition uses two
-       faces, but the specification names one, and Inter at weight 800 with
-       tightened tracking covers the display job without a second webfont —
-       which also removes a render-blocking request from the critical path.
+    /* --- Typography — C1 ----------------------------------------------------
+       Each webfont has a metrics-matched local stand-in (the @font-face rules
+       below), so the swap changes letterforms without moving a line box. */
+    --font-display: 'Space Grotesk', 'Space Grotesk Fallback', system-ui, sans-serif;
+    --font-body: 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font: var(--font-body);
+    --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', 'JetBrains Mono Fallback Win', ui-monospace, monospace;
 
-       'Inter Fallback' is metrics-matched (see the @font-face below), so the
-       webfont swap changes letterforms without moving line boxes. */
-    --font-display: 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-body: var(--font-display);
-    --font: var(--font-display);
-    --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Roboto Mono', Menlo, Consolas, monospace;
-
-    /* THE MANDATED VALUE. 12 pt === 16 px exactly (12 × 96/72).
-       Do not express this as a rem multiple — a user agent whose root size is
-       not 16 px would silently break the specification. */
-    --fs-body: 16px;       /* 12.0 pt — body copy, inputs, buttons            */
-    --fs-lg: 18px;         /* 13.5 pt — lead paragraphs                       */
-    --fs-sm: 14px;         /* 10.5 pt — secondary text, captions              */
-    --fs-xs: 13.5px;       /* 10.1 pt — the floor. labels, chips, meta        */
+    /* THE MANDATED VALUE. 12 pt === 16 px exactly. Not a rem multiple: a user
+       agent whose root size is not 16px would silently break the spec. */
+    --fs-body: 16px;
+    --fs-lg: 18px;
+    --fs-sm: 14px;
+    --fs-xs: 13.5px;
 
     --fs-h1: 44px;
     --fs-h2: 32px;
     --fs-h3: 24px;
     --fs-h4: 20px;
 
-    /* Line height is the other half of legibility: 1.6 on body gives the
-       ~2.5 mm interline the reading-speed literature wants at this size. */
     --lh-body: 1.6;
     --lh-tight: 1.25;
+
+    /* Film grain: greyscale noise at 7% alpha, tiled — the landing page's
+       texture, and the only decoration on a learning surface. No colour
+       literal inside; the matrix averages the noise channels to grey. */
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 .07'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
     --scrollbar-w: 0px;
 }
 
 /* ------------------------------------------------------------- DARK THEME --
-   Retained as an alternate, not the default. Only colour roles flip; sizing,
-   spacing, radii, motion and the stacking ladder are theme-independent and
-   are not repeated. The cream/pine identity survives the flip: the ground
-   becomes a deep pine-black rather than a neutral grey, so the system reads
-   as the same product with the lights off.
-
-   Always read the ROLE (--text, --bg-surface). A rule that reads a raw
-   palette literal (--cream, --pine) is correct in one theme only. */
+   THE DEFAULT (theme-boot.js stamps it before first paint; the landing
+   page's toggle stores the choice for every page). Only colour roles flip.
+   Ratios on ground / surface / surface-hi / chip. */
 :root[data-theme="dark"] {
-    --bg-main: #0C1512;
-    --bg-body: #0C1512;
-    --bg-surface: #13201B;
-    --bg-surface-hi: #182823;
-    --bg-surface-hover: #1C2E28;
-    --bg-field: #0A110E;
-    --bg-inset-focus: #0F1915;
-    --bg-chip: #1C2E28;
-    --bg-chip-hover: #244038;
-    --track: #24352F;
-    --track-hover: #365046;
+    --bg-main: var(--palette-ink);
+    --bg-body: var(--palette-ink);
+    --bg-surface: color-mix(in srgb, var(--palette-paper) 5%, var(--palette-ink));
+    --bg-surface-hi: color-mix(in srgb, var(--palette-paper) 8%, var(--palette-ink));
+    --bg-surface-hover: color-mix(in srgb, var(--palette-paper) 9%, var(--palette-ink));
+    --bg-field: color-mix(in srgb, var(--palette-paper) 3%, var(--palette-ink));
+    --bg-inset-focus: color-mix(in srgb, var(--palette-paper) 2%, var(--palette-ink));
+    --bg-chip: color-mix(in srgb, var(--palette-paper) 10%, var(--palette-ink));
+    --bg-chip-hover: color-mix(in srgb, var(--palette-paper) 15%, var(--palette-ink));
+    --track: color-mix(in srgb, var(--palette-paper) 22%, var(--palette-ink));
+    --track-hover: color-mix(in srgb, var(--palette-paper) 38%, var(--palette-ink));
 
-    --text-primary: #EEF3EF;
-    --text-main: #EEF3EF;
-    --text: #EEF3EF;
-    --text-muted: #AFC0B8;               /*  7.52:1 on --bg-chip              */
-    --text-faint: #93A79E;               /*  5.62:1 on --bg-chip              */
-    --text-on-solid: #0C1512;
+    --text: var(--palette-paper);                                                   /* 17.27 / 15.77 / 14.70 / 13.87 */
+    --text-muted: color-mix(in srgb, var(--palette-paper) 72%, var(--palette-ink)); /* 9.13 / 8.34 / 7.78 / 7.34 */
+    --text-faint: color-mix(in srgb, var(--palette-paper) 60%, var(--palette-ink)); /* 6.55 / 5.99 / 5.58 / 5.27 */
+    --text-on-solid: var(--palette-ink);
 
-    --color-primary: #2FBF8F;
-    --color-primary-ink: #2FBF8F;
-    --accent: #2FBF8F;
-    --accent-strong: #23A176;
-    --accent-hover: #46D4A5;
-    --accent-soft: rgba(47, 191, 143, 0.16);
-    --accent-line: rgba(47, 191, 143, 0.30);
-    --on-primary: #0C1512;
-    --on-accent: #0C1512;
+    --line: color-mix(in srgb, var(--palette-paper) 40%, var(--palette-ink));         /* 3.49 / 3.19 */
+    --line-soft: color-mix(in srgb, var(--palette-paper) 13%, var(--palette-ink));
 
-    --color-correct: #34D399;
-    --correct-soft: rgba(52, 211, 153, 0.16);
-    --correct-ink: #34D399;
+    /* Violet lightened toward paper: 6.42 / 5.87 / 5.16 as text, 4.62 on its
+       soft tint, and an ink label on the fill at 6.42. */
+    --accent: color-mix(in srgb, var(--palette-violet) 80%, var(--palette-paper));
+    --accent-strong: color-mix(in srgb, var(--palette-violet) 68%, var(--palette-paper));
+    --accent-soft: color-mix(in srgb, var(--palette-violet) 20%, transparent);
+    --accent-line: color-mix(in srgb, var(--palette-violet) 50%, transparent);
+    --on-accent: var(--palette-ink);
 
-    --color-retry: #FB8C68;
-    --retry-soft: rgba(251, 140, 104, 0.16);
-    --retry-ink: #FB8C68;
+    --color-correct: var(--palette-volt);                                           /* 15.39 on surface */
+    --correct-soft: color-mix(in srgb, var(--palette-volt) 16%, transparent);
+    --correct-ink: var(--palette-volt);
 
-    --info-soft: rgba(125, 199, 220, 0.16);
-    --info-ink: #8FD2E4;                 /*  7.12:1 on --info-soft            */
+    --color-retry: var(--status-coral-dark);
+    --retry-soft: color-mix(in srgb, var(--status-coral-dark) 16%, transparent);
+    --retry-ink: var(--status-coral-dark);
 
-    --warning: var(--sunny);
-    --warning-soft: rgba(245, 197, 24, 0.16);
-    --warning-line: rgba(245, 197, 24, 0.30);
-    --warning-ink: #F5C518;
-    --on-warning: #0C1512;
+    --warning: var(--status-amber);                                                 /* 10.91 on surface */
+    --warning-soft: color-mix(in srgb, var(--status-amber) 16%, transparent);
+    --warning-line: color-mix(in srgb, var(--status-amber) 35%, transparent);
 
-    --danger: #F87171;
-    --danger-strong: #EF4444;
-    --danger-ink: #F87171;
-    --color-danger: #F87171;
-    --color-danger-ink: #F87171;
-    --danger-soft: rgba(248, 113, 113, 0.14);
-    --danger-line: rgba(248, 113, 113, 0.30);
-    --on-danger: #0C1512;
+    --color-danger: var(--status-red-dark);
+    --danger: var(--status-red-dark);                                               /* 6.43 on surface */
+    --danger-strong: color-mix(in srgb, var(--status-red-dark) 82%, var(--palette-paper));
+    --danger-ink: var(--status-red-dark);
+    --color-danger-ink: var(--status-red-dark);
+    --danger-soft: color-mix(in srgb, var(--status-red-dark) 14%, transparent);
+    --danger-line: color-mix(in srgb, var(--status-red-dark) 35%, transparent);
+    --on-danger: var(--palette-ink);
 
-    --glass: rgba(19, 32, 27, 0.76);
-    --glass-edge: rgba(238, 243, 239, 0.08);
-    --stripe: rgba(238, 243, 239, 0.022);
-
-    --shadow-edge: 8px 0 24px -20px rgba(0, 0, 0, 0.9);
-    --shadow-under: 0 10px 20px -18px rgba(0, 0, 0, 0.9);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -20px rgba(0, 0, 0, 0.8);
-    --shadow-md: 0 8px 28px -12px rgba(0, 0, 0, 0.55);
-    --shadow-lg: 0 28px 64px -24px rgba(0, 0, 0, 0.7);
-    --glow-primary: 0 0 60px -14px rgba(47, 191, 143, 0.45);
-    --glow-correct: 0 0 0 4px rgba(52, 211, 153, 0.24);
+    --stripe: color-mix(in srgb, var(--palette-paper) 3%, transparent);
 
     color-scheme: dark;
 }
 
-/* Metrics-matched local stand-in for Inter. Overrides are the standard
-   Arial-to-Inter figures; nothing here is a colour or a size, so it is
-   theme-independent. */
+/* Metrics-matched local stand-ins, measured in the browser against the
+   loaded webfonts (canvas advance width of real headlines at 100px, and
+   bounding-box ascent/descent, each divided by the size-adjust):
+       Inter vs Arial ....................... the standard Arial-to-Inter set
+       Space Grotesk 700 vs Arial Bold ...... width 100.5%, asc 97.5, desc 28.9
+       JetBrains Mono vs Menlo .............. width  99.7%, asc 102.4, desc 30.1
+       JetBrains Mono vs Consolas ........... 0.60em / 0.55em advance = 109.1%
+   Display type is only set at 700, so its stand-in is Arial's real bold.
+   Each mono stand-in is its own family: one size-adjust cannot fit both
+   Menlo (Mac) and Consolas (Windows), and a family whose local() font is
+   missing is skipped to the next. */
 @font-face {
     font-family: 'Inter Fallback';
     src: local('Helvetica Neue'), local('Arial'), local('Liberation Sans');
     size-adjust: 107.12%;
     ascent-override: 90.20%;
     descent-override: 22.48%;
+    line-gap-override: 0%;
+}
+
+@font-face {
+    font-family: 'Space Grotesk Fallback';
+    font-weight: 700;
+    src: local('Arial Bold'), local('Arial-BoldMT'), local('Liberation Sans Bold');
+    size-adjust: 100.5%;
+    ascent-override: 97.5%;
+    descent-override: 28.9%;
+    line-gap-override: 0%;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono Fallback';
+    src: local('Menlo'), local('Courier New');
+    size-adjust: 99.7%;
+    ascent-override: 102.4%;
+    descent-override: 30.1%;
+    line-gap-override: 0%;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono Fallback Win';
+    src: local('Consolas');
+    size-adjust: 109.1%;
+    ascent-override: 93.5%;
+    descent-override: 27.5%;
     line-gap-override: 0%;
 }
 
@@ -463,8 +462,11 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-/* Numeric columns must not re-flow as digits change. */
-.tnum { font-variant-numeric: tabular-nums; }
+/* Numbers are set in the mono face, which is also what keeps a numeric
+   column from re-flowing as its digits change. */
+.tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+::selection { background: var(--volt); color: var(--on-volt); }
 
 .icon {
     width: 20px;
@@ -500,7 +502,7 @@ body {
     border: 0;
 }
 
-/* Custom scrollbars keep the dark surfaces uninterrupted. */
+/* Custom scrollbars: a pill thumb (C2) that turns violet under the pointer. */
 * {
     scrollbar-width: thin;
     scrollbar-color: var(--track) transparent;
@@ -513,7 +515,7 @@ body {
     border-radius: var(--r-pill);
     background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background-color: var(--track-hover); background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--accent); background-clip: content-box; }
 
 /* --------------------------------------------------------------- 5. BUTTONS */
 .btn {
@@ -527,20 +529,24 @@ body {
        padding reads as a lozenge with the label jammed into it. */
     padding: 0 var(--sp-5);
     border-radius: var(--r-pill);
+    font-family: var(--font-display);
     font-size: var(--fs-sm);
-    font-weight: 600;
-    letter-spacing: -0.005em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     white-space: nowrap;
     user-select: none;
-    transition: background-color var(--t-base), color var(--t-base), box-shadow var(--t-base);
+    transition: background-color var(--t-base), color var(--t-base), box-shadow var(--t-base), transform var(--t-fast);
 }
+
+/* Pressing moves the button a pixel into the page — physical, not a fade. */
+.btn:active:not(:disabled) { transform: translateY(1px); }
 
 .btn .icon { width: 16px; height: 16px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
-.btn-primary:active:not(:disabled) { background: var(--accent-strong); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22); }
+.btn-primary:active:not(:disabled) { background: var(--accent-strong); }
 
 /* Secondary buttons are a raised chip, not an outline. */
 .btn-secondary {
@@ -548,7 +554,7 @@ body {
     color: var(--text);
 }
 .btn-secondary:hover:not(:disabled) { background: var(--bg-chip-hover); }
-.btn-secondary:active:not(:disabled) { background: var(--bg-chip-hover); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.16); }
+.btn-secondary:active:not(:disabled) { background: var(--bg-chip-hover); }
 
 .btn-ghost { color: var(--text-muted); }
 .btn-ghost:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text); }
@@ -556,13 +562,13 @@ body {
 
 .btn-danger { background: var(--danger); color: var(--on-danger); }
 .btn-danger:hover:not(:disabled) { background: var(--danger-strong); }
-.btn-danger:active:not(:disabled) { background: var(--danger-strong); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22); }
+.btn-danger:active:not(:disabled) { background: var(--danger-strong); }
 
 .btn-danger-soft {
     background: var(--danger-soft);
     color: var(--danger);
 }
-.btn-danger-soft:hover:not(:disabled) { background: rgba(255, 71, 87, 0.18); }
+.btn-danger-soft:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 20%, transparent); }
 
 .btn-sm { height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-xs); border-radius: var(--r-pill); }
 .btn-lg { height: var(--control-h-lg); padding: 0 var(--sp-7); font-size: var(--fs-body); }
@@ -606,6 +612,10 @@ body {
     border-radius: var(--r-card);
     background: var(--bg-field);
     color: var(--text);
+    /* WCAG 1.4.11: a field's boundary needs 3:1 against what surrounds it.
+       A tinted well alone does not reach that, so the edge is drawn — as an
+       inset ring, which adds no size. */
+    box-shadow: inset 0 0 0 1px var(--line);
     /* C1 again — and at exactly 16px iOS Safari stops zooming the viewport
        when the field takes focus, so the mandate pays for itself twice. */
     font-size: var(--fs-body);
@@ -621,31 +631,33 @@ body {
 .select:hover,
 .textarea:hover { }
 
-/* Focus is a soft ring of light around the well — a glow, not an edge. */
+/* Focus: the edge turns violet and a hard halo sits outside it. */
 .input:focus,
 .select:focus,
 .textarea:focus {
     background: var(--bg-inset-focus);
-    box-shadow: 0 0 0 4px var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
 
 .input:disabled,
 .select:disabled { color: var(--text-muted); cursor: not-allowed; }
 
 .input.is-invalid,
-.select.is-invalid { box-shadow: 0 0 0 3px var(--danger-soft); }
+.select.is-invalid { box-shadow: inset 0 0 0 1px var(--danger), 0 0 0 3px var(--danger-soft); }
 
 /* Native arrow removed and redrawn so the control keeps a fixed height. The
-   stroke is the one colour in this file that cannot be a var() — it lives
-   inside a data: URI — so it is pinned to the --text-muted value by hand. If
-   that token changes, change this too. */
+   chevron is two gradient triangles in --text-muted rather than an SVG data
+   URI, so it follows the theme instead of carrying a pinned colour. */
 .select {
     appearance: none;
     -webkit-appearance: none;
     padding-right: var(--sp-8);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5A54' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+        linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-size: 5px 5px, 5px 5px;
     background-repeat: no-repeat;
-    background-position: right var(--sp-4) center;
+    background-position: calc(100% - 22px) 50%, calc(100% - 17px) 50%;
 }
 
 /* Error text slot is always reserved: showing a message never shifts a form. */
@@ -697,13 +709,14 @@ body {
     margin-top: 1px;
     border-radius: var(--r-xs);
     background: var(--bg-chip);
+    box-shadow: inset 0 0 0 1px var(--line);
     display: grid;
     place-items: center;
-    transition: background-color var(--t-base);
+    transition: background-color var(--t-base), box-shadow var(--t-base);
 }
 
 .check-box .icon { width: 12px; height: 12px; stroke-width: 3; color: var(--on-accent); opacity: 0; transition: opacity var(--t-base); }
-.check input:checked + .check-box { background: var(--accent); }
+.check input:checked + .check-box { background: var(--accent); box-shadow: none; }
 .check input:checked + .check-box .icon { opacity: 1; }
 .check input:focus-visible + .check-box { box-shadow: 0 0 0 3px var(--accent-soft); }
 
@@ -719,7 +732,8 @@ body {
     height: 24px;
     border-radius: var(--r-pill);
     background: var(--bg-chip);
-    transition: background-color var(--t-base);
+    box-shadow: inset 0 0 0 1px var(--line);
+    transition: background-color var(--t-base), box-shadow var(--t-base);
 }
 
 .switch-track::after {
@@ -734,7 +748,7 @@ body {
     transition: transform var(--t-base), background-color var(--t-base);
 }
 
-.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track { background: var(--accent); box-shadow: none; }
 .switch input:checked + .switch-track::after { transform: translateX(20px); background: var(--on-accent); }
 .switch input:focus-visible + .switch-track { box-shadow: 0 0 0 3px var(--accent-soft); }
 
@@ -843,10 +857,11 @@ button.stat.is-active { background: var(--accent-soft); }
 .stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
 
 .stat-value {
+    font-family: var(--font-mono);
     font-size: var(--fs-h2);
     font-weight: 700;
     line-height: 36px;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.04em;
     font-variant-numeric: tabular-nums;
 }
 
@@ -932,9 +947,7 @@ button.stat.is-active { background: var(--accent-soft); }
     align-items: center;
     justify-content: center;
     padding: var(--sp-6);
-    background: color-mix(in srgb, var(--bg-main) 84%, transparent);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: color-mix(in srgb, var(--palette-ink) 72%, transparent);
     opacity: 0;
     transition: opacity var(--t-base);
 }
@@ -1004,7 +1017,7 @@ button.stat.is-active { background: var(--accent-soft); }
 
 .modal-head > .modal-close { order: 3; }
 
-.modal-title { font-size: var(--fs-h4); font-weight: 700; letter-spacing: -0.01em; }
+.modal-title { font-size: var(--fs-h4); font-weight: 700; letter-spacing: -0.03em; }
 .modal-sub { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* The close control: fixed box, subtle bordered surface, nested safely. */
@@ -1044,7 +1057,7 @@ button.stat.is-active { background: var(--accent-soft); }
     flex: 0 0 auto;
     padding: var(--sp-3) var(--sp-6);
     background: var(--bg-surface-hi);
-    box-shadow: 0 -12px 20px -20px rgba(0, 0, 0, 0.9);
+    box-shadow: inset 0 1px 0 var(--line-soft);
 }
 
 .modal-foot-split { justify-content: space-between; }
@@ -1317,9 +1330,7 @@ body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
     justify-content: center;
     padding: var(--sp-4);
     opacity: 0;
-    background: color-mix(in srgb, var(--ink) 62%, transparent);
-    -webkit-backdrop-filter: blur(5px);
-    backdrop-filter: blur(5px);
+    background: color-mix(in srgb, var(--palette-ink) 72%, transparent);
     transition: opacity var(--t-layout);
 }
 
