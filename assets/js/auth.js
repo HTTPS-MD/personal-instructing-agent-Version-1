@@ -380,8 +380,10 @@
         }, 4200);
     }
 
+    /* Always the public site, never this page's own address: the email is
+       opened on the student's phone, not on the machine that sent it. */
     function activationRedirect() {
-        return new URL('assets/html/sign-up.html', window.location.href).href;
+        return emailLinkTo('assets/html/sign-up.html');
     }
 
     /* ============================================ 3. SIGN IN =========== */

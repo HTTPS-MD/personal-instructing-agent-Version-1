@@ -94,6 +94,12 @@
 
     <script src="assets/js/theme-boot.js"></script>
 
+    <!-- An activation / invite / reset email that lands HERE instead of on the
+         set-password page is forwarded there, tokens intact, before this page
+         paints or its Supabase client runs. Must stay blocking and ahead of
+         function.js, which reads the flag it sets. -->
+    <script src="assets/js/auth-callback.js"></script>
+
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/pages/landing.css">
 

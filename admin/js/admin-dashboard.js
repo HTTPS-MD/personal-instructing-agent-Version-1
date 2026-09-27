@@ -155,8 +155,11 @@
         return { label: 'Unknown device', glyph: 'monitor' };
     }
 
+    /* Always the public site, never this page's own address: an activation
+       sent while the console runs on localhost is opened on a student's
+       phone, which cannot reach 127.0.0.1. See PUBLIC_SITE_URL, function.js. */
     function activationRedirect() {
-        return new URL('../../assets/html/sign-up.html', window.location.href).href;
+        return emailLinkTo('assets/html/sign-up.html');
     }
 
     /* ============================================ 2. APPLICATION STATE == */

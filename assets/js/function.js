@@ -6,11 +6,36 @@
 const supabaseUrl = 'https://hvfqqdtemayhhfavmfbs.supabase.co';
 const supabaseKey = 'sb_publishable_NXpgU16p8YZ4oedc7MY5ng_J3F-2Mgy';
 
+// Where links INSIDE EMAILS point (activation, invite, password reset). It is
+// deliberately NOT taken from the page's own address: an admin who sends an
+// activation while working on 127.0.0.1 would otherwise email every student a
+// link to their own laptop, which a phone cannot open (ERR_CONNECTION_REFUSED).
+// Supabase only honours it if it is on the allow list: Authentication → URL
+// Configuration → Redirect URLs must contain this address followed by /**
+// To test the set-password page on your own machine, point this at your local
+// server for that session, and change it back before deploying.
+const PUBLIC_SITE_URL = 'https://personal-instructing-agent-version-1.pages.dev/';
+
+function emailLinkTo(path) {
+    return new URL(path, PUBLIC_SITE_URL).href;
+}
+
+// The address this page was opened with, captured BEFORE the client below
+// exists. supabase-js reads the tokens out of an email link's #hash and then
+// wipes it, but the set-password page still needs to know what kind of link it
+// was (invite, magic link, recovery) and whether it arrived with an error.
+window.PIA_ENTRY_URL = window.location.href;
+
 window.supabaseClient = null;
 window.sb = null;
 
 if (window.supabase) {
-    window.supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    window.supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey, {
+        // auth-callback.js raises this on the landing page while it hands an
+        // email link on to the set-password page: the one-time tokens belong
+        // to that page and must not be spent here on the way through.
+        auth: { detectSessionInUrl: !window.PIA_AUTH_FORWARDING }
+    });
     window.sb = window.supabaseClient;
     window.SUPABASE_URL = supabaseUrl;
     window.SUPABASE_ANON_KEY = supabaseKey;
