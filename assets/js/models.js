@@ -60,6 +60,16 @@
         // 'pia-neutral'
     ];
 
+    /* TEMPORARY — 3D loading is switched off for the test deploy.
+       pia-open.glb (66 MiB) is over Cloudflare Pages' 25 MiB per-file limit
+       and has been taken out of assets/models/. While this is false no slot
+       requests the renderer or a model; the slots listed in AVAILABLE show
+       DISABLED_LABEL instead. To turn 3D back on: put a slimmed-down
+       pia-open.glb (under 25 MiB) back in assets/models/ and set this to
+       true. Nothing else changes. */
+    var MODELS_ENABLED = false;
+    var DISABLED_LABEL = '3D Model Loading Disabled for Testing';
+
     var MODEL_DIR = 'assets/models/';
     var MODEL_EXT = '.glb';
 
@@ -189,6 +199,13 @@
         var slots = $$('.model-canvas-wrapper[data-model]').filter(function (el) {
             return AVAILABLE.indexOf(el.getAttribute('data-model')) !== -1;
         });
+
+        /* Switched off (see MODELS_ENABLED): say so in the case and stop,
+           before the renderer or any model is requested. */
+        if (!MODELS_ENABLED) {
+            slots.forEach(function (el) { setSlotState(el, DISABLED_LABEL); });
+            return;
+        }
 
         /* Nothing to do: every slot keeps the case it is already showing and
            the 935 KB renderer is never requested. This is the state the page
