@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-surface="comic">
 
 <head>
     <meta charset="UTF-8">
@@ -58,39 +58,13 @@
          rot. Do not add defer or async — both would push it past first paint
          and reintroduce the flash. -->
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-    <!-- The hero poster is the first image painted, under the headline, so it
-         is the page's LCP candidate. It is frame 0 of the hero loop, which is
-         what makes the hand-over to the playing video invisible. The scrub
-         reel's own poster is no longer preloaded: the hero now covers it until
-         the first scroll. -->
-    <link rel="preload" as="image" href="assets/images/hero-classroom-poster.jpg" fetchpriority="high">
-
-    <!-- Fetched as a PRELOAD, not as a stylesheet, and promoted to a real
-         stylesheet by theme-boot.js once it has arrived.
-
-         The reason is not page speed, it is failure mode. A <script> that
-         follows a pending stylesheet cannot execute until that stylesheet
-         resolves — so on a network where fonts.googleapis.com is unreachable
-         (a filtered school connection, for instance) the body scripts, and
-         therefore SIGN-IN, would sit blocked until the request timed out.
-         A preload never blocks anything.
-
-         The swap costs nothing visually: every face has a metrics-matched
-         local stand-in ('Inter Fallback' in global.css, the other two in
-         landing.css), so a webfont arriving changes the letterforms without
-         moving a line box. display=swap means no invisible text meanwhile.
-
-         The <noscript> copy keeps the fonts for a JS-less visitor, who has no
-         scripts to block in the first place. -->
-    <link rel="preload" as="style" id="font-css"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@700&display=swap">
-    <noscript>
-        <link rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@700&display=swap">
-    </noscript>
+    <!-- FONTS are requested by theme-boot.js below — the one place the font
+         stylesheet URL is written (FONT_STYLESHEET), so changing a typeface
+         means editing that constant and the --font-* tokens in global.css,
+         not twelve <link> tags. It is fetched as a preload and promoted to a
+         stylesheet, so an unreachable font host (a filtered school network)
+         can never block the page or sign-in; until it arrives the text uses
+         metrics-matched stand-ins, so nothing moves when it does. -->
 
     <script src="assets/js/theme-boot.js"></script>
 
@@ -212,6 +186,15 @@
                     d="M12 3.2c.5 4.3 1.9 6.8 8.8 8.8-6.9 2-8.3 4.5-8.8 8.8-.5-4.3-1.9-6.8-8.8-8.8 6.9-2 8.3-4.5 8.8-8.8Z"
                     fill="currentColor" stroke="none" />
             </symbol>
+            <!-- The locked tutor's silhouette: a chibi figure — big head, small
+                 body — to match the proportions of the other five. Solid
+                 shapes; the colour comes from CSS (fill: currentColor). -->
+            <symbol id="i-silhouette" viewBox="0 0 120 160">
+                <path d="M60 14c-23 0-40 16-40 38 0 9 3 17 8 23-3 4-4 9-3 13l7-3c1 3 3 5 6 6l-2 3h48l-2-3c3-1 5-3 6-6l7 3c1-4 0-9-3-13 5-6 8-14 8-23 0-22-17-38-40-38Z" />
+                <path d="M40 96h40l12 42H28l12-42Z" />
+                <path d="M44 138h11v16H44zM65 138h11v16H65z" />
+                <path d="M36 100c-6 6-10 16-10 24l8 2c1-7 4-14 8-19Zm48 0c6 6 10 16 10 24l-8 2c-1-7-4-14-8-19Z" />
+            </symbol>
             <symbol id="i-menu" viewBox="0 0 24 24">
                 <path d="M4 7h16M4 12h16M4 17h16" />
             </symbol>
@@ -262,12 +245,13 @@
                  right side's controls have, so the centred links sit between
                  two things of similar mass instead of between a word and a
                  cluster. -->
-            <a class="tap nav-mark" href="#top">
-                <span class="nav-mark-badge" aria-hidden="true"><svg class="icon">
-                        <use href="#i-spark"></use>
-                    </svg></span>
-                <span class="nav-mark-word">PIA</span>
-                <span class="sr-only">— Personal Instructing Agent, back to top</span>
+            <!-- THE LOGO. One file for every header: assets/images/logo.svg.
+                 Replace it to rebrand; CSS caps it at --logo-h (global.css)
+                 and keeps its aspect ratio, so any size or shape fits.
+                 width/height only reserve its box before it loads. -->
+            <a class="tap nav-mark brand-link" href="#top">
+                <img class="site-logo" src="assets/images/logo.svg"
+                    alt="PIA — Personal Instructing Agent, back to top" width="48" height="48">
             </a>
 
             <nav class="nav-menu" id="nav-menu" aria-label="Page sections">
@@ -475,65 +459,85 @@
                              agent-select.js highlights that tutor when you land
                              there (data-pick = the tutor's data-agent id).
 
-                             ART PLACEHOLDERS. .cast-art is locked to 3:4 in CSS, so
-                             the finished art can drop in without moving anything:
-                                 <img src="assets/images/cast/pia-open.webp" alt=""
-                                      width="600" height="800" decoding="async">
-                             inside the .cast-art span. alt stays empty and the span
-                             stays aria-hidden — the tutor's name is the link text. -->
+                             ART. .cast-art is locked to 3:4 in CSS, so nothing moves
+                             when an image arrives. Each <picture> holds a 600px
+                             WebP (about 45 KB) cut from the original char-N.png.
+                             No PNG fallback: every browser the site supports reads
+                             WebP, and the 2 MB originals stay out of the repo. alt is
+                             empty and the span aria-hidden: the tutor's name is the
+                             link text. The sixth tutor has no art yet and is shown
+                             LOCKED (landing.css section 7.2b). -->
                         <ul class="cast" aria-label="The six tutors">
                             <li class="cast-slot" data-reveal>
                                 <a class="cast-card" href="#agent-select" data-pick="pia-open">
-                                    <span class="cast-art" aria-hidden="true"><svg class="icon">
-                                            <use href="#i-compass"></use>
-                                        </svg></span>
+                                    <span class="cast-art" aria-hidden="true">
+                                        <picture>
+                                            <img src="assets/images/cast/char-1.webp" alt="" width="600" height="840" decoding="async">
+                                        </picture>
+                                    </span>
                                     <span class="cast-name">Explorer</span>
                                     <span class="cast-tag">Finds the why</span>
                                 </a>
                             </li>
                             <li class="cast-slot" data-reveal>
                                 <a class="cast-card" href="#agent-select" data-pick="pia-conscientious">
-                                    <span class="cast-art" aria-hidden="true"><svg class="icon">
-                                            <use href="#i-lens"></use>
-                                        </svg></span>
+                                    <span class="cast-art" aria-hidden="true">
+                                        <picture>
+                                            <img src="assets/images/cast/char-2.webp" alt="" width="600" height="840" decoding="async">
+                                        </picture>
+                                    </span>
                                     <span class="cast-name">Detective</span>
                                     <span class="cast-tag">Every detail</span>
                                 </a>
                             </li>
                             <li class="cast-slot" data-reveal>
                                 <a class="cast-card" href="#agent-select" data-pick="pia-extravert">
-                                    <span class="cast-art" aria-hidden="true"><svg class="icon">
-                                            <use href="#i-bolt"></use>
-                                        </svg></span>
+                                    <span class="cast-art" aria-hidden="true">
+                                        <picture>
+                                            <img src="assets/images/cast/char-3.webp" alt="" width="600" height="840" decoding="async">
+                                        </picture>
+                                    </span>
                                     <span class="cast-name">Spark</span>
                                     <span class="cast-tag">High energy</span>
                                 </a>
                             </li>
                             <li class="cast-slot" data-reveal>
                                 <a class="cast-card" href="#agent-select" data-pick="pia-agreeable">
-                                    <span class="cast-art" aria-hidden="true"><svg class="icon">
-                                            <use href="#i-heart"></use>
-                                        </svg></span>
+                                    <span class="cast-art" aria-hidden="true">
+                                        <picture>
+                                            <img src="assets/images/cast/char-4.webp" alt="" width="600" height="840" decoding="async">
+                                        </picture>
+                                    </span>
                                     <span class="cast-name">Ally</span>
                                     <span class="cast-tag">Endless patience</span>
                                 </a>
                             </li>
                             <li class="cast-slot" data-reveal>
                                 <a class="cast-card" href="#agent-select" data-pick="pia-calm">
-                                    <span class="cast-art" aria-hidden="true"><svg class="icon">
-                                            <use href="#i-anchor"></use>
-                                        </svg></span>
+                                    <span class="cast-art" aria-hidden="true">
+                                        <picture>
+                                            <img src="assets/images/cast/char-5.webp" alt="" width="600" height="840" decoding="async">
+                                        </picture>
+                                    </span>
                                     <span class="cast-name">Anchor</span>
                                     <span class="cast-tag">Calm &amp; steady</span>
                                 </a>
                             </li>
                             <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-neutral">
-                                    <span class="cast-art" aria-hidden="true"><svg class="icon">
-                                            <use href="#i-level"></use>
-                                        </svg></span>
+                                <!-- The sixth tutor has no art yet, so it is shown the way a
+                                     game shows a character you have not unlocked. -->
+                                <a class="cast-card is-locked" href="#agent-select" data-pick="pia-neutral">
+                                    <span class="cast-art locked-art" aria-hidden="true">
+                                        <svg class="locked-silhouette" viewBox="0 0 120 160" focusable="false">
+                                            <use href="#i-silhouette"></use>
+                                        </svg>
+                                        <span class="locked-mark">?</span>
+                                        <span class="locked-tag"><svg class="icon">
+                                                <use href="#i-key"></use>
+                                            </svg>Locked</span>
+                                    </span>
                                     <span class="cast-name">Neutral</span>
-                                    <span class="cast-tag">Just the maths</span>
+                                    <span class="cast-tag">Unlocks soon</span>
                                 </a>
                             </li>
                         </ul>
@@ -658,80 +662,56 @@
                             <div class="stage">
                                 <span class="stage-ghost" id="stage-ghost" aria-hidden="true">Explorer</span>
                                 <div class="stage-figure" data-figure="pia-open">
-                                    <div class="model-canvas-wrapper" data-model="pia-open" role="img"
-                                        aria-label="3D model of PIA Explorer &mdash; not yet available">
-                                        <span class="slot-shine" aria-hidden="true"></span>
-                                        <span class="slot-meta">
-                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
-                                                    <use href="#i-compass"></use>
-                                                </svg></span>
-                                            <span class="slot-name">PIA Explorer</span>
-                                            <span class="slot-ratio">3D model coming soon</span>
-                                        </span>
+                                    <div class="model-canvas-wrapper has-art" data-model="pia-open" role="img"
+                                        aria-label="PIA Explorer, character art">
+                                        <picture class="stage-art">
+                                            <img src="assets/images/cast/char-1.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                        </picture>
                                     </div>
                                 </div>
                                 <div class="stage-figure" data-figure="pia-conscientious" hidden>
-                                    <div class="model-canvas-wrapper" data-model="pia-conscientious" role="img"
-                                        aria-label="3D model of PIA Detective &mdash; not yet available">
-                                        <span class="slot-shine" aria-hidden="true"></span>
-                                        <span class="slot-meta">
-                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
-                                                    <use href="#i-lens"></use>
-                                                </svg></span>
-                                            <span class="slot-name">PIA Detective</span>
-                                            <span class="slot-ratio">3D model coming soon</span>
-                                        </span>
+                                    <div class="model-canvas-wrapper has-art" data-model="pia-conscientious" role="img"
+                                        aria-label="PIA Detective, character art">
+                                        <picture class="stage-art">
+                                            <img src="assets/images/cast/char-2.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                        </picture>
                                     </div>
                                 </div>
                                 <div class="stage-figure" data-figure="pia-extravert" hidden>
-                                    <div class="model-canvas-wrapper" data-model="pia-extravert" role="img"
-                                        aria-label="3D model of PIA Spark &mdash; not yet available">
-                                        <span class="slot-shine" aria-hidden="true"></span>
-                                        <span class="slot-meta">
-                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
-                                                    <use href="#i-bolt"></use>
-                                                </svg></span>
-                                            <span class="slot-name">PIA Spark</span>
-                                            <span class="slot-ratio">3D model coming soon</span>
-                                        </span>
+                                    <div class="model-canvas-wrapper has-art" data-model="pia-extravert" role="img"
+                                        aria-label="PIA Spark, character art">
+                                        <picture class="stage-art">
+                                            <img src="assets/images/cast/char-3.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                        </picture>
                                     </div>
                                 </div>
                                 <div class="stage-figure" data-figure="pia-agreeable" hidden>
-                                    <div class="model-canvas-wrapper" data-model="pia-agreeable" role="img"
-                                        aria-label="3D model of PIA Ally &mdash; not yet available">
-                                        <span class="slot-shine" aria-hidden="true"></span>
-                                        <span class="slot-meta">
-                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
-                                                    <use href="#i-heart"></use>
-                                                </svg></span>
-                                            <span class="slot-name">PIA Ally</span>
-                                            <span class="slot-ratio">3D model coming soon</span>
-                                        </span>
+                                    <div class="model-canvas-wrapper has-art" data-model="pia-agreeable" role="img"
+                                        aria-label="PIA Ally, character art">
+                                        <picture class="stage-art">
+                                            <img src="assets/images/cast/char-4.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                        </picture>
                                     </div>
                                 </div>
                                 <div class="stage-figure" data-figure="pia-calm" hidden>
-                                    <div class="model-canvas-wrapper" data-model="pia-calm" role="img"
-                                        aria-label="3D model of PIA Anchor &mdash; not yet available">
-                                        <span class="slot-shine" aria-hidden="true"></span>
-                                        <span class="slot-meta">
-                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
-                                                    <use href="#i-anchor"></use>
-                                                </svg></span>
-                                            <span class="slot-name">PIA Anchor</span>
-                                            <span class="slot-ratio">3D model coming soon</span>
-                                        </span>
+                                    <div class="model-canvas-wrapper has-art" data-model="pia-calm" role="img"
+                                        aria-label="PIA Anchor, character art">
+                                        <picture class="stage-art">
+                                            <img src="assets/images/cast/char-5.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                        </picture>
                                     </div>
                                 </div>
                                 <div class="stage-figure" data-figure="pia-neutral" hidden>
-                                    <div class="model-canvas-wrapper" data-model="pia-neutral" role="img"
-                                        aria-label="3D model of PIA Neutral &mdash; not yet available">
-                                        <span class="slot-shine" aria-hidden="true"></span>
-                                        <span class="slot-meta">
-                                            <span class="slot-icon" aria-hidden="true"><svg class="icon">
-                                                    <use href="#i-level"></use>
-                                                </svg></span>
-                                            <span class="slot-name">PIA Neutral</span>
-                                            <span class="slot-ratio">3D model coming soon</span>
+                                    <div class="model-canvas-wrapper is-locked" data-model="pia-neutral" role="img"
+                                        aria-label="PIA Neutral, locked: character art coming soon">
+                                        <span class="locked-art" aria-hidden="true">
+                                            <svg class="locked-silhouette" viewBox="0 0 120 160" focusable="false">
+                                                <use href="#i-silhouette"></use>
+                                            </svg>
+                                            <span class="locked-mark">?</span>
+                                            <span class="locked-tag"><svg class="icon">
+                                                    <use href="#i-key"></use>
+                                                </svg>Locked</span>
                                         </span>
                                     </div>
                                 </div>

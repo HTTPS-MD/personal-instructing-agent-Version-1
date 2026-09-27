@@ -20,9 +20,8 @@
 
    COLOUR SCOPE
    ------------
-   Declared HERE, not in global.css, and only overriding colour ROLES, so the
-   dashboards are untouched until they are migrated. No raw colour appears
-   outside the palette block.
+   Every colour and font comes from styles/global.css (section 0). This page
+   opts into its "comic" variant with <html data-surface="comic">.
 
    DEPLOY NOTE
    -----------
@@ -34,164 +33,16 @@
    ==========================================================================*/
 
 
-/* ═══════════════════════════════════════════ 1. PALETTE ═══════════════ */
-/* A dark base and two accents. Ink and paper are the neutral pair (ground
-   and type, swapped by the theme); violet and volt are the only hues.
+/* ═══════════════════════════════════════════ 1. TOKENS ════════════════ */
+/* NO COLOUR OR TYPE IS DEFINED IN THIS FILE.
+   The palette, both themes, the fonts and this page's own "comic" roles
+   (square edges, hard violet offsets, bright violet fills with ink labels)
+   all live in styles/global.css — section 0, the :root control panel, and
+   its :root[data-surface="comic"] blocks, which apply because index.html
+   carries <html data-surface="comic">. Reskin there, not here.
 
-   Measured pairs (WCAG 2.x):
-       paper on ink ................ 17.27:1
-       ink on violet (button) ....... 5.02:1
-       ink on volt (caption/tag) ... 16.85:1
-   Violet is too light to be small TEXT on paper (3.44:1), so the text shade
-   is mixed toward ink in light mode and toward paper in dark mode — see
-   --accent-text below. Volt is never text on paper; it is always a fill
-   under ink. */
+   What remains below is layout and motion only. */
 :root {
-    --palette-ink: #0E0B16;      /* the dark base; light mode's type       */
-    --palette-paper: #F4F1EA;    /* newsprint; dark mode's type            */
-    --palette-violet: #A259FF;   /* actions, selection, panel shadows      */
-    --palette-volt: #D4FF3A;     /* captions, highlights, the dark focus   */
-}
-
-/* ── Theme ── Dark is the default (theme-boot.js); light is the same page
-   printed in black on newsprint. */
-:root { --bg: var(--palette-paper); --fg: var(--palette-ink); color-scheme: light; }
-:root[data-theme="dark"] { --bg: var(--palette-ink); --fg: var(--palette-paper); color-scheme: dark; }
-
-/* ── Roles ──
-   Declared on `:root, :root[data-theme]` to match the specificity of
-   global.css's dark block, and loaded after it, so its colours stay off this
-   page. Mixing toward --fg works in both themes from one declaration. */
-:root,
-:root[data-theme] {
-    --bg-main: var(--bg);
-    --bg-body: var(--bg);
-    --bg-surface: color-mix(in srgb, var(--fg) 5%, var(--bg));
-    --bg-surface-hi: var(--bg-surface);
-    --bg-surface-hover: color-mix(in srgb, var(--fg) 9%, var(--bg));
-    --bg-field: color-mix(in srgb, var(--fg) 4%, var(--bg));
-    --bg-inset-focus: var(--bg-field);
-    --bg-chip: color-mix(in srgb, var(--fg) 9%, var(--bg));
-    --bg-chip-hover: color-mix(in srgb, var(--fg) 14%, var(--bg));
-    --track: color-mix(in srgb, var(--fg) 45%, var(--bg));
-    --track-hover: var(--palette-violet);
-
-    /* Ink. On ground / on surface, light | dark. */
-    --text: var(--fg);                                          /* 17.27 both    */
-    --text-primary: var(--text);
-    --text-main: var(--text);
-    --text-muted: color-mix(in srgb, var(--fg) 72%, var(--bg)); /* 7.60/6.87 | 9.13/8.34 */
-    --text-faint: color-mix(in srgb, var(--fg) 66%, var(--bg)); /* 6.11/5.52 | 7.77/7.10 */
-    --text-on-solid: var(--bg);
-
-    /* Lines. --rule is the stark panel edge; --line clears the 3:1 WCAG
-       1.4.11 asks of a control's boundary (3.03 light, 4.11 dark); --line-soft
-       only ever divides things that are already separated. */
-    --rule: var(--fg);
-    --line: color-mix(in srgb, var(--fg) 45%, var(--bg));
-    --line-soft: color-mix(in srgb, var(--fg) 16%, var(--bg));
-
-    /* Violet. The FILL always carries an ink label (5.02:1), in both themes. */
-    --accent: var(--palette-violet);
-    --accent-strong: color-mix(in srgb, var(--palette-violet) 86%, var(--palette-paper));
-    --accent-hover: var(--accent-strong);
-    --accent-soft: color-mix(in srgb, var(--palette-violet) 16%, transparent);
-    --accent-line: color-mix(in srgb, var(--palette-violet) 40%, transparent);
-    --on-accent: var(--palette-ink);
-    --on-primary: var(--on-accent);
-    --color-primary: var(--accent);
-    --color-primary-ink: var(--accent-text);
-
-    /* Volt: always a fill, always under ink. */
-    --volt: var(--palette-volt);
-    --on-volt: var(--palette-ink);
-
-    /* Violet as SMALL TEXT. Light mode: pulled toward ink (5.73:1 on paper,
-       5.17 on a surface). Dark mode overrides below. */
-    --accent-text: color-mix(in srgb, var(--palette-violet) 70%, var(--palette-ink));
-
-    /* Focus must clear 3:1 against what it sits on. Volt is invisible on
-       paper, so light mode rings in the violet text shade (5.73:1). */
-    --focus: var(--accent-text);
-
-    /* Errors wear the accent text shade plus an icon and words; there is no
-       red on this page. Success is plain ink with a check. */
-    --danger: var(--accent-text);
-    --danger-strong: var(--accent-text);
-    --danger-ink: var(--accent-text);
-    --color-danger: var(--accent-text);
-    --color-danger-ink: var(--accent-text);
-    --danger-soft: color-mix(in srgb, var(--palette-violet) 14%, transparent);
-    --danger-line: color-mix(in srgb, var(--palette-violet) 45%, transparent);
-    --on-danger: var(--palette-ink);
-
-    /* Global components reach for these. Hard offsets, never blur. */
-    --shadow-sm: none;
-    --shadow-card: var(--hard) var(--hard) 0 var(--accent);
-    --shadow-md: var(--hard) var(--hard) 0 var(--accent);
-    --shadow-lg: var(--hard-lg) var(--hard-lg) 0 var(--accent);
-
-    /* Screentone. One dot colour for every halftone on the page. */
-    --dot: color-mix(in srgb, var(--fg) 15%, transparent);
-    --speed: color-mix(in srgb, var(--fg) 9%, transparent);
-}
-
-:root[data-theme="dark"] {
-    /* Violet text in the dark: pulled toward paper, 6.05:1 on ink and 5.52
-       on a surface. */
-    --accent-text: color-mix(in srgb, var(--palette-violet) 85%, var(--palette-paper));
-    --focus: var(--palette-volt);                               /* 16.85:1 */
-}
-
-/* ── Guard ──
-   global.css still names its own hues for the dashboards, and a few of its
-   components read them directly. Here each folds back into the palette. */
-:root,
-:root[data-theme] {
-    --pine: var(--palette-violet);
-    --pine-deep: var(--accent-strong);
-    --pine-dim: var(--accent-strong);
-    --mint: var(--accent-soft);
-    --spring: var(--palette-violet);
-    --coral: var(--palette-violet);
-    --coral-soft: var(--accent-soft);
-    --coral-ink: var(--accent-text);
-    --sunny: var(--palette-volt);
-    --sunny-soft: var(--accent-soft);
-    --sunny-ink: var(--accent-text);
-    --sky: var(--bg-chip);
-    --cream: var(--bg);
-    --cream-deep: var(--bg-field);
-    --paper: var(--bg-surface);
-    --ink: var(--fg);
-    --ink-muted: var(--text-muted);
-    --ink-faint: var(--text-faint);
-    --warning: var(--palette-volt);
-    --warning-soft: var(--accent-soft);
-    --warning-ink: var(--accent-text);
-    --on-warning: var(--palette-ink);
-    --glass: var(--bg-surface);
-    --glass-edge: var(--line-soft);
-}
-
-/* ── Non-colour tokens ── */
-:root {
-    /* Square. Every global component on this page inherits zero radius. */
-    --r-card: 0;
-    --r-pill: 0;
-    --r-xs: 0;
-    --r-sm: 0;
-    --r-md: 0;
-    --r-lg: 0;
-    --r-xl: 0;
-    --r-2xl: 0;
-
-    /* Hard-shadow travel. Only the distances are tokens: a composed shadow
-       would bake in whatever colour it resolved to on :root. */
-    --hard-sm: 0.1875rem;
-    --hard: 0.3125rem;
-    --hard-lg: 0.5rem;
-
     --band-pad: clamp(4rem, 12vh, 9rem);
     --gutter: clamp(1.25rem, 5vw, 3rem);
     --tap-min: 2.75rem;                  /* 44px — WCAG 2.5.8, via .tap */
@@ -208,18 +59,6 @@
     --ease-drift: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
     --t-snap: 120ms;
-
-    /* Faces. Each webfont has a metrics-matched local stand-in (section 2),
-       so the swap changes letterforms without moving a line box. */
-    --font-display: 'Space Grotesk', 'Space Grotesk Fallback', system-ui, sans-serif;
-    --font-body: 'Inter', 'Inter Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font: var(--font-body);
-    --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', 'JetBrains Mono Fallback Win', ui-monospace, monospace;
-
-    /* Film grain: greyscale noise at 7% alpha, tiled. It is a BACKGROUND
-       layer, never an overlay, so type always paints on top of it. No colour
-       literal inside — the matrix averages the noise channels to grey. */
-    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 .07'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 
@@ -290,7 +129,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
     font-weight: 700;
-    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--accent);
+    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--pop);
     transform: translateY(calc(-100% - var(--sp-6)));
     transition: transform 160ms var(--ease-snap);
 }
@@ -536,7 +375,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     color: var(--volt);
     -webkit-text-stroke: 1.5px var(--palette-ink);
     paint-order: stroke fill;
-    text-shadow: 0.1875rem 0.1875rem 0 var(--accent);
+    text-shadow: 0.1875rem 0.1875rem 0 var(--pop);
     transform: rotate(-10deg);
     pointer-events: none;
     user-select: none;
@@ -579,35 +418,18 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     padding-block: var(--sp-2);
 }
 
-.nav-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-self: start;
-    gap: var(--sp-3);
-    font-family: var(--font-display);
-    font-size: 1.375rem;
-    font-weight: 700;
-    letter-spacing: -0.05em;
-    color: var(--text);
-}
+/* The logo (.site-logo, sized in global.css). On this page it wears the
+   comic sticker edge: a hard offset in the ink/paper rule colour, drawn as a
+   drop-shadow with zero blur so it follows whatever shape the image is.
+   It tilts under the pointer. */
+.nav-mark { justify-self: start; }
 
-.nav-mark-word { display: inline-block; padding-inline: 0.25rem; transition: background-color var(--t-snap) linear, color var(--t-snap) linear; }
-.nav-mark:hover .nav-mark-word { background: var(--volt); color: var(--on-volt); }
-
-.nav-mark-badge {
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    aspect-ratio: 1;
-    border: 1px solid var(--rule);
-    background: var(--accent);
-    color: var(--on-accent);
-    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--rule);
+.nav-mark .site-logo {
+    filter: drop-shadow(var(--hard-sm) var(--hard-sm) 0 var(--rule));
     transition: transform 240ms var(--ease-pop);
 }
 
-.nav-mark-badge .icon { width: 1.125rem; height: 1.125rem; }
-.nav-mark:hover .nav-mark-badge { transform: rotate(-12deg); }
+.nav-mark:hover .site-logo { transform: rotate(-8deg); }
 
 .nav-actions { display: flex; align-items: center; justify-self: end; gap: var(--sp-2); }
 
@@ -663,7 +485,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     padding: var(--sp-3) var(--gutter) var(--sp-7);
     border-block: 1px solid var(--rule);
     background: var(--bg);
-    box-shadow: 0 var(--hard-lg) 0 var(--accent);
+    box-shadow: 0 var(--hard-lg) 0 var(--pop);
     visibility: hidden;
     opacity: 0;
     transform: translateY(-0.5rem);
@@ -866,7 +688,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 :root:not(.js) .nav-link { min-height: var(--tap-min); font-size: var(--fs-sm); }
 
 @media (prefers-reduced-motion: reduce) {
-    .nav-mark:hover .nav-mark-badge,
+    .nav-mark:hover .site-logo,
     .theme-toggle:active,
     .nav-burger:active { transform: none; }
     .nav-menu { transform: none; }
@@ -897,7 +719,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     border: 1px solid var(--rule);
     background: var(--fg);
     color: var(--bg);
-    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--accent);
+    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--pop);
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
     font-weight: 500;
@@ -1158,7 +980,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     border: 1px solid var(--on-volt);
     background: var(--volt);
     color: var(--on-volt);
-    box-shadow: 0.07em 0.07em 0 var(--accent);
+    box-shadow: 0.07em 0.07em 0 var(--pop);
     transform: rotate(-2deg);
     transform-origin: 0 50%;
 }
@@ -1198,16 +1020,16 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     position: relative;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--rule);
+    border: var(--edge-w) solid var(--rule);
     background: var(--bg);
     color: var(--text);
-    box-shadow: var(--hard) var(--hard) 0 var(--accent);
+    box-shadow: var(--hard) var(--hard) 0 var(--pop);
     transform: rotate(var(--tilt, 0deg)) translate(var(--nudge-x, 0), var(--nudge-y, 0));
     transition: transform 180ms var(--ease-snap), box-shadow 180ms var(--ease-snap);
 }
 
-/* The portrait. 3:4, screentone, focus lines converging on the tutor's
-   glyph. Finished art replaces all of it with an <img>. */
+/* The portrait. 3:4, screentone, and manga focus lines converging on the
+   tutor. The art is a transparent cutout, so the lines show round it. */
 .cast-art {
     position: relative;
     display: grid;
@@ -1228,7 +1050,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     pointer-events: none;
 }
 
-.cast-art .icon {
+/* The glyph a card shows if it has no art (none do now, but a new tutor
+   added without an image falls back to this, not to an empty box). */
+.cast-art > .icon {
     position: relative;
     width: 42%;
     height: auto;
@@ -1241,16 +1065,126 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--rule);
 }
 
-.cast-art > img {
-    position: absolute;
-    inset: 0;
+/* The art. object-fit: cover fills the 3:4 box edge to edge inside the
+   card's rules. The figures stand in 5:7 canvases with headroom, so the
+   crop is anchored near the feet (50% 90%): every head — and every stray
+   strand of hair — stays inside. On hover the tutor hops up a little. */
+.cast-art picture { position: absolute; inset: 0; }
+
+.cast-art img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: 50% 90%;
+    transform-origin: 50% 100%;
+    transition: transform 220ms var(--ease-pop);
 }
 
-.cast-art:has(> img)::before,
-.cast-art:has(> img) .icon { display: none; }
+.cast-card:hover .cast-art img,
+.cast-card:focus-visible .cast-art img { transform: translateY(-3%) scale(1.06); }
+
+@media (prefers-reduced-motion: reduce) {
+    .cast-card:hover .cast-art img,
+    .cast-card:focus-visible .cast-art img { transform: none; }
+}
+
+/* ---- 7.2b The locked tutor --------------------------------------------------
+   The sixth tutor has no art yet, so it is shown the way a game shows a
+   character you have not unlocked: a silhouette behind a neon question
+   mark, violet screentone and scanlines, and a LOCKED tag. Used twice —
+   on its cover card and on its stage in the character select.
+
+   It stays DARK in both themes: a locked slot is an unlit one. So its
+   colours come from the palette directly, not from the theme roles, and
+   every pairing is fixed: volt on ink 16.85:1, the tag ink on volt. */
+.locked-art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    container-type: inline-size;
+    background:
+        repeating-linear-gradient(to bottom,
+            color-mix(in srgb, var(--palette-violet) 14%, transparent) 0 1px, transparent 1px 4px),
+        radial-gradient(color-mix(in srgb, var(--palette-violet) 30%, transparent) 0.075rem, transparent 0.09rem) 0 0 / 0.5rem 0.5rem,
+        var(--palette-ink);
+    color: color-mix(in srgb, var(--palette-paper) 11%, var(--palette-ink));
+}
+
+.cast-art.locked-art::before { display: none; }
+
+/* The figure: the same chibi proportions as the other five, standing on
+   the bottom edge, outlined in violet. fill is currentColor (above). */
+.locked-silhouette {
+    position: absolute;
+    inset-inline-start: 14%;
+    inset-block-end: -1%;
+    width: 72%;
+    height: auto;
+    aspect-ratio: 3 / 4;
+    fill: currentColor;
+    stroke: color-mix(in srgb, var(--palette-violet) 75%, transparent);
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+}
+
+/* The question mark sits over the head, sized to the panel (cqi), so it
+   is the same proportion on a 110px phone card and on the 288px stage. */
+.locked-mark {
+    position: relative;
+    z-index: 1;
+    margin-block-end: 26%;
+    font-family: var(--font-display);
+    font-size: 46cqi;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--palette-volt);
+    -webkit-text-stroke: 2px var(--palette-ink);
+    paint-order: stroke fill;
+    text-shadow: 0.06em 0.06em 0 var(--palette-violet);
+    transform: rotate(-8deg);
+    user-select: none;
+}
+
+.locked-tag {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 0.5rem;
+    inset-inline-start: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1875rem 0.4375rem;
+    border: 1px solid var(--palette-ink);
+    background: var(--palette-volt);
+    color: var(--palette-ink);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.locked-tag .icon { width: 0.8125rem; height: 0.8125rem; stroke-width: 2.25; }
+
+/* Poke it and the mark glitches — three hard jumps, no easing, the way a
+   corrupted sprite flickers. Pointer and keyboard alike. */
+.cast-card.is-locked:hover .locked-mark,
+.cast-card.is-locked:focus-visible .locked-mark { animation: lockedGlitch 360ms steps(1, end) 1; }
+
+@keyframes lockedGlitch {
+    0%   { transform: rotate(-8deg) translate(-3px, 1px); }
+    33%  { transform: rotate(-6deg) translate(3px, -2px); }
+    66%  { transform: rotate(-10deg) translate(-1px, 2px); }
+    100% { transform: rotate(-8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cast-card.is-locked:hover .locked-mark,
+    .cast-card.is-locked:focus-visible .locked-mark { animation: none; }
+}
 
 .cast-name {
     padding: 0.5rem 0.625rem 0;
@@ -1284,13 +1218,13 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .cast-card:focus-visible {
     z-index: 5;
     transform: rotate(0deg) translate(-3px, -4px);
-    box-shadow: calc(var(--hard) + 3px) calc(var(--hard) + 4px) 0 var(--accent);
+    box-shadow: calc(var(--hard) + 3px) calc(var(--hard) + 4px) 0 var(--pop);
 }
 
 .cast-card:hover .cast-name,
 .cast-card:focus-visible .cast-name { background: var(--volt); color: var(--on-volt); }
 
-.cast-card:active { transform: rotate(0deg) translate(var(--hard), var(--hard)); box-shadow: 0 0 0 var(--accent); }
+.cast-card:active { transform: rotate(0deg) translate(var(--hard), var(--hard)); box-shadow: 0 0 0 var(--pop); }
 .cast-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 
 @media (max-width: 29.99rem) {
@@ -1329,7 +1263,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     .cast-slot:nth-child(2) .cast-card { --tilt: 3deg; --nudge-y: 1.75rem; }
     .cast-slot:nth-child(3) .cast-card { --tilt: -2deg; --nudge-y: -0.25rem; }
     .cast-slot:nth-child(4) .cast-card { --tilt: 4deg; --nudge-x: 1rem; --nudge-y: 0.75rem; }
-    .cast-slot:nth-child(5) .cast-card { --tilt: -3deg; --nudge-y: 2rem; }
+    .cast-slot:nth-child(5) .cast-card { --tilt: -3deg; --nudge-x: 0.625rem; --nudge-y: 2rem; }
     .cast-slot:nth-child(6) .cast-card { --tilt: 5deg; --nudge-x: -0.5rem; --nudge-y: 0.5rem; }
 
     /* A hovered card clears every neighbour. */
@@ -1358,7 +1292,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     border: 1px solid var(--rule);
     background: var(--bg);
     color: var(--text);
-    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--accent);
+    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--pop);
     cursor: pointer;
     transition: transform var(--t-snap) var(--ease-snap), box-shadow var(--t-snap) var(--ease-snap),
                 background-color var(--t-snap) linear, color var(--t-snap) linear;
@@ -1366,7 +1300,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 .hero-video-toggle[hidden] { display: none; }
 .hero-video-toggle:hover { background: var(--fg); color: var(--bg); }
-.hero-video-toggle:active { transform: translate(var(--hard-sm), var(--hard-sm)); box-shadow: 0 0 0 var(--accent); }
+.hero-video-toggle:active { transform: translate(var(--hard-sm), var(--hard-sm)); box-shadow: 0 0 0 var(--pop); }
 .hero-video-toggle .icon { width: 1.125rem; height: 1.125rem; }
 .hero-video-toggle .icon-play,
 .hero-video-toggle.is-paused .icon-pause { display: none; }
@@ -1542,9 +1476,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .select-board {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    border: 1px solid var(--rule);
+    border: var(--edge-w) solid var(--rule);
     background: var(--bg);
-    box-shadow: var(--hard-lg) var(--hard-lg) 0 var(--accent);
+    box-shadow: var(--hard-lg) var(--hard-lg) 0 var(--pop);
 }
 
 @media (min-width: 56rem) {
@@ -1776,6 +1710,35 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     .model-canvas-wrapper { max-height: 40svh; }
 }
 
+/* The tutor on the stage: the transparent cutout standing in the focus
+   lines, on a flat violet floor shadow (a solid shape, no blur). */
+.model-canvas-wrapper.has-art::before {
+    content: "";
+    position: absolute;
+    inset-inline: 20%;
+    inset-block-end: 1.5%;
+    height: 7%;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.stage-art { position: absolute; inset: 0; }
+
+.stage-art img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 90%;
+}
+
+/* The locked tutor's stage: the same panel as its cover card, framed. */
+.model-canvas-wrapper.is-locked .locked-art {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--rule);
+}
+
 .slot-shine {
     position: absolute;
     inset: var(--sp-3);
@@ -1846,7 +1809,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 /* Loaded: the placeholder retires. visibility, delayed by the fade, keeps a
    screen reader from reading the retired caption after the model's alt. */
 .model-canvas-wrapper.has-model .slot-meta,
-.model-canvas-wrapper.has-model .slot-shine {
+.model-canvas-wrapper.has-model .slot-shine,
+.model-canvas-wrapper.has-model .stage-art,
+.model-canvas-wrapper.has-model .locked-art {
     opacity: 0;
     visibility: hidden;
     transition: opacity 200ms linear, visibility 0s linear 200ms;
@@ -1908,10 +1873,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .sdt-card,
 .cap {
     position: relative;
-    border: 1px solid var(--rule);
+    border: var(--edge-w) solid var(--rule);
     background: var(--bg);
     color: var(--text);
-    box-shadow: var(--hard) var(--hard) 0 var(--accent);
+    box-shadow: var(--hard) var(--hard) 0 var(--pop);
     transition: background-color var(--t-snap) linear, color var(--t-snap) linear,
                 transform var(--t-snap) var(--ease-snap), box-shadow var(--t-snap) var(--ease-snap);
 }
@@ -1921,7 +1886,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     background: var(--fg);
     color: var(--bg);
     transform: translate(-3px, -3px);
-    box-shadow: calc(var(--hard) + 3px) calc(var(--hard) + 3px) 0 var(--accent);
+    box-shadow: calc(var(--hard) + 3px) calc(var(--hard) + 3px) 0 var(--pop);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2281,15 +2246,16 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
    error from reflowing the dialog are inherited as they are. */
 .overlay {
     padding: var(--gutter);
-    background: color-mix(in srgb, var(--palette-ink) 80%, transparent);
+    background: var(--scrim);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
 }
 
+/* Ink edge for structure, violet only in the offset (see --edge-w/--pop). */
 .modal {
-    border: 1px solid var(--rule);
+    border: var(--edge-w) solid var(--rule);
     background: var(--bg);
-    box-shadow: var(--hard-lg) var(--hard-lg) 0 var(--accent);
+    box-shadow: var(--hard-lg) var(--hard-lg) 0 var(--pop);
 }
 
 .overlay .modal-head { border-block-end: 1px solid var(--rule); padding-block-end: var(--sp-4); }
@@ -2308,15 +2274,23 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .overlay .input:hover,
 .overlay .select:hover { border-color: var(--rule); }
 
-/* Focus is the edge plus a hard 2px ring — a box-shadow, so it draws
-   outside the border box and cannot change the field's height. */
+/* Focus: the edge changes colour and a ring sits outside it — a
+   box-shadow, so it cannot change the field's height. Light mode: deep
+   violet edge + soft lavender halo. Dark mode: paper edge + volt ring.
+   (Tokens --field-focus-edge / --field-focus-ring.) */
 .overlay .input:focus,
 .overlay .select:focus,
 .overlay .textarea:focus {
-    border-color: var(--rule);
+    border-color: var(--field-focus-edge);
     background: var(--bg-field);
-    box-shadow: 0 0 0 2px var(--focus);
+    box-shadow: var(--field-focus-ring);
 }
+
+/* One indicator, not two: the page-wide :focus-visible outline would draw
+   a second, offset ring around the edge-and-halo above. */
+.overlay .input:focus-visible,
+.overlay .select:focus-visible,
+.overlay .textarea:focus-visible { outline: none; }
 
 .overlay .input.is-invalid,
 .overlay .select.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 2px var(--danger-line); }
@@ -2438,7 +2412,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .toast {
     border: 1px solid var(--rule);
     background: var(--bg);
-    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--accent);
+    box-shadow: var(--hard-sm) var(--hard-sm) 0 var(--pop);
 }
 
 @media (prefers-reduced-motion: reduce) {

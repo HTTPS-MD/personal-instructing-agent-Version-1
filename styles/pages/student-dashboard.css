@@ -75,19 +75,6 @@
     flex: 0 0 auto;
 }
 
-.learn-mark {
-    width: 36px;
-    height: 36px;
-    flex: 0 0 36px;
-    border-radius: var(--r-md);
-    background: var(--accent);
-    color: var(--on-accent);
-    display: grid;
-    place-items: center;
-    font-weight: 800;
-    font-size: var(--fs-sm);
-}
-
 /* The stage chip tells the student where they are in the four-stage protocol
    without making them read a menu. */
 .stage-chip {

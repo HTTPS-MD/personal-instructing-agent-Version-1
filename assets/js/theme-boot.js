@@ -43,26 +43,56 @@
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.add('js');
 
-    /* Promote the webfont preload to a real stylesheet.
-       ------------------------------------------------------------------
-       The fonts are requested as rel="preload" in the document head so they
-       cannot render-block, and cannot block the body scripts behind them —
-       see the comment on that element. They are only useful once they are an
-       actual stylesheet, which is what this does.
+    /* ── WEBFONTS ─────────────────────────────────────────────────────────
+       THE ONE PLACE A FONT FILE IS NAMED. To change a typeface, edit this
+       URL and the matching --font-display / --font-body / --font-mono tokens
+       in styles/global.css (section C of the :root block). Every page runs
+       this file, so no HTML needs touching.
 
-       Two triggers, because one is not enough: the link's own load event is
-       the fast path, and window.load is the backstop for the case where the
-       preload finished before this listener was attached. Setting rel twice
-       is a no-op, and by window.load nothing is left to block anyway.
+       The stylesheet is requested as rel="preload" so it can never
+       render-block — or block the body scripts, i.e. sign-in — on a network
+       where the font host is slow or filtered. It becomes a real stylesheet
+       once it has arrived. Until then the text uses the metrics-matched
+       stand-ins in global.css, so nothing moves when the fonts land.
 
-       If the request never resolves the page simply keeps its fallback
-       stack, which is metrics-matched to Inter — no layout shift, no blank
-       text, no stalled sign-in. */
-    var fontCss = document.getElementById('font-css');
+       Two promotion triggers, because one is not enough: the link's own
+       load event is the fast path, and window.load is the backstop for a
+       preload that finished before the listener was attached. Setting rel
+       twice is a no-op. If the request never resolves, the page simply keeps
+       its stand-ins. */
+    var FONT_STYLESHEET = 'https://fonts.googleapis.com/css2' +
+        '?family=Inter:wght@400;500;600;700;800' +
+        '&family=JetBrains+Mono:wght@500;700' +
+        '&family=Space+Grotesk:wght@700' +
+        '&display=swap';
 
-    if (fontCss) {
-        var promote = function () { fontCss.rel = 'stylesheet'; };
-        fontCss.addEventListener('load', promote);
-        window.addEventListener('load', promote);
-    }
+    /* The hosts the fonts come from, warmed up before the request. The font
+       FILES are fetched with CORS, so their host's connection must be too;
+       the stylesheet host's must not, or the warm connection goes unused.
+       Update these if the fonts move (self-hosted files: drop them). */
+    var FONT_ORIGINS = [
+        { href: 'https://fonts.googleapis.com', cors: false },
+        { href: 'https://fonts.gstatic.com', cors: true }
+    ];
+
+    var head = document.head || document.getElementsByTagName('head')[0];
+
+    FONT_ORIGINS.forEach(function (origin) {
+        var hint = document.createElement('link');
+        hint.rel = 'preconnect';
+        hint.href = origin.href;
+        if (origin.cors) { hint.crossOrigin = ''; }
+        head.appendChild(hint);
+    });
+
+    var fontCss = document.createElement('link');
+    fontCss.id = 'font-css';
+    fontCss.rel = 'preload';
+    fontCss.as = 'style';
+    fontCss.href = FONT_STYLESHEET;
+
+    var promote = function () { fontCss.rel = 'stylesheet'; };
+    fontCss.addEventListener('load', promote);
+    window.addEventListener('load', promote);
+    head.appendChild(fontCss);
 })();

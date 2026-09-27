@@ -286,7 +286,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     max-width: 440px;
     height: 100%;
     background: var(--bg-surface);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-dialog);
     transform: translateX(16px);
     opacity: 0;
     transition: transform var(--t-layout), opacity var(--t-base);

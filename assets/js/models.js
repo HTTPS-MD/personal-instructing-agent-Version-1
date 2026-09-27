@@ -63,8 +63,11 @@
     /* TEMPORARY — 3D loading is switched off for the test deploy.
        pia-open.glb (66 MiB) is over Cloudflare Pages' 25 MiB per-file limit
        and has been taken out of assets/models/. While this is false no slot
-       requests the renderer or a model; the slots listed in AVAILABLE show
-       DISABLED_LABEL instead. To turn 3D back on: put a slimmed-down
+       requests the renderer or a model. Each case now shows the tutor's
+       character art (or the locked panel), and a mounted model would sit on
+       top of it and retire it (.has-model). DISABLED_LABEL only appears in a
+       case that still carries the old .slot-ratio caption. To turn 3D back
+       on: put a slimmed-down
        pia-open.glb (under 25 MiB) back in assets/models/ and set this to
        true. Nothing else changes. */
     var MODELS_ENABLED = false;
@@ -216,7 +219,7 @@
            label, so an error message can still say which agent it was. */
         slots.forEach(function (el) {
             var label = el.getAttribute('aria-label') || '';
-            var m = label.match(/3D model of (.+?)(?: —|$)/);
+            var m = label.match(/^(PIA [^,]+)/) || label.match(/3D model of (.+?)(?: —|$)/);
             if (m) { el.setAttribute('data-model-name', m[1]); }
         });
 

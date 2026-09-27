@@ -642,15 +642,17 @@
         initHoverIntent();
         wake();
 
-        /* For whoever opens the console. Every project should have one. */
+        /* For whoever opens the console. Every project should have one.
+           Console styling cannot use var(), so the palette is read from the
+           tokens in global.css at runtime — no colour is written here. */
+        var tokens = getComputedStyle(document.documentElement);
+        var token = function (name) { return tokens.getPropertyValue(name).trim(); };
         console.log(
             '%c PIA %c Personal Instructing Agent\n' +
             '  Six agents. One of them teaches the way you think.\n' +
             '  Built at the University of the East. Hello to the one student who checked.',
-            /* Console styling cannot read CSS variables, so the palette
-               literals from landing.css are repeated here, once. */
-            'background:#D4FF3A;color:#0E0B16;font-weight:700;padding:2px 6px',
-            'color:#A259FF'
+            'background:' + token('--palette-volt') + ';color:' + token('--palette-ink') + ';font-weight:700;padding:2px 6px',
+            'color:' + token('--palette-violet')
         );
     }
 
