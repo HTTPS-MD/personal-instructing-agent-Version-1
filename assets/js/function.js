@@ -435,11 +435,6 @@ function renderSignOutControl(profile) {
             white-space:nowrap; max-width:42vw; overflow:hidden; text-overflow:ellipsis; }
         #pia-signout-who.pia-signout-inline { max-width:26vw; text-align:right; }
         #pia-signout-who small { display:block; color:var(--text-faint); font-size:var(--fs-xs); }
-        #pia-signout-btn { cursor:pointer; border:0; border-radius:var(--r-pill);
-            padding:.5rem 1rem; font-size:var(--fs-xs); font-weight:700;
-            background:var(--bg-chip); color:var(--text); }
-        #pia-signout-btn:hover { background:var(--bg-chip-hover); }
-        #pia-signout-btn:disabled { opacity:.6; cursor:default; }
     `;
     document.head.appendChild(style);
 
@@ -456,7 +451,7 @@ function renderSignOutControl(profile) {
             const who = document.createElement('span');
             who.id = 'pia-signout-who';
             who.className = 'pia-signout-inline';
-            who.innerHTML = `<small>Naka-sign in:</small>${escapeHTML(name)}`;
+            who.innerHTML = `<small>Signed in as:</small>${escapeHTML(name)}`;
             own.parentNode.insertBefore(who, own);
         }
         return;
@@ -465,8 +460,8 @@ function renderSignOutControl(profile) {
     const wrap = document.createElement('div');
     wrap.id = 'pia-signout-control';
     wrap.innerHTML = `
-        <span id="pia-signout-who"><small>Naka-sign in:</small>${escapeHTML(name)}</span>
-        <button id="pia-signout-btn" type="button">SIGN OUT</button>
+        <span id="pia-signout-who"><small>Signed in as:</small>${escapeHTML(name)}</span>
+        <button id="pia-signout-btn" class="btn btn-signout" type="button">Sign out</button>
     `;
 
     // Kung naglagay ka ng <div id="pia-signout-slot"></div> sa header ng page,
@@ -479,7 +474,7 @@ function renderSignOutControl(profile) {
 
     document.getElementById('pia-signout-btn').addEventListener('click', async (e) => {
         e.currentTarget.disabled = true;
-        e.currentTarget.textContent = 'SIGNING OUT...';
+        e.currentTarget.textContent = 'Signing out…';
         await executeForceLogout();
     });
 }

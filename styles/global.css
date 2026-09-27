@@ -758,6 +758,39 @@ body {
 }
 .btn-danger-soft:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 20%, transparent); }
 
+/* The navbar's Sign out — every page, every role. Deliberately NOT a C2
+   pill: it is the way OUT of the learning surface, not part of it, so it
+   wears the brand's comic print instead. Square corners, a 2px edge in the
+   text colour, a mono caption. Quiet at rest (no fill), so it never
+   competes with the page's real action; on hover it inverts and lifts onto
+   the same hard violet offset the landing page's buttons use. */
+.btn-signout {
+    height: 40px;
+    padding: 0 var(--sp-4);
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    box-shadow: inset 0 0 0 2px var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.btn-signout .icon { width: 15px; height: 15px; }
+
+.btn-signout:hover:not(:disabled) {
+    background: var(--text);
+    color: var(--bg-body);
+    box-shadow: inset 0 0 0 2px var(--text), 3px 3px 0 var(--pop);
+    transform: translate(-1px, -1px);
+}
+
+.btn-signout:active:not(:disabled) {
+    box-shadow: inset 0 0 0 2px var(--text);
+    transform: translate(1px, 1px);
+}
+
 .btn-sm { height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-xs); border-radius: var(--r-pill); }
 .btn-lg { height: var(--control-h-lg); padding: 0 var(--sp-7); font-size: var(--fs-body); }
 .btn-block { width: 100%; }
