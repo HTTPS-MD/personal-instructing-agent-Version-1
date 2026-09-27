@@ -19,8 +19,8 @@
 #                and the realtime websocket.
 #   frame-ancestors 'none' + X-Frame-Options: no site may frame PIA.
 #
-# Cloudflare serves "pretty" URLs: /page.html redirects to /page. Per-page
-# rules below therefore list both spellings.
+# Cloudflare serves "pretty" URLs: /page.html redirects to /page. A per-page
+# rule added here must therefore list both spellings.
 # ============================================================================
 
 /*
@@ -32,15 +32,3 @@
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin
   X-Permitted-Cross-Domain-Policies: none
-
-# LEGACY PAGE. tutoring-dashboard.html is no longer linked from anywhere (the
-# student dashboard runs the lesson itself), but it still loads its icons from
-# unpkg and has two inline scripts. Rather than break it silently, it gets the
-# same policy plus those two allowances. Delete this block with the page.
-/student/html/tutoring-dashboard
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; media-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://hvfqqdtemayhhfavmfbs.supabase.co wss://hvfqqdtemayhhfavmfbs.supabase.co; upgrade-insecure-requests
-
-/student/html/tutoring-dashboard.html
-  ! Content-Security-Policy
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; media-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://hvfqqdtemayhhfavmfbs.supabase.co wss://hvfqqdtemayhhfavmfbs.supabase.co; upgrade-insecure-requests

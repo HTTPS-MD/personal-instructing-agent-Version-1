@@ -2,7 +2,7 @@
 // ACCOUNT ACTIVATION / PASSWORD SETUP
 // (sign-up.html lang ang gumagamit nito -- ito ang landing page ng
 //  "Send Activation Email" at "Reset Password" magic-link mula sa admin.
-//  Ang normal na sign-in + forgot-password (OTP) flow ay nasa index.js na
+//  Ang normal na sign-in + forgot-password (OTP) flow ay nasa auth.js na
 //  modal -- hindi na dinuplicate dito.)
 // ==========================================
 

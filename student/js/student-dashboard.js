@@ -33,7 +33,7 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    /* Kept in step with tutoring-dashboard.js and the server-side replay. */
+    /* Kept in step with the server-side replay. */
     var SESSION_TARGET = 10;
     var MAX_ATTEMPTS = 2;
 

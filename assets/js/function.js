@@ -771,22 +771,14 @@ async function executeForceLogout() {
 // Ang mga page na TUMUTUGMA na sa bawat stage. Kung nandoon na ang estudyante,
 // walang gagawin.
 //
-// CRITICAL FIX: ang 'Tutoring Dashboard' ay may DALAWANG page --
-// student-dashboard.html (hub) at tutoring-dashboard.html (mismong laro). Ang
-// lumang code ay `student-dashboard.html` lang ang tinitingnan, sa pamamagitan
-// pa ng .includes(). Dahil ang '/student/html/tutoring-dashboard.html' ay HINDI
-// naglalaman ng substring na 'student-dashboard.html' (sumusunod sa 'student'
-// ay '/', hindi '-'), ang bawat syncGameProgress() -- na tumatakbo sa bawat
-// problem, hint, at sagot -- ay nagpapaputok ng SARILING subscription ng
-// estudyante at nagtatapon sa kanila palabas ng laro. Walang naitatalang
-// tutoring data kailanman.
-//
-// Ang .endsWith('/' + page) ay eksaktong tugma sa filename, kaya hindi na
-// maaaring maulit ang ganitong substring collision.
+// Ang .endsWith('/' + page) ay eksaktong tugma sa filename. Dati .includes()
+// ang gamit, at ang substring collision nito sa lumang tutoring-dashboard.html
+// ang nagtatapon sa estudyante palabas ng laro sa bawat syncGameProgress().
+// Ang lesson ay tumatakbo na ngayon sa loob mismo ng student-dashboard.html.
 const STAGE_PAGES = {
     'OCEAN': { url: 'ocean-test.html', pages: ['ocean-test.html'] },
     'Character Selection': { url: 'character-selection.html', pages: ['character-selection.html'] },
-    'Tutoring Dashboard': { url: 'student-dashboard.html', pages: ['student-dashboard.html', 'tutoring-dashboard.html'] },
+    'Tutoring Dashboard': { url: 'student-dashboard.html', pages: ['student-dashboard.html'] },
     'Waiting Room': { url: 'waiting-room.html', pages: ['waiting-room.html'] }
 };
 

@@ -1487,12 +1487,12 @@ body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
 }
 
 /* ------------------------------------------ 16. JS-INJECTED GLOBAL OVERLAYS
-   assets/js/function.js runs on all nine pages and builds two overlays at
+   assets/js/function.js runs on every page and builds two overlays at
    runtime: the session-revoke dialog (forced logout when a device claim is
    withdrawn) and the idle-timeout warning.
 
-   Their styles used to live in styles/components.css, which only ever
-   shipped on the tutoring page — so on the other eight pages this security
+   Their styles used to live in styles/components.css (since deleted), which
+   only ever shipped on the tutoring page — so on the other pages this security
    dialog rendered as unstyled block elements. They belong in the shared
    system, which is here. Re-themed onto the current tokens on the way in;
    the class names are the contract with function.js and are unchanged.
