@@ -26,19 +26,16 @@
 (function () {
     'use strict';
 
-    /* Light is the default. The system's ground is warm cream and its identity
-       lives there; dark is the alternate. A dark-mode visitor must never see a
-       cream flash, which is why this still runs before first paint. */
-    var theme = 'light';
+    /* Dark is the default: the brand is ink with neon on it, and light mode
+       is the same page printed on newsprint. A stored choice from the toggle
+       always wins. The OS preference is deliberately not consulted — most
+       machines report "light" simply because nobody changed it, which would
+       make the alternate the page almost everyone sees. */
+    var theme = 'dark';
 
     try {
         var saved = localStorage.getItem('pia_theme');
-        if (saved === 'light' || saved === 'dark') {
-            /* An explicit choice always beats the operating system. */
-            theme = saved;
-        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            theme = 'dark';
-        }
+        if (saved === 'light' || saved === 'dark') { theme = saved; }
     } catch (e) {
         /* Private mode with storage disabled — fall through to the default. */
     }

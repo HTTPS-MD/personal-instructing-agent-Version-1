@@ -421,15 +421,15 @@
     function friendlyAuthError(error) {
         var raw = String((error && error.message) || '');
         if (/invalid login credentials/i.test(raw)) {
-            return 'Incorrect email or password. Check both and try again.';
+            return 'Nope — that email and password don\u2019t match. Check both (and Caps Lock) and try again.';
         }
         if (/email not confirmed/i.test(raw)) {
-            return 'This account is not activated yet. Use Activate account first.';
+            return 'This account isn\u2019t switched on yet. Hit Activate account first.';
         }
         if (/rate limit|too many/i.test(raw)) {
-            return 'Too many attempts. Wait a minute, then try again.';
+            return 'Whoa, too many tries. Take a one-minute breather, then go again.';
         }
-        return raw || 'Sign-in failed. Please try again.';
+        return raw || 'Well, that didn\u2019t work. Let\u2019s try again.';
     }
 
     async function signIn(opts) {
@@ -440,8 +440,8 @@
         var password = $('#' + opts.passwordId).value;
 
         var valid = true;
-        valid = setFieldError(opts.emailId, isEmail(email) ? '' : 'Enter a valid email address.') && valid;
-        valid = setFieldError(opts.passwordId, password ? '' : 'Password is required.') && valid;
+        valid = setFieldError(opts.emailId, isEmail(email) ? '' : 'That doesn\u2019t look like an email address.') && valid;
+        valid = setFieldError(opts.passwordId, password ? '' : 'You\u2019ll need your password for this one.') && valid;
         if (!valid) {
             focusFirstInvalid(opts.formId);
             return;
@@ -527,7 +527,7 @@
             }
         } catch (err) {
             console.error('Sign-in failed:', err);
-            setStatus(opts.statusId, 'Could not reach the server. Check your connection and try again.', 'error');
+            setStatus(opts.statusId, 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
         } finally {
             release();
         }
@@ -570,7 +570,7 @@
         clearStatus('activate-status');
 
         var email = normalizeEmail($('#ac-email').value);
-        if (!setFieldError('ac-email', isEmail(email) ? '' : 'Enter a valid email address.')) { return; }
+        if (!setFieldError('ac-email', isEmail(email) ? '' : 'That doesn\u2019t look like an email address.')) { return; }
 
         var release = setBusy($('#ac-submit'), 'Sending…');
 
@@ -591,7 +591,7 @@
             $('#activate-form').reset();
         } catch (err) {
             console.error('Activation failed:', err);
-            setStatus('activate-status', 'Could not reach the server. Please try again.', 'error');
+            setStatus('activate-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
         } finally {
             release();
         }
@@ -677,7 +677,7 @@
         clearStatus('forgot-status');
 
         var email = normalizeEmail($('#fp-email').value);
-        if (!setFieldError('fp-email', isEmail(email) ? '' : 'Enter a valid email address.')) {
+        if (!setFieldError('fp-email', isEmail(email) ? '' : 'That doesn\u2019t look like an email address.')) {
             focusFirstInvalid('forgot-form');
             return;
         }
@@ -694,7 +694,7 @@
             sent = true;
         } catch (err) {
             console.error('Reset failed:', err);
-            setStatus('forgot-status', 'Could not reach the server. Please try again.', 'error');
+            setStatus('forgot-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
         } finally {
             release();
         }
@@ -737,7 +737,7 @@
             verified = true;
         } catch (err) {
             console.error('Code check failed:', err);
-            setStatus('forgot-status', 'Could not reach the server. Please try again.', 'error');
+            setStatus('forgot-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
         } finally {
             release();
         }
@@ -769,7 +769,7 @@
             startResendCooldown();
         } catch (err) {
             console.error('Resend failed:', err);
-            setStatus('forgot-status', 'Could not reach the server. Please try again.', 'error');
+            setStatus('forgot-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
             btn.disabled = false;
             btn.textContent = 'Send a new code';
         }
@@ -818,7 +818,7 @@
         if (typeof sb === 'undefined' || !sb) {
             $$('[data-auth-open]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
-                    toast('Service unavailable', 'Could not reach the database. Please refresh.', 'danger');
+                    toast('Server\u2019s not answering', 'The database didn\u2019t pick up. Refresh and try again.', 'danger');
                 });
             });
             return;

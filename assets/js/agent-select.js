@@ -85,6 +85,18 @@
         tab.addEventListener('click', function () { select(tab, { focus: false }); });
     });
 
+    /* The cast on the cover: each card is a link to #agent-select carrying
+       data-pick="<agent id>". The link does the scrolling; this highlights
+       that tutor so the student lands on the one they tapped. Delegated, so
+       it needs no per-card wiring. */
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest ? e.target.closest('[data-pick]') : null;
+        if (!link) { return; }
+        var id = link.getAttribute('data-pick');
+        var tab = tabs.filter(function (t) { return t.getAttribute('data-agent') === id; })[0];
+        if (tab) { select(tab, { focus: false }); }
+    });
+
     /* Arrow keys wrap. Both axes are bound: the row reads left-to-right, but
        a student who reaches for Down to mean "next" should not find it dead. */
     root.addEventListener('keydown', function (e) {

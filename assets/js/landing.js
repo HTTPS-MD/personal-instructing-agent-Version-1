@@ -613,7 +613,7 @@
             wire.hidden = false;
             wire.classList.add('is-error');
             if (text) {
-                text.textContent = 'Something on this page failed to load. Reload, or carry on — sign-in still works.';
+                text.textContent = 'Part of this page tripped over itself. Reload, or carry on — sign-in still works.';
             }
 
             /* Fail visible, not blank. */
@@ -647,8 +647,10 @@
             '%c PIA %c Personal Instructing Agent\n' +
             '  Six agents. One of them teaches the way you think.\n' +
             '  Built at the University of the East. Hello to the one student who checked.',
-            'background:#22C55E;color:#121212;font-weight:700;padding:2px 6px',
-            'color:#9CA3AF'
+            /* Console styling cannot read CSS variables, so the palette
+               literals from landing.css are repeated here, once. */
+            'background:#D4FF3A;color:#0E0B16;font-weight:700;padding:2px 6px',
+            'color:#A259FF'
         );
     }
 
