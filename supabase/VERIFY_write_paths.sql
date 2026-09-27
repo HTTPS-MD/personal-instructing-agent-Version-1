@@ -130,6 +130,17 @@ begin
   perform pg_temp.pia_try('FORGE: group_type = control', 'BLOCKED', s, format(
     $q$update public.profiles set group_type = 'control' where email = %L$q$, s));
 
+  -- 0019: ang naka-flag na estudyante ay hindi pwedeng mag-clear ng sariling
+  -- must_change_password para malaktawan ang Set New Password screen. Itinataas
+  -- muna ang flag -- ang false -> false ay no-op na pinapayagan, walang patunay.
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'profiles'
+                and column_name = 'must_change_password') then
+    update public.profiles set must_change_password = true where email = s;
+    perform pg_temp.pia_try('FORGE: must_change_password = false (0019)', 'BLOCKED', s, format(
+      $q$update public.profiles set must_change_password = false where email = %L$q$, s));
+  end if;
+
   if o is not null and o is distinct from s then
     perform pg_temp.pia_try('FORGE: ibang student ang row', 'BLOCKED', s, format(
       $q$update public.profiles set consecutive_correct = 99 where email = %L$q$, o));

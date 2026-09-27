@@ -10,6 +10,36 @@ const setupForm = document.getElementById('setup-password-form');
 const setupStatus = document.getElementById('setup-status-box');
 const setupSubmitBtn = document.getElementById('setup-submit-btn');
 
+// RESET vs ACTIVATION. Iisang page ito para sa dalawa. ?mode=reset ang galing
+// sa reset CODE (auth.js); ang reset LINK ay nakikilala sa PASSWORD_RECOVERY
+// event ng Supabase (o sa type=recovery sa hash, kung naabutan pa). Salita lang
+// ang nagbabago -- pareho ang updateUser() at ang pag-sign out pagkatapos.
+let isResetMode = new URLSearchParams(window.location.search).get('mode') === 'reset' ||
+    /type=recovery/.test(window.location.hash);
+let submitLabel = 'Activate my account';
+
+function applyResetCopy() {
+    isResetMode = true;
+    submitLabel = 'Save new password';
+    const label = document.querySelector('.auth-identity-label');
+    if (label) label.textContent = 'Resetting the password for';
+    const title = document.querySelector('.auth-title');
+    if (title) title.textContent = 'Choose a new password';
+    const lede = document.querySelector('.auth-lede');
+    if (lede) lede.textContent = 'Your old password stops working as soon as you save this one. Then sign in again with your school email and the new password.';
+    document.title = 'Reset Your Password — PIA';
+    if (setupSubmitBtn && !setupSubmitBtn.disabled) {
+        setupSubmitBtn.innerHTML = '<svg class="icon"><use href="#i-key"></use></svg> ' + submitLabel;
+    }
+}
+
+if (isResetMode) applyResetCopy();
+if (window.supabaseClient) {
+    window.supabaseClient.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') applyResetCopy();
+    });
+}
+
 function showSetupStatus(message, type) {
     if (!setupStatus) return;
 
@@ -74,7 +104,11 @@ if (setupForm) {
         const password = document.getElementById('setup-password').value;
         const confirmPassword = document.getElementById('setup-confirm-password').value;
 
-        if (password.length < 6) return showSetupStatus("Password must be at least 6 characters.", "error");
+        // Kapareho ng patakaran sa set-new-password page at sa temporary password
+        // ng admin: 8+ character, may letra at may numero.
+        if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+            return showSetupStatus("Use at least 8 characters, with at least one letter and one number.", "error");
+        }
         if (password !== confirmPassword) return showSetupStatus("Passwords do not match.", "error");
 
         setupSubmitBtn.disabled = true;
@@ -84,9 +118,11 @@ if (setupForm) {
         const { error: updateError } = await window.supabaseClient.auth.updateUser({ password });
 
         if (updateError) {
-            showSetupStatus(updateError.message, "error");
+            const sameAsOld = updateError.code === 'same_password' ||
+                /different from the old password/i.test(updateError.message || '');
+            showSetupStatus(sameAsOld ? "Choose a password different from your old one." : updateError.message, "error");
             setupSubmitBtn.disabled = false;
-            setupSubmitBtn.textContent = 'Activate my account';
+            setupSubmitBtn.textContent = submitLabel;
             return;
         }
 
@@ -99,7 +135,9 @@ if (setupForm) {
         // sa normal sign-in gamit ang bago nilang password.
         await window.supabaseClient.auth.signOut();
 
-        showSetupStatus("Account activated! Redirecting to sign in...", "success");
+        showSetupStatus(isResetMode
+            ? "Password updated! Redirecting to sign in..."
+            : "Account activated! Redirecting to sign in...", "success");
         setTimeout(() => { window.location.replace('../../index.html'); }, 2000);
     });
 }

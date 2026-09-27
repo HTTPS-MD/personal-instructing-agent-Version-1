@@ -148,6 +148,7 @@
 
         if (id === 'modal-signin') { lastSignin = 'signin'; }
         if (id === 'modal-staff') { lastSignin = 'staff'; }
+        if (id === 'modal-forgot' && typeof resetForgotDialog === 'function') { resetForgotDialog(); }
 
         var current = openLayers[openLayers.length - 1];
         if (current && current.id !== id) {
@@ -502,6 +503,17 @@
                 }
             }
 
+            /* An admin set a temporary password for this student (the
+               admin-set-temp-password Edge Function). They must replace it
+               before anything else: the admin knows it, and the next one
+               should be known to the student alone. Every other student page
+               sends them back here too (requireStudentSession). */
+            if (role === 'student' && profile.must_change_password === true) {
+                setStatus(opts.statusId, 'Signed in. Choose a new password to continue…', 'ok');
+                window.location.replace('student/html/set-new-password.html');
+                return;
+            }
+
             setStatus(opts.statusId, 'Signed in. Taking you to your dashboard…', 'ok');
 
             if (role === 'admin') {
@@ -587,35 +599,179 @@
 
     /* ============================================ 5. PASSWORD RESET ==== */
 
+    /* Self-service recovery, in two steps inside one dialog.
+
+         1. The email. resetPasswordForEmail() sends ONE email carrying both a
+            reset link and a one-time code (the Supabase "Reset Password"
+            template must include {{ .ConfirmationURL }} and {{ .Token }}).
+         2. The code, for whoever finds typing it easier than opening the link
+            — a student on a lab PC whose email is on their phone, say.
+            verifyOtp(type: 'recovery') turns it into the same recovery
+            session the link would, and both routes end on the set-password
+            page, which saves the new password and signs them out to sign in
+            again normally.
+
+       Neither step ever says whether an address is enrolled: the wording is
+       identical either way, so the form cannot be used to test the roster. */
+    var forgotEmail = null;
+    var resendTimerId = null;
+    var RESEND_COOLDOWN = 60;
+
+    function passwordPageAfterCode() {
+        return new URL('assets/html/sign-up.html?mode=reset', window.location.href).href;
+    }
+
+    /* The footer's one primary button serves whichever step is showing. */
+    function showForgotStep(step) {
+        var onCode = step === 'code';
+        $('#forgot-form').hidden = onCode;
+        $('#forgot-code-form').hidden = !onCode;
+
+        var submit = $('#fp-submit');
+        submit.setAttribute('form', onCode ? 'forgot-code-form' : 'forgot-form');
+        submit.innerHTML = onCode
+            ? '<svg class="icon"><use href="#i-check"></use></svg> Verify code'
+            : '<svg class="icon"><use href="#i-key"></use></svg> Send reset link';
+
+        var field = onCode ? $('#fp-code') : $('#fp-email');
+        if (field) { field.focus({ preventScroll: true }); }
+    }
+
+    function resetForgotDialog() {
+        clearInterval(resendTimerId);
+        forgotEmail = null;
+        clearFormErrors('forgot-form');
+        clearFormErrors('forgot-code-form');
+        clearStatus('forgot-status');
+        $('#forgot-code-form').reset();
+        showForgotStep('email');
+    }
+
+    /* Supabase rate-limits reset emails; the cooldown keeps a student from
+       hitting that limit and being told to wait with no explanation. */
+    function startResendCooldown() {
+        var btn = $('#fp-resend');
+        var left = RESEND_COOLDOWN;
+        clearInterval(resendTimerId);
+        btn.disabled = true;
+        btn.textContent = 'Send a new code (' + left + 's)';
+        resendTimerId = setInterval(function () {
+            left -= 1;
+            if (left <= 0) {
+                clearInterval(resendTimerId);
+                btn.disabled = false;
+                btn.textContent = 'Send a new code';
+                return;
+            }
+            btn.textContent = 'Send a new code (' + left + 's)';
+        }, 1000);
+    }
+
+    async function sendResetEmail(email) {
+        return sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() });
+    }
+
     async function handleForgot(event) {
         event.preventDefault();
         clearFormErrors('forgot-form');
         clearStatus('forgot-status');
 
         var email = normalizeEmail($('#fp-email').value);
-        if (!setFieldError('fp-email', isEmail(email) ? '' : 'Enter a valid email address.')) { return; }
+        if (!setFieldError('fp-email', isEmail(email) ? '' : 'Enter a valid email address.')) {
+            focusFirstInvalid('forgot-form');
+            return;
+        }
 
         var release = setBusy($('#fp-submit'), 'Sending…');
+        var sent = false;
 
         try {
-            var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() });
-
+            var res = await sendResetEmail(email);
             if (res.error) {
-                setStatus('forgot-status', res.error.message, 'error');
+                setStatus('forgot-status', friendlyAuthError(res.error), 'error');
                 return;
             }
-
-            /* Deliberately does not confirm whether the address exists — that
-               would let anyone test the roster for enrolled participants. */
-            setStatus('forgot-status',
-                'If that address is on the roster, a reset link is on its way.', 'ok');
-            toast('Reset link sent', 'Check the inbox for ' + email + '.');
-            $('#forgot-form').reset();
+            sent = true;
         } catch (err) {
             console.error('Reset failed:', err);
             setStatus('forgot-status', 'Could not reach the server. Please try again.', 'error');
         } finally {
             release();
+        }
+
+        /* After release(): it restores the button's step-1 label, which the
+           step switch then replaces. */
+        if (sent) {
+            forgotEmail = email;
+            $('#fp-sent-to').textContent = email;
+            showForgotStep('code');
+            startResendCooldown();
+            toast('Check your email', 'A reset link and code are on their way.');
+        }
+    }
+
+    async function handleForgotCode(event) {
+        event.preventDefault();
+        clearFormErrors('forgot-code-form');
+        clearStatus('forgot-status');
+
+        var token = ($('#fp-code').value || '').replace(/\s+/g, '');
+        if (!setFieldError('fp-code', /^\d{6,10}$/.test(token)
+            ? '' : 'Enter the code from the email — numbers only.')) {
+            focusFirstInvalid('forgot-code-form');
+            return;
+        }
+
+        var release = setBusy($('#fp-submit'), 'Checking…');
+        var verified = false;
+
+        try {
+            var res = await sb.auth.verifyOtp({ email: forgotEmail, token: token, type: 'recovery' });
+            if (res.error) {
+                /* One message for wrong, used and expired alike: telling them
+                   apart helps a guesser, not a student. */
+                setFieldError('fp-code', 'That code is wrong or has expired. Check the newest email, or send a new code.');
+                focusFirstInvalid('forgot-code-form');
+                return;
+            }
+            verified = true;
+        } catch (err) {
+            console.error('Code check failed:', err);
+            setStatus('forgot-status', 'Could not reach the server. Please try again.', 'error');
+        } finally {
+            release();
+        }
+
+        if (verified) {
+            clearInterval(resendTimerId);
+            setStatus('forgot-status', 'Code accepted. Opening the page to choose your new password…', 'ok');
+            window.location.assign(passwordPageAfterCode());
+        }
+    }
+
+    async function handleForgotResend() {
+        if (!forgotEmail) { return; }
+        clearStatus('forgot-status');
+        var btn = $('#fp-resend');
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+
+        try {
+            var res = await sendResetEmail(forgotEmail);
+            if (res.error) {
+                setStatus('forgot-status', friendlyAuthError(res.error), 'error');
+                btn.disabled = false;
+                btn.textContent = 'Send a new code';
+                return;
+            }
+            setStatus('forgot-status', 'A new email is on its way. Use the newest code.', 'ok');
+            $('#fp-code').value = '';
+            startResendCooldown();
+        } catch (err) {
+            console.error('Resend failed:', err);
+            setStatus('forgot-status', 'Could not reach the server. Please try again.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Send a new code';
         }
     }
 
@@ -672,6 +828,9 @@
         $('#staff-form').addEventListener('submit', handleStaffSignIn);
         $('#activate-form').addEventListener('submit', handleActivate);
         $('#forgot-form').addEventListener('submit', handleForgot);
+        $('#forgot-code-form').addEventListener('submit', handleForgotCode);
+        $('#fp-resend').addEventListener('click', handleForgotResend);
+        $('#fp-change-email').addEventListener('click', function () { resetForgotDialog(); });
 
         /* Smooth in-page anchors, without hijacking anything else. */
         $$('a[href^="#"]').forEach(function (link) {

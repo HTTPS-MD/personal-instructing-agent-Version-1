@@ -217,6 +217,8 @@
 }
 
 .notice-accent { background: var(--accent-soft); }
+/* display: flex above would otherwise beat the hidden attribute. */
+.notice[hidden] { display: none; }
 .notice .icon { color: var(--accent); margin-top: 1px; }
 .notice-title { font-size: var(--fs-sm); font-weight: 700; }
 .notice-text { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; }
@@ -236,6 +238,40 @@
 .device-text { flex: 1 1 auto; min-width: 0; }
 .device-name { font-size: var(--fs-sm); font-weight: 600; }
 .device-meta { font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* Reset password dialog: two routes, each a titled block with its own action. */
+.reset-route {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.reset-route > form,
+.reset-route > .notice { align-self: stretch; }
+.reset-route-title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); font-weight: 700; }
+.reset-route-title .icon { width: 18px; height: 18px; color: var(--accent); }
+.reset-route-text { font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted); }
+
+/* The block is already the inset well colour; lift the field out of it. */
+.reset-route .input { background: var(--bg-surface); }
+
+.temp-pw-row { display: flex; gap: var(--sp-2); }
+.temp-pw-row .btn { flex: 0 0 auto; }
+
+/* Monospace, so 8 and B, or 5 and S, can't be confused when read aloud. */
+.temp-pw-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+}
+
+.temp-pw-input[readonly] { background: var(--accent-soft); }
+#temp-password-done .btn { margin-top: var(--sp-3); }
 
 /* Trait meters (drawer) */
 .trait + .trait { margin-top: var(--sp-4); }
@@ -280,19 +316,22 @@
     background: var(--bg-field);
 }
 
+/* Stacked, not three columns: the drawer is narrow, and a statement squeezed
+   beside its answer broke one word per line. Number on the left, the
+   statement, then the answer beneath it. */
 .bfpt-answer-list li {
     display: grid;
-    grid-template-columns: 2rem minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: var(--sp-3);
+    grid-template-columns: 2rem minmax(0, 1fr);
+    column-gap: var(--sp-3);
+    row-gap: 2px;
     padding: var(--sp-2) var(--sp-3);
     font-size: var(--fs-xs);
 }
 
 .bfpt-answer-list li + li { border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
-.bfpt-n { color: var(--text-faint); font-weight: 700; }
+.bfpt-n { grid-row: span 2; color: var(--text-faint); font-weight: 700; }
 .bfpt-q { color: var(--text); line-height: 1.45; }
-.bfpt-a { color: var(--text-muted); white-space: nowrap; text-align: right; }
+.bfpt-a { grid-column: 2; color: var(--text-muted); }
 .bfpt-a b { color: var(--text); }
 
 /* ---------------------------------------------------------------- 12. DRAWER */

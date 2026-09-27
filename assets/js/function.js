@@ -258,9 +258,18 @@ function canEnterStage(profile, pageKey) {
     return false;
 }
 
+// Ang page kung saan pinapalitan ng estudyante ang temporary password na
+// ibinigay ng admin. Dito lang sila pwedeng pumunta habang naka-flag.
+const SET_NEW_PASSWORD_URL = '/student/html/set-new-password.html';
+
 // I-verify ang tunay na session at kunin ang profile. Nagbabalik ng profile,
 // o null kung nag-redirect na (huwag nang ituloy ang caller).
-async function requireStudentSession() {
+//
+// opts.allowPasswordChange -- ang set-new-password page lang ang nagpapasa
+// nito. Lahat ng iba ay nire-redirect doon habang must_change_password = true,
+// kaya walang ibang student page na mabubuksan hangga't hindi napapalitan ang
+// temporary password (migration 0019).
+async function requireStudentSession(opts) {
     if (!window.supabaseClient) {
         window.location.replace('/index.html');
         return null;
@@ -277,11 +286,25 @@ async function requireStudentSession() {
     // Ang email ng session ang TANGING pinagkakatiwalaang identity.
     const email = session.user.email;
 
-    const { data: profile } = await supabaseClient
+    const PROFILE_COLUMNS = 'email, full_name, role, group_type, is_ocean_done, selected_character, current_stage';
+
+    let { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
-        .select('email, full_name, role, group_type, is_ocean_done, selected_character, current_stage')
+        .select(PROFILE_COLUMNS + ', must_change_password')
         .eq('email', email)
         .maybeSingle();
+
+    // 42703 = walang ganitong column: hindi pa na-apply ang migration 0019.
+    // Bumalik sa dating column set. Kung hindi, ang error na ito ay magiging
+    // "walang profile" sa ibaba -- at mapapa-sign out ang LAHAT ng estudyante
+    // na parang na-revoke ang session nila.
+    if (profileError && profileError.code === '42703') {
+        ({ data: profile } = await supabaseClient
+            .from('profiles')
+            .select(PROFILE_COLUMNS)
+            .eq('email', email)
+            .maybeSingle());
+    }
 
     if (!profile) {
         // Umaabot din dito ang na-revoke na session: hinaharangan ng
@@ -298,6 +321,15 @@ async function requireStudentSession() {
     const role = profile.role ? profile.role.trim().toLowerCase() : 'student';
     if (role === 'admin') { window.location.replace('/admin/html/admin-dashboard.html'); return null; }
     if (role === 'teacher') { window.location.replace('/teacher/html/teacher-dashboard.html'); return null; }
+
+    // FORCED PASSWORD CHANGE. Ang admin ang nakakaalam ng temporary password,
+    // kaya bawal munang pumasok kahit saan hanggang mapalitan ito. Ang flag ay
+    // ibinababa ng database trigger kapag talagang nagbago ang password -- hindi
+    // ito kayang i-clear ng estudyante nang direkta.
+    if (profile.must_change_password === true && !(opts && opts.allowPasswordChange)) {
+        window.location.replace(SET_NEW_PASSWORD_URL);
+        return null;
+    }
 
     // Isinusulat MULA sa na-verify na session (derived output, hindi input).
     localStorage.setItem('pia_user_email', email);

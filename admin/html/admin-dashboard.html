@@ -92,6 +92,7 @@
             <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4"/><path d="m10 6-6 6 6 6"/></symbol>
             <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4 19.5h16"/></symbol>
             <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5v-1a5 5 0 0 1 5-5h5a5 5 0 0 1 5 5v1"/></symbol>
+            <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12.5" height="12.5" rx="2.5"/><path d="M15.5 8V5.5A2 2 0 0 0 13.5 3.5h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2H8"/></symbol>
             <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.5V10H15"/></symbol>
         </defs>
     </svg>
@@ -559,7 +560,9 @@
                                 <p class="notice-text">Every new student and professor account is issued a random,
                                     unguessable initial password that is never displayed or stored. Account owners set
                                     their own password through the <strong>Send activation email</strong> or
-                                    <strong>Reset password</strong> action, which delivers a secure one-time link.</p>
+                                    <strong>Reset password</strong> action, which delivers a secure one-time link.
+                                    A student with no email access can be given a temporary password instead; they
+                                    must replace it with one only they know before they can do anything else.</p>
                             </div>
                         </div>
 
@@ -1140,6 +1143,88 @@
         </div>
     </div>
 
+    <!-- =========================================== MODAL · RESET PASSWORD
+         Hybrid recovery, admin side. Two routes, in order of preference:
+           1. EMAIL — the student gets a link and a code and picks the new
+              password themselves. The admin never sees it.
+           2. TEMPORARY PASSWORD — for a student who cannot receive email. The
+              admin-set-temp-password Edge Function sets it with the Auth Admin
+              API (the service-role key never reaches this page), flags the
+              account, and signs the student out everywhere. At next sign-in
+              they must replace it before anything else opens.
+         The temporary password is typed or generated here, sent once over
+         HTTPS, and never stored or logged by PIA. -->
+    <div class="overlay" id="modal-reset-password" role="dialog" aria-modal="true"
+        aria-labelledby="reset-pw-title" aria-describedby="reset-pw-sub">
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="reset-pw-title">Reset password</h2>
+                    <p class="modal-sub" id="reset-pw-sub">—</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+
+            <div class="modal-body stack">
+                <section class="reset-route">
+                    <p class="reset-route-title"><svg class="icon"><use href="#i-mail"></use></svg>
+                        Email a reset link and code</p>
+                    <p class="reset-route-text">Best whenever the student can open their school email. They
+                        choose the new password themselves — you never see it.</p>
+                    <button type="button" class="btn btn-secondary" id="reset-pw-email">
+                        <svg class="icon"><use href="#i-send"></use></svg> Send reset email
+                    </button>
+                </section>
+
+                <section class="reset-route">
+                    <p class="reset-route-title"><svg class="icon"><use href="#i-key"></use></svg>
+                        Set a temporary password</p>
+                    <p class="reset-route-text">For a student who can't receive the email. Tell them the password
+                        in person. They are signed out everywhere now, and at their next sign-in they must
+                        replace it with one only they know.</p>
+
+                    <form id="reset-pw-form" novalidate>
+                        <div class="field">
+                            <label class="label" for="temp-password">Temporary password</label>
+                            <div class="temp-pw-row">
+                                <input class="input temp-pw-input" type="text" id="temp-password" maxlength="72" data-clear-on-close
+                                    autocomplete="off" autocapitalize="off" spellcheck="false"
+                                    placeholder="8+ characters, letters and numbers" aria-describedby="temp-password-msg">
+                                <button type="button" class="btn btn-secondary" id="temp-password-generate">
+                                    <svg class="icon"><use href="#i-refresh"></use></svg> Generate
+                                </button>
+                            </div>
+                            <p class="field-msg" id="temp-password-msg" data-msg-for="temp-password"></p>
+                        </div>
+                    </form>
+
+                    <!-- Shown once the password is set. The field stays filled so
+                         it can be read out or copied, then is cleared on close. -->
+                    <div class="notice notice-accent" id="temp-password-done" hidden>
+                        <svg class="icon"><use href="#i-check"></use></svg>
+                        <div>
+                            <p class="notice-title">Temporary password set</p>
+                            <p class="notice-text">Give it to the student in person — not by email or chat. PIA does
+                                not keep a copy; once you close this box it can't be shown again.</p>
+                            <button type="button" class="btn btn-secondary btn-sm" id="temp-password-copy">
+                                <svg class="icon"><use href="#i-copy"></use></svg> Copy password
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close>Close</button>
+                <button class="btn btn-primary" type="submit" form="reset-pw-form" id="temp-password-submit">
+                    <svg class="icon"><use href="#i-key"></use></svg> Set temporary password
+                </button>
+            </footer>
+        </div>
+    </div>
+
     <!-- ================================================ MODAL · FACULTY -->
     <div class="overlay" id="modal-faculty" role="dialog" aria-modal="true" aria-labelledby="faculty-title">
         <div class="modal modal-sm">
@@ -1357,7 +1442,7 @@
                             <svg class="icon"><use href="#i-user"></use></svg> Allow character re-selection
                         </button>
                         <button class="action-list-item" data-student-action="reset-password">
-                            <svg class="icon"><use href="#i-key"></use></svg> Send password-reset email
+                            <svg class="icon"><use href="#i-key"></use></svg> Reset password…
                         </button>
                         <button class="action-list-item is-danger" data-student-action="delete">
                             <svg class="icon"><use href="#i-trash"></use></svg> Delete participant

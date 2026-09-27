@@ -2287,6 +2287,9 @@ body {
 
 .link-btn { font-weight: 700; color: var(--accent-text); }
 .link-btn:hover { color: var(--accent-text); }
+/* The reset dialog's "Send a new code (42s)" while it cools down. */
+.link-btn:disabled,
+.link-btn:disabled:hover { color: var(--text-muted); text-decoration: none; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
     .overlay .btn:hover:not(:disabled),

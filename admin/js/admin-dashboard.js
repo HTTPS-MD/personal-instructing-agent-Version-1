@@ -194,6 +194,7 @@
         adminName: 'Admin',
         sections: [],
         cohort: [],          // lightweight summary of every non-admin profile
+        resultEmails: {},    // lower-cased emails with a row in ocean_submissions
         rosterPage: [],      // the current page of the roster table
         faculty: [],
         totalStudents: 0,
@@ -201,6 +202,7 @@
         filters: { group: 'all', sub: 'all', stage: null, search: '' },
         activeStudent: null,
         managingEmail: null,
+        resetEmail: null,    // the student the Reset password dialog is acting on
         activeSection: null,
         loading: { roster: false, cohort: false }
     };
@@ -352,6 +354,10 @@
         overlay.classList.remove('is-open');
         overlay.style.zIndex = '';
         openLayers = openLayers.filter(function (layer) { return layer !== overlay; });
+
+        /* Fields holding something sensitive (a temporary password) are
+           wiped however the dialog closes: button, X, backdrop or Escape. */
+        $$('[data-clear-on-close]', overlay).forEach(function (field) { field.value = ''; });
 
         setTimeout(function () {
             overlay.classList.remove('is-mounted');
@@ -573,11 +579,10 @@
     /* Columns the overview aggregates need. Selecting the exact set rather
        than '*' keeps active_devices the only array we pull.
 
-       Completion is read from is_ocean_done, never inferred from a score:
-       since migration 0018 profiles carries no assessment score for anyone.
-       The results themselves live only in ocean_submissions (admin-only),
-       and are fetched where they are shown — the student drawer and the
-       CSV export. */
+       Since migration 0018 profiles carries no assessment score for anyone;
+       results live only in ocean_submissions, which only an admin can read.
+       is_ocean_done is still pulled, because a retake clears it while the
+       old result stays in the table — see hasCurrentResult(). */
     var COHORT_COLUMNS = 'full_name, email, section, group_type, status, current_stage, is_in_game,' +
         ' stage_started_at, active_devices, is_ocean_done, pre_test_score, post_test_score';
 
@@ -589,14 +594,30 @@
     async function loadCohort() {
         state.loading.cohort = true;
 
-        var res = await sb.from('profiles')
-            .select(COHORT_COLUMNS)
-            .neq('role', 'admin')
-            .limit(2000);
+        /* The results table answers "who has a stored result"; only an admin
+           gets rows back from it. Just the email column: the scores
+           themselves are fetched by the drawer and the export. */
+        var both = await Promise.all([
+            sb.from('profiles')
+                .select(COHORT_COLUMNS)
+                .neq('role', 'admin')
+                .limit(2000),
+            sb.from('ocean_submissions')
+                .select('email')
+                .limit(5000)
+        ]);
+        var res = both[0];
+        var results = both[1];
 
         state.loading.cohort = false;
 
         if (res.error) { throw res.error; }
+        if (results.error) { throw results.error; }
+
+        state.resultEmails = {};
+        (results.data || []).forEach(function (row) {
+            state.resultEmails[String(row.email || '').toLowerCase()] = true;
+        });
 
         state.cohort = res.data || [];
         renderKpis();
@@ -735,10 +756,20 @@
 
     /* ======================================= 5. OVERVIEW RENDERERS ====== */
 
+    /* Completed = a stored result in ocean_submissions AND not sent back for
+       a retake. A retake clears is_ocean_done but keeps the old result in
+       the table, so the table alone would count a student who is mid-retake
+       as finished — the old score-on-profiles check never did that, because
+       the reset erased the score. */
+    function hasCurrentResult(s) {
+        return s.is_ocean_done === true &&
+            !!(state.resultEmails && state.resultEmails[String(s.email || '').toLowerCase()]);
+    }
+
     function renderKpis() {
         var cohort = state.cohort;
         var total = cohort.length;
-        var oceanDone = cohort.filter(function (s) { return s.is_ocean_done === true; }).length;
+        var oceanDone = cohort.filter(hasCurrentResult).length;
         var online = cohort.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
         var inactive = cohort.filter(function (s) { return (s.status || '') !== 'active'; }).length;
 
@@ -891,7 +922,7 @@
 
         container.innerHTML = state.sections.map(function (section) {
             var members = state.cohort.filter(function (s) { return s.section === section.name; });
-            var done = members.filter(function (s) { return s.is_ocean_done === true; }).length;
+            var done = members.filter(hasCurrentResult).length;
             var share = pct(done, members.length);
             return '' +
                 '<div>' +
@@ -921,7 +952,7 @@
         grid.innerHTML = state.sections.map(function (section) {
             var members = state.cohort.filter(function (s) { return s.section === section.name; });
             var online = members.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
-            var done = members.filter(function (s) { return s.is_ocean_done === true; }).length;
+            var done = members.filter(hasCurrentResult).length;
 
             var stack = members.slice(0, 4).map(function (s) {
                 return '<span class="avatar">' + esc(initialsOf(s.full_name, s.email)) + '</span>';
@@ -1266,7 +1297,8 @@
         $('#drawer-stage').textContent = stageLabel(stageOf(s));
         $('#drawer-devices').textContent = (s.active_devices || []).length + ' of ' + toInt(s.max_devices, 1);
         $('#drawer-status').textContent = (drawerOnline ? 'Online' : 'Offline') +
-            ' · ' + ((s.status || '') === 'active' ? 'Activated' : 'Not activated');
+            ' · ' + ((s.status || '') === 'active' ? 'Activated' : 'Not activated') +
+            (s.must_change_password === true ? ' · Must change temporary password' : '');
         $('#drawer-pre').textContent = s.pre_test_score == null ? 'n/a' : s.pre_test_score;
         $('#drawer-post').textContent = s.post_test_score == null ? 'n/a' : s.post_test_score;
 
@@ -1397,7 +1429,7 @@
                 else if (action === 'devices') { openDeviceManager(s.email); }
                 else if (action === 'retake-ocean') { allowRetakeOcean(s.email); }
                 else if (action === 'retake-character') { allowRetakeCharacter(s.email); }
-                else if (action === 'reset-password') { sendPasswordReset(s.email, btn); }
+                else if (action === 'reset-password') { closeModal('drawer-student'); openResetPassword(s.email); }
                 else if (action === 'delete') { deleteStudent(s.email); }
             });
         });
@@ -1430,18 +1462,22 @@
         toastOk('Activation email sent', 'Delivered to ' + email + '.');
     }
 
-    /* Security: the admin never sets a known password. The owner sets their
-       own through the emailed link. */
-    async function sendPasswordReset(email, sourceBtn) {
-        var ok = await confirmAction({
-            title: 'Reset password',
-            heading: 'Send a reset link to ' + email + '?',
-            message: 'They will choose their own new password through the emailed link. ' +
-                'No password is set or revealed here.',
-            confirmLabel: 'Send reset email',
-            tone: 'accent'
-        });
-        if (!ok) { return; }
+    /* The preferred route: the owner sets their own password through the
+       emailed link or code, and no password is ever known to the admin.
+       opts.confirmed skips the confirm step when the caller is already a
+       deliberate choice — the Reset password dialog. */
+    async function sendPasswordReset(email, sourceBtn, opts) {
+        if (!(opts && opts.confirmed)) {
+            var ok = await confirmAction({
+                title: 'Reset password',
+                heading: 'Send a reset link to ' + email + '?',
+                message: 'They will choose their own new password through the emailed link. ' +
+                    'No password is set or revealed here.',
+                confirmLabel: 'Send reset email',
+                tone: 'accent'
+            });
+            if (!ok) { return; }
+        }
 
         var release = setBusy(sourceBtn, 'Sending…');
         var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() });
@@ -1452,6 +1488,121 @@
             return;
         }
         toastOk('Reset email sent', email + ' can now set a new password.');
+    }
+
+    /* ---- Temporary password (admin override) ------------------------------
+       For a student who cannot receive the reset email. The password goes to
+       the admin-set-temp-password Edge Function, which holds the service-role
+       key, verifies this admin, sets it with the Auth Admin API, raises
+       must_change_password and signs the student out everywhere. The student
+       is then forced to replace it at their next sign-in, so the admin never
+       knows the password they end up with. */
+
+    /* No look-alikes (0/O, 1/l/I), so it can be read out across a classroom.
+       Three groups of four, with an upper, a lower and a digit guaranteed,
+       and hyphens that satisfy a symbol rule if the project enforces one. */
+    function generateTempPassword() {
+        var upper = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+        var lower = 'abcdefghjkmnpqrstuvwxyz';
+        var digit = '23456789';
+        var all = upper + lower + digit;
+        var bytes = new Uint32Array(15);
+        crypto.getRandomValues(bytes);
+
+        var chars = [];
+        for (var i = 0; i < 12; i++) { chars.push(all[bytes[i] % all.length]); }
+
+        /* Force one of each class into distinct random slots. */
+        var slots = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        [[upper, 12], [lower, 13], [digit, 14]].forEach(function (pair) {
+            var pick = slots.splice(bytes[pair[1]] % slots.length, 1)[0];
+            chars[pick] = pair[0][bytes[pair[1]] % pair[0].length];
+        });
+
+        return chars.slice(0, 4).join('') + '-' + chars.slice(4, 8).join('') + '-' + chars.slice(8).join('');
+    }
+
+    /* The same floor the Edge Function enforces; Supabase's own password
+       policy applies on top and its message is shown if it is stricter. */
+    function tempPasswordProblem(pw) {
+        if (pw.length < 8) { return 'Use at least 8 characters.'; }
+        if (pw.length > 72) { return 'Use 72 characters or fewer.'; }
+        if (!/[A-Za-z]/.test(pw) || !/\d/.test(pw)) { return 'Use at least one letter and one number.'; }
+        return '';
+    }
+
+    function openResetPassword(email) {
+        state.resetEmail = email;
+        $('#reset-pw-sub').textContent = email;
+        $('#temp-password').value = '';
+        $('#temp-password').readOnly = false;
+        $('#temp-password-generate').disabled = false;
+        setFieldError('temp-password', '');
+        $('#temp-password-done').hidden = true;
+        $('#temp-password-submit').disabled = false;
+        openModal('modal-reset-password');
+    }
+
+    /* supabase-js reports a non-2xx function response as FunctionsHttpError,
+       with the Response in error.context; the function puts its reason in
+       { error }. A FunctionsFetchError means it never answered at all —
+       most often because it has not been deployed yet. */
+    async function functionErrorMessage(error) {
+        try {
+            if (error && error.context && typeof error.context.json === 'function') {
+                var body = await error.context.json();
+                if (body && body.error) { return body.error; }
+            }
+        } catch (e) { /* not JSON */ }
+        if (error && error.name === 'FunctionsFetchError') {
+            return 'Could not reach the password service. Check that the admin-set-temp-password ' +
+                'Edge Function is deployed.';
+        }
+        return (error && error.message) || 'The temporary password could not be set.';
+    }
+
+    async function handleSetTempPassword(event) {
+        event.preventDefault();
+        var email = state.resetEmail;
+        var pw = $('#temp-password').value;
+
+        var problem = tempPasswordProblem(pw);
+        setFieldError('temp-password', problem);
+        if (problem) { $('#temp-password').focus(); return; }
+
+        var release = setBusy($('#temp-password-submit'), 'Setting…');
+        var res = await sb.functions.invoke('admin-set-temp-password', {
+            body: { email: email, password: pw }
+        });
+        release();
+
+        if (res.error) {
+            setFieldError('temp-password', await functionErrorMessage(res.error));
+            return;
+        }
+
+        /* Done: freeze the field so what is read out is what was set.
+           Generate too, or one stray click would replace it with a
+           password the student's account never received. */
+        $('#temp-password').readOnly = true;
+        $('#temp-password-generate').disabled = true;
+        $('#temp-password-submit').disabled = true;
+        $('#temp-password-done').hidden = false;
+        toastOk('Temporary password set', email + ' must choose a new password at next sign-in.' +
+            (res.data && res.data.sessionsRevoked === false ? ' (Their open sessions could not be ended.)' : ''));
+        refreshAll();
+    }
+
+    async function copyTempPassword() {
+        var value = $('#temp-password').value;
+        if (!value) { return; }
+        try {
+            await navigator.clipboard.writeText(value);
+            toastOk('Copied', 'Clear it from your clipboard once you have given it to the student.');
+        } catch (err) {
+            $('#temp-password').select();
+            toastErr('Copy blocked', 'Select the password and copy it manually.');
+        }
     }
 
     /* ---- Retakes ---- */
@@ -2874,6 +3025,16 @@
     }
 
     function initForms() {
+        $('#reset-pw-form').addEventListener('submit', handleSetTempPassword);
+        $('#temp-password-generate').addEventListener('click', function () {
+            $('#temp-password').value = generateTempPassword();
+            setFieldError('temp-password', '');
+        });
+        $('#temp-password-copy').addEventListener('click', copyTempPassword);
+        $('#reset-pw-email').addEventListener('click', function () {
+            sendPasswordReset(state.resetEmail, $('#reset-pw-email'), { confirmed: true });
+        });
+
         $('#register-student-form').addEventListener('submit', handleRegisterStudent);
         $('#edit-student-form').addEventListener('submit', handleUpdateStudent);
         $('#add-professor-form').addEventListener('submit', handleRegisterProfessor);

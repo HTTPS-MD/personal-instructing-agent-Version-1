@@ -1199,7 +1199,7 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="forgot-title">Reset your password</h2>
-                    <p class="modal-sub">We'll email a secure link where you can choose a new one.</p>
+                    <p class="modal-sub">We'll email you a link and a code. Use whichever is easier.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon">
@@ -1210,12 +1210,41 @@
 
             <div class="modal-body">
 
+                <!-- STEP 1 — the email. -->
                 <form id="forgot-form" novalidate>
                     <div class="field">
                         <label class="label" for="fp-email">School email</label>
                         <input class="input" type="email" id="fp-email" autocomplete="username"
                             placeholder="maria.santos@student.ue.edu.ph">
                         <p class="field-msg" data-msg-for="fp-email"></p>
+                    </div>
+                </form>
+
+                <!-- STEP 2 — the code, as an alternative to the link. The same
+                     email carries both; verifyOtp(type: 'recovery') turns the
+                     code into the same session the link would, and both end on
+                     the set-password page. auth.js swaps the footer button
+                     between the two forms. -->
+                <form id="forgot-code-form" novalidate hidden>
+                    <div class="auth-intro">
+                        <svg class="icon">
+                            <use href="#i-mail"></use>
+                        </svg>
+                        <p class="auth-intro-text">
+                            If <b id="fp-sent-to">that address</b> is on the roster, an email is on its way
+                            with a reset link and a code. Open the link, or type the code here.
+                        </p>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="fp-code">Reset code</label>
+                        <input class="input" type="text" id="fp-code" inputmode="numeric"
+                            autocomplete="one-time-code" maxlength="10" spellcheck="false"
+                            placeholder="Code from the email" aria-describedby="fp-code-msg">
+                        <p class="field-msg" id="fp-code-msg" data-msg-for="fp-code"></p>
+                    </div>
+                    <div class="auth-alt">
+                        <button type="button" class="link-btn" id="fp-resend" disabled>Send a new code</button>
+                        <button type="button" class="link-btn" id="fp-change-email">Use a different email</button>
                     </div>
                 </form>
                 <p class="auth-status" id="forgot-status" role="status">

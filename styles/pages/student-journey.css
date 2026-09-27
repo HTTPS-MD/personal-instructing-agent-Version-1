@@ -265,6 +265,63 @@ body.opacity-0 { opacity: 0; }
 .gate-actions { display: flex; flex-direction: column; gap: var(--sp-3); }
 .gate-actions .btn { height: 52px; font-size: 15px; font-weight: 700; }
 
+/* ---- 4.1b Set new password (forced change after a temporary password) ---- */
+.pw-identity {
+    margin-bottom: var(--sp-5);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.pw-identity b { color: var(--text); }
+
+.pw-form { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* Each rule ticks as it is met: the dot becomes the accent, the text full ink. */
+.pw-rules {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2) var(--sp-4);
+    margin: 0 0 var(--sp-3);
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+}
+
+.pw-rules li { display: flex; align-items: center; gap: var(--sp-2); }
+.pw-rules .icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--text-faint); }
+.pw-rules li.is-met { color: var(--text); }
+.pw-rules li.is-met .icon { color: var(--accent); }
+
+@media (max-width: 420px) {
+    .pw-rules { grid-template-columns: minmax(0, 1fr); }
+}
+
+.pw-show {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+/* Reserved height: a message appearing never moves the button above it. */
+.pw-status {
+    min-height: 1.6em;
+    margin-top: var(--sp-4);
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+}
+
+.pw-status.is-error { color: var(--danger); }
+.pw-status.is-ok { color: var(--accent); }
+
 /* ---- 4.2 The test ---- */
 .test-wrap {
     display: grid;
