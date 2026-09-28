@@ -1326,11 +1326,20 @@
                         <p class="kv-label">Role</p>
                         <p class="kv-value">Observer</p>
                     </div>
+                    <div class="kv">
+                        <p class="kv-label">Devices</p>
+                        <p class="kv-value tnum" id="faculty-devices">—</p>
+                    </div>
                 </div>
 
                 <div class="action-list">
                     <button class="action-list-item" id="faculty-reset">
                         <svg class="icon"><use href="#i-key"></use></svg> Send password-reset email
+                    </button>
+                    <!-- The same "Sign out everywhere" students have: ends every
+                         session and frees every device slot (admin_revoke_sessions). -->
+                    <button class="action-list-item" id="faculty-signout">
+                        <svg class="icon"><use href="#i-logout"></use></svg> Sign out everywhere
                     </button>
                     <button class="action-list-item is-danger" id="faculty-delete">
                         <svg class="icon"><use href="#i-trash"></use></svg> Remove faculty account

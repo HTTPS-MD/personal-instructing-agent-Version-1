@@ -2000,6 +2000,8 @@
                 '<td class="col-right"><span class="row-actions">' +
                 '<button class="btn-icon" title="Send password-reset email" data-fac-act="reset" data-email="' + esc(f.email) + '">' +
                 icon('key', 'icon-sm') + '</button>' +
+                '<button class="btn-icon" title="Sign out everywhere" data-fac-act="signout" data-email="' + esc(f.email) + '">' +
+                icon('logout', 'icon-sm') + '</button>' +
                 '<button class="btn-icon" title="Remove faculty" data-fac-act="delete" data-email="' + esc(f.email) + '">' +
                 icon('trash', 'icon-sm') + '</button>' +
                 '</span></td>' +
@@ -2017,8 +2019,11 @@
             if (actionBtn) {
                 event.stopPropagation();
                 var email = actionBtn.getAttribute('data-email');
-                if (actionBtn.getAttribute('data-fac-act') === 'reset') {
+                var act = actionBtn.getAttribute('data-fac-act');
+                if (act === 'reset') {
                     sendPasswordReset(email, actionBtn);
+                } else if (act === 'signout') {
+                    signOutFacultyEverywhere(email, actionBtn);
                 } else {
                     deleteFaculty(email);
                 }
@@ -2031,6 +2036,10 @@
 
         $('#faculty-reset').addEventListener('click', function () {
             if (state.activeFaculty) { sendPasswordReset(state.activeFaculty.email, this); }
+        });
+
+        $('#faculty-signout').addEventListener('click', function () {
+            if (state.activeFaculty) { signOutFacultyEverywhere(state.activeFaculty.email, this); }
         });
 
         $('#faculty-delete').addEventListener('click', function () {
@@ -2051,8 +2060,45 @@
         $('#faculty-dept').textContent = f.department || '—';
         $('#faculty-section').textContent = f.assigned_section || 'Unassigned';
         $('#faculty-status').textContent = (f.status || '') === 'active' ? 'Active' : 'Inactive';
+        $('#faculty-devices').textContent = '…';
 
         openModal('modal-faculty');
+        loadFacultyDevices(f.email);
+    }
+
+    /* professors has no device columns; the account's profile does. */
+    async function loadFacultyDevices(email) {
+        var res = await sb.from('profiles').select('active_devices, max_devices').eq('email', email).maybeSingle();
+        if (!state.activeFaculty || state.activeFaculty.email !== email) { return; }
+        $('#faculty-devices').textContent = (res.error || !res.data)
+            ? '—'
+            : (res.data.active_devices || []).length + ' of ' + toInt(res.data.max_devices, 1) + ' in use';
+    }
+
+    /* The students' "Sign out everywhere", for a professor: every session
+       ends and every device slot is freed (admin_revoke_sessions, which since
+       migration 0021 also deletes their refresh tokens). */
+    async function signOutFacultyEverywhere(email, sourceBtn) {
+        var ok = await confirmAction({
+            title: 'Sign out everywhere',
+            heading: 'Sign ' + email + ' out everywhere?',
+            message: 'Every session for this account ends immediately and each of their devices is ' +
+                'freed. They sign in again with their password.',
+            confirmLabel: 'Sign out everywhere'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Signing out…');
+        var res = await sb.rpc('admin_revoke_sessions', { p_email: email });
+        release();
+
+        if (res.error) {
+            toastErr('Sign-out failed', friendlyDbError(res.error, 'Their sessions were not ended.'));
+            return;
+        }
+
+        toastOk('Signed out everywhere', email + ' was signed out of every device.');
+        if (state.activeFaculty && state.activeFaculty.email === email) { loadFacultyDevices(email); }
     }
 
     async function handleRegisterProfessor(event) {
