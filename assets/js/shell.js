@@ -203,7 +203,7 @@
         document.addEventListener('keydown', function (event) {
             if (event.key !== 'Escape') { return; }
             if (!railIsExpanded() || isMobileLayout()) { return; }
-            if (openLayers.length) { return; }
+            if (hasOpenModal()) { return; }
             if (rail.pointerInside) { return; }
 
             rail.touchOpen = false;
