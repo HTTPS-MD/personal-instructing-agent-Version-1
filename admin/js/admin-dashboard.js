@@ -2679,9 +2679,13 @@
                 (isYou ? ' <span class="badge">You</span>' : '') + '</td>' +
                 '<td class="tnum muted">' + (a.active_devices || []).length + ' of ' + toInt(a.max_devices, 1) + '</td>' +
                 '<td class="col-right"><span class="row-actions">' +
+                /* No actions on your own row: removing yourself would lock
+                   you out, and another administrator can do it for you. */
                 (isYou ? '' :
                     '<button class="btn-icon" title="Email a one-time link to set their password" ' +
-                    'data-admin-act="link" data-email="' + esc(a.email) + '">' + icon('send', 'icon-sm') + '</button>') +
+                    'data-admin-act="link" data-email="' + esc(a.email) + '">' + icon('send', 'icon-sm') + '</button>' +
+                    '<button class="btn-icon" title="Remove administrator" ' +
+                    'data-admin-act="remove" data-email="' + esc(a.email) + '">' + icon('trash', 'icon-sm') + '</button>') +
                 '</span></td>' +
                 '</tr>';
         }).join('');
@@ -2714,6 +2718,37 @@
             return;
         }
         toastOk('Link sent', 'Delivered to ' + email + '.');
+    }
+
+    /* Removal deletes the account (admin_delete_user), which also ends its
+       sessions: with the profile gone, pia_caller_role() no longer says
+       admin, so every admin check refuses them at once. It is not a demotion
+       -- the only other roles are participant (which would put them in the
+       research roster) and professor (which needs a faculty record). To give
+       someone access again, add them as a new administrator. */
+    async function removeAdmin(email, sourceBtn) {
+        if (email === state.adminEmail) { return; }
+
+        var ok = await confirmAction({
+            title: 'Remove administrator',
+            heading: 'Remove ' + email + '?',
+            message: 'Their account is deleted and their access to this console ends immediately. ' +
+                'This cannot be undone; to give them access again, add them as a new administrator.',
+            confirmLabel: 'Remove administrator'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, '…');
+        var res = await sb.rpc('admin_delete_user', { target_email: email });
+        release();
+
+        if (res.error) {
+            toastErr('Not removed', friendlyDbError(res.error, 'The administrator was not removed.'));
+            return;
+        }
+
+        toastOk('Administrator removed', email + ' no longer has access.');
+        await loadAdmins();
     }
 
     async function handleAddAdmin(event) {
@@ -3215,8 +3250,11 @@
         $('#add-professor-form').addEventListener('submit', handleRegisterProfessor);
         $('#add-admin-form').addEventListener('submit', handleAddAdmin);
         $('#admin-tbody').addEventListener('click', function (event) {
-            var btn = event.target.closest('[data-admin-act="link"]');
-            if (btn) { resendAdminLink(btn.getAttribute('data-email'), btn); }
+            var btn = event.target.closest('[data-admin-act]');
+            if (!btn) { return; }
+            var email = btn.getAttribute('data-email');
+            if (btn.getAttribute('data-admin-act') === 'remove') { removeAdmin(email, btn); }
+            else { resendAdminLink(email, btn); }
         });
         $('#password-form').addEventListener('submit', handlePasswordUpdate);
 
