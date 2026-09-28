@@ -205,9 +205,15 @@
     /* ============================================ 3. MODALS + TOASTS === */
 
     var openLayers = [];
-    /* Matches --z-overlay in global.css; see the stacking ladder there. */
-    var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
+
+    /* The layer ladder lives in ONE place, global.css (--z-overlay,
+       --z-toast, --z-banner, --z-boot). Read it rather than repeat it, so a
+       change there can never leave a dialog under the rail or over a toast. */
+    function cssInt(name, fallback) {
+        var v = parseInt(getComputedStyle(document.documentElement).getPropertyValue(name), 10);
+        return isFinite(v) ? v : fallback;
+    }
     var signingOut = false;
     var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -232,18 +238,21 @@
         });
     }
 
-    function openModal(id) {
+    /* `trigger` is the control that opened the dialog. Focus returns to IT on
+       close -- not to document.activeElement, which Safari leaves on <body>
+       when a button is clicked (it never focuses buttons on click). */
+    function openModal(id, trigger) {
         var o = document.getElementById(id);
         if (!o || openLayers.indexOf(o) !== -1) { return; }
         if (!openLayers.length) {
-            lastFocused = document.activeElement;
+            lastFocused = trigger || document.activeElement;
             lockScroll();
             setBackgroundInert(true);
         }
         o.classList.add('is-mounted');
         openLayers.push(o);
         /* Each layer above the last; z-index does not affect layout. */
-        o.style.zIndex = String(Z_OVERLAY_BASE + openLayers.length);
+        o.style.zIndex = String(cssInt('--z-overlay', 100) + openLayers.length);
         void o.offsetWidth;
         o.classList.add('is-open');
         /* Focus the safe choice, not the first button in the markup. */
@@ -271,7 +280,7 @@
 
     function initModals() {
         $$('[data-modal-open]').forEach(function (t) {
-            t.addEventListener('click', function () { openModal(t.getAttribute('data-modal-open')); });
+            t.addEventListener('click', function () { openModal(t.getAttribute('data-modal-open'), t); });
         });
         $$('.overlay').forEach(function (o) {
             o.addEventListener('mousedown', function (e) { if (e.target === o) { closeModal(o); } });
@@ -293,7 +302,10 @@
     }
 
     /* Toasts stack newest-last and never more than three deep: a flaky
-       connection cannot bury the screen. */
+       connection cannot bury the screen. Each one dismisses itself, but not
+       while the pointer is on it or focus is inside it (WCAG 2.2.1: a
+       teacher reading it is never cut off mid-sentence), and each has its
+       own close button. Where the stack sits is teacher.css, section 9b. */
     var TOAST_MAX = 3;
 
     function toast(title, description, tone) {
@@ -307,13 +319,41 @@
         $('use', n).setAttribute('href', danger ? '#i-alert' : '#i-check');
         setText($('.toast-title', n), title);
         setText($('.toast-desc', n), description || '');
+
+        var remaining = danger ? 6000 : 3800;
+        var startedAt = 0;
+        var timer = null;
+        var gone = false;
+
+        function dismiss() {
+            if (gone) { return; }
+            gone = true;
+            clearTimeout(timer);
+            /* A keyboard user who closed it keeps their place on the page. */
+            if (n.contains(document.activeElement)) { $('#main').focus({ preventScroll: true }); }
+            n.classList.remove('is-open');
+            setTimeout(function () { n.remove(); }, 200);
+        }
+        function arm() {
+            clearTimeout(timer);
+            startedAt = Date.now();
+            timer = setTimeout(dismiss, remaining);
+        }
+        function pause() {
+            clearTimeout(timer);
+            remaining = Math.max(1500, remaining - (Date.now() - startedAt));
+        }
+
+        n.addEventListener('mouseenter', pause);
+        n.addEventListener('mouseleave', arm);
+        n.addEventListener('focusin', pause);
+        n.addEventListener('focusout', function (e) { if (!n.contains(e.relatedTarget)) { arm(); } });
+        $('.toast-close', n).addEventListener('click', dismiss);
+
         stack.appendChild(n);
         void n.offsetWidth;
         n.classList.add('is-open');
-        setTimeout(function () {
-            n.classList.remove('is-open');
-            setTimeout(function () { n.remove(); }, 200);
-        }, danger ? 6000 : 3800);
+        arm();
     }
 
     /* ============================================ 4. ACCESS GUARD ====== */
@@ -325,26 +365,49 @@
         setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
     }
 
+    /* A request that never reached the server (Wi-Fi dropped, DNS, a
+       captive portal) is NOT a verdict on who the teacher is. PostgREST and
+       auth errors carry a code or a status; network failures carry neither,
+       only a fetch/network message -- or the browser simply says offline. */
+    function isNetworkError(err) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { return true; }
+        if (!err) { return false; }
+        var code = String(err.code || '');
+        var status = Number(err.status || 0);
+        var msg = String(err.message || err);
+        return !code && !status && /fetch|network|load failed|timed? ?out|offline/i.test(msg);
+    }
+
+    /* Returns 'ok', 'denied' (already on its way to sign-in), 'offline'
+       (could not reach the server: retry, never redirect) or 'no-client'
+       (the Supabase library itself did not load: reload). */
     async function enforceTeacherAccess() {
-        if (typeof sb === 'undefined' || !sb) {
-            setBootText("Can't reach PIA's server.");
-            showBanner("Can't reach PIA's server. Check the connection, then reload.");
-            return false;
-        }
+        if (typeof sb === 'undefined' || !sb) { return 'no-client'; }
 
         try {
             var session = await sb.auth.getSession();
-            if (session.error || !session.data.session) {
+            if (session.error) {
+                if (isNetworkError(session.error)) { return 'offline'; }
                 leave('Your session ended. Taking you to sign in…');
-                return false;
+                return 'denied';
+            }
+            if (!session.data.session) {
+                leave('Your session ended. Taking you to sign in…');
+                return 'denied';
             }
 
             var email = session.data.session.user.email;
             var res = await sb.from('profiles').select('role, section, full_name').eq('email', email).maybeSingle();
 
-            if (res.error || !res.data || res.data.role !== 'teacher') {
+            if (res.error) {
+                if (isNetworkError(res.error)) { return 'offline'; }
+                console.error('Teacher console: access check refused.', res.error);
+                leave("Couldn't confirm your access. Taking you back to sign in…");
+                return 'denied';
+            }
+            if (!res.data || res.data.role !== 'teacher') {
                 leave('This page is for teachers. Taking you back to sign in…');
-                return false;
+                return 'denied';
             }
 
             try { localStorage.setItem('pia_user_email', email); } catch (e) { /* private mode */ }
@@ -354,17 +417,20 @@
             state.name = res.data.full_name || null;
 
             /* profiles is the source of truth; the professors row is a fallback
-               for accounts created before the two were written together. */
+               for accounts created before the two were written together. A
+               failed fallback only costs a label, so it never blocks entry. */
             if (!state.section || !state.name) {
                 var prof = await sb.from('professors').select('name, assigned_section').eq('email', email).maybeSingle();
+                if (prof.error && isNetworkError(prof.error)) { return 'offline'; }
                 if (!state.section) { state.section = (prof.data && prof.data.assigned_section) || null; }
                 if (!state.name) { state.name = (prof.data && prof.data.name) || null; }
             }
-            return true;
+            return 'ok';
         } catch (e) {
+            if (isNetworkError(e)) { return 'offline'; }
             console.error('Teacher console: access check failed.', e);
             leave("Couldn't confirm your access. Taking you back to sign in…");
-            return false;
+            return 'denied';
         }
     }
 
@@ -397,6 +463,24 @@
 
     var inflight = null;
 
+    /* CERC, defence in depth. teacher_class_status already returns only
+       these fields; the page ALSO keeps only these, so if the function ever
+       grew a column (by mistake, in a later migration) that column would
+       never reach page memory, the DOM or the browser console. There is no
+       OCEAN score, research group, persona or test score in this list, and
+       nothing below reads a field that is not in it. */
+    var ROW_FIELDS = [
+        'student_key', 'full_name', 'activity', 'online',
+        'attention', 'attention_minutes',
+        'problems_done', 'problems_target', 'seconds_since_active'
+    ];
+
+    function pickRow(r) {
+        var o = {};
+        ROW_FIELDS.forEach(function (k) { o[k] = r ? r[k] : undefined; });
+        return o;
+    }
+
     /* Single flight: every caller shares the request already running. */
     function refresh() {
         if (!inflight) {
@@ -416,7 +500,7 @@
         if (res.error) { onLoadError(res.error); return; }
 
         try {
-            state.rows = Array.isArray(res.data) ? res.data : [];
+            state.rows = Array.isArray(res.data) ? res.data.map(pickRow) : [];
             state.loadedAt = Date.now();
             render();
             try {
@@ -810,9 +894,109 @@
             busy(btn, true);
             setText(btn, 'Signing out…');
             $$('[data-modal-close]', $('#modal-signout')).forEach(function (b) { b.setAttribute('aria-disabled', 'true'); });
+
+            /* executeForceLogout awaits the server; on a hung connection the
+               button would say "Signing out…" forever. After 8 seconds, finish
+               locally: this device forgets the session either way. */
+            setTimeout(function () {
+                try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+                window.location.replace('../../index.html');
+            }, 8000);
+
             if (typeof executeForceLogout === 'function') { executeForceLogout(); }
             else { window.location.replace('../../index.html'); }
         });
+    }
+
+    /* ---- The network, heard directly rather than at the next poll ---- */
+    function bindNetwork() {
+        window.addEventListener('offline', function () {
+            if (state.connection === 'lost') { return; }
+            if (state.loadedAt) {
+                toast("You're offline", 'Still showing the class as of ' + clock(state.loadedAt) +
+                    '. PIA reconnects on its own.', 'danger');
+            }
+            state.connection = 'lost';
+            paintLive();
+        });
+
+        /* Back online: fetch now (onLoadOk says "Back online" once it lands). */
+        window.addEventListener('online', function () {
+            refresh().then(schedule);
+        });
+    }
+
+    /* ---- Skip link: focus the main region itself, not just the URL hash ---- */
+    function bindSkipLink() {
+        var link = $('#skip-link');
+        if (!link) { return; }
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            var main = $('#main');
+            main.focus({ preventScroll: true });
+            main.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+        });
+    }
+
+    /* ---- The phone/tablet drawer (≤1024px), made keyboard- and
+       screen-reader-honest. shell.js slides it in and out; this keeps the
+       semantics in step with what is on screen:
+         closed -> the drawer is inert (no tabbing into an invisible panel)
+         open   -> the page behind it is inert, focus moves into it, Escape
+                   or choosing a link closes it, focus returns to the toggle
+       and the toggle's aria-expanded always tells the truth. ---- */
+    function initDrawerA11y() {
+        var app = $('#app');
+        var sidebar = $('#sidebar');
+        var toggle = $('#mobile-nav-toggle');
+        var workspace = $('.workspace');
+        var skip = $('#skip-link');
+        if (!app || !sidebar || !toggle || !workspace) { return; }
+
+        var mq = window.matchMedia('(max-width: 1024px)');
+        var wasOpen = false;
+
+        function isOpen() { return app.getAttribute('data-mobile-nav') === 'open'; }
+
+        function sync() {
+            var mobile = mq.matches;
+            var open = isOpen();
+
+            /* Crossing to desktop with the drawer open would strand its scrim
+               over the page; close it properly instead. */
+            if (!mobile && open) { PIAShell.closeMobileNav(); return; }
+
+            sidebar.toggleAttribute('inert', mobile && !open);
+            workspace.toggleAttribute('inert', mobile && open);
+            if (skip) { skip.toggleAttribute('inert', mobile && open); }
+            toggle.setAttribute('aria-expanded', String(mobile && open));
+
+            if (open && !wasOpen) {
+                var first = $('.nav-item', sidebar);
+                if (first) { first.focus({ preventScroll: true }); }
+            } else if (!open && wasOpen && mobile && !openLayers.length) {
+                toggle.focus({ preventScroll: true });
+            }
+            wasOpen = open;
+        }
+
+        new MutationObserver(sync).observe(app, { attributes: true, attributeFilter: ['data-mobile-nav'] });
+        if (mq.addEventListener) { mq.addEventListener('change', sync); } else { mq.addListener(sync); }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || openLayers.length || !isOpen()) { return; }
+            e.preventDefault();
+            PIAShell.closeMobileNav();
+        });
+
+        /* Choosing where to go closes the drawer, as on any phone app. */
+        $$('.nav-item, .brand-link', sidebar).forEach(function (a) {
+            a.addEventListener('click', function () {
+                if (mq.matches && isOpen()) { PIAShell.closeMobileNav(); }
+            });
+        });
+
+        sync();
     }
 
     /* ============================================ 9. BOOT ============== */
@@ -823,29 +1007,84 @@
             'this page gets a name, a status and a count. (CERC 2025-1-PTCS-231, migration 0026)');
     }
 
+    var started = false;
+    var bootFailure = null;     /* 'offline' | 'no-client' while the veil offers a retry */
+
+    /* The access check could not reach the server. The veil stays up (the
+       page behind it is not ready to be used) and says what happened in
+       plain words, with one action. Nothing about the teacher is cleared. */
+    function showBootRetry(kind) {
+        bootFailure = kind;
+        $('#boot-spinner').hidden = true;
+        setBootText(kind === 'no-client'
+            ? "PIA didn't finish loading. Check the connection, then try again."
+            : "Can't reach PIA's server. Check the Wi-Fi, then try again. Nothing is lost.");
+        var btn = $('#boot-retry');
+        btn.hidden = false;
+        busy(btn, false);
+        setText(btn, 'Try again');
+        btn.focus({ preventScroll: true });
+    }
+
+    function bindBootRetry() {
+        var btn = $('#boot-retry');
+        btn.addEventListener('click', function () {
+            if (isBusy(btn) || !bootFailure) { return; }
+            /* The client library itself is missing: only a reload fetches it. */
+            if (bootFailure === 'no-client') { window.location.reload(); return; }
+            busy(btn, true);
+            setText(btn, 'Trying…');
+            start().catch(function (err) {
+                console.error('Teacher console failed to start.', err);
+                if (!started) { showBootRetry('offline'); return; }
+                showBanner('The console hit a snag starting up. Reload the page.');
+                reveal();
+            });
+        });
+        /* The connection came back while the veil was waiting: retry at once. */
+        window.addEventListener('online', function () {
+            if (!started && bootFailure === 'offline' && !isBusy(btn)) { btn.click(); }
+        });
+    }
+
+    async function start() {
+        $('#boot-spinner').hidden = false;
+        setBootText('Checking your access…');
+
+        var access = await enforceTeacherAccess();
+        if (access === 'offline' || access === 'no-client') { showBootRetry(access); return; }
+        if (access !== 'ok') { return; }
+
+        started = true;
+        bootFailure = null;
+        $('#boot-retry').hidden = true;
+
+        initModals();
+        PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
+        initDrawerA11y();
+        bindControls();
+        bindNetwork();
+        paintIdentity();
+
+        /* Show the page now and let the skeletons carry the wait: the
+           frame is already the right shape, so nothing jumps when the
+           class arrives. */
+        setPhase('loading');
+        paintSkeletons();
+        reveal();
+        paintLive();
+
+        await refresh();
+        schedule();
+        setInterval(paintLive, 5000);
+    }
+
     async function boot() {
+        hello();
+        bindSkipLink();
+        bindBootRetry();
         try {
-            hello();
-            setBootText('Checking your access…');
-            var allowed = await enforceTeacherAccess();
-            if (!allowed) { return; }
-
-            initModals();
-            PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
-            bindControls();
-            paintIdentity();
-
-            /* Show the page now and let the skeletons carry the wait: the
-               frame is already the right shape, so nothing jumps when the
-               class arrives. */
-            setPhase('loading');
-            paintSkeletons();
-            reveal();
-            paintLive();
-
-            await refresh();
-            schedule();
-            setInterval(paintLive, 5000);
+            await start();
         } catch (err) {
             console.error('Teacher console failed to start.', err);
             showBanner('The console hit a snag starting up. Reload the page.');

@@ -25,7 +25,7 @@
 
 <body data-boot="pending">
 
-    <a class="skip-link" id="skip-link" href="#main">Skip to the class</a>
+    <a class="skip-link" id="skip-link" href="#main">Skip to main content</a>
 
     <svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
         <defs>
@@ -43,8 +43,12 @@
     </svg>
 
     <div class="boot-veil" id="boot-veil">
-        <div class="spinner" aria-hidden="true"></div>
+        <div class="spinner" id="boot-spinner" aria-hidden="true"></div>
         <p class="boot-text" id="boot-text" role="status">Checking your access…</p>
+        <!-- Only when the access check could not reach the server: a dropped
+             connection is not a failed sign-in, so it gets a retry, never a
+             redirect. -->
+        <button class="btn btn-primary" id="boot-retry" type="button" hidden>Try again</button>
     </div>
 
     <div class="error-banner" id="global-error-banner" role="alert" hidden>
@@ -77,7 +81,7 @@
                     <a class="nav-item is-active" href="#main" aria-current="page">
                         <span class="rail-slot"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-activity"></use></svg></span>
                         <span class="nav-label rail-reveal">Live monitor</span>
-                        <span class="nav-count rail-reveal tnum" id="nav-count-students">—</span>
+                        <span class="nav-count rail-reveal tnum"><span id="nav-count-students">—</span><span class="sr-only"> students</span></span>
                     </a>
                 </nav>
             </div>
@@ -86,6 +90,7 @@
                 <button class="sidebar-user" type="button" data-modal-open="modal-signout" aria-haspopup="dialog">
                     <span class="rail-slot"><span class="avatar" id="teacher-initials" aria-hidden="true">··</span></span>
                     <span class="sidebar-user-text rail-reveal">
+                        <span class="sr-only">Sign out options for </span>
                         <span class="sidebar-user-name" id="teacher-name">Loading…</span>
                         <span class="sidebar-user-role" id="teacher-email">—</span>
                     </span>
@@ -97,7 +102,7 @@
             <header class="topbar">
                 <div class="topbar-left">
                     <button class="btn-icon nav-toggle-mobile" id="mobile-nav-toggle" type="button"
-                        aria-label="Open navigation" aria-controls="sidebar">
+                        aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false" data-tip="Menu">
                         <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
                     </button>
                     <p class="crumbs">
@@ -108,7 +113,7 @@
                 </div>
 
                 <div class="topbar-right">
-                    <button class="btn-icon is-bordered" id="refresh-btn" type="button" title="Refresh now"
+                    <button class="btn-icon is-bordered" id="refresh-btn" type="button" data-tip="Refresh now"
                         aria-label="Refresh the class now">
                         <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"></use></svg>
                     </button>
@@ -206,7 +211,7 @@
                                     <span class="sr-only">Find a student</span>
                                     <svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg>
                                     <input class="find-input" type="search" id="search-student" placeholder="Find a student"
-                                        autocomplete="off" spellcheck="false" enterkeyhint="search">
+                                        autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="80">
                                 </label>
                                 <button class="btn btn-secondary" id="reset-filters" type="button" hidden>Show everyone</button>
                             </div>
@@ -320,6 +325,9 @@
                 <p class="toast-title"></p>
                 <p class="toast-desc"></p>
             </div>
+            <button class="btn-icon toast-close" type="button" aria-label="Dismiss notification">
+                <svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
+            </button>
         </div>
     </template>
 
