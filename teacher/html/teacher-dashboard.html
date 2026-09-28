@@ -126,56 +126,71 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title" id="page-greeting">Live monitor</h1>
-                            <p class="page-desc">Who is working right now, and who may need a hand. This updates
-                                by itself — there's no need to refresh.</p>
+                            <p class="page-desc">Who is here, who is working, and who needs you. It refreshes by
+                                itself every few seconds.</p>
                         </div>
                     </div>
 
                     <div class="stack">
-                        <!-- Clickable tiles double as the filter control. -->
+                        <!-- The tiles double as the filter. What a teacher running a
+                             75-minute session needs, and nothing else: no scores, no
+                             research groups, no tutor personas (CERC protocol). -->
                         <div class="grid grid-4" id="stat-tiles">
                             <button class="stat" data-filter="all">
                                 <span class="stat-top">
-                                    <span class="stat-label">Class size</span>
-                                    <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-users"></use></svg></span>
+                                    <span class="stat-label">Class</span>
+                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-users"></use></svg></span>
                                 </span>
                                 <span class="stat-value" id="stat-total">—</span>
-                                <span class="stat-foot">Students in your section</span>
+                                <span class="stat-foot" id="stat-online">— online</span>
                             </button>
 
-                            <button class="stat" data-filter="online">
+                            <button class="stat" data-filter="attention">
                                 <span class="stat-top">
-                                    <span class="stat-label">Working now</span>
-                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-activity"></use></svg></span>
-                                </span>
-                                <span class="stat-value" id="stat-online">—</span>
-                                <span class="stat-foot">Active in the last 10 minutes</span>
-                            </button>
-
-                            <button class="stat" data-filter="inactive">
-                                <span class="stat-top">
-                                    <span class="stat-label">Gone quiet</span>
-                                    <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-clock"></use></svg></span>
-                                </span>
-                                <span class="stat-value" id="stat-inactive">—</span>
-                                <span class="stat-foot">Signed in but idle</span>
-                            </button>
-
-                            <button class="stat" data-filter="struggling">
-                                <span class="stat-top">
-                                    <span class="stat-label">May need help</span>
+                                    <span class="stat-label">Needs attention</span>
                                     <span class="stat-glyph g-danger"><svg class="icon"><use href="#i-alert"></use></svg></span>
                                 </span>
-                                <span class="stat-value" id="stat-struggling">—</span>
-                                <span class="stat-foot">Pre-test below 70</span>
+                                <span class="stat-value" id="stat-attention">—</span>
+                                <span class="stat-foot">Stuck, idle or dropped</span>
                             </button>
+
+                            <button class="stat" data-filter="solving">
+                                <span class="stat-top">
+                                    <span class="stat-label">Solving now</span>
+                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-activity"></use></svg></span>
+                                </span>
+                                <span class="stat-value" id="stat-solving">—</span>
+                                <span class="stat-foot">Active in the last 3 minutes</span>
+                            </button>
+
+                            <button class="stat" data-filter="finished">
+                                <span class="stat-top">
+                                    <span class="stat-label">Finished</span>
+                                    <span class="stat-glyph g-warn"><svg class="icon"><use href="#i-check"></use></svg></span>
+                                </span>
+                                <span class="stat-value" id="stat-finished">—</span>
+                                <span class="stat-foot">Completed this lesson</span>
+                            </button>
+                        </div>
+
+                        <!-- The facilitation rule, where it is needed. Keeps teacher
+                             help from turning into math tutoring inside PIA sessions,
+                             which the comparison with the traditional class depends on. -->
+                        <div class="notice notice-accent">
+                            <svg class="icon"><use href="#i-check"></use></svg>
+                            <div>
+                                <p class="notice-title">"Needs attention" means a nudge, not a lesson</p>
+                                <p class="notice-text">Help with focus, sign-in or finding their place, and let PIA
+                                    teach the math. It flags students stuck on one problem for 5+ minutes, idle for
+                                    3+ minutes, or disconnected mid-lesson.</p>
+                            </div>
                         </div>
 
                         <div class="card">
                             <div class="card-head">
                                 <div class="card-head-text">
-                                    <h2 class="card-title">Student roster</h2>
-                                    <p class="card-sub" id="roster-sub">Select a student to see their details.</p>
+                                    <h2 class="card-title">Your section</h2>
+                                    <p class="card-sub" id="roster-sub">Loading…</p>
                                 </div>
                                 <div class="card-tools">
                                     <label class="search">
@@ -186,27 +201,15 @@
                                 </div>
                             </div>
 
-                            <div class="card-head" style="min-height:60px">
-                                <div class="filter-row" role="group" aria-label="Filter students">
-                                    <button class="filter-tab active" data-filter="all">Everyone</button>
-                                    <button class="filter-tab" data-filter="online">Working now</button>
-                                    <button class="filter-tab" data-filter="inactive">Gone quiet</button>
-                                    <button class="filter-tab" data-filter="offline">Not signed in</button>
-                                    <button class="filter-tab" data-filter="struggling">May need help</button>
-                                    <button class="filter-tab" data-filter="smooth">Doing fine</button>
-                                </div>
-                            </div>
-
                             <div class="table-wrap">
                                 <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Student</th>
-                                            <th>Group</th>
-                                            <th>Topic</th>
-                                            <th>Progress</th>
-                                            <th>Right now</th>
-                                            <th class="col-right">Details</th>
+                                            <th>Status</th>
+                                            <th>This lesson</th>
+                                            <th>Needs attention</th>
+                                            <th class="col-right">Last action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="student-monitoring-body"></tbody>
@@ -214,8 +217,8 @@
 
                                 <div id="empty-state" class="state-block" style="display:none">
                                     <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-search"></use></svg></span>
-                                    <p class="state-title">Nobody matches that</p>
-                                    <p class="state-desc">Try a different filter, or clear the search box.</p>
+                                    <p class="state-title" id="empty-title">Nobody matches that</p>
+                                    <p class="state-desc" id="empty-desc">Try another tile, or clear the search box.</p>
                                     <button class="btn btn-secondary btn-sm" id="reset-filters">Show everyone</button>
                                 </div>
                             </div>
@@ -223,69 +226,6 @@
                     </div>
                 </section>
             </main>
-        </div>
-    </div>
-
-    <!-- ============================================ DRAWER · STUDENT ---- -->
-    <div class="overlay drawer-overlay" id="student-profile-screen" role="dialog" aria-modal="true"
-        aria-labelledby="profile-name">
-        <div class="drawer">
-            <header class="drawer-head">
-                <button class="btn-icon" data-modal-close aria-label="Close">
-                    <svg class="icon"><use href="#i-arrow-left"></use></svg>
-                </button>
-                <p class="card-title" style="flex:1 1 auto">Student details</p>
-                <button class="modal-close" data-modal-close aria-label="Close">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
-            </header>
-
-            <div class="drawer-body stack">
-                <div class="drawer-identity">
-                    <span class="drawer-avatar" id="profile-avatar">
-                        <img id="profile-avatar-img" src="../../assets/images/char-1.png" alt="" width="60" height="60">
-                    </span>
-                    <div style="min-width:0">
-                        <span class="badge badge-accent" id="profile-persona-badge">—</span>
-                        <h3 class="page-title" style="font-size:18px;margin-top:8px" id="profile-name">—</h3>
-                        <p class="cell-mail" id="profile-email">—</p>
-                    </div>
-                </div>
-
-                <div class="kv-grid">
-                    <div class="kv">
-                        <p class="kv-label">Section</p>
-                        <p class="kv-value" id="profile-section">—</p>
-                    </div>
-                    <div class="kv">
-                        <p class="kv-label">Group</p>
-                        <p class="kv-value" id="profile-type">—</p>
-                    </div>
-                    <div class="kv">
-                        <p class="kv-label">Pre-test</p>
-                        <p class="kv-value tnum" id="profile-pretest">—</p>
-                    </div>
-                    <div class="kv" style="background:var(--accent-soft)">
-                        <p class="kv-label">Post-test</p>
-                        <p class="kv-value tnum" id="profile-posttest" style="color:var(--accent)">—</p>
-                    </div>
-                </div>
-
-                <!-- Research integrity: the OCEAN breakdown is never sent to a
-                     teacher's browser, only to the admin/researcher views. -->
-                <div class="notice">
-                    <svg class="icon"><use href="#i-check"></use></svg>
-                    <div>
-                        <p class="notice-title">Personality results are not shown here</p>
-                        <p class="notice-text">Trait scores stay with the research team so they can't affect
-                            how a student is taught. You see progress and activity only.</p>
-                    </div>
-                </div>
-            </div>
-
-            <footer class="modal-foot">
-                <button class="btn btn-secondary btn-block" data-modal-close>Close</button>
-            </footer>
         </div>
     </div>
 

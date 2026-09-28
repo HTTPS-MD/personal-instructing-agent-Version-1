@@ -365,6 +365,7 @@ async function requireStudentSession(opts) {
     // kailangang baguhin para magkaroon silang lahat ng sign-out control.
     renderSignOutControl(profile);
     startIdleWatchdog();
+    startPresenceHeartbeat();
 
     return profile;
 }
@@ -546,6 +547,31 @@ function startIdleWatchdog() {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) resetIdle(); });
 
     resetIdle();
+}
+
+// ==========================================
+// 1C-5. PRESENCE HEARTBEAT (teacher live monitor)
+// Tells the server "this student is here" every 45 seconds while the page is
+// visible. The server stamps the time itself (touch_presence, migration
+// 0026), so a student cannot fake it, and a teacher's dashboard shows them
+// offline two minutes after the tab closes. A hidden tab stops beating --
+// a student on another tab is not working in PIA -- and beats again the
+// moment it is shown. Failures are ignored: presence is a convenience for
+// the teacher, never a reason to interrupt a student.
+// ==========================================
+const PRESENCE_EVERY_MS = 45 * 1000;
+let presenceTimerId = null;
+
+function beatPresence() {
+    if (!window.supabaseClient || document.hidden) return;
+    window.supabaseClient.rpc('touch_presence', { p_online: true }).then(() => {}, () => {});
+}
+
+function startPresenceHeartbeat() {
+    if (presenceTimerId !== null) return;
+    beatPresence();
+    presenceTimerId = setInterval(beatPresence, PRESENCE_EVERY_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) beatPresence(); });
 }
 
 // ==========================================
@@ -741,6 +767,10 @@ async function executeForceLogout() {
 
     try {
         if (window.supabaseClient) {
+            // Off the teacher's "online" list at once, not two minutes later.
+            // (Staff accounts are not monitored; the server ignores them.)
+            clearInterval(presenceTimerId);
+            await window.supabaseClient.rpc('touch_presence', { p_online: false });
             if (deviceId) {
                 await window.supabaseClient.rpc('release_device', { p_device_id: deviceId });
             }

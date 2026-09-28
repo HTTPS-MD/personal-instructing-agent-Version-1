@@ -1,13 +1,18 @@
 /**
  * ============================================================================
- * PIA SYSTEM — TEACHER CONSOLE
+ * PIA SYSTEM — TEACHER CONSOLE (live monitor)
  * ============================================================================
- * Live monitoring for one section. Uses the shared `sb` client from
+ * One screen for a teacher running a 75-minute PIA session in their own
+ * section: who is here, who is working, who needs attention, and how far
+ * each student is through this lesson. Uses the shared `sb` client from
  * function.js and the shared rail from shell.js.
  *
- * RESEARCH INTEGRITY: ocean_* is never selected here. A teacher who knows a
- * student's trait scores may teach them differently, which would contaminate
- * the variable the study measures. Only progress and activity are exposed.
+ * WITHIN THE CERC PROTOCOL: everything about students comes from one server
+ * function, teacher_class_status (migration 0026), which returns only a
+ * name, a status, a progress count and an attention flag. Personality
+ * results, the research group, the tutor persona and test scores never
+ * reach this page -- teachers cannot read student rows directly any more,
+ * so not even the browser console can ask for them.
  * ==========================================================================*/
 (function () {
     'use strict';
@@ -20,16 +25,12 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    /* A student is "gone quiet" after this long without the app writing a
-       timestamp for them. */
-    var IDLE_MINUTES = 10;
-    var STRUGGLING_BELOW = 70;
-
     var state = {
         section: null,
         name: null,
         email: null,
-        students: [],
+        rows: [],
+        loadedAt: 0,
         filter: 'all',
         search: ''
     };
@@ -242,19 +243,46 @@
 
     /* ============================================ 4. DATA ============== */
 
-    /* Exactly the columns the table renders. Selecting '*' would ship every
-       student's device IDs and OCEAN scores to the teacher's browser. */
-    var COLUMNS = 'full_name, email, group_type, status, is_in_game, stage_started_at,' +
-        ' selected_character, pre_test_score, post_test_score';
+    /* Ten seconds is "live" for a classroom, and 31 rows is a trivial query.
+       Polling a guarded function rather than subscribing to table changes is
+       deliberate: a realtime subscription streams WHOLE rows, and a student
+       row carries exactly the research columns this page must never see. */
+    var REFRESH_MS = 10000;
+
+    var ACTIVITY = {
+        solving:     { label: 'Solving',         tone: 'online' },
+        idle:        { label: 'Idle',            tone: 'inactive' },
+        not_started: { label: 'Not started yet', tone: 'inactive' },
+        setting_up:  { label: 'Getting set up',  tone: 'neutral' },
+        waiting:     { label: 'In waiting room', tone: 'neutral' },
+        finished:    { label: 'Finished',        tone: 'done' },
+        offline:     { label: 'Offline',         tone: 'offline' }
+    };
+
+    /* Who to look at first, after anyone who needs attention. */
+    var ORDER = { idle: 1, not_started: 2, solving: 3, setting_up: 4, waiting: 5, finished: 6, offline: 7 };
+
+    function attentionText(r) {
+        var m = r.attention_minutes || 0;
+        if (r.attention === 'stuck') { return 'Same problem for ' + m + ' min'; }
+        if (r.attention === 'idle') { return 'No activity for ' + m + ' min'; }
+        if (r.attention === 'dropped') { return 'Disconnected mid-lesson'; }
+        return '';
+    }
+
+    function agoText(sec) {
+        if (sec === null || sec === undefined) { return '—'; }
+        if (sec < 60) { return 'Just now'; }
+        var m = Math.floor(sec / 60);
+        return m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ago';
+    }
 
     function skeletonRows(n) {
         var out = '';
         for (var i = 0; i < (n || 5); i++) {
             out += '<tr aria-hidden="true"><td><div class="cell-user">' +
-                '<span class="skeleton skeleton-avatar"></span><span style="width:150px">' +
-                '<span class="skeleton skeleton-line" style="width:70%"></span>' +
-                '<span class="skeleton skeleton-line" style="width:90%"></span></span></div></td>' +
-                '<td><span class="skeleton skeleton-pill"></span></td>' +
+                '<span class="skeleton skeleton-avatar"></span>' +
+                '<span class="skeleton skeleton-line" style="width:140px"></span></div></td>' +
                 '<td><span class="skeleton skeleton-pill"></span></td>' +
                 '<td><span class="skeleton skeleton-pill"></span></td>' +
                 '<td><span class="skeleton skeleton-pill"></span></td>' +
@@ -263,190 +291,161 @@
         return out;
     }
 
-    /* Derives the three engagement states. is_in_game means working right now;
-       otherwise stage_started_at is the newest timestamp the app actually
-       writes (profiles has no last_seen column). */
-    function engagementOf(s) {
-        if ((s.status || '') !== 'active') { return 'offline'; }
-        if (s.is_in_game) { return 'online'; }
-        if (!s.stage_started_at) { return 'inactive'; }
-        var mins = (Date.now() - new Date(s.stage_started_at).getTime()) / 60000;
-        return mins > IDLE_MINUTES ? 'inactive' : 'online';
-    }
-
-    function learningOf(s) {
-        return (s.pre_test_score !== null && s.pre_test_score !== undefined &&
-            s.pre_test_score < STRUGGLING_BELOW) ? 'struggling' : 'smooth';
-    }
-
     async function loadMonitoring() {
         var tbody = $('#student-monitoring-body');
 
         if (!state.section) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">' +
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">' +
                 'No section is assigned to your account yet. Please contact the administrator.</td></tr>';
+            $('#roster-sub').textContent = 'No section assigned.';
             paintStats([]);
             return;
         }
 
-        if (!state.students.length) { tbody.innerHTML = skeletonRows(6); }
+        if (!state.loadedAt) { tbody.innerHTML = skeletonRows(6); }
 
-        var res = await sb.from('profiles').select(COLUMNS).eq('section', state.section)
-            .order('full_name', { ascending: true });
+        var res;
+        try {
+            res = await sb.rpc('teacher_class_status');
+        } catch (err) {
+            res = { error: err };
+        }
 
         if (res.error) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">Could not load your roster. ' +
-                esc(res.error.message) + '</td></tr>';
+            paintConnection('error');
+            if (!state.loadedAt) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">Could not load your class. ' +
+                    esc(res.error.message || '') + '</td></tr>';
+            }
             return;
         }
 
-        state.students = res.data || [];
-        $('#nav-count-students').textContent = state.students.length;
+        state.rows = res.data || [];
+        state.loadedAt = Date.now();
+        $('#nav-count-students').textContent = state.rows.length;
         render();
+        paintConnection('ok');
     }
 
-    function paintStats(list) {
-        var online = list.filter(function (s) { return engagementOf(s) === 'online'; }).length;
-        var idle = list.filter(function (s) { return engagementOf(s) === 'inactive'; }).length;
-        var strug = list.filter(function (s) { return learningOf(s) === 'struggling'; }).length;
+    function paintStats(rows) {
+        var count = function (test) { return rows.filter(test).length; };
+        $('#stat-total').textContent = rows.length;
+        $('#stat-online').textContent = count(function (r) { return r.online; }) + ' online';
+        $('#stat-attention').textContent = count(function (r) { return !!r.attention; });
+        $('#stat-solving').textContent = count(function (r) { return r.activity === 'solving'; });
+        $('#stat-finished').textContent = count(function (r) { return r.activity === 'finished'; });
+    }
 
-        $('#stat-total').textContent = list.length;
-        $('#stat-online').textContent = online;
-        $('#stat-inactive').textContent = idle;
-        $('#stat-struggling').textContent = strug;
+    function matchesFilter(r) {
+        if (state.filter === 'attention') { return !!r.attention; }
+        if (state.filter === 'solving') { return r.activity === 'solving'; }
+        if (state.filter === 'finished') { return r.activity === 'finished'; }
+        return true;
+    }
+
+    function progressCell(r) {
+        /* Before the lesson (waiting, setting up) there is nothing to count. */
+        if (r.activity === 'waiting' || r.activity === 'setting_up' ||
+            (r.activity === 'offline' && !r.problems_done)) {
+            return '<span class="muted">—</span>';
+        }
+        var target = r.problems_target || 10;
+        var pct = Math.round(Math.min(r.problems_done, target) / target * 100);
+        return '<span class="lesson-progress">' +
+            '<span class="bar"><span class="bar-fill" style="width:' + pct + '%"></span></span>' +
+            '<span class="tnum">' + r.problems_done + ' / ' + target + '</span></span>';
     }
 
     function render() {
-        paintStats(state.students);
+        paintStats(state.rows);
 
         var term = state.search.trim().toLowerCase();
-        var rows = state.students.filter(function (s) {
-            var eng = engagementOf(s), learn = learningOf(s);
-
-            if (state.filter === 'online' && eng !== 'online') { return false; }
-            if (state.filter === 'inactive' && eng !== 'inactive') { return false; }
-            if (state.filter === 'offline' && eng !== 'offline') { return false; }
-            if (state.filter === 'struggling' && learn !== 'struggling') { return false; }
-            if (state.filter === 'smooth' && learn !== 'smooth') { return false; }
-
-            if (term) {
-                return ((s.full_name || '') + ' ' + (s.email || '')).toLowerCase().indexOf(term) !== -1;
-            }
-            return true;
+        var rows = state.rows.filter(function (r) {
+            if (!matchesFilter(r)) { return false; }
+            return !term || String(r.full_name || '').toLowerCase().indexOf(term) !== -1;
         });
 
-        var tbody = $('#student-monitoring-body');
-        $('#empty-state').style.display = rows.length ? 'none' : 'block';
+        /* Attention first -- longest wait at the top -- then by status. */
+        rows.sort(function (a, b) {
+            if (!!a.attention !== !!b.attention) { return a.attention ? -1 : 1; }
+            if (a.attention && b.attention) { return (b.attention_minutes || 0) - (a.attention_minutes || 0); }
+            var d = (ORDER[a.activity] || 9) - (ORDER[b.activity] || 9);
+            return d || String(a.full_name).localeCompare(String(b.full_name));
+        });
 
-        tbody.innerHTML = rows.map(function (s) {
-            var eng = engagementOf(s);
-            var learn = learningOf(s);
+        var empty = !rows.length;
+        $('#empty-state').style.display = empty ? 'block' : 'none';
+        if (empty) {
+            var noneYet = state.filter === 'attention' && !term;
+            $('#empty-title').textContent = noneYet ? 'Nobody needs attention right now' : 'Nobody matches that';
+            $('#empty-desc').textContent = noneYet
+                ? 'Students stuck, idle or disconnected will appear here.'
+                : 'Try another tile, or clear the search box.';
+        }
 
-            var engLabel = { online: 'Working now', inactive: 'Gone quiet', offline: 'Not signed in' }[eng];
-            var engClass = { online: 'status-badge-online', inactive: 'status-badge-inactive', offline: 'status-badge-offline' }[eng];
-            var dotClass = { online: 'status-dot-online', inactive: 'status-dot-inactive', offline: 'status-dot-offline' }[eng];
-            var pulse = eng === 'online' ? ' engagement-dot-pulse' : '';
+        $('#student-monitoring-body').innerHTML = rows.map(function (r) {
+            var a = ACTIVITY[r.activity] || ACTIVITY.offline;
+            var pulse = r.activity === 'solving' ? ' engagement-dot-pulse' : '';
+            var att = attentionText(r);
 
             return '' +
-                '<tr class="is-clickable" data-student="' + esc(s.email) + '">' +
+                '<tr data-key="' + esc(r.student_key) + '"' + (r.attention ? ' class="needs-attention"' : '') + '>' +
                 '<td><div class="cell-user">' +
                 '<span class="student-avatar-wrap">' +
-                '<span class="student-avatar-initial">' + esc(initialsOf(s.full_name, s.email)) + '</span>' +
-                '<span class="student-avatar-status ' + dotClass + '"></span></span>' +
-                '<span><span class="cell-name">' + esc(s.full_name || 'Unnamed student') + '</span>' +
-                '<span class="cell-mail">' + esc(s.email || '') + '</span></span>' +
+                '<span class="student-avatar-initial">' + esc(initialsOf(r.full_name, '')) + '</span>' +
+                '<span class="student-avatar-status status-dot-' + a.tone + '"></span></span>' +
+                '<span class="cell-name">' + esc(r.full_name) + '</span>' +
                 '</div></td>' +
-                '<td><span class="badge">' + esc(s.group_type || '—') + '</span></td>' +
-                '<td class="muted">Algebraic expressions</td>' +
-                '<td><span class="learning-badge ' + (learn === 'struggling' ? 'learning-struggling' : 'learning-smooth') + '">' +
-                '<svg class="icon"><use href="#i-' + (learn === 'struggling' ? 'alert' : 'trend') + '"></use></svg>' +
-                (learn === 'struggling' ? 'May need help' : 'Doing fine') + '</span></td>' +
-                '<td><span class="engagement-badge ' + engClass + '">' +
-                '<span class="status-dot ' + dotClass + pulse + '"></span>' + engLabel + '</span></td>' +
-                '<td class="col-right"><button class="btn btn-secondary btn-sm" data-open="' + esc(s.email) + '">View</button></td>' +
+                '<td><span class="engagement-badge status-badge-' + a.tone + '">' +
+                '<span class="status-dot status-dot-' + a.tone + pulse + '"></span>' + esc(a.label) + '</span></td>' +
+                '<td>' + progressCell(r) + '</td>' +
+                '<td>' + (att
+                    ? '<span class="learning-badge learning-struggling"><svg class="icon"><use href="#i-alert"></use></svg>' +
+                      esc(att) + '</span>'
+                    : '<span class="muted">—</span>') + '</td>' +
+                '<td class="col-right muted tnum">' + esc(agoText(r.seconds_since_active)) + '</td>' +
                 '</tr>';
         }).join('');
 
-        $('#roster-sub').textContent = rows.length === state.students.length
-            ? 'Showing all ' + rows.length + ' student' + (rows.length === 1 ? '' : 's') + '.'
-            : 'Showing ' + rows.length + ' of ' + state.students.length + '.';
+        $('#roster-sub').textContent = rows.length === state.rows.length
+            ? 'Section ' + state.section + ' · ' + rows.length + ' student' + (rows.length === 1 ? '' : 's')
+            : 'Showing ' + rows.length + ' of ' + state.rows.length;
 
         $$('[data-filter]').forEach(function (el) {
-            if (el.classList.contains('filter-tab')) {
-                el.classList.toggle('active', el.getAttribute('data-filter') === state.filter);
-            } else {
-                el.classList.toggle('is-active', el.getAttribute('data-filter') === state.filter);
-            }
+            el.classList.toggle('is-active', el.getAttribute('data-filter') === state.filter);
         });
     }
 
-    /* ============================================ 5. DRAWER ============ */
-
-    function openStudent(email) {
-        var s = state.students.filter(function (x) { return x.email === email; })[0];
-        if (!s) { return; }
-
-        var persona = (s.selected_character || '').replace('pia-', '') || 'not chosen';
-
-        $('#profile-name').textContent = s.full_name || 'Unnamed student';
-        $('#profile-email').textContent = s.email || '';
-        $('#profile-section').textContent = state.section || '—';
-        $('#profile-type').textContent = s.group_type || '—';
-        $('#profile-pretest').textContent = s.pre_test_score == null ? 'Not recorded' : s.pre_test_score;
-        $('#profile-posttest').textContent = s.post_test_score == null ? 'Not taken yet' : s.post_test_score;
-        $('#profile-persona-badge').textContent = persona === 'not chosen'
-            ? 'No tutor chosen' : persona.charAt(0).toUpperCase() + persona.slice(1) + ' tutor';
-
-        /* Most persona art is not in the repo yet; fall back to a monogram
-           rather than showing a broken image. */
-        var box = $('#profile-avatar');
-        var img = $('#profile-avatar-img');
-        box.removeAttribute('data-mono');
-        img.onerror = function () {
-            box.setAttribute('data-mono', initialsOf(s.full_name, s.email));
-        };
-        img.src = s.selected_character
-            ? '../../assets/images/' + s.selected_character.replace('pia-', 'char-') + '.png'
-            : '../../assets/images/char-1.png';
-
-        openModal('student-profile-screen');
-    }
-
-    /* ============================================ 6. REALTIME ========== */
+    /* ============================================ 5. LIVE REFRESH ====== */
 
     function paintConnection(status) {
         var dot = $('#live-dot'), label = $('#live-label');
         if (!dot || !label) { return; }
-        if (status === 'SUBSCRIBED') { dot.className = 'dot dot-live'; label.textContent = 'Live'; }
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { dot.className = 'dot dot-warn'; label.textContent = 'Reconnecting…'; }
-        else if (status === 'CLOSED') { dot.className = 'dot dot-off'; label.textContent = 'Offline'; }
+        if (status === 'ok') {
+            dot.className = 'dot dot-live';
+            var sec = Math.round((Date.now() - state.loadedAt) / 1000);
+            label.textContent = sec < 5 ? 'Live' : 'Updated ' + sec + 's ago';
+        } else {
+            dot.className = 'dot dot-warn';
+            label.textContent = 'Reconnecting…';
+        }
     }
 
-    function setupRealtime() {
-        if (typeof registerChannel !== 'function' || !state.section) { return; }
+    var pollId = null;
 
-        /* Scoped to this teacher's own section: without the filter every change
-           in the whole system reaches this browser. Debounced so a class all
-           signing in at once does not fire dozens of reloads. */
-        var suffix = String(state.section).replace(/[^A-Za-z0-9_-]/g, '_');
-        var timer = null;
-
-        registerChannel('teacher-monitoring-' + suffix, function (ch) {
-            return ch.on('postgres_changes', {
-                event: '*', schema: 'public', table: 'profiles',
-                filter: 'section=eq.' + state.section
-            }, function () {
-                clearTimeout(timer);
-                timer = setTimeout(loadMonitoring, 400);
-            }).subscribe(paintConnection);
-        });
+    function schedule() {
+        clearTimeout(pollId);
+        pollId = setTimeout(async function () {
+            /* A hidden tab does not poll; showing it again refreshes at once. */
+            if (!document.hidden) { await loadMonitoring(); }
+            schedule();
+        }, REFRESH_MS);
     }
 
-    /* Engagement is time-based, so a row can go stale without any database
-       change. Re-deriving once a minute keeps "gone quiet" honest. */
-    setInterval(function () { if (state.students.length) { render(); } }, 60000);
+    /* The "updated … ago" label ticks between refreshes. */
+    setInterval(function () { if (state.loadedAt) { paintConnection('ok'); } }, 5000);
 
-    /* ============================================ 7. BOOT ============== */
+    /* ============================================ 6. BOOT ============== */
 
     async function boot() {
         setBootText('Verifying your access…');
@@ -463,7 +462,9 @@
 
         $$('[data-filter]').forEach(function (el) {
             el.addEventListener('click', function () {
-                state.filter = el.getAttribute('data-filter');
+                var f = el.getAttribute('data-filter');
+                /* Clicking the active tile again goes back to everyone. */
+                state.filter = (state.filter === f) ? 'all' : f;
                 render();
             });
         });
@@ -475,16 +476,15 @@
             render();
         });
 
-        $('#student-monitoring-body').addEventListener('click', function (e) {
-            var row = e.target.closest('[data-student]');
-            if (row) { openStudent(row.getAttribute('data-student')); }
-        });
-
         $('#refresh-btn').addEventListener('click', async function () {
             var release = setBusy(this, '…');
             await loadMonitoring();
             release();
-            toast('Refreshed', 'Your roster is up to date.');
+            toast('Refreshed', 'Your class is up to date.');
+        });
+
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) { loadMonitoring(); }
         });
 
         $('#signout-confirm').addEventListener('click', function () {
@@ -495,7 +495,7 @@
         setBootText('Loading your section…');
         await loadMonitoring();
         reveal();
-        setupRealtime();
+        schedule();
     }
 
     if (document.readyState === 'loading') {

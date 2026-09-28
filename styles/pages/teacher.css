@@ -78,6 +78,9 @@
 .status-badge-online { background: var(--accent-soft); color: var(--accent); }
 .status-badge-inactive { background: var(--warning-soft); color: var(--warning); }
 .status-badge-offline { background: var(--bg-chip); color: var(--text-muted); }
+/* Waiting room / getting set up: present, not yet in the lesson. */
+.status-badge-neutral { background: var(--bg-chip); color: var(--text); }
+.status-badge-done { background: var(--correct-soft); color: var(--correct-ink); }
 
 /* "Doing fine" is good news: the correct status colour (volt), not amber. */
 .learning-smooth { background: var(--correct-soft); color: var(--correct-ink); }
@@ -96,6 +99,33 @@
 .status-dot-online { background: var(--accent); }
 .status-dot-inactive { background: var(--warning); }
 .status-dot-offline { background: var(--track); }
+.status-dot-neutral { background: var(--text-muted); }
+.status-dot-done { background: var(--correct); }
+
+/* "This lesson": problems finished out of the lesson's target. A count, not
+   a score -- nothing here says how many were right. */
+.lesson-progress { display: inline-flex; align-items: center; gap: var(--sp-3); }
+/* Spans inside a table cell: made blocks so the rail and fill take a size. */
+.lesson-progress .bar { display: block; width: 88px; flex: 0 0 88px; }
+.lesson-progress .bar-fill { display: block; }
+.lesson-progress .tnum { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+
+/* A row that needs the teacher: a quiet edge, never a red row -- the class
+   may be able to see this screen. */
+.table tbody tr.needs-attention td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+
+/* The facilitation note (same block as the admin console's). */
+.notice {
+    display: flex;
+    gap: var(--sp-3);
+    padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+.notice-accent { background: var(--accent-soft); }
+.notice .icon { color: var(--accent); margin-top: 1px; flex: 0 0 auto; }
+.notice-title { font-size: var(--fs-sm); font-weight: 700; }
+.notice-text { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; }
 
 /* Only the live state pulses, so a scanning eye is drawn to who is actually
    working right now. Opacity only — the dot never changes size. */
