@@ -466,10 +466,16 @@
             var profileRes = await sb.from('profiles').select('*')
                 .eq('email', auth.data.user.email).maybeSingle();
 
+            /* Every refusal below undoes the session signInWithPassword just
+               created ON THIS DEVICE, and nothing more. scope 'local' matters:
+               supabase-js defaults to 'global', which revokes the account's
+               refresh tokens everywhere — so one refused attempt on a lab PC
+               used to sign the student out of the device they were actually
+               using, while that device still held its slot. */
             if (profileRes.error || !profileRes.data) {
                 /* An auth user with no profile row cannot be routed anywhere.
                    Sign back out rather than leaving a half-session behind. */
-                await sb.auth.signOut();
+                await sb.auth.signOut({ scope: 'local' });
                 setStatus(opts.statusId,
                     'This account is not set up yet. Please contact the study administrator.', 'error');
                 return;
@@ -486,7 +492,7 @@
                somewhere they did not ask to go. */
             var mismatch = areaMismatch(opts.area, role);
             if (mismatch) {
-                await sb.auth.signOut();
+                await sb.auth.signOut({ scope: 'local' });
                 setStatus(opts.statusId, mismatch, 'error');
                 return;
             }
@@ -499,7 +505,13 @@
             if (role !== 'admin' && typeof enforceDeviceLimit === 'function') {
                 var check = await enforceDeviceLimit(auth.data.user.email, profile);
                 if (!check.allowed) {
-                    await sb.auth.signOut();
+                    /* Device limit: the OTHER device keeps its session and
+                       its slot; only this refused attempt is undone. */
+                    await sb.auth.signOut({ scope: 'local' });
+                    try {
+                        localStorage.removeItem('pia_user_email');
+                        localStorage.removeItem('pia_user_role');
+                    } catch (err) { /* private mode */ }
                     setStatus(opts.statusId, check.reason, 'error');
                     return;
                 }
