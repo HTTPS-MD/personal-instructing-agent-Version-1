@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-surface="console">
 
 <head>
     <meta charset="UTF-8">
@@ -7,14 +7,15 @@
     <meta name="color-scheme" content="light dark">
 
     <!-- Before first paint: the stored theme (dark by default) goes on
-         <html> so there is never a flash of the wrong one. -->
+         <html> so there is never a flash of the wrong one. data-surface=
+         "console" switches this page, and only this page, to the teacher
+         console's square, monochrome tokens (teacher.css, section 0). -->
     <script src="../../assets/js/theme-boot.js"></script>
     <title>Teacher Console — PIA System</title>
 
     <script src="../../assets/js/page-guard.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/shell.css">
@@ -23,18 +24,16 @@
 
 <body data-boot="pending">
 
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <a class="skip-link" id="skip-link" href="#main">Skip to the class</a>
+
+    <svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
         <defs>
-            <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
-            <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7.5" r="3.5"/><path d="M22 20v-1.5a4 4 0 0 0-3-3.87"/><path d="M16 4.1a4 4 0 0 1 0 7"/></symbol>
             <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
             <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
-            <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 16.5 6-6 4 4 8-8"/><path d="M15 6.5h6v6"/></symbol>
-            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.1 1.9"/></symbol>
             <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
             <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
-            <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H4"/><path d="m10 6-6 6 6 6"/></symbol>
             <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+            <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m6 14 6 6 6-6"/></symbol>
             <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
             <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
             <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.5V10H15"/></symbol>
@@ -43,12 +42,11 @@
     </svg>
 
     <div class="boot-veil" id="boot-veil">
-        <div class="spinner" aria-hidden="true"></div>
-        <p class="boot-text" id="boot-text">Verifying your access…</p>
+        <p class="boot-text"><span id="boot-text" role="status">Checking your access…</span><span class="boot-cursor" aria-hidden="true"></span></p>
     </div>
 
     <div class="error-banner" id="global-error-banner" role="alert" hidden>
-        <svg class="icon"><use href="#i-alert"></use></svg>
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-alert"></use></svg>
         <span id="global-error-message"></span>
     </div>
 
@@ -56,12 +54,12 @@
 
     <div class="app" id="app" data-rail="collapsed">
 
-        <!-- Same hover rail as the admin console, from styles/shell.css and
-             assets/js/shell.js. A teacher has one view, so the rail is short —
+        <!-- Same hover rail as the admin console (styles/shell.css,
+             assets/js/shell.js). A teacher has one view, so the rail is short,
              but the chrome behaves identically across roles. -->
         <aside class="sidebar" id="sidebar" aria-label="Primary">
             <div class="sidebar-brand">
-                <span class="rail-slot"><a class="brand-link" href="#"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA — back to top" width="48" height="48"></a></span>
+                <span class="rail-slot"><a class="brand-link" href="#main"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA, back to the class" width="48" height="48"></a></span>
                 <div class="brand-text rail-reveal">
                     <div class="brand-name">PIA System</div>
                     <div class="brand-sub">Teacher Console</div>
@@ -70,21 +68,23 @@
 
             <div class="sidebar-scroll">
                 <nav class="nav-group" aria-label="Workspace">
-                    <p class="nav-group-label rail-reveal">My Section</p>
+                    <p class="nav-group-label rail-reveal">My section</p>
 
-                    <button class="nav-item is-active" data-view="monitor">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-activity"></use></svg></span>
+                    <!-- The only view: a "you are here" marker, not a button
+                         that does nothing. -->
+                    <a class="nav-item is-active" href="#main" aria-current="page">
+                        <span class="rail-slot"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-activity"></use></svg></span>
                         <span class="nav-label rail-reveal">Live monitor</span>
-                        <span class="nav-count rail-reveal" id="nav-count-students">—</span>
-                    </button>
+                        <span class="nav-count rail-reveal tnum" id="nav-count-students">—</span>
+                    </a>
                 </nav>
             </div>
 
             <div class="sidebar-foot">
-                <button class="sidebar-user" data-modal-open="modal-signout">
+                <button class="sidebar-user" type="button" data-modal-open="modal-signout" aria-haspopup="dialog">
                     <span class="rail-slot"><span class="avatar" id="teacher-initials" aria-hidden="true">··</span></span>
                     <span class="sidebar-user-text rail-reveal">
-                        <span class="sidebar-user-name teacher-name" id="teacher-name">Loading…</span>
+                        <span class="sidebar-user-name" id="teacher-name">Loading…</span>
                         <span class="sidebar-user-role" id="teacher-email">—</span>
                     </span>
                 </button>
@@ -94,171 +94,232 @@
         <div class="workspace">
             <header class="topbar">
                 <div class="topbar-left">
-                    <button class="btn-icon nav-toggle-mobile" id="mobile-nav-toggle" title="Open navigation">
-                        <svg class="icon"><use href="#i-menu"></use></svg>
-                        <span class="sr-only">Open navigation</span>
+                    <button class="btn-icon nav-toggle-mobile" id="mobile-nav-toggle" type="button"
+                        aria-label="Open navigation" aria-controls="sidebar">
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
                     </button>
-                    <nav class="crumbs" aria-label="Breadcrumb">
+                    <p class="crumbs">
                         <span class="crumbs-trail">Teacher</span>
-                        <svg class="icon icon-sm crumbs-trail"><use href="#i-chev-right"></use></svg>
+                        <svg class="icon icon-sm crumbs-trail" aria-hidden="true" focusable="false"><use href="#i-chev-right"></use></svg>
                         <strong id="teacher-section-label">Loading…</strong>
-                    </nav>
+                    </p>
                 </div>
 
                 <div class="topbar-right">
-                    <span class="env-pill" id="live-pill">
-                        <span class="dot dot-off" id="live-dot"></span>
-                        <span id="live-label">Connecting…</span>
-                    </span>
-                    <button class="btn-icon is-bordered" id="refresh-btn" title="Refresh">
-                        <svg class="icon"><use href="#i-refresh"></use></svg>
-                        <span class="sr-only">Refresh</span>
+                    <button class="btn-icon is-bordered" id="refresh-btn" type="button" title="Refresh now"
+                        aria-label="Refresh the class now">
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"></use></svg>
                     </button>
-                    <button class="btn btn-signout" data-modal-open="modal-signout">
-                        <svg class="icon"><use href="#i-logout"></use></svg>
+                    <button class="btn btn-signout" type="button" data-modal-open="modal-signout" aria-haspopup="dialog">
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-logout"></use></svg>
                         Sign out
                     </button>
                 </div>
             </header>
 
-            <main class="main">
-                <section class="page">
-                    <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title" id="page-greeting">Live monitor</h1>
-                            <p class="page-desc">Who is here, who is working, and who needs you. It refreshes by
-                                itself every few seconds.</p>
+            <main class="main" id="main" tabindex="-1">
+                <!-- data-load: loading -> ready, or error when the first load
+                     fails. The empty and error states key off it in CSS. -->
+                <div class="page console" id="console" data-load="loading">
+
+                    <header class="mast">
+                        <div class="mast-meta">
+                            <p class="mast-hello" id="mast-hello">Teacher console</p>
+                            <p class="live" id="live" data-state="connecting">
+                                <span class="live-dot" aria-hidden="true"></span>
+                                <span class="live-text" id="live-text">Connecting…</span>
+                            </p>
                         </div>
+                        <h1 class="mast-title">
+                            <span class="mast-kicker" id="mast-kicker">Section</span>
+                            <span class="mast-name" id="mast-section">—</span>
+                        </h1>
+                    </header>
+
+                    <!-- Two columns on a desktop, one on a phone: who needs you
+                         first, then the counts, then everyone. What a teacher
+                         running a 75-minute session needs and nothing else: no
+                         scores, no research groups, no tutor personas (CERC). -->
+                    <div class="deck">
+                        <section class="queue" id="queue" aria-labelledby="queue-title" aria-busy="true">
+                            <header class="queue-head">
+                                <h2 class="queue-title" id="queue-title">Needs attention</h2>
+                                <p class="queue-n"><span class="tnum" id="queue-n">—</span><span class="sr-only"> flagged</span></p>
+                            </header>
+
+                            <!-- The facilitation rule, where it is needed. Keeps
+                                 teacher help from turning into math tutoring
+                                 inside PIA sessions, which the comparison with
+                                 the traditional class depends on. -->
+                            <p class="queue-rule"><strong>Nudge, don't teach.</strong> Help with focus, sign-in or
+                                finding their place. PIA teaches the math.</p>
+
+                            <ol class="queue-list" id="queue-list"></ol>
+                            <p class="queue-clear" id="queue-clear">All clear. Nobody's stuck.</p>
+
+                            <button class="btn btn-secondary queue-more" id="queue-more" type="button" hidden>
+                                <span id="queue-more-text">Show all in the roster</span>
+                                <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-down"></use></svg>
+                            </button>
+
+                            <p class="queue-foot">Flags after 5 min on one problem, 3 min idle, or a drop mid-lesson.</p>
+                        </section>
+
+                        <section class="ledger" aria-labelledby="ledger-title">
+                            <h2 class="ledger-title" id="ledger-title">Filter the roster</h2>
+                            <div class="ledger-grid" role="group" aria-labelledby="ledger-title">
+                                <button class="tally tally-all" type="button" data-filter="all" aria-pressed="true" disabled>
+                                    <span class="tally-label">Everyone</span>
+                                    <span class="tally-n tnum" data-count="all">—</span>
+                                    <span class="tally-note tnum" id="tally-online">— online</span>
+                                </button>
+                                <button class="tally" type="button" data-filter="attention" aria-pressed="false" disabled>
+                                    <span class="tally-label">Needs attention</span>
+                                    <span class="tally-n tnum" data-count="attention">—</span>
+                                </button>
+                                <button class="tally" type="button" data-filter="solving" aria-pressed="false" disabled>
+                                    <span class="tally-label">Solving now</span>
+                                    <span class="tally-n tnum" data-count="solving">—</span>
+                                </button>
+                                <button class="tally" type="button" data-filter="finished" aria-pressed="false" disabled>
+                                    <span class="tally-label">Finished</span>
+                                    <span class="tally-n tnum" data-count="finished">—</span>
+                                </button>
+                                <button class="tally" type="button" data-filter="offline" aria-pressed="false" disabled>
+                                    <span class="tally-label">Offline</span>
+                                    <span class="tally-n tnum" data-count="offline">—</span>
+                                </button>
+                            </div>
+                        </section>
                     </div>
 
-                    <div class="stack">
-                        <!-- The tiles double as the filter. What a teacher running a
-                             75-minute session needs, and nothing else: no scores, no
-                             research groups, no tutor personas (CERC protocol). -->
-                        <div class="grid grid-4" id="stat-tiles">
-                            <button class="stat" data-filter="all">
-                                <span class="stat-top">
-                                    <span class="stat-label">Class</span>
-                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-users"></use></svg></span>
-                                </span>
-                                <span class="stat-value" id="stat-total">—</span>
-                                <span class="stat-foot" id="stat-online">— online</span>
-                            </button>
+                    <section class="roster" id="roster" aria-labelledby="roster-title" aria-busy="true">
+                        <header class="roster-head">
+                            <div class="roster-head-text">
+                                <h2 class="roster-title" id="roster-title" tabindex="-1">Roster</h2>
+                                <p class="roster-sub tnum" id="roster-sub">Loading…</p>
+                            </div>
+                            <div class="roster-tools">
+                                <label class="find" for="search-student">
+                                    <span class="sr-only">Find a student</span>
+                                    <svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg>
+                                    <input class="find-input" type="search" id="search-student" placeholder="Find a student"
+                                        autocomplete="off" spellcheck="false" enterkeyhint="search">
+                                </label>
+                                <button class="btn btn-secondary" id="reset-filters" type="button" hidden>Show everyone</button>
+                            </div>
+                        </header>
 
-                            <button class="stat" data-filter="attention">
-                                <span class="stat-top">
-                                    <span class="stat-label">Needs attention</span>
-                                    <span class="stat-glyph g-danger"><svg class="icon"><use href="#i-alert"></use></svg></span>
-                                </span>
-                                <span class="stat-value" id="stat-attention">—</span>
-                                <span class="stat-foot">Stuck, idle or dropped</span>
-                            </button>
-
-                            <button class="stat" data-filter="solving">
-                                <span class="stat-top">
-                                    <span class="stat-label">Solving now</span>
-                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-activity"></use></svg></span>
-                                </span>
-                                <span class="stat-value" id="stat-solving">—</span>
-                                <span class="stat-foot">Active in the last 3 minutes</span>
-                            </button>
-
-                            <button class="stat" data-filter="finished">
-                                <span class="stat-top">
-                                    <span class="stat-label">Finished</span>
-                                    <span class="stat-glyph g-warn"><svg class="icon"><use href="#i-check"></use></svg></span>
-                                </span>
-                                <span class="stat-value" id="stat-finished">—</span>
-                                <span class="stat-foot">Completed this lesson</span>
-                            </button>
+                        <!-- Explicit table roles: on a phone the rows are laid out
+                             as cards, and some browsers drop a table's semantics
+                             once its display changes. -->
+                        <div class="roster-scroll">
+                            <table class="roster-table" role="table" aria-describedby="roster-sub">
+                                <caption class="sr-only">Students in your section: status, progress this lesson,
+                                    attention flag and last action. Updates every 10 seconds.</caption>
+                                <thead role="rowgroup">
+                                    <tr role="row">
+                                        <th role="columnheader" scope="col">Student</th>
+                                        <th role="columnheader" scope="col">Status</th>
+                                        <th role="columnheader" scope="col">This lesson</th>
+                                        <th role="columnheader" scope="col">Needs attention</th>
+                                        <th role="columnheader" scope="col" class="col-end">Last action</th>
+                                    </tr>
+                                </thead>
+                                <tbody role="rowgroup" id="roster-body"></tbody>
+                            </table>
                         </div>
 
-                        <!-- The facilitation rule, where it is needed. Keeps teacher
-                             help from turning into math tutoring inside PIA sessions,
-                             which the comparison with the traditional class depends on. -->
-                        <div class="notice notice-accent">
-                            <svg class="icon"><use href="#i-check"></use></svg>
-                            <div>
-                                <p class="notice-title">"Needs attention" means a nudge, not a lesson</p>
-                                <p class="notice-text">Help with focus, sign-in or finding their place, and let PIA
-                                    teach the math. It flags students stuck on one problem for 5+ minutes, idle for
-                                    3+ minutes, or disconnected mid-lesson.</p>
-                            </div>
+                        <div class="roster-state roster-empty">
+                            <p class="roster-state-title" id="empty-title">Nobody matches that.</p>
+                            <p class="roster-state-text" id="empty-text">Try another name, or show everyone.</p>
                         </div>
 
-                        <div class="card">
-                            <div class="card-head">
-                                <div class="card-head-text">
-                                    <h2 class="card-title">Your section</h2>
-                                    <p class="card-sub" id="roster-sub">Loading…</p>
-                                </div>
-                                <div class="card-tools">
-                                    <label class="search">
-                                        <svg class="icon"><use href="#i-search"></use></svg>
-                                        <input type="search" class="input" id="search-student"
-                                            placeholder="Search by name" aria-label="Search students">
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="table-wrap">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Student</th>
-                                            <th>Status</th>
-                                            <th>This lesson</th>
-                                            <th>Needs attention</th>
-                                            <th class="col-right">Last action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="student-monitoring-body"></tbody>
-                                </table>
-
-                                <div id="empty-state" class="state-block" style="display:none">
-                                    <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-search"></use></svg></span>
-                                    <p class="state-title" id="empty-title">Nobody matches that</p>
-                                    <p class="state-desc" id="empty-desc">Try another tile, or clear the search box.</p>
-                                    <button class="btn btn-secondary btn-sm" id="reset-filters">Show everyone</button>
-                                </div>
-                            </div>
+                        <div class="roster-state roster-error" role="alert">
+                            <p class="roster-state-title">Can't load your class.</p>
+                            <p class="roster-state-text" id="error-text"></p>
+                            <button class="btn btn-primary" id="retry-btn" type="button">Try again</button>
                         </div>
-                    </div>
-                </section>
+                    </section>
+                </div>
             </main>
         </div>
     </div>
 
     <!-- =========================================== MODAL · SIGN OUT ----- -->
-    <div class="overlay" id="modal-signout" role="dialog" aria-modal="true" aria-labelledby="signout-heading">
+    <div class="overlay" id="modal-signout" role="dialog" aria-modal="true" aria-labelledby="signout-title"
+        aria-describedby="signout-text">
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
-                    <h2 class="modal-title">Sign out</h2>
-                    <p class="modal-sub">End this teacher session.</p>
+                    <h2 class="modal-title" id="signout-title">Sign out?</h2>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close">
-                    <svg class="icon"><use href="#i-x"></use></svg>
+                <button class="modal-close" type="button" data-modal-close aria-label="Close">
+                    <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
                 </button>
             </header>
             <div class="modal-body">
-                <div class="modal-hero">
-                    <span class="modal-hero-glyph g-accent">
-                        <svg class="icon icon-lg"><use href="#i-logout"></use></svg>
-                    </span>
-                    <p class="modal-hero-title" id="signout-heading">Sign out of the console?</p>
-                    <p class="modal-hero-text">Your students' sessions are not affected. You can sign back in
-                        at any time.</p>
-                </div>
+                <p class="modal-copy" id="signout-text">Your students keep working: their sessions don't depend on
+                    yours. You can sign back in any time.</p>
             </div>
             <footer class="modal-foot">
-                <button class="btn btn-secondary" data-modal-close>Stay signed in</button>
-                <button class="btn btn-primary" id="signout-confirm">Sign out</button>
+                <button class="btn btn-secondary" type="button" data-modal-close data-autofocus>Stay signed in</button>
+                <button class="btn btn-primary" id="signout-confirm" type="button">Sign out</button>
             </footer>
         </div>
     </div>
 
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
+    <p class="sr-only" id="announce" aria-live="polite"></p>
+
+    <!-- Rows, queue items and toasts are cloned from these and filled with
+         textContent: no student data is ever parsed as HTML. -->
+    <template id="tpl-row">
+        <tr class="r-row" role="row">
+            <th class="r-name" role="rowheader" scope="row"></th>
+            <td class="r-status" role="cell"><span class="cell-in"><span class="mk" aria-hidden="true"></span><span class="r-status-text"></span></span></td>
+            <td class="r-lesson" role="cell"><span class="cell-in"><span class="strip" aria-hidden="true"></span><span class="r-count tnum"></span><span class="r-count-sr sr-only"> problems done</span></span></td>
+            <td class="r-flag" role="cell"><span class="cell-in"><span class="flag" hidden><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="#i-alert"></use></svg><span class="flag-text"></span></span><span class="none" aria-hidden="true">—</span></span></td>
+            <td class="r-last tnum" role="cell"></td>
+        </tr>
+    </template>
+
+    <template id="tpl-skel-row">
+        <tr class="r-row r-skel" aria-hidden="true">
+            <th class="r-name"><span class="skel"></span></th>
+            <td class="r-status"><span class="skel"></span></td>
+            <td class="r-lesson"><span class="skel"></span></td>
+            <td class="r-flag"><span class="skel"></span></td>
+            <td class="r-last"><span class="skel"></span></td>
+        </tr>
+    </template>
+
+    <template id="tpl-queue">
+        <li class="q-item">
+            <span class="q-min tnum"><span class="q-min-n"></span><span class="q-min-u">min</span></span>
+            <span class="q-body">
+                <span class="q-name"></span>
+                <span class="q-why"></span>
+            </span>
+        </li>
+    </template>
+
+    <template id="tpl-skel-queue">
+        <li class="q-item q-skel" aria-hidden="true">
+            <span class="q-min"><span class="skel"></span></span>
+            <span class="q-body"><span class="skel"></span><span class="skel"></span></span>
+        </li>
+    </template>
+
+    <template id="tpl-toast">
+        <div class="toast">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"></use></svg>
+            <div class="toast-text">
+                <p class="toast-title"></p>
+                <p class="toast-desc"></p>
+            </div>
+        </div>
+    </template>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../../assets/js/shell.js"></script>

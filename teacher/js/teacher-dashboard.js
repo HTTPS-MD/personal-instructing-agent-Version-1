@@ -3,9 +3,9 @@
  * PIA SYSTEM — TEACHER CONSOLE (live monitor)
  * ============================================================================
  * One screen for a teacher running a 75-minute PIA session in their own
- * section: who is here, who is working, who needs attention, and how far
- * each student is through this lesson. Uses the shared `sb` client from
- * function.js and the shared rail from shell.js.
+ * section: who needs attention, how many are working, and where each student
+ * is in this lesson. Uses the shared `sb` client from function.js and the
+ * shared rail from shell.js.
  *
  * WITHIN THE CERC PROTOCOL: everything about students comes from one server
  * function, teacher_class_status (migration 0026), which returns only a
@@ -13,6 +13,17 @@
  * results, the research group, the tutor persona and test scores never
  * reach this page -- teachers cannot read student rows directly any more,
  * so not even the browser console can ask for them.
+ *
+ * HOW IT DRAWS: rows, queue items and toasts are cloned from <template>s and
+ * filled with textContent, so no student data is ever parsed as HTML. Each
+ * row is kept by its student_key and updated in place on every refresh:
+ * nothing is rebuilt, so a teacher's text selection, a screen reader's
+ * place and the order of unchanged rows all survive the 10-second poll.
+ *
+ * HOW IT FETCHES: one request at a time. A poll, the refresh button and a
+ * tab coming back into view all share the request already in flight, so an
+ * older answer can never land on top of a newer one, and the poll always
+ * re-arms itself -- an error cannot stop it.
  * ==========================================================================*/
 (function () {
     'use strict';
@@ -20,9 +31,54 @@
     var $ = function (s, r) { return (r || document).querySelector(s); };
     var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-    var esc = (typeof escapeHTML === 'function') ? escapeHTML : function (v) {
-        return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    /* ============================================ 0. SETTINGS ========== */
+
+    /* Ten seconds is "live" for a classroom, and 31 rows is a trivial query.
+       Polling a guarded function rather than subscribing to table changes is
+       deliberate: a realtime subscription streams WHOLE rows, and a student
+       row carries exactly the research columns this page must never see. */
+    var REFRESH_MS = 10000;
+
+    /* The queue lists this many; the rest are one tap away in the roster. */
+    var QUEUE_MAX = 5;
+
+    /* The last class size and queue length, so the loading skeletons are the
+       right height and nothing jumps when the data lands. Counts only,
+       nothing about any student. */
+    var SIZE_KEY = 'pia_teacher_class_size';
+    var QUEUE_KEY = 'pia_teacher_queue_size';
+
+    /* Status by shape (see teacher.css, section 8). `lesson` says whether
+       "n / 10" means anything yet: not before the lesson, and for someone
+       offline only once they have done some. */
+    var ACTIVITY = {
+        solving:     { label: 'Solving',        mark: 'full',  lesson: 'yes' },
+        idle:        { label: 'Idle',           mark: 'empty', lesson: 'yes' },
+        not_started: { label: 'Not started',    mark: 'empty', lesson: 'yes' },
+        setting_up:  { label: 'Getting set up', mark: 'half',  lesson: 'no' },
+        waiting:     { label: 'Waiting room',   mark: 'half',  lesson: 'no' },
+        finished:    { label: 'Finished',       mark: 'done',  lesson: 'yes' },
+        offline:     { label: 'Offline',        mark: 'off',   lesson: 'if-any' }
+    };
+
+    /* Who to look at first, after anyone who needs attention. */
+    var ORDER = { idle: 1, not_started: 2, solving: 3, setting_up: 4, waiting: 5, finished: 6, offline: 7 };
+
+    var REASON = { stuck: 'Same problem', idle: 'No activity', dropped: 'Dropped offline' };
+
+    var FILTERS = {
+        all: function () { return true; },
+        attention: function (r) { return !!r.attention; },
+        solving: function (r) { return r.activity === 'solving'; },
+        finished: function (r) { return r.activity === 'finished'; },
+        offline: function (r) { return r.activity === 'offline'; }
+    };
+
+    var FILTER_WORDS = {
+        attention: 'needs attention',
+        solving: 'is solving',
+        finished: 'has finished',
+        offline: 'is offline'
     };
 
     var state = {
@@ -32,8 +88,15 @@
         rows: [],
         loadedAt: 0,
         filter: 'all',
-        search: ''
+        search: '',
+        connection: 'connecting',   /* connecting | ok | lost */
+        flagged: null               /* student_key -> true, from the last render */
     };
+
+    var rowEls = new Map();     /* student_key -> <tr>, reused across refreshes */
+    var queueEls = new Map();   /* student_key -> <li> */
+
+    /* ============================================ 1. SMALL HELPERS ===== */
 
     function debounce(fn, wait) {
         var t = null;
@@ -44,6 +107,38 @@
         };
     }
 
+    /* The server sends integers; this page trusts nothing it did not make. */
+    function toCount(v) {
+        var n = parseInt(v, 10);
+        return isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function nameOf(r) {
+        var n = String(r.full_name == null ? '' : r.full_name).trim();
+        return n || 'Unnamed student';
+    }
+
+    /* Writes only when the text changed, so an unchanged cell is not touched
+       and a selection inside it survives the refresh. */
+    function setText(el, text) {
+        text = String(text);
+        if (el && el.textContent !== text) { el.textContent = text; }
+    }
+
+    function clone(id) {
+        return document.getElementById(id).content.firstElementChild.cloneNode(true);
+    }
+
+    /* Puts el at position i in parent, moving it only if it is not there. */
+    function place(parent, el, i) {
+        if (parent.children[i] !== el) { parent.insertBefore(el, parent.children[i] || null); }
+    }
+
+    /* After place() has filled positions 0..n-1, anything after is stale. */
+    function trim(parent, n) {
+        while (parent.children.length > n) { parent.lastElementChild.remove(); }
+    }
+
     function initialsOf(name, email) {
         var src = (name || '').trim().replace(/^(Dr|Prof|Mr|Mrs|Ms)\.?\s+/i, '');
         if (!src) { return (email || '?').slice(0, 2).toUpperCase(); }
@@ -51,9 +146,48 @@
         return (p.length === 1 ? p[0].slice(0, 2) : p[0][0] + p[p.length - 1][0]).toUpperCase();
     }
 
-    /* ============================================ 1. BOOT GATE ========= */
+    function agoText(sec) {
+        if (sec === null || sec === undefined) { return '—'; }
+        sec = toCount(sec);
+        if (sec < 60) { return 'Just now'; }
+        var m = Math.floor(sec / 60);
+        return m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ago';
+    }
 
-    function setBootText(m) { var n = $('#boot-text'); if (n) { n.textContent = m; } }
+    function clock(ts) {
+        return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function reducedMotion() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    /* Marks a button as working: one click at a time, and keyboard focus
+       stays on it (a disabled button would drop focus to the page). */
+    function busy(button, on) {
+        if (!button) { return; }
+        if (on) {
+            button.setAttribute('aria-busy', 'true');
+            button.setAttribute('aria-disabled', 'true');
+        } else {
+            button.removeAttribute('aria-busy');
+            button.removeAttribute('aria-disabled');
+        }
+    }
+
+    function isBusy(button) { return button.getAttribute('aria-busy') === 'true'; }
+
+    /* A polite screen-reader line, for changes a sighted teacher sees at once. */
+    function announce(text) {
+        var el = $('#announce');
+        if (!el) { return; }
+        el.textContent = '';
+        setTimeout(function () { el.textContent = text; }, 60);
+    }
+
+    /* ============================================ 2. BOOT GATE ========= */
+
+    function setBootText(m) { setText($('#boot-text'), m); }
 
     function reveal() {
         document.body.removeAttribute('data-boot');
@@ -61,19 +195,20 @@
         if (v) { setTimeout(function () { v.hidden = true; }, 200); }
     }
 
-    function showAccessError(message) {
+    function showBanner(message) {
         var banner = $('#global-error-banner');
         if (!banner) { return; }
-        $('#global-error-message').textContent = message;
+        setText($('#global-error-message'), message);
         banner.hidden = false;
     }
 
-    /* ============================================ 2. MODALS + TOAST ==== */
+    /* ============================================ 3. MODALS + TOASTS === */
 
     var openLayers = [];
     /* Matches --z-overlay in global.css; see the stacking ladder there. */
     var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
+    var signingOut = false;
     var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -88,26 +223,36 @@
         document.documentElement.style.setProperty('--scrollbar-w', '0px');
     }
 
+    /* While a dialog is open, everything behind it is inert: not clickable,
+       not focusable, and invisible to a screen reader's virtual cursor. */
+    function setBackgroundInert(on) {
+        ['app', 'skip-link'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) { el.toggleAttribute('inert', on); }
+        });
+    }
+
     function openModal(id) {
         var o = document.getElementById(id);
         if (!o || openLayers.indexOf(o) !== -1) { return; }
-        if (!openLayers.length) { lastFocused = document.activeElement; lockScroll(); }
+        if (!openLayers.length) {
+            lastFocused = document.activeElement;
+            lockScroll();
+            setBackgroundInert(true);
+        }
         o.classList.add('is-mounted');
         openLayers.push(o);
-        
-        /* Raise this layer above every layer already open. All overlays share
-           one base z-index in CSS, so without this the winner is decided by DOM
-           source order — which is how an open drawer ended up covering a
-           confirmation dialog it had itself triggered. z-index does not affect
-           layout, so this costs nothing in CLS. */
+        /* Each layer above the last; z-index does not affect layout. */
         o.style.zIndex = String(Z_OVERLAY_BASE + openLayers.length);
         void o.offsetWidth;
         o.classList.add('is-open');
-        var f = o.querySelector('button, input, select, textarea');
+        /* Focus the safe choice, not the first button in the markup. */
+        var f = o.querySelector('[data-autofocus]') || o.querySelector('button, input');
         if (f) { f.focus({ preventScroll: true }); }
     }
 
     function closeModal(target) {
+        if (signingOut) { return; }
         var o = (typeof target === 'string') ? document.getElementById(target) : target;
         o = o || openLayers[openLayers.length - 1];
         if (!o) { return; }
@@ -117,6 +262,7 @@
         setTimeout(function () {
             o.classList.remove('is-mounted');
             if (!openLayers.length) {
+                setBackgroundInert(false);
                 unlockScroll();
                 if (lastFocused && lastFocused.focus) { lastFocused.focus({ preventScroll: true }); }
             }
@@ -146,54 +292,59 @@
         });
     }
 
+    /* Toasts stack newest-last and never more than three deep: a flaky
+       connection cannot bury the screen. */
+    var TOAST_MAX = 3;
+
     function toast(title, description, tone) {
         var stack = $('#toast-stack');
         if (!stack) { return; }
-        var n = document.createElement('div');
-        n.className = 'toast toast-' + (tone === 'danger' ? 'danger' : 'accent');
-        n.innerHTML = '<svg class="icon"><use href="#i-' + (tone === 'danger' ? 'alert' : 'check') +
-            '"></use></svg><div class="toast-text"><p class="toast-title">' + esc(title) + '</p>' +
-            (description ? '<p class="toast-desc">' + esc(description) + '</p>' : '') + '</div>';
+        while (stack.children.length >= TOAST_MAX) { stack.firstElementChild.remove(); }
+
+        var n = clone('tpl-toast');
+        var danger = tone === 'danger';
+        n.classList.add(danger ? 'toast-danger' : 'toast-accent');
+        $('use', n).setAttribute('href', danger ? '#i-alert' : '#i-check');
+        setText($('.toast-title', n), title);
+        setText($('.toast-desc', n), description || '');
         stack.appendChild(n);
         void n.offsetWidth;
         n.classList.add('is-open');
         setTimeout(function () {
             n.classList.remove('is-open');
             setTimeout(function () { n.remove(); }, 200);
-        }, 3800);
+        }, danger ? 6000 : 3800);
     }
 
-    function setBusy(button, label) {
-        if (!button) { return function () {}; }
-        var html = button.innerHTML, w = button.getBoundingClientRect().width;
-        button.style.width = Math.ceil(w) + 'px';
-        button.disabled = true;
-        button.textContent = label || 'Working…';
-        return function () {
-            button.innerHTML = html;
-            button.disabled = false;
-            button.style.width = '';
-        };
-    }
+    /* ============================================ 4. ACCESS GUARD ====== */
 
-    /* ============================================ 3. ACCESS GUARD ====== */
+    function leave(message) {
+        setBootText(message);
+        showBanner(message);
+        try { localStorage.removeItem('pia_user_email'); } catch (err) { /* ignore */ }
+        setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
+    }
 
     async function enforceTeacherAccess() {
         if (typeof sb === 'undefined' || !sb) {
-            setBootText('Could not connect.');
-            showAccessError('Database connection failed. Please refresh.');
+            setBootText("Can't reach PIA's server.");
+            showBanner("Can't reach PIA's server. Check the connection, then reload.");
             return false;
         }
 
         try {
             var session = await sb.auth.getSession();
-            if (session.error || !session.data.session) { throw new Error('Session expired. Please log in again.'); }
+            if (session.error || !session.data.session) {
+                leave('Your session ended. Taking you to sign in…');
+                return false;
+            }
 
             var email = session.data.session.user.email;
             var res = await sb.from('profiles').select('role, section, full_name').eq('email', email).maybeSingle();
 
             if (res.error || !res.data || res.data.role !== 'teacher') {
-                throw new Error('Unauthorized access. Teacher privileges required.');
+                leave('This page is for teachers. Taking you back to sign in…');
+                return false;
             }
 
             try { localStorage.setItem('pia_user_email', email); } catch (e) { /* private mode */ }
@@ -209,101 +360,52 @@
                 if (!state.section) { state.section = (prof.data && prof.data.assigned_section) || null; }
                 if (!state.name) { state.name = (prof.data && prof.data.name) || null; }
             }
-
-            var shown = state.name || email.split('@')[0];
-            $('#teacher-name').textContent = shown;
-            $('#teacher-email').textContent = email;
-            $('#teacher-initials').textContent = initialsOf(shown, email);
-            $('#teacher-section-label').textContent = state.section
-                ? 'Section ' + state.section : 'No section assigned';
-
-            var hour = new Date().getHours();
-            var greet = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
-
-            /* Faculty names carry an honorific, so a naive first-word split
-               greets them as "Dr." — keep the title WITH the surname, which is
-               how a teacher is actually addressed. */
-            var honorific = /^(Dr|Prof|Mr|Mrs|Ms)\.?\s+/i.exec(shown);
-            var parts = shown.trim().split(/\s+/);
-            var address = honorific
-                ? parts[0] + ' ' + parts[parts.length - 1]
-                : parts[0];
-            $('#page-greeting').textContent = greet + ', ' + address;
-
             return true;
         } catch (e) {
-            console.error('Teacher dashboard access error:', e);
-            setBootText(e.message || 'Failed to verify access.');
-            showAccessError(e.message || 'Failed to verify access.');
-            try { localStorage.removeItem('pia_user_email'); } catch (err) { /* ignore */ }
-            setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
+            console.error('Teacher console: access check failed.', e);
+            leave("Couldn't confirm your access. Taking you back to sign in…");
             return false;
         }
     }
 
-    /* ============================================ 4. DATA ============== */
+    function paintIdentity() {
+        var shown = state.name || state.email.split('@')[0];
+        setText($('#teacher-name'), shown);
+        setText($('#teacher-email'), state.email);
+        setText($('#teacher-initials'), initialsOf(shown, state.email));
+        setText($('#teacher-section-label'), state.section ? 'Section ' + state.section : 'No section yet');
 
-    /* Ten seconds is "live" for a classroom, and 31 rows is a trivial query.
-       Polling a guarded function rather than subscribing to table changes is
-       deliberate: a realtime subscription streams WHOLE rows, and a student
-       row carries exactly the research columns this page must never see. */
-    var REFRESH_MS = 10000;
+        /* The section is the headline; with none, say so plainly. */
+        $('#mast-kicker').hidden = !state.section;
+        setText($('#mast-section'), state.section || 'No section yet');
+        if (state.section) { document.title = 'Section ' + state.section + ' · Teacher Console — PIA System'; }
 
-    var ACTIVITY = {
-        solving:     { label: 'Solving',         tone: 'online' },
-        idle:        { label: 'Idle',            tone: 'inactive' },
-        not_started: { label: 'Not started yet', tone: 'inactive' },
-        setting_up:  { label: 'Getting set up',  tone: 'neutral' },
-        waiting:     { label: 'In waiting room', tone: 'neutral' },
-        finished:    { label: 'Finished',        tone: 'done' },
-        offline:     { label: 'Offline',         tone: 'offline' }
-    };
-
-    /* Who to look at first, after anyone who needs attention. */
-    var ORDER = { idle: 1, not_started: 2, solving: 3, setting_up: 4, waiting: 5, finished: 6, offline: 7 };
-
-    function attentionText(r) {
-        var m = r.attention_minutes || 0;
-        if (r.attention === 'stuck') { return 'Same problem for ' + m + ' min'; }
-        if (r.attention === 'idle') { return 'No activity for ' + m + ' min'; }
-        if (r.attention === 'dropped') { return 'Disconnected mid-lesson'; }
-        return '';
+        /* Faculty names carry an honorific, so a naive first-word split
+           greets them as "Dr." -- keep the title WITH the surname, which is
+           how a teacher is actually addressed. */
+        var hour = new Date().getHours();
+        var greet = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+        var parts = shown.trim().split(/\s+/);
+        var address = /^(Dr|Prof|Mr|Mrs|Ms)\.?$/i.test(parts[0]) && parts.length > 1
+            ? parts[0] + ' ' + parts[parts.length - 1]
+            : parts[0];
+        var today = new Date().toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+        setText($('#mast-hello'), greet + ', ' + address + ' · ' + today);
     }
 
-    function agoText(sec) {
-        if (sec === null || sec === undefined) { return '—'; }
-        if (sec < 60) { return 'Just now'; }
-        var m = Math.floor(sec / 60);
-        return m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ago';
-    }
+    /* ============================================ 5. DATA ============== */
 
-    function skeletonRows(n) {
-        var out = '';
-        for (var i = 0; i < (n || 5); i++) {
-            out += '<tr aria-hidden="true"><td><div class="cell-user">' +
-                '<span class="skeleton skeleton-avatar"></span>' +
-                '<span class="skeleton skeleton-line" style="width:140px"></span></div></td>' +
-                '<td><span class="skeleton skeleton-pill"></span></td>' +
-                '<td><span class="skeleton skeleton-pill"></span></td>' +
-                '<td><span class="skeleton skeleton-pill"></span></td>' +
-                '<td class="col-right"><span class="skeleton skeleton-pill"></span></td></tr>';
+    var inflight = null;
+
+    /* Single flight: every caller shares the request already running. */
+    function refresh() {
+        if (!inflight) {
+            inflight = load().then(function () { inflight = null; }, function () { inflight = null; });
         }
-        return out;
+        return inflight;
     }
 
-    async function loadMonitoring() {
-        var tbody = $('#student-monitoring-body');
-
-        if (!state.section) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">' +
-                'No section is assigned to your account yet. Please contact the administrator.</td></tr>';
-            $('#roster-sub').textContent = 'No section assigned.';
-            paintStats([]);
-            return;
-        }
-
-        if (!state.loadedAt) { tbody.innerHTML = skeletonRows(6); }
-
+    async function load() {
         var res;
         try {
             res = await sb.rpc('teacher_class_status');
@@ -311,191 +413,444 @@
             res = { error: err };
         }
 
-        if (res.error) {
-            paintConnection('error');
-            if (!state.loadedAt) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">Could not load your class. ' +
-                    esc(res.error.message || '') + '</td></tr>';
-            }
-            return;
+        if (res.error) { onLoadError(res.error); return; }
+
+        try {
+            state.rows = Array.isArray(res.data) ? res.data : [];
+            state.loadedAt = Date.now();
+            render();
+            try {
+                sessionStorage.setItem(SIZE_KEY, String(state.rows.length));
+                sessionStorage.setItem(QUEUE_KEY, String($('#queue-list').children.length));
+            } catch (e) { /* ignore */ }
+            onLoadOk();
+        } catch (err) {
+            /* A bug in drawing, not a network problem. Say so, keep polling. */
+            console.error('Teacher console: could not draw the class.', err);
+            onLoadError({ code: 'render' });
         }
-
-        state.rows = res.data || [];
-        state.loadedAt = Date.now();
-        $('#nav-count-students').textContent = state.rows.length;
-        render();
-        paintConnection('ok');
     }
 
-    function paintStats(rows) {
-        var count = function (test) { return rows.filter(test).length; };
-        $('#stat-total').textContent = rows.length;
-        $('#stat-online').textContent = count(function (r) { return r.online; }) + ' online';
-        $('#stat-attention').textContent = count(function (r) { return !!r.attention; });
-        $('#stat-solving').textContent = count(function (r) { return r.activity === 'solving'; });
-        $('#stat-finished').textContent = count(function (r) { return r.activity === 'finished'; });
-    }
-
-    function matchesFilter(r) {
-        if (state.filter === 'attention') { return !!r.attention; }
-        if (state.filter === 'solving') { return r.activity === 'solving'; }
-        if (state.filter === 'finished') { return r.activity === 'finished'; }
-        return true;
-    }
-
-    function progressCell(r) {
-        /* Before the lesson (waiting, setting up) there is nothing to count. */
-        if (r.activity === 'waiting' || r.activity === 'setting_up' ||
-            (r.activity === 'offline' && !r.problems_done)) {
-            return '<span class="muted">—</span>';
+    function explain(err) {
+        var code = String((err && err.code) || '');
+        var msg = String((err && err.message) || '');
+        if (code === '42501') {
+            return 'Your sign-in expired or lost teacher access. Sign out and back in; if it keeps happening, ask the admin.';
         }
-        var target = r.problems_target || 10;
-        var pct = Math.round(Math.min(r.problems_done, target) / target * 100);
-        return '<span class="lesson-progress">' +
-            '<span class="bar"><span class="bar-fill" style="width:' + pct + '%"></span></span>' +
-            '<span class="tnum">' + r.problems_done + ' / ' + target + '</span></span>';
+        if (code === 'PGRST202' || code === '42883') {
+            return "The live monitor isn't installed on the server yet. Ask the admin to run migration 0026.";
+        }
+        if (code === 'render') {
+            return 'Something broke while drawing the class. Reload the page.';
+        }
+        if (!code || /fetch|network|load failed/i.test(msg)) {
+            return "Can't reach the server. Check the Wi-Fi; PIA retries every 10 seconds.";
+        }
+        return 'The server turned the request down (' + code + '). PIA retries every 10 seconds.';
     }
+
+    function setPhase(phase) {
+        $('#console').setAttribute('data-load', phase);
+        var loading = phase === 'loading';
+        $('#queue').setAttribute('aria-busy', String(loading));
+        $('#roster').setAttribute('aria-busy', String(loading));
+        $$('.tally').forEach(function (el) { el.disabled = phase !== 'ready'; });
+    }
+
+    function onLoadError(err) {
+        var message = explain(err);
+        if (!state.loadedAt) {
+            /* Nothing on screen yet: the roster becomes the error, with a retry. */
+            setPhase('error');
+            trim($('#queue-list'), 0);
+            trim($('#roster-body'), 0);
+            setText($('#error-text'), message);
+        } else if (state.connection !== 'lost') {
+            /* Keep what is on screen, and say once how old it is. */
+            toast('Connection lost', 'Still showing the class as of ' + clock(state.loadedAt) + '. ' + message, 'danger');
+        }
+        state.connection = 'lost';
+        paintLive();
+    }
+
+    function onLoadOk() {
+        if (state.connection === 'lost' && $('#console').getAttribute('data-load') === 'ready') {
+            toast('Back online', 'The class is up to date again.');
+        }
+        state.connection = 'ok';
+        setPhase('ready');
+        paintLive();
+    }
+
+    /* ============================================ 6. DRAWING =========== */
 
     function render() {
-        paintStats(state.rows);
+        paintCounts();
+        paintQueue();
+        paintRoster();
+        announceNewFlags();
+    }
 
-        var term = state.search.trim().toLowerCase();
-        var rows = state.rows.filter(function (r) {
-            if (!matchesFilter(r)) { return false; }
-            return !term || String(r.full_name || '').toLowerCase().indexOf(term) !== -1;
+    function paintCounts() {
+        var c = { all: state.rows.length, attention: 0, solving: 0, finished: 0, offline: 0 };
+        var online = 0;
+        state.rows.forEach(function (r) {
+            if (r.attention) { c.attention++; }
+            if (r.activity === 'solving') { c.solving++; }
+            if (r.activity === 'finished') { c.finished++; }
+            if (r.activity === 'offline') { c.offline++; }
+            if (r.online) { online++; }
         });
-
-        /* Attention first -- longest wait at the top -- then by status. */
-        rows.sort(function (a, b) {
-            if (!!a.attention !== !!b.attention) { return a.attention ? -1 : 1; }
-            if (a.attention && b.attention) { return (b.attention_minutes || 0) - (a.attention_minutes || 0); }
-            var d = (ORDER[a.activity] || 9) - (ORDER[b.activity] || 9);
-            return d || String(a.full_name).localeCompare(String(b.full_name));
+        $$('[data-count]').forEach(function (el) {
+            var n = c[el.getAttribute('data-count')] || 0;
+            setText(el, n);
+            el.setAttribute('data-n', String(n));
         });
+        setText($('#tally-online'), online + ' online');
+        setText($('#queue-n'), c.attention);
+        setText($('#nav-count-students'), state.rows.length);
+    }
 
-        var empty = !rows.length;
-        $('#empty-state').style.display = empty ? 'block' : 'none';
-        if (empty) {
-            var noneYet = state.filter === 'attention' && !term;
-            $('#empty-title').textContent = noneYet ? 'Nobody needs attention right now' : 'Nobody matches that';
-            $('#empty-desc').textContent = noneYet
-                ? 'Students stuck, idle or disconnected will appear here.'
-                : 'Try another tile, or clear the search box.';
-        }
-
-        $('#student-monitoring-body').innerHTML = rows.map(function (r) {
-            var a = ACTIVITY[r.activity] || ACTIVITY.offline;
-            var pulse = r.activity === 'solving' ? ' engagement-dot-pulse' : '';
-            var att = attentionText(r);
-
-            return '' +
-                '<tr data-key="' + esc(r.student_key) + '"' + (r.attention ? ' class="needs-attention"' : '') + '>' +
-                '<td><div class="cell-user">' +
-                '<span class="student-avatar-wrap">' +
-                '<span class="student-avatar-initial">' + esc(initialsOf(r.full_name, '')) + '</span>' +
-                '<span class="student-avatar-status status-dot-' + a.tone + '"></span></span>' +
-                '<span class="cell-name">' + esc(r.full_name) + '</span>' +
-                '</div></td>' +
-                '<td><span class="engagement-badge status-badge-' + a.tone + '">' +
-                '<span class="status-dot status-dot-' + a.tone + pulse + '"></span>' + esc(a.label) + '</span></td>' +
-                '<td>' + progressCell(r) + '</td>' +
-                '<td>' + (att
-                    ? '<span class="learning-badge learning-struggling"><svg class="icon"><use href="#i-alert"></use></svg>' +
-                      esc(att) + '</span>'
-                    : '<span class="muted">—</span>') + '</td>' +
-                '<td class="col-right muted tnum">' + esc(agoText(r.seconds_since_active)) + '</td>' +
-                '</tr>';
-        }).join('');
-
-        $('#roster-sub').textContent = rows.length === state.rows.length
-            ? 'Section ' + state.section + ' · ' + rows.length + ' student' + (rows.length === 1 ? '' : 's')
-            : 'Showing ' + rows.length + ' of ' + state.rows.length;
-
-        $$('[data-filter]').forEach(function (el) {
-            el.classList.toggle('is-active', el.getAttribute('data-filter') === state.filter);
+    function paintFilters() {
+        $$('.tally').forEach(function (el) {
+            el.setAttribute('aria-pressed', String(el.getAttribute('data-filter') === state.filter));
         });
     }
 
-    /* ============================================ 5. LIVE REFRESH ====== */
+    /* ---- The queue: flagged students, longest wait first ---- */
+    function paintQueue() {
+        var flagged = state.rows.filter(function (r) { return !!r.attention; });
+        flagged.sort(function (a, b) {
+            return (toCount(b.attention_minutes) - toCount(a.attention_minutes)) ||
+                nameOf(a).localeCompare(nameOf(b));
+        });
 
-    function paintConnection(status) {
-        var dot = $('#live-dot'), label = $('#live-label');
-        if (!dot || !label) { return; }
-        if (status === 'ok') {
-            dot.className = 'dot dot-live';
-            var sec = Math.round((Date.now() - state.loadedAt) / 1000);
-            label.textContent = sec < 5 ? 'Live' : 'Updated ' + sec + 's ago';
-        } else {
-            dot.className = 'dot dot-warn';
-            label.textContent = 'Reconnecting…';
+        var shown = flagged.slice(0, QUEUE_MAX);
+        var list = $('#queue-list');
+        var live = new Set();
+
+        shown.forEach(function (r, i) {
+            var key = String(r.student_key);
+            var li = queueEls.get(key);
+            if (!li) {
+                li = clone('tpl-queue');
+                li.setAttribute('data-key', key);
+                queueEls.set(key, li);
+            }
+            live.add(key);
+            setText($('.q-min-n', li), toCount(r.attention_minutes));
+            setText($('.q-name', li), nameOf(r));
+            setText($('.q-why', li), REASON[r.attention] || 'Needs a look');
+            place(list, li, i);
+        });
+        trim(list, shown.length);
+        queueEls.forEach(function (el, key) { if (!live.has(key)) { queueEls.delete(key); } });
+
+        var more = $('#queue-more');
+        more.hidden = flagged.length <= shown.length;
+        setText($('#queue-more-text'), 'Show all ' + flagged.length + ' in the roster');
+        setText($('#queue-clear'), state.section ? "All clear. Nobody's stuck." : 'Nothing to watch yet.');
+    }
+
+    /* ---- The roster: everyone, filtered and searched ---- */
+    function rosterOrder(a, b) {
+        if (!!a.attention !== !!b.attention) { return a.attention ? -1 : 1; }
+        if (a.attention && b.attention) {
+            var m = toCount(b.attention_minutes) - toCount(a.attention_minutes);
+            if (m) { return m; }
         }
+        var d = (ORDER[a.activity] || 9) - (ORDER[b.activity] || 9);
+        return d || nameOf(a).localeCompare(nameOf(b));
+    }
+
+    function fillRow(tr, r) {
+        var a = ACTIVITY[r.activity] || ACTIVITY.offline;
+        var target = Math.min(toCount(r.problems_target) || 10, 20);
+        var done = Math.min(toCount(r.problems_done), target);
+
+        setText($('.r-name', tr), nameOf(r));
+
+        var mk = $('.mk', tr);
+        if (mk.getAttribute('data-mark') !== a.mark) { mk.setAttribute('data-mark', a.mark); }
+        setText($('.r-status-text', tr), a.label);
+
+        /* This lesson: one cell per problem, "n/10" beside it. */
+        var counts = a.lesson === 'yes' || (a.lesson === 'if-any' && done > 0);
+        var lesson = $('.r-lesson', tr);
+        if (lesson.hasAttribute('data-na') === counts) { lesson.toggleAttribute('data-na', !counts); }
+        var strip = $('.strip', tr);
+        if (strip.childElementCount !== target) {
+            strip.textContent = '';
+            for (var i = 0; i < target; i++) { strip.appendChild(document.createElement('span')); }
+        }
+        Array.prototype.forEach.call(strip.children, function (cell, j) {
+            var on = counts && j < done;
+            if (cell.classList.contains('on') !== on) { cell.classList.toggle('on', on); }
+        });
+        setText($('.r-count', tr), counts ? done + '/' + target : '—');
+        $('.r-count-sr', tr).hidden = !counts;
+
+        /* The flag: words and minutes, amber. */
+        var flag = $('.flag', tr);
+        if (flag.hidden === !!r.attention) { flag.hidden = !r.attention; }
+        setText($('.flag-text', tr), r.attention
+            ? (REASON[r.attention] || 'Needs a look') + ' · ' + toCount(r.attention_minutes) + ' min'
+            : '');
+
+        setText($('.r-last', tr), agoText(r.seconds_since_active));
+    }
+
+    function paintRoster() {
+        var term = state.search.trim().toLowerCase();
+        var match = FILTERS[state.filter] || FILTERS.all;
+        var list = state.rows.filter(function (r) {
+            return match(r) && (!term || nameOf(r).toLowerCase().indexOf(term) !== -1);
+        });
+        list.sort(rosterOrder);
+
+        var body = $('#roster-body');
+        list.forEach(function (r, i) {
+            var key = String(r.student_key);
+            var tr = rowEls.get(key);
+            if (!tr) {
+                tr = clone('tpl-row');
+                tr.setAttribute('data-key', key);
+                rowEls.set(key, tr);
+            }
+            fillRow(tr, r);
+            place(body, tr, i);
+        });
+        trim(body, list.length);
+
+        /* Forget students who left the section; keep the filtered-out ones. */
+        var present = new Set(state.rows.map(function (r) { return String(r.student_key); }));
+        rowEls.forEach(function (el, key) { if (!present.has(key)) { rowEls.delete(key); } });
+
+        paintRosterMeta(list.length, term);
+        paintFilters();
+    }
+
+    function paintRosterMeta(shown, term) {
+        var total = state.rows.length;
+        var narrowed = state.filter !== 'all' || !!term;
+
+        setText($('#roster-sub'), narrowed
+            ? 'Showing ' + shown + ' of ' + total
+            : total + ' student' + (total === 1 ? '' : 's'));
+        $('#reset-filters').hidden = !narrowed;
+
+        if (shown) { return; }
+
+        /* The words for an empty roster. CSS decides when they show. */
+        var title, text;
+        if (!total) {
+            title = state.section ? 'No students in Section ' + state.section + ' yet.' : 'No section on your account yet.';
+            text = state.section
+                ? 'They appear here once the admin adds them. This page fills in by itself.'
+                : 'Ask the admin to assign you one. This page fills in by itself.';
+        } else if (term) {
+            title = 'Nobody called “' + state.search.trim() + '”' + (state.filter !== 'all' ? ' ' + FILTER_WORDS[state.filter] : '') + '.';
+            text = 'Check the spelling, or show everyone.';
+        } else if (state.filter === 'attention') {
+            title = 'Nobody needs attention.';
+            text = 'Flagged students show up here and in the queue.';
+        } else {
+            title = 'Nobody ' + FILTER_WORDS[state.filter] + ' right now.';
+            text = 'Pick another count, or show everyone.';
+        }
+        setText($('#empty-title'), title);
+        setText($('#empty-text'), text);
+    }
+
+    /* A screen-reader teacher hears when someone new is flagged. */
+    function announceNewFlags() {
+        var now = {};
+        var fresh = [];
+        state.rows.forEach(function (r) {
+            if (!r.attention) { return; }
+            var key = String(r.student_key);
+            now[key] = true;
+            if (state.flagged && !state.flagged[key]) { fresh.push(r); }
+        });
+        state.flagged = now;
+
+        if (fresh.length === 1) {
+            var r = fresh[0];
+            announce(nameOf(r) + ' needs attention: ' + (REASON[r.attention] || 'needs a look').toLowerCase() +
+                ', ' + toCount(r.attention_minutes) + ' minutes.');
+        } else if (fresh.length > 1) {
+            announce(fresh.length + ' more students need attention.');
+        }
+    }
+
+    /* ---- Loading skeletons, sized to the last class seen ---- */
+    function paintSkeletons() {
+        var n = 8, q = 2;
+        try {
+            n = toCount(sessionStorage.getItem(SIZE_KEY)) || 8;
+            q = toCount(sessionStorage.getItem(QUEUE_KEY));
+        } catch (e) { /* ignore */ }
+        n = Math.min(Math.max(n, 3), 40);
+        /* Two is what the queue reserves anyway (teacher.css, --q-row). */
+        q = Math.min(Math.max(q, 2), QUEUE_MAX);
+
+        var body = $('#roster-body');
+        for (var i = 0; i < n; i++) { body.appendChild(clone('tpl-skel-row')); }
+        var list = $('#queue-list');
+        for (var j = 0; j < q; j++) { list.appendChild(clone('tpl-skel-queue')); }
+    }
+
+    /* ============================================ 7. LIVE STATUS ======= */
+
+    function paintLive() {
+        var el = $('#live');
+        var text, mode;
+        if (state.connection === 'lost') {
+            mode = 'lost';
+            text = state.loadedAt ? 'Reconnecting · last ' + clock(state.loadedAt) : 'Reconnecting…';
+        } else if (!state.loadedAt) {
+            mode = 'connecting';
+            text = 'Connecting…';
+        } else {
+            var sec = Math.round((Date.now() - state.loadedAt) / 1000);
+            mode = 'live';
+            text = sec < 15 ? 'Live · every 10 s' : (sec < 60 ? 'Updated ' + sec + 's ago' : 'Updated ' + Math.floor(sec / 60) + 'm ago');
+        }
+        if (el.getAttribute('data-state') !== mode) { el.setAttribute('data-state', mode); }
+        setText($('#live-text'), text);
     }
 
     var pollId = null;
 
     function schedule() {
         clearTimeout(pollId);
-        pollId = setTimeout(async function () {
+        pollId = setTimeout(function () {
             /* A hidden tab does not poll; showing it again refreshes at once. */
-            if (!document.hidden) { await loadMonitoring(); }
-            schedule();
+            var work = document.hidden ? Promise.resolve() : refresh();
+            work.then(schedule, schedule);
         }, REFRESH_MS);
     }
 
-    /* The "updated … ago" label ticks between refreshes. */
-    setInterval(function () { if (state.loadedAt) { paintConnection('ok'); } }, 5000);
+    /* ============================================ 8. CONTROLS ========== */
 
-    /* ============================================ 6. BOOT ============== */
+    function scrollToRoster(focus) {
+        var roster = $('#roster');
+        var top = roster.getBoundingClientRect().top;
+        /* Only when the roster is off screen, which on a phone it usually is. */
+        if (top > window.innerHeight * 0.6 || top < 0) {
+            roster.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+        }
+        if (focus) { $('#roster-title').focus({ preventScroll: true }); }
+    }
 
-    async function boot() {
-        setBootText('Verifying your access…');
-        var allowed = await enforceTeacherAccess();
-        if (!allowed) { return; }
+    function setFilter(f) {
+        state.filter = FILTERS[f] ? f : 'all';
+        paintRoster();
+    }
 
-        initModals();
-        PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
-
+    function bindControls() {
         $('#search-student').addEventListener('input', debounce(function (e) {
             state.search = e.target.value;
-            render();
-        }, 200));
+            paintRoster();
+        }, 120));
 
-        $$('[data-filter]').forEach(function (el) {
+        $$('.tally').forEach(function (el) {
             el.addEventListener('click', function () {
                 var f = el.getAttribute('data-filter');
-                /* Clicking the active tile again goes back to everyone. */
-                state.filter = (state.filter === f) ? 'all' : f;
-                render();
+                /* Pressing the pressed filter again goes back to everyone. */
+                setFilter(state.filter === f ? 'all' : f);
+                scrollToRoster(false);
             });
         });
 
-        $('#reset-filters').addEventListener('click', function () {
-            state.filter = 'all';
-            state.search = '';
-            $('#search-student').value = '';
-            render();
+        $('#queue-more').addEventListener('click', function () {
+            setFilter('attention');
+            scrollToRoster(true);
         });
 
-        $('#refresh-btn').addEventListener('click', async function () {
-            var release = setBusy(this, '…');
-            await loadMonitoring();
-            release();
-            toast('Refreshed', 'Your class is up to date.');
+        $('#reset-filters').addEventListener('click', function () {
+            state.search = '';
+            $('#search-student').value = '';
+            setFilter('all');
+            $('#search-student').focus({ preventScroll: true });
+        });
+
+        $('#refresh-btn').addEventListener('click', function () {
+            var btn = this;
+            if (isBusy(btn)) { return; }
+            busy(btn, true);
+            refresh().then(function () {
+                busy(btn, false);
+                schedule();
+            });
+        });
+
+        $('#retry-btn').addEventListener('click', function () {
+            var btn = this;
+            if (isBusy(btn)) { return; }
+            busy(btn, true);
+            setText(btn, 'Trying…');
+            refresh().then(function () {
+                busy(btn, false);
+                setText(btn, 'Try again');
+                schedule();
+            });
         });
 
         document.addEventListener('visibilitychange', function () {
-            if (!document.hidden) { loadMonitoring(); }
+            if (document.hidden) { return; }
+            refresh().then(schedule);
         });
 
         $('#signout-confirm').addEventListener('click', function () {
+            var btn = this;
+            if (signingOut) { return; }
+            signingOut = true;
+            clearTimeout(pollId);
+            busy(btn, true);
+            setText(btn, 'Signing out…');
+            $$('[data-modal-close]', $('#modal-signout')).forEach(function (b) { b.setAttribute('aria-disabled', 'true'); });
             if (typeof executeForceLogout === 'function') { executeForceLogout(); }
             else { window.location.replace('../../index.html'); }
         });
+    }
 
-        setBootText('Loading your section…');
-        await loadMonitoring();
-        reveal();
-        schedule();
+    /* ============================================ 9. BOOT ============== */
+
+    function hello() {
+        console.info('%cPIA // teacher console', 'font-family: ui-monospace, monospace; font-weight: 700;');
+        console.info('Looking for OCEAN scores or research groups? Wrong room. They never leave the database: ' +
+            'this page gets a name, a status and a count. (CERC 2025-1-PTCS-231, migration 0026)');
+    }
+
+    async function boot() {
+        try {
+            hello();
+            setBootText('Checking your access…');
+            var allowed = await enforceTeacherAccess();
+            if (!allowed) { return; }
+
+            initModals();
+            PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
+            bindControls();
+            paintIdentity();
+
+            /* Show the page now and let the skeletons carry the wait: the
+               frame is already the right shape, so nothing jumps when the
+               class arrives. */
+            setPhase('loading');
+            paintSkeletons();
+            reveal();
+            paintLive();
+
+            await refresh();
+            schedule();
+            setInterval(paintLive, 5000);
+        } catch (err) {
+            console.error('Teacher console failed to start.', err);
+            showBanner('The console hit a snag starting up. Reload the page.');
+            reveal();
+        }
     }
 
     if (document.readyState === 'loading') {

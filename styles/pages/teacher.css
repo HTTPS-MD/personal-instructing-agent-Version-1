@@ -3,266 +3,158 @@
    REQUIRES styles/global.css (reset, tokens, shared components) and
    styles/shell.css (rail, workspace, top bar).
 
-   A teacher watches ONE section live. Where the admin console is built for
-   managing many things, this is built for watching a handful of rows change:
-   fewer views, bigger status affordances, and a roster that is legible at a
-   glance from the front of a classroom.
+   A teacher walks a classroom with a phone, or glances at a laptop from the
+   front of the room, and asks one question: who needs me? So this page is
+   built mobile-first, and the answer is the biggest thing on it.
+
+   THE CONSOLE SURFACE. The learner pages keep global.css's rounded, violet
+   design (C2 is a rule for LEARNER surfaces). This is not one, so it gets
+   its own voice, the way the landing page has its "comic" surface: square
+   edges, hard 1px rules, ink and paper, and one colour only -- amber, for
+   "needs attention". Everything is declared as token overrides under
+   :root[data-surface="console"], which only teacher-dashboard.html carries,
+   so no other page changes. There is no colour literal in this file.
+
+   Status is shape before colour, so it reads in greyscale and to anyone who
+   cannot tell amber from yellow:
+       ■ solving   ◩ getting set up / waiting room   □ idle / not started
+       ✓ finished  – offline
+
+   Sections:
+       0. Console tokens            6. Filter ledger
+       1. Shared components here    7. Roster (cards, then a table)
+       2. Boot veil + banner        8. Status marks, progress strip, flag
+       3. Page frame                9. Loading, empty and error states
+       4. Masthead                 10. Motion
+       5. Needs-attention queue
    ==========================================================================*/
 
-/* ------------------------------------------------------------- 1. TABLES */
-.table-wrap { overflow-x: auto; }
+/* ------------------------------------------------------ 0. CONSOLE TOKENS */
+:root[data-surface="console"] {
+    /* Square everything, the scrollbar thumb included. */
+    --r-card: 0;
+    --r-pill: 0;
+    --r-xs: 0;
+    --r-sm: 0;
+    --r-md: 0;
+    --r-lg: 0;
+    --r-xl: 0;
+    --r-2xl: 0;
 
-.table { font-size: var(--fs-sm); }
+    /* Monochrome. The accent becomes the text colour, so focus rings, the
+       active nav item, primary buttons and selection are ink on paper in the
+       light theme and paper on ink in the dark one. */
+    --accent: var(--text);
+    --accent-strong: var(--text);
+    --accent-hover: var(--text);
+    --accent-soft: color-mix(in srgb, var(--text) 9%, transparent);
+    --accent-line: var(--text);
+    --on-accent: var(--bg-body);
+    --on-primary: var(--bg-body);
+    --color-primary: var(--text);
+    --color-primary-ink: var(--text);
+    --pop: var(--text);
 
-.table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    height: 44px;
-    padding: 0 var(--sp-5);
-    background: var(--bg-surface);
-    text-align: left;
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    white-space: nowrap;
+    /* The hard edge, and the one hue. Amber is the token system's own
+       "warning / needs attention" colour; red stays reserved for destructive
+       admin actions and never labels a child. --flag is amber as text (5.4:1
+       on paper, 10.9:1 on ink); --flag-fill is amber as a block, always with
+       an ink label on it (about 11:1). */
+    --rule: var(--text);
+    --flag: var(--warning);
+    --flag-fill: var(--status-amber);
+    --on-flag: var(--palette-ink);
+
+    /* Depth is a hard offset in the text colour. No blur, no violet. */
+    --shadow-edge: 1px 0 0 var(--rule);
+    --shadow-under: 0 1px 0 var(--rule);
+    --shadow-card: 0 0 0 1px var(--rule);
+    --shadow-md: 0 0 0 1px var(--rule), 0.25rem 0.25rem 0 var(--rule);
+    --shadow-lg: 0 0 0 1px var(--rule), 0.375rem 0.375rem 0 var(--rule);
+    --shadow-dialog: 0 0 0 1px var(--rule), 0.5rem 0.5rem 0 var(--rule);
+
+    /* Hover is deliberate, not twitchy; a press answers at once. */
+    --t-hover: 150ms var(--ease-flat);
+
+    /* One queue row. The queue reserves two of them while it loads, so the
+       roster below does not jump when the data lands. */
+    --q-row: 4.5rem;
 }
 
-.table tbody td {
-    height: 64px;              /* taller than admin: read from a distance */
-    padding: 0 var(--sp-5);
-    vertical-align: middle;
-    white-space: nowrap;
+/* ------------------------------------------ 1. SHARED COMPONENTS, HERE ONLY */
+/* global.css has no rule for [hidden], so any class that sets display would
+   quietly win over it. On this page, hidden always means hidden. */
+:root[data-surface="console"] [hidden] { display: none !important; }
+
+:root[data-surface="console"] ::selection { background: var(--text); color: var(--bg-body); }
+
+:root[data-surface="console"] * { scrollbar-color: var(--line) transparent; }
+:root[data-surface="console"] *::-webkit-scrollbar-thumb {
+    background-color: var(--line);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+:root[data-surface="console"] *::-webkit-scrollbar-thumb:hover { background-color: var(--text); }
+
+.sprite { position: absolute; overflow: hidden; }
+
+/* Controls: 44px minimum, a 150ms hover, a press you can feel, and a busy
+   state that refuses a second click without losing keyboard focus (buttons
+   are marked aria-disabled rather than disabled while they work). */
+:root[data-surface="console"] .btn,
+:root[data-surface="console"] .btn-icon {
+    transition: background-color var(--t-hover), color var(--t-hover), box-shadow var(--t-hover), transform var(--t-fast);
 }
 
-.table tbody tr { transition: background-color var(--t-base); }
-.table tbody tr:nth-child(even) { background: var(--stripe); }
-.table tbody tr:hover,
-.table tbody tr:nth-child(even):hover { background: var(--bg-surface-hover); }
+:root[data-surface="console"] .btn-secondary { background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--rule); }
+:root[data-surface="console"] .btn-secondary:hover:not(:disabled) { background: var(--bg-chip); }
+:root[data-surface="console"] .btn-primary:hover:not(:disabled) { box-shadow: 0.1875rem 0.1875rem 0 var(--line); }
+:root[data-surface="console"] .btn-icon.is-bordered { background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--rule); }
+:root[data-surface="console"] .btn-icon:active:not([aria-disabled="true"]) { transform: translateY(1px); }
+:root[data-surface="console"] .btn-signout { height: var(--control-h); }
 
-.col-right { text-align: right; }
+:root[data-surface="console"] [aria-disabled="true"] { cursor: not-allowed; }
+:root[data-surface="console"] [aria-busy="true"] { cursor: progress; }
+:root[data-surface="console"] .btn[aria-disabled="true"]:not([aria-busy="true"]) { opacity: 0.45; }
 
-.cell-user { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
-.cell-name { display: block; font-weight: 600; line-height: 18px; }
-.cell-mail { display: block; font-size: var(--fs-xs); line-height: 16px; color: var(--text-muted); }
+:root[data-surface="console"] .modal-close { width: var(--icon-btn); height: var(--icon-btn); flex-basis: var(--icon-btn); }
+:root[data-surface="console"] .modal-close:hover { background: var(--bg-chip-hover); color: var(--text); }
+.modal-copy { font-size: var(--fs-sm); color: var(--text-muted); line-height: var(--lh-body); }
 
-.empty-cell {
-    /* min-height, not height: the message wraps on narrow screens and the
-       cell must be free to grow rather than clip it. */
-    min-height: 12.5rem;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 13.5px;
-}
+:root[data-surface="console"] .nav-count { font-family: var(--font-mono); }
+:root[data-surface="console"] .crumbs strong { font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; }
+/* On a phone the masthead already names the section; a truncated crumb
+   beside it is noise. It returns at the tablet breakpoint, below. */
+:root[data-surface="console"] .crumbs { display: none; }
 
-/* ------------------------------------------------------ 2. STATUS PILLS --
-   Fixed heights and nowrap: a row switching from Online to Inactive changes
-   colour and nothing else. */
-.engagement-badge,
-.learning-badge {
+:root[data-surface="console"] .toast-danger .icon { color: var(--flag); }
+.toast-desc:empty { display: none; }
+
+/* Skip link: off-screen until a keyboard reaches it, then the first thing on
+   the page. */
+.skip-link {
+    position: fixed;
+    top: var(--sp-2);
+    left: var(--sp-2);
+    z-index: var(--z-banner);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 26px;
-    padding: 0 var(--sp-3);
-    border-radius: var(--r-pill);
-    background: var(--bg-chip);
-    color: var(--text-muted);
-    font-size: var(--fs-xs);
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.status-badge-online { background: var(--accent-soft); color: var(--accent); }
-.status-badge-inactive { background: var(--warning-soft); color: var(--warning); }
-.status-badge-offline { background: var(--bg-chip); color: var(--text-muted); }
-/* Waiting room / getting set up: present, not yet in the lesson. */
-.status-badge-neutral { background: var(--bg-chip); color: var(--text); }
-.status-badge-done { background: var(--correct-soft); color: var(--correct-ink); }
-
-/* "Doing fine" is good news: the correct status colour (volt), not amber. */
-.learning-smooth { background: var(--correct-soft); color: var(--correct-ink); }
-.learning-struggling { background: var(--danger-soft); color: var(--danger); }
-
-.learning-badge .icon { width: 13px; height: 13px; }
-
-.status-dot {
-    width: 7px;
-    height: 7px;
-    flex: 0 0 7px;
-    border-radius: 50%;
-    background: var(--track);
-}
-
-.status-dot-online { background: var(--accent); }
-.status-dot-inactive { background: var(--warning); }
-.status-dot-offline { background: var(--track); }
-.status-dot-neutral { background: var(--text-muted); }
-.status-dot-done { background: var(--correct); }
-
-/* "This lesson": problems finished out of the lesson's target. A count, not
-   a score -- nothing here says how many were right. */
-.lesson-progress { display: inline-flex; align-items: center; gap: var(--sp-3); }
-/* Spans inside a table cell: made blocks so the rail and fill take a size. */
-.lesson-progress .bar { display: block; width: 88px; flex: 0 0 88px; }
-.lesson-progress .bar-fill { display: block; }
-.lesson-progress .tnum { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
-
-/* A row that needs the teacher: a quiet edge, never a red row -- the class
-   may be able to see this screen. */
-.table tbody tr.needs-attention td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
-
-/* The facilitation note (same block as the admin console's). */
-.notice {
-    display: flex;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-}
-.notice-accent { background: var(--accent-soft); }
-.notice .icon { color: var(--accent); margin-top: 1px; flex: 0 0 auto; }
-.notice-title { font-size: var(--fs-sm); font-weight: 700; }
-.notice-text { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; }
-
-/* Only the live state pulses, so a scanning eye is drawn to who is actually
-   working right now. Opacity only — the dot never changes size. */
-.engagement-dot-pulse { animation: teacher-pulse 2s ease-in-out infinite; }
-
-@keyframes teacher-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-}
-
-/* ------------------------------------------------- 3. ROSTER AVATAR + DOT */
-.student-avatar-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
-
-.student-avatar-initial {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--r-sm);
-    background: var(--bg-chip);
-    display: grid;
-    place-items: center;
-    font-size: var(--fs-sm);
-    font-weight: 700;
-}
-
-/* The ring is the surrounding surface's own colour — a gap punched out of the
-   avatar, never an outline. */
-.student-avatar-status {
-    position: absolute;
-    right: -2px;
-    bottom: -2px;
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    box-shadow: 0 0 0 2.5px var(--bg-surface);
-}
-
-.table tbody tr:hover .student-avatar-status { box-shadow: 0 0 0 2.5px var(--bg-surface-hover); }
-
-/* --------------------------------------------------------- 4. STAT TILES */
-.stat {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 128px;
-    padding: var(--sp-5);
-    background: var(--bg-surface);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-card);
-    text-align: left;
-    transition: background-color var(--t-base);
-}
-
-button.stat { cursor: pointer; }
-button.stat:hover { background: var(--bg-surface-hover); }
-button.stat.is-active { background: var(--accent-soft); }
-
-.stat-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
-.stat-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
-
-.stat-glyph {
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    border-radius: var(--r-sm);
-    display: grid;
-    place-items: center;
-    background: var(--bg-chip);
-    color: var(--text-muted);
-}
-
-.stat-glyph .icon { width: 15px; height: 15px; }
-.stat-glyph.g-accent { background: var(--accent-soft); color: var(--accent); }
-.stat-glyph.g-warn { background: var(--warning-soft); color: var(--warning); }
-.stat-glyph.g-danger { background: var(--danger-soft); color: var(--danger); }
-.stat-glyph.g-muted { background: var(--warning-soft); color: var(--warning); }
-
-.stat-value {
-    font-size: 30px;
-    font-weight: 700;
-    line-height: 36px;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-}
-
-.stat-foot { min-height: 18px; font-size: var(--fs-xs); color: var(--text-muted); }
-
-/* ------------------------------------------------------- 5. FILTER TABS */
-.filter-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
-
-.filter-tab {
-    height: 34px;
+    min-height: var(--control-h);
     padding: 0 var(--sp-4);
-    border-radius: var(--r-pill);
-    background: var(--bg-field);
-    color: var(--text-muted);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    white-space: nowrap;
-    transition: background-color var(--t-base), color var(--t-base);
+    background: var(--text);
+    color: var(--bg-body);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transform: translateY(calc(-100% - var(--sp-4)));
 }
 
-.filter-tab:hover { background: var(--bg-chip); color: var(--text); }
-.filter-tab.active { background: var(--accent-soft); color: var(--accent); }
+.skip-link:focus,
+.skip-link:focus-visible { transform: none; outline-offset: 2px; }
 
-/* --------------------------------------------------- 6. EMPTY / LOADING */
-.state-block {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-3);
-    min-height: 260px;
-    padding: var(--sp-6);
-    text-align: center;
-}
-
-.state-glyph {
-    width: 48px;
-    height: 48px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r-lg);
-    background: var(--bg-field);
-    color: var(--text-faint);
-}
-
-.state-title { font-size: 14px; font-weight: 600; }
-.state-desc { font-size: var(--fs-sm); color: var(--text-muted); max-width: 42ch; }
-
-.skeleton { border-radius: var(--r-xs); background: var(--bg-surface-hi); animation: skel 1.4s ease-in-out infinite; }
-@keyframes skel { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
-.skeleton-line { height: 10px; border-radius: var(--r-pill); }
-.skeleton-line + .skeleton-line { margin-top: 6px; }
-.skeleton-pill { height: 26px; width: 92px; border-radius: var(--r-pill); }
-.skeleton-avatar { width: 36px; height: 36px; border-radius: var(--r-sm); flex: 0 0 36px; }
-
-/* -------------------------------------------------------- 7. BOOT GATE */
+/* ------------------------------------------------ 2. BOOT VEIL + BANNER */
 body[data-boot="pending"] .app,
 body[data-boot="pending"] .toast-stack { visibility: hidden; }
 
@@ -270,19 +162,33 @@ body[data-boot="pending"] .toast-stack { visibility: hidden; }
     position: fixed;
     inset: 0;
     z-index: var(--z-boot);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-4);
+    display: grid;
+    place-items: center;
+    padding-inline: var(--sp-4);
     background: var(--bg-body);
-    opacity: 1;
     transition: opacity var(--t-base);
 }
 
 body:not([data-boot="pending"]) .boot-veil { opacity: 0; pointer-events: none; }
 body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
-.boot-text { font-size: var(--fs-sm); color: var(--text-muted); }
+
+.boot-text {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.boot-cursor {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.1em;
+    background: var(--text);
+}
 
 .error-banner {
     position: fixed;
@@ -294,94 +200,654 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     align-items: center;
     justify-content: center;
     gap: var(--sp-3);
-    min-height: 44px;
-    padding: var(--sp-2) var(--sp-5);
-    background: var(--danger);
-    color: var(--text-on-solid);
+    min-height: var(--control-h);
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--flag-fill);
+    color: var(--on-flag);
+    box-shadow: 0 1px 0 var(--palette-ink);
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: 700;
     text-align: center;
 }
 
 .error-banner .icon { width: 16px; height: 16px; }
-.error-banner[hidden] { display: none; }
 
-/* --------------------------------------------------- 8. STUDENT DRAWER */
-.drawer-overlay { justify-content: flex-end; padding: 0; }
+/* ------------------------------------------------------- 3. PAGE FRAME */
+.console {
+    display: grid;
+    gap: var(--sp-6);
+}
 
-.drawer {
+.deck {
+    display: grid;
+    gap: var(--sp-5);
+}
+
+/* A label in the console's instrument voice: mono, uppercase, tracked. */
+.mast-meta,
+.mast-kicker,
+.queue-rule strong,
+.queue-foot,
+.q-why,
+.q-min-u,
+.ledger-title,
+.tally-note,
+.roster-sub,
+.r-status,
+.flag,
+.roster-table thead th {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* --------------------------------------------------------- 4. MASTHEAD */
+/* The section name is the headline: from the back of a room it is the one
+   thing that tells a teacher they are on the right class. The greeting is
+   only a caption above it. */
+.mast {
+    display: grid;
+    gap: var(--sp-3);
+    padding-bottom: var(--sp-5);
+    border-bottom: 1px solid var(--rule);
+}
+
+.mast-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-5);
+    color: var(--text-muted);
+}
+
+.mast-hello { text-wrap: balance; }
+
+.mast-title {
+    display: grid;
+    gap: var(--sp-1);
+}
+
+.mast-kicker {
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    line-height: var(--lh-tight);
+    color: var(--text-muted);
+}
+
+.mast-name {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 17vw, 8rem);
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.055em;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+}
+
+/* Connection. The label is set in mono and reserves its widest state, so
+   "Live" turning into "Updated 12s ago" never nudges the line. */
+.live {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--text);
+}
+
+.live-text { min-width: 25ch; }
+
+.live-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    flex: 0 0 auto;
+    background: var(--text);
+}
+
+.live[data-state="connecting"] .live-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--text); }
+.live[data-state="lost"] { color: var(--flag); }
+.live[data-state="lost"] .live-dot { background: var(--flag-fill); }
+
+/* ------------------------------------------- 5. NEEDS-ATTENTION QUEUE */
+.queue {
     display: flex;
     flex-direction: column;
-    width: 100%;
-    max-width: 440px;
-    height: 100%;
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-dialog);
-    transform: translateX(16px);
-    opacity: 0;
-    transition: transform var(--t-layout), opacity var(--t-base);
-}
-
-.overlay.is-open .drawer { transform: translateX(0); opacity: 1; }
-
-.drawer-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    flex: 0 0 auto;
-    min-height: var(--topbar-h);
-    padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-5);
-}
-
-.drawer-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-5); }
-
-.drawer-identity {
-    display: flex;
-    align-items: center;
     gap: var(--sp-4);
-    padding-bottom: var(--sp-5);
+    padding: var(--sp-4);
+    background: var(--bg-surface);
+    box-shadow: inset 0 0 0 1px var(--rule);
 }
 
-.drawer-avatar {
-    width: 60px;
-    height: 60px;
-    flex: 0 0 60px;
-    border-radius: var(--r-lg);
-    background: var(--bg-field);
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-    font-size: 20px;
+.queue-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--sp-4);
+}
+
+.queue-title {
+    font-size: var(--fs-h4);
+    letter-spacing: -0.02em;
+}
+
+/* The glance number. Faint at zero, amber the moment anyone is flagged --
+   decided by :has(), so the script never has to remember to recolour it. */
+.queue-n {
+    font-family: var(--font-mono);
+    font-size: clamp(3rem, 14vw, 5.5rem);
     font-weight: 700;
+    line-height: 0.85;
+    letter-spacing: -0.06em;
+    color: var(--text-faint);
 }
 
-.drawer-avatar img { width: 100%; height: 100%; object-fit: contain; }
-/* Missing persona art falls back to a monogram rather than a broken image. */
-.drawer-avatar[data-mono] img { display: none; }
-.drawer-avatar[data-mono]::after { content: attr(data-mono); color: var(--accent); }
+.queue:has(.q-item:not(.q-skel)) .queue-n { color: var(--flag); }
 
-.kv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.queue-rule {
+    padding-block: var(--sp-3);
+    border-block: 1px dashed var(--line);
+    font-size: var(--fs-sm);
+    line-height: 1.55;
+    color: var(--text-muted);
+}
 
-.kv {
-    min-height: 66px;
+.queue-rule strong { font-weight: 700; color: var(--text); }
+
+.queue-list {
+    display: grid;
+    gap: var(--sp-2);
+    min-height: calc(var(--q-row) * 2 + var(--sp-2));
+    align-content: start;
+}
+
+.queue-list:empty { display: none; }
+
+.q-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: var(--q-row);
+    background: var(--bg-body);
+    box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+/* Minutes waiting: ink on an amber block, the loudest thing on the page. */
+.q-min {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    min-width: 4.5rem;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--flag-fill);
+    color: var(--on-flag);
+    font-family: var(--font-mono);
+}
+
+.q-min-n {
+    font-size: var(--fs-h3);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+}
+
+.q-min-u { font-weight: 700; }
+
+.q-body {
+    display: grid;
+    align-content: center;
+    gap: var(--sp-1);
+    min-width: 0;
     padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
 }
 
-.kv-label { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
-.kv-value { margin-top: var(--sp-1); font-size: 15px; font-weight: 600; }
+.q-name {
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    line-height: var(--lh-tight);
+    overflow-wrap: anywhere;
+}
 
-/* ---------------------------------------------------------- 9. UTILITIES */
-.grid { display: grid; gap: var(--sp-4); align-items: stretch; }
-.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+.q-why { color: var(--text-muted); }
 
-/* ------------------------------------------------------- 10. RESPONSIVE */
-@media (max-width: 1279px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Shown by the page's state, not by the script: loaded, and nobody flagged. */
+.queue-clear {
+    display: none;
+    place-items: center;
+    min-height: calc(var(--q-row) * 2 + var(--sp-2));
+    padding: var(--sp-4);
+    border: 1px dashed var(--line);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--text-muted);
+}
 
-@media (max-width: 768px) {
-    .grid-4 { grid-template-columns: minmax(0, 1fr); }
-    .drawer { max-width: 100%; }
-    .filter-row { width: 100%; }
+.console[data-load="ready"] .queue:not(:has(.q-item)) .queue-clear { display: grid; }
+
+.queue-more { width: 100%; }
+
+.queue-foot { color: var(--text-faint); line-height: 1.5; }
+
+/* ------------------------------------------------------- 6. FILTER LEDGER */
+/* A departure board: five counts that are also the roster's filters. The
+   1px gap over a rule-coloured ground draws the grid lines. The pressed
+   filter inverts; aria-pressed is the single source of that state. */
+.ledger {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+
+.ledger-title { font-weight: 700; color: var(--text-muted); }
+
+.ledger-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    box-shadow: 0 0 0 1px var(--rule);
+}
+
+.tally {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "label n"
+        "note  n";
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-height: 4rem;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--bg-surface);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--t-hover), color var(--t-hover);
+}
+
+.tally-all { grid-column: 1 / -1; }
+
+.tally-label { grid-area: label; font-size: var(--fs-sm); font-weight: 600; line-height: var(--lh-tight); }
+.tally-note { grid-area: note; color: var(--text-muted); }
+
+.tally-n {
+    grid-area: n;
+    min-width: 2ch;
+    font-family: var(--font-mono);
+    font-size: clamp(1.75rem, 7vw, 2.5rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    text-align: right;
+}
+
+.tally-n[data-n="0"] { color: var(--text-faint); }
+:where(.tally[data-filter="attention"]) .tally-n:not([data-n="0"]) { color: var(--flag); }
+
+.tally:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.tally:active:not(:disabled) { background: var(--bg-chip); }
+.tally:focus-visible { position: relative; z-index: var(--z-page); outline-offset: -5px; }
+.tally:disabled { cursor: progress; }
+.tally:disabled .tally-n { color: var(--text-faint); }
+
+.tally[aria-pressed="true"],
+.tally[aria-pressed="true"]:hover:not(:disabled) { background: var(--text); color: var(--bg-body); }
+.tally[aria-pressed="true"] .tally-note,
+.tally[aria-pressed="true"] .tally-n { color: inherit; }
+
+/* ------------------------------------------------------------- 7. ROSTER */
+.roster {
+    background: var(--bg-surface);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    scroll-margin-top: calc(var(--topbar-h) + var(--sp-4));
+}
+
+.roster-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-3) var(--sp-4);
+    padding: var(--sp-4);
+    border-bottom: 1px solid var(--rule);
+}
+
+.roster-head-text { flex: 1 1 12rem; min-width: 0; }
+
+.roster-title { font-size: var(--fs-h4); letter-spacing: -0.02em; }
+.roster-title:focus { outline: none; }
+
+.roster-sub { margin-top: var(--sp-1); color: var(--text-muted); }
+
+.roster-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    flex: 1 1 100%;
+}
+
+.find { position: relative; display: flex; flex: 1 1 14rem; min-width: 0; }
+
+.find .icon {
+    position: absolute;
+    left: var(--sp-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint);
+    pointer-events: none;
+}
+
+/* 16px, never less: a smaller field makes iOS zoom the whole page on focus. */
+.find-input {
+    width: 100%;
+    min-height: var(--field-h);
+    padding: 0 var(--sp-3) 0 var(--sp-8);
+    background: var(--bg-field);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--line);
+    font-family: var(--font-body);
+    font-size: var(--fs-body);
+    appearance: none;
+    transition: box-shadow var(--t-hover);
+}
+
+.find-input:hover { box-shadow: inset 0 0 0 1px var(--text); }
+.find-input:focus-visible { outline-offset: 0; }
+.find-input::placeholder { color: var(--text-faint); }
+
+/* PHONE FIRST: every row is a card. Status and time on top, the name big
+   enough to read at arm's length, then progress, then the flag -- which
+   only takes a line when there is one. */
+.roster-table,
+.roster-table tbody { display: block; width: 100%; }
+
+.roster-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.r-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "status last"
+        "name   name"
+        "lesson lesson"
+        "flag   flag";
+    gap: var(--sp-2) var(--sp-3);
+    padding: var(--sp-4);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.r-row:last-child { border-bottom: 0; }
+
+.r-row > th,
+.r-row > td { display: block; min-width: 0; padding: 0; text-align: left; font-weight: inherit; }
+
+.cell-in { display: inline-flex; align-items: center; gap: var(--sp-2); max-width: 100%; }
+
+/* On a card the progress strip stretches with the screen (up to 16rem). */
+.r-lesson > .cell-in { display: flex; }
+
+.r-name {
+    grid-area: name;
+    font-size: var(--fs-lg);
+    line-height: var(--lh-tight);
+    overflow-wrap: anywhere;
+}
+
+.r-row > .r-name { font-weight: 700; }
+.r-status { grid-area: status; }
+.r-lesson { grid-area: lesson; }
+.r-flag { grid-area: flag; }
+
+.r-last {
+    grid-area: last;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.r-row > .r-last { text-align: right; }
+
+/* A card needs no "—" lines: nothing to count before the lesson, no flag. */
+.r-lesson[data-na],
+.r-row:not(:has(.flag:not([hidden]))) .r-flag { display: none; }
+
+/* A flagged card carries an amber edge as well as the words. */
+.r-row:has(.flag:not([hidden])) {
+    box-shadow: inset 0.25rem 0 0 var(--flag-fill);
+    padding-left: calc(var(--sp-4) + 0.25rem);
+}
+
+/* ------------------------------------ 8. STATUS MARKS, STRIP AND FLAG */
+.mk {
+    position: relative;
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 0.75rem;
+    height: 0.75rem;
+    box-shadow: inset 0 0 0 1.5px var(--text);
+}
+
+.mk[data-mark="full"] { background: var(--text); }
+.mk[data-mark="half"] { background: linear-gradient(135deg, var(--text) 50%, transparent 50%); }
+.mk[data-mark="done"] { background: var(--text); }
+.mk[data-mark="done"]::after {
+    content: "";
+    position: absolute;
+    left: 36%;
+    top: 12%;
+    width: 30%;
+    height: 58%;
+    border: solid var(--bg-surface);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.mk[data-mark="off"] { height: 2px; box-shadow: none; background: var(--text-faint); }
+
+.r-status-text { white-space: nowrap; }
+.r-row:has(.mk[data-mark="off"]) .r-status-text { color: var(--text-muted); }
+
+/* One cell per problem in the lesson: "3 of 10" is read as a shape before it
+   is read as a number. A count, never a score -- nothing here says how many
+   were right. */
+.strip {
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 2px;
+    flex: 1 1 auto;
+    width: 7.5rem;
+    max-width: 16rem;
+    height: 0.75rem;
+}
+
+.strip > span { box-shadow: inset 0 0 0 1px var(--line); }
+.strip > span.on { background: var(--text); box-shadow: none; }
+
+.r-count { font-size: var(--fs-sm); white-space: nowrap; }
+.r-lesson[data-na] .strip { display: none; }
+.r-lesson[data-na] .r-count { color: var(--text-faint); }
+
+.flag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-2);
+    background: var(--flag-fill);
+    color: var(--on-flag);
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.none { color: var(--text-faint); }
+.r-flag:has(.flag:not([hidden])) .none { display: none; }
+
+/* -------------------------- 9. LOADING, EMPTY AND ERROR STATES */
+/* Skeletons are hatched blocks, sized by the layout they stand in for. */
+.skel {
+    display: block;
+    width: 100%;
+    height: 0.75rem;
+    background: repeating-linear-gradient(-45deg, var(--line-soft) 0 2px, transparent 2px 6px);
+    box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+
+.r-skel .r-name .skel { width: 60%; height: 1.125rem; }
+.r-skel:nth-child(3n + 2) .r-name .skel { width: 44%; }
+.r-skel:nth-child(3n) .r-name .skel { width: 52%; }
+.r-skel .r-status .skel { width: 6rem; }
+.r-skel .r-lesson .skel { width: 9rem; }
+.r-skel .r-last .skel { width: 4rem; }
+
+.q-skel { box-shadow: inset 0 0 0 1px var(--line-soft); }
+.q-skel .q-min { background: transparent; box-shadow: inset -1px 0 0 var(--line-soft); }
+.q-skel .q-min .skel { width: 2rem; height: 1.5rem; }
+.q-skel .q-body .skel:first-child { width: 55%; height: 1rem; }
+.q-skel .q-body .skel + .skel { width: 35%; }
+
+.roster-state {
+    display: none;
+    justify-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-8) var(--sp-5);
+    text-align: center;
+}
+
+.roster-state-title { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 700; }
+.roster-state-text { max-width: 44ch; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* Empty and error are page states in CSS. The script writes the words;
+   whether they show is decided here. */
+.console[data-load="ready"] .roster:not(:has(.r-row)) .roster-empty { display: grid; }
+.console[data-load="error"] .roster-error { display: grid; }
+.console[data-load="error"] .roster-scroll { display: none; }
+
+/* ---------------------------------------------------------- 10. MOTION */
+/* Three things move: the live square blinks, skeletons breathe, and the
+   refresh icon turns while it works. Nothing moves for anyone who asked
+   for less motion. */
+@keyframes console-blink { 50% { opacity: 0; } }
+@keyframes console-breathe { 50% { opacity: 0.4; } }
+@keyframes console-turn { to { transform: rotate(360deg); } }
+
+.live[data-state="live"] .live-dot { animation: console-blink 2s steps(1, end) infinite; }
+.boot-cursor { animation: console-blink 1s steps(1, end) infinite; }
+.skel { animation: console-breathe 1.4s ease-in-out infinite; }
+#refresh-btn[aria-busy="true"] .icon { animation: console-turn 0.8s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+    .live-dot,
+    .boot-cursor,
+    .skel,
+    #refresh-btn .icon { animation: none !important; }
+}
+
+/* --------------------------------------------- TABLET: 48rem (768px) UP */
+@media (min-width: 48rem) {
+    :root[data-surface="console"] .crumbs { display: flex; }
+    .console { gap: var(--sp-7); }
+    .queue { padding: var(--sp-5); }
+
+    /* The counts become one strip of five. */
+    .ledger-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .tally-all { grid-column: auto; }
+    .tally {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "label"
+            "n"
+            "note";
+        align-content: space-between;
+        row-gap: var(--sp-2);
+        min-height: 7rem;
+    }
+    .tally-n { text-align: left; }
+
+    .roster-head { padding: var(--sp-4) var(--sp-5); }
+    .roster-tools { flex: 0 1 26rem; justify-content: flex-end; }
+
+    /* The cards become a table again: real columns, 1px rules. */
+    .roster-scroll { overflow-x: auto; }
+    .roster-table { display: table; }
+    .roster-table thead {
+        display: table-header-group;
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip-path: none;
+    }
+    .roster-table tbody { display: table-row-group; }
+
+    .r-row,
+    .r-row:has(.flag:not([hidden])) { display: table-row; padding: 0; box-shadow: none; }
+
+    .roster-table th,
+    .roster-table td,
+    .r-row > th,
+    .r-row > td {
+        display: table-cell;
+        padding: var(--sp-3) var(--sp-4);
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: middle;
+    }
+
+    .roster-table thead th {
+        padding-block: var(--sp-3);
+        border-bottom: 1px solid var(--rule);
+        font-weight: 700;
+        color: var(--text-muted);
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .roster-table tbody .r-row:last-child > * { border-bottom: 0; }
+
+    .r-row > .r-name { font-size: var(--fs-body); font-weight: 600; }
+    .r-lesson > .cell-in { display: inline-flex; }
+    .strip { flex: 0 0 auto; }
+    .roster-table .col-end,
+    .r-row > .r-last { text-align: right; }
+
+    .r-lesson[data-na],
+    .r-row:not(:has(.flag:not([hidden]))) .r-flag { display: table-cell; }
+
+    .r-row:has(.flag:not([hidden])) > :first-child { box-shadow: inset 0.25rem 0 0 var(--flag-fill); }
+}
+
+/* -------------------------------------------- DESKTOP: 64rem (1024px) UP */
+/* The deck splits, deliberately uneven: the queue takes the weight, the
+   counts stand beside it as a board. */
+@media (min-width: 64rem) {
+    .deck {
+        grid-template-columns: minmax(0, 1.8fr) minmax(16rem, 1fr);
+        gap: var(--sp-6);
+        align-items: stretch;
+    }
+
+    .ledger-grid {
+        flex: 1 1 auto;
+        grid-template-columns: minmax(0, 1fr);
+        grid-auto-rows: minmax(4rem, 1fr);
+    }
+
+    .tally {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "label n"
+            "note  n";
+        align-content: center;
+        row-gap: 0;
+        min-height: 4rem;
+    }
+
+    .tally-n { text-align: right; }
 }
