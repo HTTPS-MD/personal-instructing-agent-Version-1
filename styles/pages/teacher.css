@@ -7,13 +7,17 @@
    front of the room, and asks one question: who needs me? So this page is
    built mobile-first, and the answer is the biggest thing on it.
 
-   THE CONSOLE SURFACE. The learner pages keep global.css's rounded, violet
-   design (C2 is a rule for LEARNER surfaces). This is not one, so it gets
-   its own voice, the way the landing page has its "comic" surface: square
-   edges, hard 1px rules, ink and paper, and one colour only -- amber, for
-   "needs attention". Everything is declared as token overrides under
-   :root[data-surface="console"], which only teacher-dashboard.html carries,
-   so no other page changes. There is no colour literal in this file.
+   THE CONSOLE SURFACE. Teacher and admin are the same product wearing the
+   same clothes: rounded C2 cards, the shared violet accent, soft elevation
+   instead of a hard ink edge. Section 0 used to retheme this page to a
+   square, monochrome "console" voice of its own; a teacher and an admin
+   working side by side read that as two different apps, so the retheme is
+   gone and this page now inherits global.css's tokens exactly like the
+   admin console does. What is genuinely teacher-specific -- the mobile-first
+   card-to-table roster, the needs-attention queue, live status, CERC-safe
+   scope -- is untouched; :root[data-surface="console"] still scopes the
+   handful of rules below that are ONLY layout, not a second brand. Amber
+   stays reserved for "needs attention", same as admin's badge-warn.
 
    Status is shape before colour, so it reads in greyscale and to anyone who
    cannot tell amber from yellow:
@@ -31,47 +35,24 @@
 
 /* ------------------------------------------------------ 0. CONSOLE TOKENS */
 :root[data-surface="console"] {
-    /* Square everything, the scrollbar thumb included. */
-    --r-card: 0;
-    --r-pill: 0;
-    --r-xs: 0;
-    --r-sm: 0;
-    --r-md: 0;
-    --r-lg: 0;
-    --r-xl: 0;
-    --r-2xl: 0;
+    /* --r-*, --accent*, --pop and the shadow ramp are no longer overridden
+       here: this surface reads them straight from global.css, same as the
+       admin console, so cards, buttons and focus rings match exactly.
 
-    /* Monochrome. The accent becomes the text colour, so focus rings, the
-       active nav item, primary buttons and selection are ink on paper in the
-       light theme and paper on ink in the dark one. */
-    --accent: var(--text);
-    --accent-strong: var(--text);
-    --accent-hover: var(--text);
-    --accent-soft: color-mix(in srgb, var(--text) 9%, transparent);
-    --accent-line: var(--text);
-    --on-accent: var(--bg-body);
-    --on-primary: var(--bg-body);
-    --color-primary: var(--text);
-    --color-primary-ink: var(--text);
-    --pop: var(--text);
+       --rule is what every "just a hairline" boundary below reads (the
+       queue, the roster, a tally cell). Pointed at the same soft hairline
+       admin's card shadow uses, so those boundaries read as elevation, not
+       as a drawn box. */
+    --rule: var(--line-soft);
 
-    /* The hard edge, and the one hue. Amber is the token system's own
-       "warning / needs attention" colour; red stays reserved for destructive
-       admin actions and never labels a child. --flag is amber as text (5.4:1
-       on paper, 10.9:1 on ink); --flag-fill is amber as a block, always with
-       an ink label on it (about 11:1). */
-    --rule: var(--text);
+    /* Amber is still the ONLY additional hue, reserved for "needs
+       attention" -- exactly admin's badge-warn convention. Red stays
+       reserved for destructive admin actions and never labels a child.
+       --flag is amber as text (5.4:1 on paper, 10.9:1 on ink); --flag-fill
+       is amber as a block, always with an ink label on it (about 11:1). */
     --flag: var(--warning);
     --flag-fill: var(--status-amber);
     --on-flag: var(--palette-ink);
-
-    /* Depth is a hard offset in the text colour. No blur, no violet. */
-    --shadow-edge: 1px 0 0 var(--rule);
-    --shadow-under: 0 1px 0 var(--rule);
-    --shadow-card: 0 0 0 1px var(--rule);
-    --shadow-md: 0 0 0 1px var(--rule), 0.25rem 0.25rem 0 var(--rule);
-    --shadow-lg: 0 0 0 1px var(--rule), 0.375rem 0.375rem 0 var(--rule);
-    --shadow-dialog: 0 0 0 1px var(--rule), 0.5rem 0.5rem 0 var(--rule);
 
     /* Hover is deliberate, not twitchy; a press answers at once. */
     --t-hover: 150ms var(--ease-flat);
@@ -86,31 +67,14 @@
    quietly win over it. On this page, hidden always means hidden. */
 :root[data-surface="console"] [hidden] { display: none !important; }
 
-:root[data-surface="console"] ::selection { background: var(--text); color: var(--bg-body); }
-
-:root[data-surface="console"] * { scrollbar-color: var(--line) transparent; }
-:root[data-surface="console"] *::-webkit-scrollbar-thumb {
-    background-color: var(--line);
-    border: 2px solid transparent;
-    background-clip: content-box;
-}
-:root[data-surface="console"] *::-webkit-scrollbar-thumb:hover { background-color: var(--text); }
-
 .sprite { position: absolute; overflow: hidden; }
 
-/* Controls: 44px minimum, a 150ms hover, a press you can feel, and a busy
-   state that refuses a second click without losing keyboard focus (buttons
-   are marked aria-disabled rather than disabled while they work). */
-:root[data-surface="console"] .btn,
-:root[data-surface="console"] .btn-icon {
-    transition: background-color var(--t-hover), color var(--t-hover), box-shadow var(--t-hover), transform var(--t-fast);
-}
-
-:root[data-surface="console"] .btn-secondary { background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--rule); }
-:root[data-surface="console"] .btn-secondary:hover:not(:disabled) { background: var(--bg-chip); }
-:root[data-surface="console"] .btn-primary:hover:not(:disabled) { box-shadow: 0.1875rem 0.1875rem 0 var(--line); }
-:root[data-surface="console"] .btn-icon.is-bordered { background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--rule); }
-:root[data-surface="console"] .btn-icon:active:not([aria-disabled="true"]) { transform: translateY(1px); }
+/* Buttons, selection, scrollbars, the nav count and the crumb all come
+   straight from global.css and shell.css now, same as the admin console.
+   What stays here is behaviour, not styling: the 44px touch floor on the
+   two controls whose global size is smaller, and a busy state that refuses
+   a second click without losing keyboard focus (buttons are marked
+   aria-disabled rather than disabled while they work). */
 :root[data-surface="console"] .btn-signout { height: var(--control-h); }
 
 :root[data-surface="console"] [aria-disabled="true"] { cursor: not-allowed; }
@@ -118,11 +82,8 @@
 :root[data-surface="console"] .btn[aria-disabled="true"]:not([aria-busy="true"]) { opacity: 0.45; }
 
 :root[data-surface="console"] .modal-close { width: var(--icon-btn); height: var(--icon-btn); flex-basis: var(--icon-btn); }
-:root[data-surface="console"] .modal-close:hover { background: var(--bg-chip-hover); color: var(--text); }
 .modal-copy { font-size: var(--fs-sm); color: var(--text-muted); line-height: var(--lh-body); }
 
-:root[data-surface="console"] .nav-count { font-family: var(--font-mono); }
-:root[data-surface="console"] .crumbs strong { font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; }
 /* On a phone the masthead already names the section; a truncated crumb
    beside it is noise. It returns at the tablet breakpoint, below. */
 :root[data-surface="console"] .crumbs { display: none; }
@@ -140,14 +101,13 @@
     display: inline-flex;
     align-items: center;
     min-height: var(--control-h);
-    padding: 0 var(--sp-4);
-    background: var(--text);
-    color: var(--bg-body);
-    font-family: var(--font-mono);
-    font-size: var(--fs-xs);
+    padding: 0 var(--sp-5);
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-display);
+    font-size: var(--fs-sm);
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     transform: translateY(calc(-100% - var(--sp-4)));
 }
 
@@ -158,12 +118,17 @@
 body[data-boot="pending"] .app,
 body[data-boot="pending"] .toast-stack { visibility: hidden; }
 
+/* Identical to the admin console's boot veil: a spinner and one line of
+   muted text while the server confirms role = 'teacher'. */
 .boot-veil {
     position: fixed;
     inset: 0;
     z-index: var(--z-boot);
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-4);
     padding-inline: var(--sp-4);
     background: var(--bg-body);
     transition: opacity var(--t-base);
@@ -172,23 +137,16 @@ body[data-boot="pending"] .toast-stack { visibility: hidden; }
 body:not([data-boot="pending"]) .boot-veil { opacity: 0; pointer-events: none; }
 body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 
-.boot-text {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-1);
-    font-family: var(--font-mono);
-    font-size: var(--fs-xs);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
+.spinner {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--track);
+    border-top-color: var(--accent);
+    animation: spin 700ms linear infinite;
 }
 
-.boot-cursor {
-    display: inline-block;
-    width: 0.6em;
-    height: 1.1em;
-    background: var(--text);
-}
+.boot-text { font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
 
 .error-banner {
     position: fixed;
@@ -202,11 +160,11 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     gap: var(--sp-3);
     min-height: var(--control-h);
     padding: var(--sp-2) var(--sp-4);
+    /* Amber, not admin's red: red never appears on a surface about children. */
     background: var(--flag-fill);
     color: var(--on-flag);
-    box-shadow: 0 1px 0 var(--palette-ink);
     font-size: var(--fs-sm);
-    font-weight: 700;
+    font-weight: 600;
     text-align: center;
 }
 
@@ -223,22 +181,33 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     gap: var(--sp-5);
 }
 
-/* A label in the console's instrument voice: mono, uppercase, tracked. */
-.mast-meta,
+/* Small labels, in the same voice as admin's .metric-label / .kv-label /
+   table headers: body face, uppercase, tracked. Mono is kept for NUMBERS
+   only (.tnum, .queue-n, .tally-n, .q-min), exactly as admin does. */
 .mast-kicker,
-.queue-rule strong,
+.ledger-title,
+.roster-table thead th {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Supporting copy: sentence case at the small size, like admin's .card-sub. */
+.mast-meta,
 .queue-foot,
 .q-why,
-.q-min-u,
-.ledger-title,
 .tally-note,
 .roster-sub,
 .r-status,
-.flag,
-.roster-table thead th {
+.flag {
+    font-size: var(--fs-xs);
+}
+
+.q-min-u {
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
@@ -270,19 +239,19 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 }
 
 .mast-kicker {
-    font-weight: 700;
-    letter-spacing: 0.14em;
     line-height: var(--lh-tight);
-    color: var(--text-muted);
+    color: var(--text-faint);
 }
 
+/* Still the biggest thing on the page -- it has to be readable from across
+   a classroom -- but a dashboard title, not a poster: sentence case, the
+   display face, and a ceiling well below the old 8rem. */
 .mast-name {
     font-family: var(--font-display);
-    font-size: clamp(3rem, 17vw, 8rem);
+    font-size: clamp(2.25rem, 9vw, 3.5rem);
     font-weight: 700;
-    line-height: 0.9;
-    letter-spacing: -0.055em;
-    text-transform: uppercase;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
     overflow-wrap: anywhere;
     text-wrap: balance;
 }
@@ -293,30 +262,36 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--text);
+    color: var(--text-muted);
 }
 
 .live-text { min-width: 25ch; }
 
+/* Same dot the admin console's env-pill uses for its own realtime state
+   (shell.css .dot / .dot-live) -- one connection indicator, one meaning,
+   across both consoles. */
 .live-dot {
     width: 0.625rem;
     height: 0.625rem;
+    border-radius: 50%;
     flex: 0 0 auto;
-    background: var(--text);
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.live[data-state="connecting"] .live-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--text); }
+.live[data-state="connecting"] .live-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--text-faint); }
 .live[data-state="lost"] { color: var(--flag); }
-.live[data-state="lost"] .live-dot { background: var(--flag-fill); }
+.live[data-state="lost"] .live-dot { background: var(--flag-fill); box-shadow: 0 0 0 3px var(--warning-soft); }
 
 /* ------------------------------------------- 5. NEEDS-ATTENTION QUEUE */
 .queue {
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-4);
+    padding: var(--sp-5);
     background: var(--bg-surface);
-    box-shadow: inset 0 0 0 1px var(--rule);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
 }
 
 .queue-head {
@@ -326,27 +301,33 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     gap: var(--sp-4);
 }
 
+/* Admin's .card-title. */
 .queue-title {
-    font-size: var(--fs-h4);
-    letter-spacing: -0.02em;
+    font-size: 17px;
+    letter-spacing: -0.01em;
 }
 
 /* The glance number. Faint at zero, amber the moment anyone is flagged --
    decided by :has(), so the script never has to remember to recolour it. */
+/* Admin's .stat-value, a size up: still the one number a teacher reads from
+   across the room, no longer poster-scale. */
 .queue-n {
     font-family: var(--font-mono);
-    font-size: clamp(3rem, 14vw, 5.5rem);
+    font-size: clamp(2.5rem, 10vw, 3.5rem);
     font-weight: 700;
-    line-height: 0.85;
-    letter-spacing: -0.06em;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
     color: var(--text-faint);
 }
 
 .queue:has(.q-item:not(.q-skel)) .queue-n { color: var(--flag); }
 
+/* Admin's .notice.notice-accent: a soft violet well, no drawn border. */
 .queue-rule {
-    padding-block: var(--sp-3);
-    border-block: 1px dashed var(--line);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
     font-size: var(--fs-sm);
     line-height: 1.55;
     color: var(--text-muted);
@@ -368,7 +349,11 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     grid-template-columns: auto minmax(0, 1fr);
     min-height: var(--q-row);
     background: var(--bg-body);
-    box-shadow: inset 0 0 0 1px var(--rule);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-card);
+    /* Clips the amber .q-min block to the same curve as the card -- without
+       this its square corner would poke out past the rounded edge. */
+    overflow: hidden;
 }
 
 /* Minutes waiting: ink on an amber block, the loudest thing on the page. */
@@ -410,17 +395,16 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 .q-why { color: var(--text-muted); }
 
 /* Shown by the page's state, not by the script: loaded, and nobody flagged. */
+/* Same inset well admin uses for its own empty/state blocks. */
 .queue-clear {
     display: none;
     place-items: center;
     min-height: calc(var(--q-row) * 2 + var(--sp-2));
     padding: var(--sp-4);
-    border: 1px dashed var(--line);
-    font-family: var(--font-mono);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
     font-size: var(--fs-sm);
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-weight: 600;
     text-align: center;
     color: var(--text-muted);
 }
@@ -443,12 +427,13 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 
 .ledger-title { font-weight: 700; color: var(--text-muted); }
 
+/* A card grid, same as admin's stage funnel (.funnel / .funnel-step) --
+   gap between tiles rather than a shared 1px rule, so each filter reads as
+   its own tappable card. */
 .ledger-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1px;
-    background: var(--rule);
-    box-shadow: 0 0 0 1px var(--rule);
+    gap: var(--sp-2);
 }
 
 .tally {
@@ -463,9 +448,11 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     padding: var(--sp-3) var(--sp-4);
     background: var(--bg-surface);
     color: var(--text);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
     text-align: left;
     cursor: pointer;
-    transition: background-color var(--t-hover), color var(--t-hover);
+    transition: background-color var(--t-hover), color var(--t-hover), box-shadow var(--t-hover);
 }
 
 .tally-all { grid-column: 1 / -1; }
@@ -489,20 +476,26 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 
 .tally:hover:not(:disabled) { background: var(--bg-surface-hover); }
 .tally:active:not(:disabled) { background: var(--bg-chip); }
-.tally:focus-visible { position: relative; z-index: var(--z-page); outline-offset: -5px; }
+.tally:focus-visible { position: relative; z-index: var(--z-page); }
 .tally:disabled { cursor: progress; }
 .tally:disabled .tally-n { color: var(--text-faint); }
 
+/* Same active-filter language as admin's stat tiles and segmented control
+   (button.stat.is-active, .segment-btn.is-active): a violet wash and violet
+   text, not an ink invert. */
 .tally[aria-pressed="true"],
-.tally[aria-pressed="true"]:hover:not(:disabled) { background: var(--text); color: var(--bg-body); }
+.tally[aria-pressed="true"]:hover:not(:disabled) { background: var(--accent-soft); color: var(--text); }
+.tally[aria-pressed="true"] .tally-label { color: var(--accent); }
 .tally[aria-pressed="true"] .tally-note,
 .tally[aria-pressed="true"] .tally-n { color: inherit; }
 
 /* ------------------------------------------------------------- 7. ROSTER */
 .roster {
     background: var(--bg-surface);
-    box-shadow: inset 0 0 0 1px var(--rule);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
     scroll-margin-top: calc(var(--topbar-h) + var(--sp-4));
+    overflow: hidden;
 }
 
 .roster-head {
@@ -516,7 +509,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 
 .roster-head-text { flex: 1 1 12rem; min-width: 0; }
 
-.roster-title { font-size: var(--fs-h4); letter-spacing: -0.02em; }
+.roster-title { font-size: 17px; letter-spacing: -0.01em; }
 .roster-title:focus { outline: none; }
 
 .roster-sub { margin-top: var(--sp-1); color: var(--text-muted); }
@@ -546,6 +539,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     padding: 0 var(--sp-3) 0 var(--sp-8);
     background: var(--bg-field);
     color: var(--text);
+    border-radius: var(--r-card);
     box-shadow: inset 0 0 0 1px var(--line);
     font-family: var(--font-body);
     font-size: var(--fs-body);
@@ -553,7 +547,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     transition: box-shadow var(--t-hover);
 }
 
-.find-input:hover { box-shadow: inset 0 0 0 1px var(--text); }
+.find-input:hover { box-shadow: inset 0 0 0 1px var(--text-muted); }
 .find-input:focus-visible { outline-offset: 0; }
 .find-input::placeholder { color: var(--text-faint); }
 
@@ -669,21 +663,27 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     height: 0.75rem;
 }
 
-.strip > span { box-shadow: inset 0 0 0 1px var(--line); }
-.strip > span.on { background: var(--text); box-shadow: none; }
+.strip > span { border-radius: 1px; box-shadow: inset 0 0 0 1px var(--line); }
+/* Same fill as admin's own progress bars (.bar-fill), not a flat ink cell. */
+.strip > span.on { background: var(--accent); box-shadow: none; }
 
 .r-count { font-size: var(--fs-sm); white-space: nowrap; }
 .r-lesson[data-na] .strip { display: none; }
 .r-lesson[data-na] .r-count { color: var(--text-faint); }
 
+/* Admin's .badge shape (a pill), kept as a SOLID amber fill rather than
+   badge-warn's soft wash: in a long roster the flag must still be the
+   loudest thing in its row. */
 .flag {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-1) var(--sp-2);
+    gap: 6px;
+    min-height: 24px;
+    padding: 2px var(--sp-3);
+    border-radius: var(--r-pill);
     background: var(--flag-fill);
     color: var(--on-flag);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.3;
 }
 
@@ -691,13 +691,15 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 .r-flag:has(.flag:not([hidden])) .none { display: none; }
 
 /* -------------------------- 9. LOADING, EMPTY AND ERROR STATES */
-/* Skeletons are hatched blocks, sized by the layout they stand in for. */
+/* Same skeleton as admin's (.skeleton / .skeleton-line): a solid rounded
+   bar that breathes on opacity only, sized by the layout it stands in for,
+   so live data replaces it without a single pixel of shift. */
 .skel {
     display: block;
     width: 100%;
     height: 0.75rem;
-    background: repeating-linear-gradient(-45deg, var(--line-soft) 0 2px, transparent 2px 6px);
-    box-shadow: inset 0 0 0 1px var(--line-soft);
+    border-radius: var(--r-pill);
+    background: var(--bg-surface-hi);
 }
 
 .r-skel .r-name .skel { width: 60%; height: 1.125rem; }
@@ -731,21 +733,20 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 .console[data-load="error"] .roster-scroll { display: none; }
 
 /* ---------------------------------------------------------- 10. MOTION */
-/* Three things move: the live square blinks, skeletons breathe, and the
-   refresh icon turns while it works. Nothing moves for anyone who asked
-   for less motion. */
-@keyframes console-blink { 50% { opacity: 0; } }
-@keyframes console-breathe { 50% { opacity: 0.4; } }
+/* Four things move: the live dot pulses softly, skeletons breathe, the boot
+   spinner turns, and the refresh icon turns while it works. Nothing moves
+   for anyone who asked for less motion. */
+@keyframes console-pulse { 50% { opacity: 0.55; } }
+@keyframes console-breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
 @keyframes console-turn { to { transform: rotate(360deg); } }
 
-.live[data-state="live"] .live-dot { animation: console-blink 2s steps(1, end) infinite; }
-.boot-cursor { animation: console-blink 1s steps(1, end) infinite; }
+.live[data-state="live"] .live-dot { animation: console-pulse 2s ease-in-out infinite; }
 .skel { animation: console-breathe 1.4s ease-in-out infinite; }
 #refresh-btn[aria-busy="true"] .icon { animation: console-turn 0.8s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
     .live-dot,
-    .boot-cursor,
+    .spinner,
     .skel,
     #refresh-btn .icon { animation: none !important; }
 }

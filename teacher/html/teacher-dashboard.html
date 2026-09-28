@@ -8,8 +8,9 @@
 
     <!-- Before first paint: the stored theme (dark by default) goes on
          <html> so there is never a flash of the wrong one. data-surface=
-         "console" switches this page, and only this page, to the teacher
-         console's square, monochrome tokens (teacher.css, section 0). -->
+         "console" only scopes the teacher console's LAYOUT rules
+         (teacher.css); colours, curvature and type come from global.css,
+         exactly as on the admin console. -->
     <script src="../../assets/js/theme-boot.js"></script>
     <title>Teacher Console — PIA System</title>
 
@@ -42,7 +43,8 @@
     </svg>
 
     <div class="boot-veil" id="boot-veil">
-        <p class="boot-text"><span id="boot-text" role="status">Checking your access…</span><span class="boot-cursor" aria-hidden="true"></span></p>
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="boot-text" id="boot-text" role="status">Checking your access…</p>
     </div>
 
     <div class="error-banner" id="global-error-banner" role="alert" hidden>
