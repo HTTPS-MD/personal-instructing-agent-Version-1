@@ -131,7 +131,8 @@
         student: 'modal-signin',
         staff: 'modal-staff',
         activate: 'modal-activate',
-        forgot: 'modal-forgot'
+        forgot: 'modal-forgot',
+        'device-reset': 'modal-device-reset'
     };
 
     /* "Back to sign in" (data-auth-open="back") returns to whichever sign-in
@@ -438,6 +439,11 @@
         clearFormErrors(opts.formId);
         clearStatus(opts.statusId);
 
+        /* The device-limit way out belongs to the attempt that hit the limit;
+           a new attempt starts without it. */
+        var offer = $('#' + opts.formId + ' [data-device-reset]');
+        if (offer) { offer.hidden = true; }
+
         var email = normalizeEmail($('#' + opts.emailId).value);
         var password = $('#' + opts.passwordId).value;
 
@@ -513,32 +519,20 @@
                         localStorage.removeItem('pia_user_role');
                     } catch (err) { /* private mode */ }
                     setStatus(opts.statusId, check.reason, 'error');
+
+                    /* Most often the "other device" is a lab PC whose browser
+                       was closed without signing out. Offer the way out that
+                       needs no admin: an email code (section 3b). */
+                    deviceReset.email = email;
+                    deviceReset.area = opts.area;
+                    if (offer) { offer.hidden = false; }
                     return;
                 }
             }
 
-            /* An admin set a temporary password for this student (the
-               admin-set-temp-password Edge Function). They must replace it
-               before anything else: the admin knows it, and the next one
-               should be known to the student alone. Every other student page
-               sends them back here too (requireStudentSession). */
-            if (role === 'student' && profile.must_change_password === true) {
-                setStatus(opts.statusId, 'Signed in. Choose a new password to continue…', 'ok');
-                window.location.replace('student/html/set-new-password.html');
-                return;
-            }
-
-            setStatus(opts.statusId, 'Signed in. Taking you to your dashboard…', 'ok');
-
-            if (role === 'admin') {
-                window.location.replace('admin/html/admin-dashboard.html');
-            } else if (role === 'teacher') {
-                window.location.replace('teacher/html/teacher-dashboard.html');
-            } else if (typeof resolveStudentRedirect === 'function') {
-                window.location.replace(await resolveStudentRedirect(profile));
-            } else {
-                window.location.replace('student/html/waiting-room.html');
-            }
+            await routeAfterSignIn(profile, role, function (message, tone) {
+                setStatus(opts.statusId, message, tone);
+            });
         } catch (err) {
             console.error('Sign-in failed:', err);
             setStatus(opts.statusId, 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
@@ -571,6 +565,210 @@
             submitId: 'st-submit',
             statusId: 'staff-status'
         });
+    }
+
+    /* The end of every successful sign-in -- by password, or by the email
+       code of section 3b. `report(message, tone)` is wherever this sign-in
+       shows its progress: a dialog's status row, or a toast. */
+    async function routeAfterSignIn(profile, role, report) {
+        /* An admin set a temporary password for this student (the
+           admin-set-temp-password Edge Function). They must replace it
+           before anything else: the admin knows it, and the next one
+           should be known to the student alone. Every other student page
+           sends them back here too (requireStudentSession). */
+        if (role === 'student' && profile.must_change_password === true) {
+            report('Signed in. Choose a new password to continue…', 'ok');
+            window.location.replace('student/html/set-new-password.html');
+            return;
+        }
+
+        report('Signed in. Taking you to your dashboard…', 'ok');
+
+        if (role === 'admin') {
+            window.location.replace('admin/html/admin-dashboard.html');
+        } else if (role === 'teacher') {
+            window.location.replace('teacher/html/teacher-dashboard.html');
+        } else if (typeof resolveStudentRedirect === 'function') {
+            window.location.replace(await resolveStudentRedirect(profile));
+        } else {
+            window.location.replace('student/html/waiting-room.html');
+        }
+    }
+
+    /* ======================================= 3b. SIGN OUT OF OTHER DEVICES */
+
+    /* A sign-in refused at the device limit offers "Sign out of other
+       devices". Its dialog emails a one-time code (signInWithOtp); entering
+       it opens a session on THIS device (verifyOtp), and reset_my_devices()
+       (migration 0025) then signs every other device out and registers this
+       one. The database checks the email proof itself -- the session must
+       come from an email code or link in the last 15 minutes -- so a password
+       alone cannot do this, not even from the browser console.
+
+       The same email carries a link. It comes back to this page with
+       ?flow=device-reset (auth-callback.js lets it through) and finishes the
+       same way on whichever device opens it. */
+    var deviceReset = { email: null, area: null };
+    var drTimerId = null;
+
+    function friendlyResetError(error) {
+        var raw = String((error && error.message) || '');
+        if (/code from your email/i.test(raw)) { return 'Confirm it’s you with the code from your email first.'; }
+        if (/signed out/i.test(raw)) { return 'This sign-in expired. Send a new code and try again.'; }
+        return 'We couldn’t sign your other devices out. Try again, or ask your teacher.';
+    }
+
+    function startDeviceResetCooldown() {
+        var btn = $('#dr-resend');
+        var left = RESEND_COOLDOWN;
+        clearInterval(drTimerId);
+        btn.disabled = true;
+        btn.textContent = 'Send a new code (' + left + 's)';
+        drTimerId = setInterval(function () {
+            left -= 1;
+            if (left <= 0) {
+                clearInterval(drTimerId);
+                btn.disabled = false;
+                btn.textContent = 'Send a new code';
+                return;
+            }
+            btn.textContent = 'Send a new code (' + left + 's)';
+        }, 1000);
+    }
+
+    async function sendDeviceResetCode() {
+        clearStatus('device-reset-status');
+        var res;
+        try {
+            res = await sb.auth.signInWithOtp({
+                email: deviceReset.email,
+                options: { shouldCreateUser: false, emailRedirectTo: emailLinkTo('index.html?flow=device-reset') }
+            });
+        } catch (err) {
+            res = { error: { message: 'Can’t reach the server. Check your Wi-Fi, then try again.' } };
+        }
+
+        if (res.error) {
+            setStatus('device-reset-status', friendlyAuthError(res.error), 'error');
+            $('#dr-resend').disabled = false;
+            $('#dr-resend').textContent = 'Send a new code';
+            return;
+        }
+        setStatus('device-reset-status', 'Code sent. It can take a minute to arrive.', 'ok');
+        startDeviceResetCooldown();
+    }
+
+    function openDeviceReset() {
+        if (!deviceReset.email) { return; }
+        $('#device-reset-form').reset();
+        clearFormErrors('device-reset-form');
+        clearStatus('device-reset-status');
+        $('#dr-sent-to').textContent = deviceReset.email;
+        openAuth('device-reset');
+        sendDeviceResetCode();
+    }
+
+    /* Shared by the code and the link: this device now holds a session that
+       came from the email. Sign the others out, then carry on like any
+       sign-in. Any refusal undoes this device's session too. */
+    async function completeDeviceReset(area, report) {
+        var fail = async function (message) {
+            await sb.auth.signOut({ scope: 'local' });
+            report(message, 'error');
+            return false;
+        };
+
+        var reset = await sb.rpc('reset_my_devices', { p_device_id: getOrCreateDeviceId() });
+        if (reset.error) { return fail(friendlyResetError(reset.error)); }
+
+        var session = (await sb.auth.getSession()).data.session;
+        var email = session && session.user ? session.user.email : null;
+        if (!email) { return fail('This sign-in expired. Send a new code and try again.'); }
+
+        var profileRes = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
+        if (profileRes.error || !profileRes.data) {
+            return fail('This account is not set up yet. Please contact the study administrator.');
+        }
+
+        var profile = profileRes.data;
+        var role = normalizeRole(profile.role);
+        var mismatch = area ? areaMismatch(area, role) : '';
+        if (mismatch) { return fail(mismatch); }
+
+        try {
+            localStorage.setItem('pia_user_email', email);
+            localStorage.setItem('pia_user_role', role);
+        } catch (err) { /* private mode */ }
+
+        clearInterval(drTimerId);
+        await routeAfterSignIn(profile, role, report);
+        return true;
+    }
+
+    async function handleDeviceResetCode(event) {
+        event.preventDefault();
+        clearFormErrors('device-reset-form');
+        clearStatus('device-reset-status');
+
+        var token = ($('#dr-code').value || '').replace(/\s+/g, '');
+        if (!setFieldError('dr-code', /^\d{6,10}$/.test(token)
+            ? '' : 'Enter the code from the email — numbers only.')) {
+            focusFirstInvalid('device-reset-form');
+            return;
+        }
+
+        var release = setBusy($('#dr-submit'), 'Checking…');
+
+        try {
+            var res = await sb.auth.verifyOtp({ email: deviceReset.email, token: token, type: 'email' });
+            if (res.error) {
+                /* One message for wrong, used and expired alike: telling them
+                   apart helps a guesser, not a student. */
+                setFieldError('dr-code', 'That code is wrong or has expired. Check the newest email, or send a new code.');
+                focusFirstInvalid('device-reset-form');
+                return;
+            }
+
+            await completeDeviceReset(deviceReset.area, function (message, tone) {
+                setStatus('device-reset-status', message, tone);
+            });
+        } catch (err) {
+            console.error('Device reset failed:', err);
+            setStatus('device-reset-status', 'Can’t reach the server. Check your Wi-Fi, then try again.', 'error');
+        } finally {
+            release();
+        }
+    }
+
+    /* The link in the same email lands here as ?flow=device-reset#tokens.
+       supabase-js turns the tokens into a session while it starts, so this
+       waits for getSession() BEFORE tidying the address bar -- clearing the
+       hash first would throw the tokens away. Returns true when this visit
+       was that link, so the boot skips the returning-visitor treatment. */
+    async function handleDeviceResetLink() {
+        var entry = new URL(window.PIA_ENTRY_URL || window.location.href);
+        if (entry.searchParams.get('flow') !== 'device-reset') { return false; }
+
+        var hash = new URLSearchParams(entry.hash.replace(/^#/, ''));
+        var session = null;
+        try { session = (await sb.auth.getSession()).data.session; } catch (err) { /* handled below */ }
+        history.replaceState(null, '', entry.pathname);
+
+        var linkToast = function (message, tone) {
+            toast(tone === 'error' ? 'Couldn’t sign you in' : 'Signing you in',
+                message, tone === 'error' ? 'danger' : 'accent');
+        };
+
+        if (hash.get('error') || hash.get('error_code') || !session) {
+            linkToast(hash.get('error_code') === 'otp_expired'
+                ? 'That link expired or was already used. Sign in again to get a new one.'
+                : 'That link didn’t work. Sign in again to get a new one.', 'error');
+            return true;
+        }
+
+        linkToast('Signing out your other devices…', 'ok');
+        await completeDeviceReset(null, linkToast);
+        return true;
     }
 
     /* ============================================ 4. ACTIVATION ======== */
@@ -1020,6 +1218,11 @@
         $('#forgot-form').addEventListener('submit', handleForgot);
         $('#forgot-code-form').addEventListener('submit', handleForgotCode);
         $('#fp-resend').addEventListener('click', handleForgotResend);
+        $('#device-reset-form').addEventListener('submit', handleDeviceResetCode);
+        $('#dr-resend').addEventListener('click', sendDeviceResetCode);
+        $$('[data-device-reset]').forEach(function (btn) {
+            btn.addEventListener('click', openDeviceReset);
+        });
         $('#fp-change-email').addEventListener('click', function () { resetForgotDialog(); });
 
         /* Smooth in-page anchors, without hijacking anything else. */
@@ -1032,7 +1235,14 @@
             });
         });
 
-        offerResume();
+        /* A "Sign out of other devices" link finishes here and navigates on;
+           if it could not, this device is signed out again, so the page must
+           not keep the signed-in guess theme-boot.js made. Otherwise, the
+           usual welcome for a visitor who is already signed in. */
+        handleDeviceResetLink().then(function (handled) {
+            if (handled) { document.documentElement.removeAttribute('data-session'); }
+            else { offerResume(); }
+        });
     }
 
     if (document.readyState === 'loading') {

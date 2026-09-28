@@ -1200,6 +1200,15 @@
                         <span data-status-text></span>
                     </p>
 
+                    <!-- Only after a sign-in is refused at the device limit
+                         (auth.js): the way out that does not need an admin. -->
+                    <button type="button" class="btn btn-secondary portal-submit device-offer" data-device-reset hidden>
+                        <svg class="icon">
+                            <use href="#i-mail"></use>
+                        </svg>
+                        Sign out of other devices
+                    </button>
+
                     <div class="portal-links">
                         <p class="portal-note">
                             First time here?
@@ -1281,6 +1290,13 @@
                         </svg>
                         <span data-status-text></span>
                     </p>
+
+                    <button type="button" class="btn btn-secondary portal-submit device-offer" data-device-reset hidden>
+                        <svg class="icon">
+                            <use href="#i-mail"></use>
+                        </svg>
+                        Sign out of other devices
+                    </button>
 
                     <!-- "student", not "signin": auth.js relabels every
                          data-auth-open="signin" trigger for a returning session,
@@ -1423,6 +1439,72 @@
                             <use href="#i-key"></use>
                         </svg>
                         Send reset link
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL · SIGN OUT OF OTHER DEVICES
+         Opened from a sign-in refused at the device limit. The code is sent
+         the moment it opens; entering it here signs every other device out
+         and this one in (reset_my_devices, migration 0025). The same email
+         carries a link, which does the same on whichever device opens it.
+         ===================================================================== -->
+    <div class="overlay" id="modal-device-reset" role="dialog" aria-modal="true"
+        aria-labelledby="device-reset-title" aria-describedby="device-reset-sub">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="device-reset-title">Sign out of other devices</h2>
+                    <p class="modal-sub" id="device-reset-sub">Confirm it's you with a code from your email.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon">
+                        <use href="#i-x"></use>
+                    </svg>
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <form id="device-reset-form" novalidate>
+                    <div class="auth-intro">
+                        <svg class="icon">
+                            <use href="#i-mail"></use>
+                        </svg>
+                        <p class="auth-intro-text">
+                            A code is on its way to <b id="dr-sent-to">your email</b>. Entering it signs your
+                            account out of every other computer and signs you in here.
+                        </p>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="dr-code">Code from the email</label>
+                        <input class="input" type="text" id="dr-code" inputmode="numeric" autocomplete="one-time-code"
+                            maxlength="10" spellcheck="false" placeholder="6-digit code"
+                            aria-describedby="dr-code-msg" data-autofocus>
+                        <p class="field-msg" id="dr-code-msg" data-msg-for="dr-code"></p>
+                    </div>
+                    <div class="auth-alt">
+                        <button type="button" class="link-btn" id="dr-resend" disabled>Send a new code</button>
+                    </div>
+                </form>
+                <p class="auth-status" id="device-reset-status" role="status">
+                    <svg class="icon">
+                        <use href="#i-alert"></use>
+                    </svg>
+                    <span data-status-text></span>
+                </p>
+            </div>
+
+            <footer class="modal-foot modal-foot-split">
+                <button type="button" class="link-btn" data-auth-open="back">Back to sign in</button>
+                <div class="modal-foot-actions">
+                    <button class="btn btn-primary" type="submit" form="device-reset-form" id="dr-submit">
+                        <svg class="icon">
+                            <use href="#i-check"></use>
+                        </svg>
+                        Verify and sign in
                     </button>
                 </div>
             </footer>

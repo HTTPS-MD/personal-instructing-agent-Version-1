@@ -2413,6 +2413,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     font-size: var(--fs-body);
 }
 
+/* "Sign out of other devices" -- appears under the status row only after a
+   sign-in is refused at the device limit. [hidden] restated: .btn's
+   display:inline-flex would otherwise keep it on screen. */
+.overlay .device-offer { margin-block-start: var(--sp-2); }
+.device-offer[hidden] { display: none; }
+
 .portal-links {
     display: flex;
     flex-direction: column;

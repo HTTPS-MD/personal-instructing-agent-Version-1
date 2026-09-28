@@ -36,6 +36,11 @@
 
     if (!isAuthResult) { return; }
 
+    /* "Sign out of other devices" (auth.js, section 3b) sends its link back
+       to THIS page on purpose, marked ?flow=device-reset: it is finished
+       here, not on the set-password page. */
+    if (query.get('flow') === 'device-reset') { return; }
+
     /* Read by function.js: this page's client leaves the tokens alone. */
     window.PIA_AUTH_FORWARDING = true;
 
