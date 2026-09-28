@@ -560,10 +560,11 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Settings</h1>
-                            <p class="page-desc">Credentials and device policy for your own administrator account.</p>
+                            <p class="page-desc">Your own credentials and device policy, and who else has administrator access.</p>
                         </div>
                     </div>
 
+                    <div class="stack-lg">
                     <div class="grid grid-2">
                         <div class="card">
                             <div class="card-head">
@@ -621,6 +622,39 @@
                                 <button class="btn btn-secondary" id="save-device-limit">Save policy</button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Every administrator account. Adding one creates the
+                         sign-in account and an admin profile, then emails a
+                         one-time link where they choose their own password --
+                         no password is ever known here. -->
+                    <div class="card">
+                        <div class="card-head">
+                            <div class="card-head-text">
+                                <h2 class="card-title">Administrators</h2>
+                                <p class="card-sub">Full access to every participant, stage and result. Keep this list short.</p>
+                            </div>
+                            <div class="card-tools">
+                                <button class="btn btn-primary" data-modal-open="modal-add-admin">
+                                    <svg class="icon"><use href="#i-plus"></use></svg>
+                                    Add administrator
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Administrator</th>
+                                        <th>Status</th>
+                                        <th>Devices</th>
+                                        <th class="col-right col-w-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                     </div>
                 </section>
 
@@ -940,6 +974,58 @@
             <footer class="modal-foot">
                 <button class="btn btn-secondary" data-modal-close>Cancel</button>
                 <button class="btn btn-primary" type="submit" form="add-professor-form" id="ap-submit">Add professor</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ======================================= MODAL · ADD ADMINISTRATOR -->
+    <div class="overlay" id="modal-add-admin" role="dialog" aria-modal="true" aria-labelledby="add-admin-title">
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="add-admin-title">Add administrator</h2>
+                    <p class="modal-sub">Creates a new account with full access to this console.</p>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <form id="add-admin-form" novalidate>
+                    <div class="form-grid">
+                        <div class="field">
+                            <label class="label" for="aa-name">Full name <span class="req">*</span></label>
+                            <input class="input" type="text" id="aa-name" placeholder="Dr. Ana Reyes" autocomplete="off">
+                            <p class="field-msg" data-msg-for="aa-name"></p>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="aa-email">Email address <span class="req">*</span></label>
+                            <input class="input" type="email" id="aa-email" placeholder="a.reyes@ue.edu.ph" autocomplete="off">
+                            <p class="field-msg" data-msg-for="aa-email"></p>
+                        </div>
+                        <div class="field" style="max-width:220px">
+                            <label class="label" for="aa-devices">Maximum devices</label>
+                            <input class="input tnum" type="number" id="aa-devices" min="1" max="10" value="2">
+                            <p class="field-msg" data-msg-for="aa-devices"></p>
+                        </div>
+                    </div>
+
+                    <div class="notice notice-accent" style="margin-top:16px">
+                        <svg class="icon"><use href="#i-shield"></use></svg>
+                        <div>
+                            <p class="notice-title">What happens next</p>
+                            <p class="notice-text">The account starts with a random password nobody knows. They get a
+                                one-time link to choose their own, then sign in with <strong>Admin sign in</strong> on
+                                the home page. Emails that already belong to a professor or a participant are refused.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button class="btn btn-primary" type="submit" form="add-admin-form" id="aa-submit">Add administrator</button>
             </footer>
         </div>
     </div>

@@ -200,6 +200,7 @@
         resultEmails: {},    // lower-cased emails with a row in ocean_submissions
         rosterPage: [],      // the current page of the roster table
         faculty: [],
+        admins: [],
         totalStudents: 0,
         page: 1,
         filters: { group: 'all', sub: 'all', stage: null, search: '' },
@@ -2641,6 +2642,170 @@
         window.location.replace('../../index.html');
     }
 
+    /* ---- Administrators ------------------------------------------------
+       Adding one is the student-registration path with role 'admin':
+       admin_create_auth_user with a random password nobody sees, then the
+       profile row, then the same one-time activation link students get,
+       where they choose their own password. No password is ever known here.
+
+       Only NEW accounts. An email that already belongs to a professor or a
+       participant is refused rather than promoted: a promoted professor
+       would keep a "Remove faculty" button that deletes their whole account,
+       admin access included, and a participant's row is research data. */
+
+    async function loadAdmins() {
+        var res = await sb.from('profiles')
+            .select('full_name, email, status, max_devices, active_devices')
+            .eq('role', 'admin')
+            .order('full_name', { ascending: true });
+        if (res.error) { throw res.error; }
+
+        state.admins = res.data || [];
+        renderAdmins();
+    }
+
+    function renderAdmins() {
+        $('#admin-tbody').innerHTML = state.admins.map(function (a) {
+            /* Only a new account is 'inactive' until its link is used; admins
+               added by hand before this form may have no status at all. */
+            var pending = (a.status || '') === 'inactive';
+            var isYou = a.email === state.adminEmail;
+            return '' +
+                '<tr>' +
+                '<td>' + userCell(a) + '</td>' +
+                '<td><span class="badge ' + (pending ? '' : 'badge-accent') + '">' +
+                '<span class="dot ' + (pending ? 'dot-off' : 'dot-live') + '"></span>' +
+                (pending ? 'Awaiting activation' : 'Active') + '</span>' +
+                (isYou ? ' <span class="badge">You</span>' : '') + '</td>' +
+                '<td class="tnum muted">' + (a.active_devices || []).length + ' of ' + toInt(a.max_devices, 1) + '</td>' +
+                '<td class="col-right"><span class="row-actions">' +
+                (isYou ? '' :
+                    '<button class="btn-icon" title="Email a one-time link to set their password" ' +
+                    'data-admin-act="link" data-email="' + esc(a.email) + '">' + icon('send', 'icon-sm') + '</button>') +
+                '</span></td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function sendAdminLinkEmail(email) {
+        return sb.auth.signInWithOtp({
+            email: email,
+            options: { shouldCreateUser: false, emailRedirectTo: activationRedirect() }
+        });
+    }
+
+    async function resendAdminLink(email, sourceBtn) {
+        var ok = await confirmAction({
+            title: 'Send sign-in link',
+            heading: 'Email ' + email + ' a one-time link?',
+            message: 'It opens a page where they choose a new password. Their current password ' +
+                'stops working once they save the new one.',
+            confirmLabel: 'Send link',
+            tone: 'accent'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, '…');
+        var res = await sendAdminLinkEmail(email);
+        release();
+
+        if (res.error) {
+            toastErr('Link not sent', res.error.message);
+            return;
+        }
+        toastOk('Link sent', 'Delivered to ' + email + '.');
+    }
+
+    async function handleAddAdmin(event) {
+        event.preventDefault();
+        clearFormErrors('add-admin-form');
+
+        var name = $('#aa-name').value.trim();
+        var email = normalizeEmail($('#aa-email').value);
+        var maxDevices = toInt($('#aa-devices').value, 0);
+
+        var valid = true;
+        valid = setFieldError('aa-name', name ? '' : 'Full name is required.') && valid;
+        valid = setFieldError('aa-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
+        valid = setFieldError('aa-devices', (maxDevices >= 1 && maxDevices <= 10) ? '' : 'Choose between 1 and 10.') && valid;
+        if (!valid) { return; }
+
+        /* Checked BEFORE the auth user exists: profiles carries UNIQUE(email),
+           so a late failure would strand a sign-in account. */
+        var existing = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
+        if (existing.error) {
+            toastErr('Could not check the email', friendlyDbError(existing.error, 'Unknown database error.'));
+            return;
+        }
+        if (existing.data) {
+            var role = String(existing.data.role || 'student').trim().toLowerCase();
+            setFieldError('aa-email', role === 'admin'
+                ? 'This account is already an administrator.'
+                : role === 'teacher'
+                    ? 'This email belongs to a professor account. Use a different email for administrator access.'
+                    : 'This email belongs to a study participant. Participants cannot be administrators.');
+            return;
+        }
+
+        var ok = await confirmAction({
+            title: 'Add administrator',
+            heading: 'Give ' + email + ' administrator access?',
+            message: 'Administrators see every participant and result, open and close stages, and can ' +
+                'delete accounts, including other administrators. They will get a one-time link to ' +
+                'choose their own password.',
+            confirmLabel: 'Create administrator',
+            tone: 'accent'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy($('#aa-submit'), 'Creating…');
+
+        try {
+            var authRes = await sb.rpc('admin_create_auth_user', {
+                target_email: email,
+                default_password: generateSecurePassword()
+            });
+            if (authRes.error) {
+                toastErr('Account not created', friendlyDbError(authRes.error, 'Could not create the sign-in account.'));
+                return;
+            }
+
+            var insertRes = await sb.from('profiles').insert([{
+                full_name: name,
+                email: email,
+                role: 'admin',
+                status: 'inactive',
+                max_devices: maxDevices
+            }]);
+            if (insertRes.error) {
+                showNotice('Administrator not finished',
+                    friendlyDbError(insertRes.error, 'Could not save the profile.') +
+                    '\n\nA sign-in account was already created for ' + email +
+                    '. Delete it in Supabase (Authentication → Users) before trying again.',
+                    'danger');
+                return;
+            }
+
+            closeModal('modal-add-admin');
+            $('#add-admin-form').reset();
+            clearFormErrors('add-admin-form');
+
+            var mail = await sendAdminLinkEmail(email);
+            if (mail.error) {
+                showNotice('Administrator created, email not sent',
+                    email + ' is set up, but the link could not be sent: ' + mail.error.message +
+                    '\n\nUse the send-link button next to their name under Administrators to try again.',
+                    'danger');
+            } else {
+                toastOk('Administrator added', email + ' will get a link to choose their password.');
+            }
+
+            await loadAdmins();
+        } finally {
+            release();
+        }
+    }
+
     /* ============================================ 12. SCORES ENCODING === */
 
     async function openScoresModal(sectionName) {
@@ -2996,6 +3161,7 @@
                 loadRoster(),
                 loadStageCounters(),
                 loadFaculty(),
+                loadAdmins(),
                 loadSettings()
             ]);
             hideGlobalError();
@@ -3047,6 +3213,11 @@
         $('#register-student-form').addEventListener('submit', handleRegisterStudent);
         $('#edit-student-form').addEventListener('submit', handleUpdateStudent);
         $('#add-professor-form').addEventListener('submit', handleRegisterProfessor);
+        $('#add-admin-form').addEventListener('submit', handleAddAdmin);
+        $('#admin-tbody').addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-admin-act="link"]');
+            if (btn) { resendAdminLink(btn.getAttribute('data-email'), btn); }
+        });
         $('#password-form').addEventListener('submit', handlePasswordUpdate);
 
         $('#new-section-form').addEventListener('submit', async function (event) {
