@@ -761,6 +761,146 @@ const SESSION_ENDED_COPY = {
     }
 };
 
+// ==========================================
+// 1C-7. STAFF SESSION WATCH (admin and teacher consoles)
+// When a staff login is ended on the server -- a device revoked from
+// another device (0030), or "Sign out everywhere" -- the browser still holds
+// a token that looks fine locally: supabase-js getSession() only reads
+// localStorage and never asks the server. So the console kept running, and
+// on the next load the homepage greeted a dead session and bounced between
+// "Continue to dashboard" and page-guard.
+//
+// This asks the SERVER, jwt_is_current() -- the same test every policy runs,
+// which since 0030 also refuses a token whose session was deleted:
+//   * every 10 s while the page is visible, and at once on focus, on becoming
+//     visible and on reconnecting;
+//   * the moment another device revokes this one: the revoking console sends
+//     a broadcast nudge on this device's channel (nudgeDevice below). The
+//     nudge carries nothing and proves nothing; it only makes this page ask
+//     the server now instead of within 10 s;
+//   * when supabase-js itself drops the session (its refresh token was
+//     deleted), via SIGNED_OUT.
+// Only a definite "no" from the server, or no session at all, ends the
+// session. A network error or a missing function never does.
+//
+// Ending: every beat stops, the session is removed from THIS browser only
+// (scope 'local' -- the server already ended it; a global sign-out would
+// end the account's other, legitimate logins), storage is cleared except the
+// device ID and theme, and the page goes to the staff sign-in, which says why.
+// ==========================================
+const STAFF_SIGNIN_PATH = '/index.html';
+
+function deviceChannelKey(deviceId) {
+    return String(deviceId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
+}
+
+// true / false from the server; null when there is no definite answer.
+async function isSessionCurrentOnServer() {
+    if (!window.supabaseClient) return null;
+    try {
+        const { data, error } = await supabaseClient.rpc('jwt_is_current');
+        if (error) return null;           // offline, missing, or an expired token mid-refresh
+        return data === true ? true : (data === false ? false : null);
+    } catch (e) {
+        return null;
+    }
+}
+
+function staffSignInUrl(reason) {
+    return STAFF_SIGNIN_PATH + '?signin=staff' + (reason ? '&reason=' + encodeURIComponent(reason) : '');
+}
+
+// Removes this browser's copy of a session the server has already ended, and
+// leaves for the staff sign-in. Also used by the consoles' own boot checks.
+async function endStaffSession(reason) {
+    if (piaSessionEnded) return;
+    piaSessionEnded = true;
+
+    stopSessionGuard();
+    if (staffWatch) clearInterval(staffWatch.timer);
+    clearInterval(presenceTimerId);
+    clearTimeout(idleTimeoutId);
+    clearInterval(idleCountdownId);
+    removeAllChannels();
+
+    try {
+        await Promise.race([
+            supabaseClient.auth.signOut({ scope: 'local' }),
+            new Promise((resolve) => setTimeout(resolve, 3000))
+        ]);
+    } catch (e) { /* the storage clear below is what matters */ }
+    clearLocalSession();
+    window.location.replace(staffSignInUrl(reason || 'ended'));
+}
+
+let staffWatch = null;
+
+function startStaffSessionWatch() {
+    if (staffWatch || piaSessionEnded || !window.supabaseClient) return;
+    staffWatch = { timer: null, busy: false };
+
+    const check = async () => {
+        if (piaSessionEnded || staffWatch.busy) return;
+        if (document.hidden || navigator.onLine === false) return;
+        staffWatch.busy = true;
+        try {
+            const { data } = await supabaseClient.auth.getSession();
+            if (!data || !data.session) { endStaffSession('ended'); return; }
+            if ((await isSessionCurrentOnServer()) === false) endStaffSession('revoked');
+        } catch (e) {
+            /* no definite answer */
+        } finally {
+            staffWatch.busy = false;
+        }
+    };
+
+    staffWatch.timer = setInterval(check, SESSION_CHECK_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    window.addEventListener('focus', check);
+    window.addEventListener('online', check);
+
+    supabaseClient.auth.onAuthStateChange((event) => {
+        if (event !== 'SIGNED_OUT' || piaUserSigningOut) return;
+        setTimeout(() => endStaffSession('ended'), 0);   // never call the auth client from its own callback
+    });
+
+    let deviceId = null;
+    try { deviceId = localStorage.getItem('pia_device_id'); } catch (e) { /* storage blocked */ }
+    const key = deviceChannelKey(deviceId);
+    if (key && typeof registerChannel === 'function') {
+        registerChannel('pia-device-' + key, (ch) => ch
+            .on('broadcast', { event: 'recheck' }, () => { check(); })
+            .subscribe());
+    }
+
+    check();
+}
+
+// Sent by the console that revoked a device, so that device checks at once.
+// Best effort: if broadcast is unavailable, the 10-second check still finds
+// out. Carries no data -- a forged nudge can only make a page ask the server.
+function nudgeDevice(deviceId) {
+    const key = deviceChannelKey(deviceId);
+    if (!key || !window.supabaseClient) return;
+
+    const ch = supabaseClient.channel('pia-device-' + key);
+    let done = false;
+    const finish = () => {
+        if (done) return;
+        done = true;
+        try { supabaseClient.removeChannel(ch); } catch (e) { /* ignore */ }
+    };
+
+    ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            Promise.resolve(ch.send({ type: 'broadcast', event: 'recheck', payload: {} })).then(finish, finish);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            finish();
+        }
+    });
+    setTimeout(finish, 5000);
+}
+
 // Local-only cleanup, shared by the notice's button. Keeps the device ID (the
 // device manager knows this PC by it) and the theme choice.
 function clearLocalSession() {

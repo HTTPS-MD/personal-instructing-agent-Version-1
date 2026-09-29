@@ -1155,6 +1155,45 @@
         });
     }
 
+    /* Is the session in storage one the SERVER still accepts? getSession()
+       only reads localStorage, so a login ended elsewhere -- a device revoked
+       from another device, "Sign out everywhere", a deleted account -- still
+       looked signed in here. 'invalid' only on a definite answer; offline is
+       'unknown' and keeps the greeting, as before. */
+    async function sessionVerdict() {
+        try {
+            var user = await sb.auth.getUser();
+            if (user.error) {
+                var status = Number(user.error.status || 0);
+                if (status === 401 || status === 403 || /session.*(missing|not found)|invalid.*(jwt|token)|jwt expired/i
+                    .test(String(user.error.message || user.error.name || ''))) {
+                    return 'invalid';
+                }
+                return 'unknown';
+            }
+            if (!user.data || !user.data.user) { return 'invalid'; }
+        } catch (err) {
+            return 'unknown';
+        }
+
+        /* The auth server knows about deleted sessions; the database also
+           knows about "Sign out everywhere" (sessions_revoked_at). */
+        if (typeof isSessionCurrentOnServer === 'function' && (await isSessionCurrentOnServer()) === false) {
+            return 'invalid';
+        }
+        return 'valid';
+    }
+
+    async function forgetDeadSession() {
+        try {
+            await Promise.race([
+                sb.auth.signOut({ scope: 'local' }),     /* this browser only: the server already ended it */
+                new Promise(function (resolve) { setTimeout(resolve, 3000); })
+            ]);
+        } catch (err) { /* the storage clear below is what matters */ }
+        if (typeof clearLocalSession === 'function') { clearLocalSession(); }
+    }
+
     async function offerResume() {
         var root = document.documentElement;
         var session = null;
@@ -1165,9 +1204,16 @@
             /* Storage unavailable — treat as signed out. */
         }
 
+        if (session && (await sessionVerdict()) === 'invalid') {
+            /* A session the server has already ended: remove this browser's
+               copy instead of greeting it. */
+            await forgetDeadSession();
+            session = null;
+        }
+
         if (!session) {
             /* The pre-paint guess was stale (signed out in another tab, an
-               expired session): hand back the normal page. */
+               expired or ended session): hand back the normal page. */
             root.removeAttribute('data-session');
             return;
         }
@@ -1185,6 +1231,10 @@
             label.textContent = btn.getAttribute('data-resume-label') || 'Continue to dashboard';
             btn.addEventListener('click', function (event) {
                 event.stopImmediatePropagation();
+                /* page-guard.js admits only with this set. Written from the
+                   session just verified, so the dashboard can never bounce
+                   this click back here. */
+                try { localStorage.setItem('pia_user_email', email); } catch (err) { /* private mode */ }
                 if (role === 'admin') { window.location.replace('admin/html/admin-dashboard.html'); }
                 else if (role === 'teacher') { window.location.replace('teacher/html/teacher-dashboard.html'); }
                 else { window.location.replace('student/html/waiting-room.html'); }
@@ -1269,9 +1319,43 @@
            not keep the signed-in guess theme-boot.js made. Otherwise, the
            usual welcome for a visitor who is already signed in. */
         handleDeviceResetLink().then(function (handled) {
-            if (handled) { document.documentElement.removeAttribute('data-session'); }
-            else { offerResume(); }
+            if (handled) { document.documentElement.removeAttribute('data-session'); return; }
+            return offerResume().then(handleEntryIntent);
         });
+    }
+
+    /* ---- 6.2 Arriving with an intent ----
+       index.html?signin=staff opens the staff sign-in (the consoles and
+       page-guard send people here); &reason= says why they are signing in
+       again. The address is tidied first so a reload does not repeat it. */
+    var ENTRY_REASONS = {
+        revoked: 'This device was signed out from another device. Sign in again to continue here.',
+        ended: 'Your session ended. Sign in again to continue.'
+    };
+
+    function handleEntryIntent() {
+        var entry;
+        try { entry = new URL(window.PIA_ENTRY_URL || window.location.href); } catch (err) { return; }
+
+        var target = entry.searchParams.get('signin');
+        var reason = entry.searchParams.get('reason');
+        if (!target && !reason) { return; }
+
+        entry.searchParams.delete('signin');
+        entry.searchParams.delete('reason');
+        history.replaceState(null, '', entry.pathname + (entry.search || '') + entry.hash);
+
+        /* Still signed in with a session the server accepts: the page already
+           offers "Continue to dashboard". */
+        if (document.documentElement.getAttribute('data-session') === 'in') { return; }
+
+        var key = target === 'staff' ? 'staff' : 'signin';
+        var statusId = key === 'staff' ? 'staff-status' : 'signin-status';
+        openAuth(key);
+        if (ENTRY_REASONS[reason]) {
+            /* After the dialog has mounted, so opening it cannot clear it. */
+            setTimeout(function () { setStatus(statusId, ENTRY_REASONS[reason], 'error'); }, 200);
+        }
     }
 
     if (document.readyState === 'loading') {

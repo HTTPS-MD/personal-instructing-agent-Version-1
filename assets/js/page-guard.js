@@ -19,7 +19,12 @@
     function enforceAuthGuard() {
         var email = null;
         try { email = localStorage.getItem('pia_user_email'); } catch (e) { /* storage blocked */ }
-        if (!email) { window.location.replace('../../index.html'); }
+        if (!email) {
+            /* Staff pages open the staff sign-in directly; student pages the
+               ordinary one. */
+            var staff = /\/(admin|teacher)\//.test(window.location.pathname);
+            window.location.replace(staff ? '../../index.html?signin=staff' : '../../index.html');
+        }
     }
 
     enforceAuthGuard();

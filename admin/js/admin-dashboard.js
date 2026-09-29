@@ -3033,6 +3033,8 @@
 
         renderAdminDevices((res.data && res.data.devices) || []);
         announceRevoke(res.data);
+        /* Tell that device to check now rather than within 10 seconds. */
+        nudgeDevice(deviceId);
 
         var currentId = null;
         try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
@@ -3127,6 +3129,7 @@
         closeModal('modal-device-limit');
         renderAdminDevices(updated);
         announceRevoke(revoke.data, 'This browser is now registered.');
+        if (deviceId !== currentId) { nudgeDevice(deviceId); }
 
         var storedId = null;
         try { storedId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
@@ -4998,27 +5001,57 @@
 
         /* --- Phase 1: AUTH. A failure here is a genuine authorization
            problem, so redirecting is correct. --- */
+        /* Three different failures, three different outcomes. The old code
+           treated them all as "unauthorized": it removed pia_user_email but
+           left the dead token in storage, so the homepage greeted a session
+           the server had already ended, and "Continue to dashboard" bounced
+           off page-guard forever.
+             - the session is gone or refused   -> clear THIS browser, staff sign-in
+             - a live session that is not admin -> that person's own console
+             - no answer (offline)              -> say so, keep the session */
         var email;
-        try {
-            setBootText('Verifying administrator access…');
+        setBootText('Verifying administrator access…');
 
-            var sessionRes = await sb.auth.getSession();
-            if (sessionRes.error || !sessionRes.data.session) {
-                throw new Error('Session expired. Please log in again.');
-            }
+        var sessionRes;
+        try { sessionRes = await sb.auth.getSession(); }
+        catch (err) { sessionRes = { error: err, data: { session: null } }; }
 
-            email = sessionRes.data.session.user.email;
+        if (sessionRes.error || !sessionRes.data.session) {
+            setBootText('Your session ended. Taking you to sign in…');
+            endStaffSession('ended');
+            return;
+        }
 
-            var profileRes = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
-            if (profileRes.error || !profileRes.data || profileRes.data.role !== 'admin') {
-                throw new Error('Unauthorized access. Admin privileges required.');
-            }
-        } catch (err) {
-            console.error('Auth check failed:', err);
-            setBootText(err.message || 'Failed to verify admin access.');
-            showGlobalError(err.message || 'Failed to verify admin access.');
-            try { localStorage.removeItem('pia_user_email'); } catch (e) { /* ignore */ }
-            setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
+        email = sessionRes.data.session.user.email;
+
+        var profileRes;
+        try { profileRes = await sb.from('profiles').select('role').eq('email', email).maybeSingle(); }
+        catch (err) { profileRes = { error: { message: (err && err.message) || 'Network error' } }; }
+
+        if (profileRes.error && isNetworkFailure(profileRes.error)) {
+            setBootText('Can’t reach the server. Check the connection, then reload.');
+            showGlobalError('Can’t reach the server. Your session is kept; reload when you are back online.');
+            return;
+        }
+
+        /* A live session can always read its own profile row. None at all
+           means the server no longer accepts this login. */
+        if (profileRes.error || !profileRes.data) {
+            var current = await isSessionCurrentOnServer();
+            console.error('Admin console: access check refused.', profileRes.error || 'no profile row', 'session current:', current);
+            setBootText('Your session ended. Taking you to sign in…');
+            endStaffSession(current === false ? 'revoked' : 'ended');
+            return;
+        }
+
+        var role = String(profileRes.data.role || '').trim().toLowerCase();
+        if (role !== 'admin') {
+            /* Signed in, just not an administrator: their own console, with
+               their session intact. */
+            setBootText('This console is for administrators. Taking you to yours…');
+            window.location.replace(role === 'teacher'
+                ? '../../teacher/html/teacher-dashboard.html'
+                : '../../student/html/waiting-room.html');
             return;
         }
 
@@ -5051,6 +5084,9 @@
         loadMathTask();
 
         setupRealtime();
+        /* Ends this console the moment the server stops accepting its login
+           (function.js 1C-7) -- a revoke from another device lands here. */
+        startStaffSessionWatch();
         await loadAdminDevices();
     }
 

@@ -358,9 +358,17 @@
 
     /* ============================================ 4. ACCESS GUARD ====== */
 
-    function leave(message) {
+    /* `ended`: the server no longer accepts this login. Removing only
+       pia_user_email used to leave the dead token in storage, so the
+       homepage greeted a session that no longer existed. endStaffSession
+       (function.js) clears this browser's copy and opens the staff sign-in. */
+    function leave(message, ended) {
         setBootText(message);
         showBanner(message);
+        if (ended && typeof endStaffSession === 'function') {
+            setTimeout(function () { endStaffSession('ended'); }, 1500);
+            return;
+        }
         try { localStorage.removeItem('pia_user_email'); } catch (err) { /* ignore */ }
         setTimeout(function () { window.location.replace('../../index.html'); }, 3000);
     }
@@ -388,11 +396,11 @@
             var session = await sb.auth.getSession();
             if (session.error) {
                 if (isNetworkError(session.error)) { return 'offline'; }
-                leave('Your session ended. Taking you to sign in…');
+                leave('Your session ended. Taking you to sign in…', true);
                 return 'denied';
             }
             if (!session.data.session) {
-                leave('Your session ended. Taking you to sign in…');
+                leave('Your session ended. Taking you to sign in…', true);
                 return 'denied';
             }
 
@@ -402,7 +410,7 @@
             if (res.error) {
                 if (isNetworkError(res.error)) { return 'offline'; }
                 console.error('Teacher console: access check refused.', res.error);
-                leave("Couldn't confirm your access. Taking you back to sign in…");
+                leave("Couldn't confirm your access. Taking you back to sign in…", true);
                 return 'denied';
             }
             /* A valid session can always read its own profile row, so no row at
@@ -410,7 +418,7 @@
                server (an admin ended it, or "Sign out everywhere") -- not that
                the person is the wrong kind of user. */
             if (!res.data) {
-                leave('Your session ended. Taking you to sign in…');
+                leave('Your session ended. Taking you to sign in…', true);
                 return 'denied';
             }
             if (res.data.role !== 'teacher') {
@@ -437,7 +445,7 @@
         } catch (e) {
             if (isNetworkError(e)) { return 'offline'; }
             console.error('Teacher console: access check failed.', e);
-            leave("Couldn't confirm your access. Taking you back to sign in…");
+            leave("Couldn't confirm your access. Taking you back to sign in…", true);
             return 'denied';
         }
     }
@@ -1070,6 +1078,10 @@
         initModals();
         PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
         initDrawerA11y();
+        /* An ended login (an admin's "Sign out everywhere", a revoked device)
+           closes this console at once instead of leaving it polling a class
+           it can no longer read (function.js 1C-7). */
+        if (typeof startStaffSessionWatch === 'function') { startStaffSessionWatch(); }
         bindControls();
         bindNetwork();
         paintIdentity();
