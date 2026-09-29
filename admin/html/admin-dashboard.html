@@ -941,18 +941,11 @@
                         </div>
                     </div>
 
+                    <!-- The pre-test score is entered later, in Edit participant or
+                         Input scores, once the student has taken the test. -->
                     <div class="form-section">
-                        <p class="form-section-title">Baseline &amp; consent</p>
-                        <div class="form-grid form-grid-2">
-                            <div class="field">
-                                <label class="label" for="rs-pretest">Pre-test score</label>
-                                <input class="input tnum" type="number" step="0.1" min="0" max="100" id="rs-pretest"
-                                    placeholder="0 – 100">
-                                <p class="field-msg" data-msg-for="rs-pretest"></p>
-                            </div>
-                        </div>
-
-                        <label class="check" style="margin-top:4px">
+                        <p class="form-section-title">Consent</p>
+                        <label class="check">
                             <input type="checkbox" id="rs-consent">
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
@@ -961,6 +954,16 @@
                             </span>
                         </label>
                         <p class="field-msg" data-msg-for="rs-consent"></p>
+
+                        <label class="check">
+                            <input type="checkbox" id="rs-assent">
+                            <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                            <span class="check-text">
+                                Student assent received
+                                <small>The student agreed to take part. If you have not met them yet, record it later in
+                                    Edit participant.</small>
+                            </span>
+                        </label>
                     </div>
                 </form>
             </div>
@@ -984,7 +987,7 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="edit-student-title">Edit participant</h2>
-                    <p class="modal-sub">Changing the email also updates the auth user, so the student can still sign in.</p>
+                    <p class="modal-sub">Update placement, the pre-test score and consent. The email stays fixed.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1069,15 +1072,35 @@
                     </div>
 
                     <div class="form-section">
-                        <p class="form-section-title">Baseline</p>
+                        <p class="form-section-title">Baseline &amp; consent</p>
                         <div class="form-grid form-grid-2">
                             <div class="field">
                                 <label class="label" for="es-pretest">Pre-test score</label>
-                                <input class="input tnum" type="number" step="0.1" min="0" max="100" id="es-pretest"
-                                    placeholder="0 – 100">
+                                <input class="input tnum" type="number" step="any" min="0" id="es-pretest"
+                                    inputmode="decimal" placeholder="Not taken yet" aria-describedby="es-pretest-help">
+                                <p class="qb-help" id="es-pretest-help">Leave blank until the student has taken the
+                                    pre-test. Enter the score as your instrument reports it.</p>
                                 <p class="field-msg" data-msg-for="es-pretest"></p>
                             </div>
                         </div>
+
+                        <label class="check" style="margin-top:4px">
+                            <input type="checkbox" id="es-consent">
+                            <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                            <span class="check-text">
+                                Parental consent received
+                                <small id="es-consent-note">Signed consent form from a parent or guardian.</small>
+                            </span>
+                        </label>
+
+                        <label class="check">
+                            <input type="checkbox" id="es-assent">
+                            <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                            <span class="check-text">
+                                Student assent received
+                                <small id="es-assent-note">The student agreed to take part.</small>
+                            </span>
+                        </label>
                     </div>
                 </form>
             </div>
@@ -1318,7 +1341,7 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="scores-title">Input scores</h2>
-                    <p class="modal-sub">Pre-test and post-test values must be between 0 and 100.</p>
+                    <p class="modal-sub">Pre-test: any score of 0 or more. Post-test: 0 to 100.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1842,6 +1865,14 @@
                     <div class="kv">
                         <p class="kv-label">Account status</p>
                         <p class="kv-value" id="drawer-status">—</p>
+                    </div>
+                    <div class="kv">
+                        <p class="kv-label">Parental consent</p>
+                        <p class="kv-value" id="drawer-consent">—</p>
+                    </div>
+                    <div class="kv">
+                        <p class="kv-label">Student assent</p>
+                        <p class="kv-value" id="drawer-assent">—</p>
                     </div>
                 </div>
 

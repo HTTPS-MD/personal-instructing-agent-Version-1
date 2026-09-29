@@ -217,6 +217,61 @@
 
 @media (min-width: 30rem) { .gate-foot { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+/* Who can enter a closed stage: the section overrides, then everyone else
+   who was let in individually. The block keeps one line of height while it
+   loads, so the card does not jump when the data arrives. */
+.gate-access {
+    min-height: 58px;
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--line-soft);
+}
+
+.gate-access-label {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.gate-access-skeleton { width: 60%; height: 14px; margin-top: var(--sp-2); }
+
+.gate-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.gate-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 5px var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.gate-chip-name { min-width: 0; overflow-wrap: anywhere; }
+.gate-chip-count { flex: 0 0 auto; font-weight: 500; opacity: 0.8; white-space: nowrap; }
+
+.gate-access-note {
+    margin-top: var(--sp-2);
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
 /* Notice / policy block */
 .notice {
     display: flex;

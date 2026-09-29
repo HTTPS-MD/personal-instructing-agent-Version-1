@@ -103,14 +103,18 @@
         return msg || fallback;
     }
 
-    /* Pre/post test scores are 0–100. A mistyped 1000 silently corrupts the
-       research data, and the teacher dashboard thresholds on < 70. */
-    function parseScore(raw) {
+    /* A score is blank (not taken yet) or a number that is not negative. The
+       pre-test has no ceiling, because its scoring format can go past 100;
+       the post-test passes max = 100, where a mistyped 1000 would otherwise
+       go straight into the research data. */
+    var POST_TEST_MAX = 100;
+
+    function parseScore(raw, max) {
         if (raw === null || raw === undefined || String(raw).trim() === '') {
             return { ok: true, value: null };
         }
-        var n = parseFloat(raw);
-        if (!Number.isFinite(n) || n < 0 || n > 100) { return { ok: false, value: null }; }
+        var n = Number(String(raw).trim());
+        if (!Number.isFinite(n) || n < 0 || (max != null && n > max)) { return { ok: false, value: null }; }
         return { ok: true, value: n };
     }
 
@@ -184,13 +188,14 @@
 
     /* Stage gate keys map to settings rows: stage_ocean / stage_char / stage_dash.
        These strings are also the p_stage argument of admin_set_stage_open and
-       admin_grant_stage — do not rename them. */
+       admin_grant_stage — do not rename them. `label` is the profiles.current_stage
+       value of a student inside that stage. */
     var GATES = [
-        { key: 'ocean', stage: 'Stage 1', title: 'OCEAN personality test', open: false,
+        { key: 'ocean', stage: 'Stage 1', title: 'OCEAN personality test', open: false, label: 'OCEAN',
           desc: 'Allows students to answer the Big Five Inventory. Responses are scored server-side.' },
-        { key: 'char', stage: 'Stage 2', title: 'Character selection', open: false,
+        { key: 'char', stage: 'Stage 2', title: 'Character selection', open: false, label: 'Character Selection',
           desc: 'Allows the free-choice group to pick their preferred agent persona.' },
-        { key: 'dash', stage: 'Stage 3', title: 'Tutoring dashboard', open: false,
+        { key: 'dash', stage: 'Stage 3', title: 'Tutoring dashboard', open: false, label: 'Tutoring Dashboard',
           desc: 'Allows students to open the problem sets and begin a tutoring session.' }
     ];
 
@@ -213,6 +218,9 @@
         resetEmail: null,    // the student the Reset password dialog is acting on
         activeSection: null,
         deviceDiag: [],      // the last device-registration problems (see deviceProblem)
+        overrides: undefined, // stage_overrides rows; undefined = loading, null = unavailable
+        overridesMissing: false,
+        cohortLoaded: false,
         loading: { roster: false, cohort: false }
     };
 
@@ -892,6 +900,16 @@
     var COHORT_COLUMNS = 'full_name, email, section, group_type, status, current_stage, is_in_game,' +
         ' stage_started_at, active_devices, is_ocean_done, pre_test_score, post_test_score';
 
+    /* Added by migration 0033. Until it runs they do not exist, and naming a
+       missing column fails the whole read -- so the cohort falls back to the
+       columns above rather than taking the overview down with it. */
+    var CONSENT_COLUMNS = ', parental_consent, student_assent';
+
+    function isMissingColumn(error) {
+        return !!error && (error.code === '42703' || error.code === 'PGRST204' ||
+            /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+    }
+
     /* One pass over the cohort powers the KPI tiles, the pipeline, live
        sessions, section health and the section card counts. The study is a
        single Grade 7 cohort, so this is a small bounded read; the cap is a
@@ -903,17 +921,23 @@
         /* The results table answers "who has a stored result"; only an admin
            gets rows back from it. Just the email column: the scores
            themselves are fetched by the drawer and the export. */
+        function readProfiles(columns) {
+            return sb.from('profiles').select(columns).neq('role', 'admin').limit(2000);
+        }
+
         var both = await Promise.all([
-            sb.from('profiles')
-                .select(COHORT_COLUMNS)
-                .neq('role', 'admin')
-                .limit(2000),
+            readProfiles(COHORT_COLUMNS + CONSENT_COLUMNS),
             sb.from('ocean_submissions')
                 .select('email')
                 .limit(5000)
         ]);
         var res = both[0];
         var results = both[1];
+
+        if (res.error && isMissingColumn(res.error)) {
+            console.warn('[PIA] consent columns missing; apply migration 0033. Cohort read without them.');
+            res = await readProfiles(COHORT_COLUMNS);
+        }
 
         state.loading.cohort = false;
 
@@ -926,11 +950,13 @@
         });
 
         state.cohort = res.data || [];
+        state.cohortLoaded = true;
         renderKpis();
         renderPipeline();
         renderLiveSessions();
         renderSectionHealth();
         renderSections();
+        renderGateAccess();
     }
 
     async function loadSections() {
@@ -1040,9 +1066,17 @@
         renderFaculty('');
     }
 
-    /* settings holds one row per stage flag: stage_ocean / stage_char / stage_dash. */
+    /* settings holds one row per stage flag: stage_ocean / stage_char / stage_dash.
+       stage_overrides (0033) lists the sections an admin opened into a closed
+       stage; it is read alongside, and its failure never hides the switches. */
     async function loadSettings() {
-        var res = await sb.from('settings').select('key, value');
+        var both = await Promise.all([
+            sb.from('settings').select('key, value'),
+            sb.from('stage_overrides').select('stage, section, granted_count, granted_by, granted_at')
+                .order('section', { ascending: true })
+        ]);
+        var res = both[0];
+        var overrides = both[1];
         if (res.error) { throw res.error; }
 
         (res.data || []).forEach(function (row) {
@@ -1051,6 +1085,12 @@
             var gate = GATES.filter(function (g) { return g.key === key; })[0];
             if (gate) { gate.open = (row.value === true || row.value === 'true'); }
         });
+
+        state.overridesMissing = !!overrides.error && qbMissingTable(overrides.error);
+        if (overrides.error && !state.overridesMissing) {
+            console.error('[PIA] stage overrides could not be read:', overrides.error);
+        }
+        state.overrides = overrides.error ? null : (overrides.data || []);
 
         renderGates();
         renderGateSummary();
@@ -1215,12 +1255,20 @@
 
     function renderGateSummary() {
         $('#gate-summary').innerHTML = GATES.map(function (gate) {
+            var access = gateAccess(gate);
+            var meta = gate.stage;
+            if (access && access.sections.length) {
+                meta += ' · Override: ' + access.sections.map(function (o) { return o.section; }).join(', ');
+            }
+            if (access && access.others.length) {
+                meta += ' · +' + access.others.length + ' student' + (access.others.length === 1 ? '' : 's');
+            }
             return '' +
                 '<div class="device-row">' +
                 '<span class="dot ' + (gate.open ? 'dot-live' : 'dot-off') + '"></span>' +
                 '<div class="device-text">' +
                 '<p class="device-name">' + esc(gate.title) + '</p>' +
-                '<p class="device-meta">' + esc(gate.stage) + '</p>' +
+                '<p class="device-meta">' + esc(meta) + '</p>' +
                 '</div>' +
                 '<span class="badge ' + (gate.open ? 'badge-accent' : '') + '">' +
                 (gate.open ? 'Open' : 'Closed') + '</span>' +
@@ -1587,6 +1635,10 @@
             state.cohort.filter(function (s) { return s.email === email; })[0] || null;
     }
 
+    function consentLabel(value) {
+        return value === true ? 'Received' : value === false ? 'Not received' : 'Not recorded';
+    }
+
     function openStudentDrawer(email) {
         var s = findStudent(email);
         if (!s) { return; }
@@ -1614,6 +1666,8 @@
         $('#drawer-status').textContent = (drawerOnline ? 'Online' : 'Offline') +
             ' · ' + ((s.status || '') === 'active' ? 'Activated' : 'Not activated') +
             (s.must_change_password === true ? ' · Must change temporary password' : '');
+        $('#drawer-consent').textContent = consentLabel(s.parental_consent);
+        $('#drawer-assent').textContent = consentLabel(s.student_assent);
         $('#drawer-pre').textContent = s.pre_test_score == null ? 'n/a' : s.pre_test_score;
         $('#drawer-post').textContent = s.post_test_score == null ? 'n/a' : s.post_test_score;
 
@@ -2016,14 +2070,13 @@
         var section = $('#rs-section').value;
         var groupType = ($('input[name="rs-condition"]:checked') || {}).value;
         var maxDevices = toInt($('#rs-device').value, 1);
-        var score = parseScore($('#rs-pretest').value);
+        var assent = $('#rs-assent').checked;
 
         var valid = true;
         valid = setFieldError('rs-first', first ? '' : 'First name is required.') && valid;
         valid = setFieldError('rs-last', last ? '' : 'Last name is required.') && valid;
         valid = setFieldError('rs-email', isEmail(email) ? '' : 'Enter a valid school email address.') && valid;
         valid = setFieldError('rs-section', section ? '' : 'Create a section first.') && valid;
-        valid = setFieldError('rs-pretest', score.ok ? '' : 'Pre-test score must be between 0 and 100.') && valid;
         valid = setFieldError('rs-consent', $('#rs-consent').checked ? '' : 'Parental consent must be recorded first.') && valid;
         if (!valid) { return; }
 
@@ -2036,8 +2089,19 @@
                for instance) an auth user is left behind with no profile, and
                every later attempt fails with "user already exists" — that
                student can never be registered again. Checking first avoids the
-               whole situation. */
-            var existing = await sb.from('profiles').select('email').eq('email', email).maybeSingle();
+               whole situation.
+
+               It also names the consent columns, so a database without
+               migration 0033 is caught here too, before anything is created. */
+            var existing = await sb.from('profiles')
+                .select('email' + CONSENT_COLUMNS).eq('email', email).maybeSingle();
+
+            if (existing.error) {
+                toastErr('Registration stopped', isMissingColumn(existing.error)
+                    ? 'The database cannot store consent and assent yet. Apply migration 0033, then try again.'
+                    : friendlyDbError(existing.error, 'Could not check the roster for this email.'));
+                return;
+            }
 
             if (existing.data) {
                 setFieldError('rs-email', 'This email is already on the roster.');
@@ -2060,7 +2124,8 @@
                 email: email,
                 section: section,
                 group_type: groupType,
-                pre_test_score: score.value,
+                parental_consent: true,
+                student_assent: assent,
                 max_devices: maxDevices,
                 status: 'inactive',
                 role: 'student'
@@ -2108,6 +2173,8 @@
         $('#es-email').value = s.email;
         $('#es-pretest').value = s.pre_test_score == null ? '' : s.pre_test_score;
         $('#es-device').value = toInt(s.max_devices, 1);
+        fillConsentBox('es-consent', s.parental_consent, 'Signed consent form from a parent or guardian.');
+        fillConsentBox('es-assent', s.student_assent, 'The student agreed to take part.');
 
         /* A section that was deleted from `sections` must still be selectable,
            otherwise saving would silently move the student. */
@@ -2127,6 +2194,25 @@
         openModal('modal-edit-student');
     }
 
+    /* null = registered before consent was stored (0033), shown as "not
+       recorded". The box can only be ticked or not, so the save sends a
+       value only when the admin changes the box: opening Edit to add a score
+       must not turn "not recorded" into "not received". */
+    function fillConsentBox(id, value, hint) {
+        var box = $('#' + id);
+        box.checked = value === true;
+        box.setAttribute('data-initial', box.checked ? 'true' : 'false');
+        $('#' + id + '-note').textContent = value == null
+            ? 'Not recorded yet. Tick it once you have it on file.'
+            : hint;
+    }
+
+    function consentChange(id) {
+        var box = $('#' + id);
+        var now = box.checked ? 'true' : 'false';
+        return now === box.getAttribute('data-initial') ? undefined : box.checked;
+    }
+
     async function handleUpdateStudent(event) {
         event.preventDefault();
         clearFormErrors('edit-student-form');
@@ -2143,7 +2229,7 @@
         var valid = true;
         valid = setFieldError('es-first', first ? '' : 'First name is required.') && valid;
         valid = setFieldError('es-last', last ? '' : 'Last name is required.') && valid;
-        valid = setFieldError('es-pretest', score.ok ? '' : 'Pre-test score must be between 0 and 100.') && valid;
+        valid = setFieldError('es-pretest', score.ok ? '' : 'Enter a number of 0 or more, or leave it blank.') && valid;
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2164,10 +2250,17 @@
                 group_type: groupType,
                 max_devices: maxDevices
             };
+            var consent = consentChange('es-consent');
+            var assent = consentChange('es-assent');
+            if (consent !== undefined) { payload.parental_consent = consent; }
+            if (assent !== undefined) { payload.student_assent = assent; }
+
             var updateRes = await sb.from('profiles').update(payload).eq('email', originalEmail);
 
             if (updateRes.error) {
-                toastErr('Update failed', friendlyDbError(updateRes.error, 'Could not update the profile.'));
+                toastErr('Update failed', isMissingColumn(updateRes.error)
+                    ? 'The database cannot store consent and assent yet. Apply migration 0033, then try again.'
+                    : friendlyDbError(updateRes.error, 'Could not update the profile.'));
                 return;
             }
 
@@ -2500,6 +2593,9 @@
                 '<span class="switch-track"></span>' +
                 '</label>' +
                 '</div>' +
+                '<div class="gate-access" data-gate-access="' + gate.key + '">' +
+                gateAccessHtml(gate) +
+                '</div>' +
                 '</div>' +
                 '<div class="gate-foot">' +
                 '<button class="btn btn-secondary btn-sm" data-target="' + gate.key + '" data-target-scope="section">Section override</button>' +
@@ -2526,6 +2622,91 @@
         label.className = 'badge ' + (open ? 'badge-accent' : '');
     }
 
+    /* Who can enter a CLOSED stage, from two sources:
+         sections  the section overrides recorded by admin_grant_stage (0033),
+                   each with how many of its students are in the stage now;
+         others    every other student in the stage — a student override, an
+                   admin reset, or a grant made before 0033 was applied.
+       A student inside a closed stage got there by a grant: closing a stage
+       returns everyone in it to the Waiting Room. Returns null while either
+       source is still loading, and for an open stage, where nobody needs one. */
+    function gateAccess(gate) {
+        if (gate.open || state.overrides === undefined || !state.cohortLoaded) { return null; }
+
+        var inStage = state.cohort.filter(function (s) { return s.current_stage === gate.label; });
+        var named = {};
+        var sections = (state.overrides || []).filter(function (o) { return o.stage === gate.key; })
+            .map(function (o) {
+                named[o.section] = true;
+                return {
+                    section: o.section,
+                    inStage: inStage.filter(function (s) { return s.section === o.section; }).length,
+                    granted: o.granted_count,
+                    by: o.granted_by,
+                    at: o.granted_at
+                };
+            });
+        var others = inStage.filter(function (s) { return !named[s.section]; });
+
+        return { sections: sections, others: others };
+    }
+
+    function gateAccessHtml(gate) {
+        var head = '<p class="gate-access-label">Section overrides</p>';
+
+        if (gate.open) {
+            return head + '<p class="gate-access-note">Not needed while the stage is open to every section.</p>';
+        }
+
+        var access = gateAccess(gate);
+        if (!access) {
+            return head + '<span class="skeleton-text gate-access-skeleton" aria-hidden="true"></span>';
+        }
+
+        var html = head;
+
+        if (state.overrides === null) {
+            html += '<p class="gate-access-note">' + (state.overridesMissing
+                ? 'Apply migration 0033 to list section overrides here.'
+                : 'Section overrides could not be loaded. Refresh to try again.') + '</p>';
+        } else if (access.sections.length) {
+            html += '<ul class="gate-chips" aria-label="Sections opened into this stage">' +
+                access.sections.map(function (o) {
+                    var detail = 'Granted to ' + o.granted + ' student' + (o.granted === 1 ? '' : 's') +
+                        ' · ' + formatStamp(o.at) + (o.by ? ' · by ' + o.by : '');
+                    return '<li class="gate-chip" title="' + esc(detail) + '">' +
+                        '<span class="gate-chip-name">' + esc(o.section) + '</span>' +
+                        '<span class="gate-chip-count">' + o.inStage + ' in stage</span>' +
+                        '</li>';
+                }).join('') +
+                '</ul>';
+        } else if (!access.others.length) {
+            html += '<p class="gate-access-note">None. No section or student can enter while it is closed.</p>';
+        }
+
+        if (access.others.length) {
+            var names = access.others.slice(0, 12).map(function (s) {
+                return (s.full_name || s.email) + (s.section ? ' (' + s.section + ')' : '');
+            }).join('\n') + (access.others.length > 12 ? '\n…and ' + (access.others.length - 12) + ' more' : '');
+            html += '<p class="gate-access-note" title="' + esc(names) + '">' +
+                (access.sections.length ? '+ ' : '') +
+                access.others.length + ' student' + (access.others.length === 1 ? '' : 's') +
+                ' with individual access</p>';
+        }
+
+        return html;
+    }
+
+    /* Repaints only the override blocks, so a data refresh never rebuilds a
+       switch the admin may be about to press. */
+    function renderGateAccess() {
+        GATES.forEach(function (gate) {
+            var box = $('[data-gate-access="' + gate.key + '"]');
+            if (box) { box.innerHTML = gateAccessHtml(gate); }
+        });
+        if ($('#gate-summary')) { renderGateSummary(); }
+    }
+
     /* Closing a stage through the settings table alone does not evict the
        students already inside — their own current_stage acts as a targeted
        grant, so they keep re-entering by direct URL. admin_set_stage_open
@@ -2550,7 +2731,17 @@
         }
 
         gate.open = wanted;
-        renderGateSummary();
+        /* Opening or closing for everyone ends the stage's section overrides
+           on the server (0033); show that now rather than after the refresh. */
+        if (Array.isArray(state.overrides)) {
+            state.overrides = state.overrides.filter(function (o) { return o.stage !== key; });
+        }
+        if (!wanted) {
+            state.cohort.forEach(function (s) {
+                if (s.current_stage === gate.label) { s.current_stage = 'Waiting Room'; }
+            });
+        }
+        renderGateAccess();
 
         var evicted = (res.data && res.data.evicted) || 0;
         if (!wanted && evicted > 0) {
@@ -3403,7 +3594,7 @@
 
         $('#scores-save').disabled = false;
         $('#scores-note').textContent = students.length + ' row' + (students.length === 1 ? '' : 's') +
-            ' · values must be 0–100';
+            ' · pre-test 0 or more · post-test 0–' + POST_TEST_MAX;
 
         $('#scores-tbody').innerHTML = students.map(function (s) {
             var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
@@ -3411,11 +3602,11 @@
                 '<tr>' +
                 '<td>' + userCell(s) + '</td>' +
                 '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
-                '<td class="col-right"><input class="input score-input" type="number" step="0.1" min="0" max="100"' +
-                ' data-score="pre" data-email="' + esc(s.email) + '"' +
+                '<td class="col-right"><input class="input score-input" type="number" step="any" min="0"' +
+                ' inputmode="decimal" data-score="pre" data-email="' + esc(s.email) + '"' +
                 ' value="' + esc(s.pre_test_score == null ? '' : s.pre_test_score) + '"></td>' +
-                '<td class="col-right"><input class="input score-input" type="number" step="0.1" min="0" max="100"' +
-                ' data-score="post" data-email="' + esc(s.email) + '"' +
+                '<td class="col-right"><input class="input score-input" type="number" step="any" min="0"' +
+                ' max="' + POST_TEST_MAX + '" inputmode="decimal" data-score="post" data-email="' + esc(s.email) + '"' +
                 ' value="' + esc(s.post_test_score == null ? '' : s.post_test_score) + '"></td>' +
                 '</tr>';
         }).join('');
@@ -3437,13 +3628,15 @@
 
             var email = preInput.getAttribute('data-email');
             var pre = parseScore(preInput.value);
-            var post = parseScore(postInput.value);
+            var post = parseScore(postInput.value, POST_TEST_MAX);
 
             preInput.classList.toggle('is-invalid', !pre.ok);
             postInput.classList.toggle('is-invalid', !post.ok);
 
             if (!pre.ok || !post.ok) {
-                toastErr('Score out of range', 'The score for ' + email + ' must be between 0 and 100.');
+                toastErr('Score out of range', 'For ' + email + ': ' + (!pre.ok
+                    ? 'the pre-test score must be a number of 0 or more.'
+                    : 'the post-test score must be between 0 and ' + POST_TEST_MAX + '.'));
                 return;
             }
 
@@ -3680,7 +3873,8 @@
         });
 
         var base = ['full_name', 'email', 'section', 'group_type', 'status',
-            'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'is_ocean_done'];
+            'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'is_ocean_done',
+            'parental_consent', 'student_assent'];
         var scores = ['ocean_e', 'ocean_a', 'ocean_c', 'ocean_n', 'ocean_o'];
         var items = [];
         for (var i = 1; i <= 50; i++) { items.push('item_' + (i < 10 ? '0' : '') + i); }
