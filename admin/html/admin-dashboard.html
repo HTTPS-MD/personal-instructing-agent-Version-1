@@ -191,6 +191,12 @@
                         <span class="sidebar-user-role" id="admin-email">—</span>
                     </span>
                 </button>
+
+                <!-- The last thing in the rail, where a way out belongs. -->
+                <button class="nav-item nav-item-signout" data-modal-open="modal-signout">
+                    <span class="rail-slot"><svg class="icon"><use href="#i-logout"></use></svg></span>
+                    <span class="nav-label rail-reveal">Sign out</span>
+                </button>
             </div>
         </aside>
 
@@ -208,21 +214,6 @@
                         <svg class="icon icon-sm crumbs-trail"><use href="#i-chev-right"></use></svg>
                         <strong id="crumb-current">Overview</strong>
                     </nav>
-                </div>
-
-                <div class="topbar-right">
-                    <span class="env-pill" id="live-pill">
-                        <span class="dot dot-off" id="live-dot"></span>
-                        <span id="live-label">Connecting…</span>
-                    </span>
-                    <button class="btn-icon is-bordered" id="refresh-btn" title="Refresh all data">
-                        <svg class="icon"><use href="#i-refresh"></use></svg>
-                        <span class="sr-only">Refresh</span>
-                    </button>
-                    <button class="btn btn-signout" data-modal-open="modal-signout">
-                        <svg class="icon"><use href="#i-logout"></use></svg>
-                        Sign out
-                    </button>
                 </div>
             </header>
 
@@ -1262,10 +1253,6 @@
                     <svg class="icon"><use href="#i-x"></use></svg>
                 </button>
                 <div class="modal-head-actions">
-                    <button class="btn btn-secondary" id="section-broadcast-btn">
-                        <svg class="icon"><use href="#i-send"></use></svg>
-                        Email roster
-                    </button>
                     <button class="btn btn-primary" id="section-scores-btn">
                         <svg class="icon"><use href="#i-file"></use></svg>
                         Input scores
@@ -1312,24 +1299,21 @@
             </header>
 
             <div class="modal-body modal-body-flush">
-                <!-- Usually the whole section took the same test: set its highest
-                     possible score once, then type only the raw scores. -->
+                <!-- One highest possible score per test, for the whole section:
+                     it is the denominator for every student below, who each get
+                     a single raw score to type. -->
                 <div class="scores-toolbar" id="scores-toolbar">
-                    <div class="scores-toolbar-field">
+                    <div class="field">
                         <label class="label" for="scores-max-pre">Pre-test · highest possible</label>
-                        <div class="scores-toolbar-row">
-                            <input class="input score-input tnum" type="number" step="any" min="0" inputmode="decimal"
-                                id="scores-max-pre" placeholder="e.g. 50">
-                            <button class="btn btn-secondary btn-sm" type="button" data-scores-apply="pre">Apply to all</button>
-                        </div>
+                        <input class="input score-input tnum" type="number" step="any" min="0" inputmode="decimal"
+                            id="scores-max-pre" placeholder="e.g. 50">
+                        <p class="field-msg" data-msg-for="scores-max-pre"></p>
                     </div>
-                    <div class="scores-toolbar-field">
+                    <div class="field">
                         <label class="label" for="scores-max-post">Post-test · highest possible</label>
-                        <div class="scores-toolbar-row">
-                            <input class="input score-input tnum" type="number" step="any" min="0" inputmode="decimal"
-                                id="scores-max-post" placeholder="e.g. 50">
-                            <button class="btn btn-secondary btn-sm" type="button" data-scores-apply="post">Apply to all</button>
-                        </div>
+                        <input class="input score-input tnum" type="number" step="any" min="0" inputmode="decimal"
+                            id="scores-max-post" placeholder="e.g. 50">
+                        <p class="field-msg" data-msg-for="scores-max-post"></p>
                     </div>
                 </div>
 
@@ -1338,9 +1322,8 @@
                         <thead>
                             <tr>
                                 <th>Student</th>
-                                <th>Condition</th>
-                                <th class="col-score">Pre-test <span class="th-sub">raw / highest</span></th>
-                                <th class="col-score">Post-test <span class="th-sub">raw / highest</span></th>
+                                <th class="col-score">Pre-test <span class="th-sub">raw score</span></th>
+                                <th class="col-score">Post-test <span class="th-sub">raw score</span></th>
                             </tr>
                         </thead>
                         <tbody id="scores-tbody"></tbody>

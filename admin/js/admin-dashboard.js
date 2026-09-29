@@ -353,7 +353,7 @@
     }
 
     function initRouter() {
-        $$('.nav-item, .sidebar-user').forEach(function (item) {
+        $$('.nav-item[data-view], .sidebar-user').forEach(function (item) {
             item.addEventListener('click', function () {
                 switchView(item.getAttribute('data-view'));
             });
@@ -813,7 +813,7 @@
             cohort: [['#pipeline-strip', 'block'], ['#live-tbody', 'rows', 4],
                      ['#section-health', 'block'], ['#sections-grid', 'block']],
             sections: [['#sections-grid', 'block'], ['#section-health', 'block']],
-            roster: [['#student-tbody', 'rows', 7]],
+            roster: [['#student-tbody', 'rows', 5]],
             faculty: [['#faculty-tbody', 'rows', 4]],
             settings: [['#gates-grid', 'block'], ['#gate-summary', 'block']],
             admins: [['#admin-tbody', 'rows', 4]],
@@ -1004,7 +1004,7 @@
         fill('#section-health', times(4, skeletonHealth));
         fill('#sections-grid', times(3, skeletonSectionCard));
         fill('#gates-grid', GATES.map(skeletonGate).join(''));
-        fill('#student-tbody', skeletonRows(7, 6));
+        fill('#student-tbody', skeletonRows(5, 6));
         fill('#faculty-tbody', skeletonRows(4, 4));
         fill('#admin-tbody', skeletonRows(4, 2));
         fill('#audit-tbody', skeletonRows(4, 4));
@@ -1124,7 +1124,7 @@
     async function loadRoster() {
         var tbody = $('#student-tbody');
         if (!state.rosterPage.length) {
-            tbody.innerHTML = skeletonRows(7, 6);
+            tbody.innerHTML = skeletonRows(5, 6);
         }
         state.loading.roster = true;
         $('#pager-info').textContent = 'Loading…';
@@ -1161,7 +1161,7 @@
         if (res.error) {
             /* Placeholders (or stale rows) become a message with a retry: an
                empty table would read as "no students". */
-            tbody.innerHTML = '<tr><td colspan="7"><div class="state-block region-error">' +
+            tbody.innerHTML = '<tr><td colspan="5"><div class="state-block region-error">' +
                 '<span class="state-glyph">' + icon('alert', 'icon-lg') + '</span>' +
                 '<p class="state-title">Couldn’t load the roster</p>' +
                 '<p class="state-desc">' + esc(friendlyDbError(res.error, 'Unknown database error.')) + '</p>' +
@@ -1565,28 +1565,23 @@
 
     var ROSTER_HEADS = {
         default:
-            '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Stage</th>' +
-            '<th>Pre-test</th><th>Devices</th><th class="col-right col-w-actions">Actions</th></tr>',
+            '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Stage</th><th>Status</th></tr>',
         'Active Game':
             '<tr><th>Student</th><th>Problem</th><th>Difficulty</th><th>Hints</th>' +
-            '<th>Streak</th><th>Duration</th><th class="col-right col-w-actions">Actions</th></tr>',
+            '<th>Streak</th><th>Duration</th></tr>',
         stage:
-            '<tr><th>Student</th><th>Section</th><th>Activity</th><th>Duration</th>' +
-            '<th class="col-right col-w-actions">Actions</th></tr>'
+            '<tr><th>Student</th><th>Section</th><th>Activity</th><th>Duration</th></tr>'
     };
 
-    /* Edit only. Deleting a participant destroys collected responses, so it
-       lives one deliberate step away — inside the profile drawer, where the
-       admin has the student's name, section and progress in front of them.
-       A trash icon sitting inches from a row you click to open that drawer is
-       an accident waiting to happen, and it duplicated an action that was
-       already there. */
-    function rosterActions(email) {
-        return '' +
-            '<td class="col-right"><span class="row-actions">' +
-            '<button class="btn-icon" title="Edit participant" data-row-act="edit" data-email="' + esc(email) + '">' +
-            icon('pencil', 'icon-sm') + '</button>' +
-            '</span></td>';
+    /* A row has no buttons: it opens the participant panel, whose Actions
+       list holds Edit details, Delete and the rest. Deleting destroys
+       collected responses, so it stays one deliberate step away in there.
+       With no buttons left the row takes focus itself (see initRoster). */
+    function rosterRow(s, cells) {
+        var started = s.stage_started_at || '';
+        return '<tr class="is-clickable" tabindex="0" data-student="' + esc(s.email) + '"' +
+            ' data-started-at="' + esc(started) + '" aria-label="Open profile: ' + esc(s.full_name || s.email) + '">' +
+            '<td>' + userCell(s) + '</td>' + cells + '</tr>';
     }
 
     function renderRoster() {
@@ -1601,20 +1596,15 @@
         empty.classList.toggle('is-hidden', state.rosterPage.length !== 0);
 
         tbody.innerHTML = state.rosterPage.map(function (s) {
-            var email = s.email;
             var started = s.stage_started_at || '';
 
             if (drill === 'Active Game') {
-                return '' +
-                    '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
-                    '<td>' + userCell(s) + '</td>' +
+                return rosterRow(s,
                     '<td class="tnum muted">Question ' + toInt(s.current_problem, 1) + '</td>' +
                     '<td><span class="badge badge">' + esc(s.current_difficulty || 'Normal') + '</span></td>' +
                     '<td class="tnum muted">' + toInt(s.hints_used, 0) + '</td>' +
                     '<td class="tnum muted">' + toInt(s.consecutive_correct, 0) + '</td>' +
-                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>' +
-                    rosterActions(email) +
-                    '</tr>';
+                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>');
             }
 
             if (drill) {
@@ -1623,31 +1613,24 @@
                 if (drill === 'Character Selection') { activity = 'Browsing personas'; }
                 if (drill === 'Tutoring Dashboard') { activity = 'Browsing dashboard'; }
 
-                return '' +
-                    '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
-                    '<td>' + userCell(s) + '</td>' +
+                return rosterRow(s,
                     '<td class="muted">' + esc(s.section || '—') + '</td>' +
                     '<td><span class="badge badge-accent">' + esc(activity) + '</span></td>' +
-                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>' +
-                    rosterActions(email) +
-                    '</tr>';
+                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>');
             }
 
             var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
-            var used = (s.active_devices || []).length;
-            var limit = toInt(s.max_devices, 1);
-            var deviceTone = used >= limit && used > 0 ? 'badge-warn' : '';
+            /* Who has activated their account: the one roster fact an admin
+               acts on (send the activation email). */
+            var active = (s.status || '') === 'active';
 
-            return '' +
-                '<tr class="is-clickable" data-student="' + esc(email) + '" data-started-at="' + esc(started) + '">' +
-                '<td>' + userCell(s) + '</td>' +
+            return rosterRow(s,
                 '<td class="muted">' + esc(s.section || '—') + '</td>' +
                 '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
                 '<td>' + stageBadge(stageOf(s)) + '</td>' +
-                '<td class="tnum muted">' + esc(s.pre_test_score == null ? '—' : s.pre_test_score) + '</td>' +
-                '<td><span class="badge ' + deviceTone + ' tnum">' + used + ' / ' + limit + '</span></td>' +
-                rosterActions(email) +
-                '</tr>';
+                '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
+                '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
+                (active ? 'Active' : 'Awaiting activation') + '</span></td>');
         }).join('');
 
         var pages = Math.max(1, Math.ceil(state.totalStudents / PAGE_SIZE));
@@ -1740,19 +1723,18 @@
             if (state.page < pages) { state.page++; loadRoster(); }
         });
 
-        /* One delegated listener covers every row and every row action. */
+        /* One delegated listener covers every row. */
         $('#student-tbody').addEventListener('click', function (event) {
-            var actionBtn = event.target.closest('[data-row-act]');
-            if (actionBtn) {
-                event.stopPropagation();
-                if (actionBtn.getAttribute('data-row-act') === 'edit') {
-                    openEditStudent(actionBtn.getAttribute('data-email'));
-                }
-                return;
-            }
-
             var row = event.target.closest('[data-student]');
             if (row) { openStudentDrawer(row.getAttribute('data-student')); }
+        });
+
+        $('#student-tbody').addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') { return; }
+            var row = event.target.closest('[data-student]');
+            if (!row || event.target !== row) { return; }
+            event.preventDefault();
+            openStudentDrawer(row.getAttribute('data-student'));
         });
     }
 
@@ -3843,6 +3825,9 @@
         return best === null ? '' : best;
     }
 
+    /* One raw-score field per test. The highest possible score is the
+       section's (the field above the table), so it is only shown here, as the
+       denominator, with the resulting transmuted score beside it. */
     function scorePairCell(s, test) {
         var raw = s[test + '_test_raw_score'];
         var max = s[test + '_test_max_score'];
@@ -3850,28 +3835,33 @@
         var who = s.full_name || s.email;
         var label = test === 'pre' ? 'Pre-test' : 'Post-test';
         return '' +
-            '<td class="col-score">' +
+            '<td class="col-score" data-label="' + label + '">' +
             '<div class="score-pair" data-test="' + test + '" data-legacy="' + esc(legacy) + '"' +
             ' data-initial-raw="' + esc(raw == null ? '' : raw) + '" data-initial-max="' + esc(max == null ? '' : max) + '">' +
             '<input class="input score-input" type="number" step="any" min="0" inputmode="decimal" data-part="raw"' +
             ' aria-label="' + esc(label + ' raw score, ' + who) + '" value="' + esc(raw == null ? '' : raw) + '">' +
-            '<span class="score-of" aria-hidden="true">/</span>' +
-            '<input class="input score-input" type="number" step="any" min="0" inputmode="decimal" data-part="max"' +
-            ' aria-label="' + esc(label + ' highest possible score, ' + who) + '" value="' + esc(max == null ? '' : max) + '">' +
+            '<span class="score-of tnum" aria-hidden="true">/ <span data-max-out>—</span></span>' +
             '<output class="score-out tnum"></output>' +
             '</div>' +
             '</td>';
     }
 
-    /* The live transmuted score under one pair of fields. */
+    /* The section's highest possible score for one test, as typed. */
+    function sectionMax(test) {
+        return $('#scores-max-' + test).value;
+    }
+
+    /* The transmuted score beside one raw field, from the section's maximum. */
     function paintScorePair(pair) {
+        var test = pair.getAttribute('data-test');
         var out = pair.querySelector('.score-out');
-        var read = readScorePair(pair.querySelector('[data-part="raw"]').value,
-            pair.querySelector('[data-part="max"]').value, true);
+        var maxText = sectionMax(test).trim();
+        var read = readScorePair(pair.querySelector('[data-part="raw"]').value, maxText, true);
         var legacy = pair.getAttribute('data-legacy');
 
+        pair.querySelector('[data-max-out]').textContent = maxText || '—';
         pair.classList.toggle('is-invalid', !read.ok);
-        $$('.score-input', pair).forEach(function (input) { input.classList.toggle('is-invalid', !read.ok); });
+        pair.querySelector('[data-part="raw"]').classList.toggle('is-invalid', !read.ok);
         out.classList.remove('is-legacy');
         out.removeAttribute('title');
         if (!read.ok) {
@@ -3890,7 +3880,7 @@
     async function openScoresModal(sectionName) {
         state.activeSection = sectionName;
         $('#scores-title').textContent = 'Input scores — ' + sectionName;
-        $('#scores-tbody').innerHTML = skeletonRows(4, 5);
+        $('#scores-tbody').innerHTML = skeletonRows(3, 5);
         $('#scores-max-pre').value = '';
         $('#scores-max-post').value = '';
         $('#scores-save').disabled = true;
@@ -3903,7 +3893,7 @@
 
         if (res.error) {
             var missing = isMissingColumn(res.error);
-            $('#scores-tbody').innerHTML = '<tr><td colspan="4">' +
+            $('#scores-tbody').innerHTML = '<tr><td colspan="3">' +
                 '<div class="state-block" style="min-height:200px">' +
                 '<p class="state-title">' + (missing ? 'Raw scores are not set up yet' : 'Could not load scores') + '</p>' +
                 '<p class="state-desc">' + esc(missing
@@ -3918,7 +3908,7 @@
         });
 
         if (!students.length) {
-            $('#scores-tbody').innerHTML = '<tr><td colspan="4">' +
+            $('#scores-tbody').innerHTML = '<tr><td colspan="3">' +
                 '<div class="state-block" style="min-height:200px">' +
                 '<p class="state-title">No students in this section</p>' +
                 '</div></td></tr>';
@@ -3926,16 +3916,15 @@
         }
 
         $('#scores-save').disabled = false;
-        $('#scores-note').textContent = students.length + ' student' + (students.length === 1 ? '' : 's');
+        $('#scores-note').textContent = 'Applies to all ' + students.length + ' student' + (students.length === 1 ? '' : 's');
+        clearFormErrors('scores-toolbar');
         $('#scores-max-pre').value = commonValue(students.map(function (s) { return s.pre_test_max_score; }));
         $('#scores-max-post').value = commonValue(students.map(function (s) { return s.post_test_max_score; }));
 
         $('#scores-tbody').innerHTML = students.map(function (s) {
-            var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
             return '' +
                 '<tr data-email="' + esc(s.email) + '" data-name="' + esc(s.full_name || s.email) + '">' +
                 '<td>' + userCell(s) + '</td>' +
-                '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
                 scorePairCell(s, 'pre') +
                 scorePairCell(s, 'post') +
                 '</tr>';
@@ -3944,22 +3933,10 @@
         $$('#scores-tbody .score-pair').forEach(paintScorePair);
     }
 
-    /* Fills every row's "highest possible" for one test. Explicit, and
-       visible before anything is saved: a student who sat a different
-       version can still be corrected in their own row. A row left without a
-       raw score still has no score. */
-    function applyScoreMax(test) {
-        var value = $('#scores-max-' + test).value.trim();
-        var check = readScorePair('0', value);
-        if (!value || !check.ok) {
-            toastErr('Enter the highest possible score', 'Type a number above 0 for the ' + TEST_LABELS[test] + ' first.');
-            $('#scores-max-' + test).focus();
-            return;
-        }
-        $$('#scores-tbody .score-pair[data-test="' + test + '"]').forEach(function (pair) {
-            pair.querySelector('[data-part="max"]').value = value;
-            paintScorePair(pair);
-        });
+    /* A new section maximum re-scores every row beneath it. */
+    function repaintScores(test) {
+        setFieldError('scores-max-' + test, '');
+        $$('#scores-tbody .score-pair[data-test="' + test + '"]').forEach(paintScorePair);
     }
 
     /* UPDATE per row, never upsert. An upsert INSERTS when nothing matches: if
@@ -3983,19 +3960,27 @@
             for (var j = 0; j < pairs.length; j++) {
                 var pair = pairs[j];
                 var test = pair.getAttribute('data-test');
-                var read = readScorePair(pair.querySelector('[data-part="raw"]').value,
-                    pair.querySelector('[data-part="max"]').value, true);
+                var read = readScorePair(pair.querySelector('[data-part="raw"]').value, sectionMax(test), true);
 
                 paintScorePair(pair);
                 if (!read.ok) {
-                    pair.querySelector('[data-part="raw"]').focus();
-                    toastErr('Check the ' + TEST_LABELS[test],
-                        rows[i].getAttribute('data-name') + ': ' + read.error);
+                    /* No highest possible score is a problem with the section's
+                       field, not with the row that happened to reach it first. */
+                    var rawText = pair.querySelector('[data-part="raw"]').value.trim();
+                    if (rawText && !sectionMax(test).trim()) {
+                        setFieldError('scores-max-' + test, 'Enter the highest possible score.');
+                        $('#scores-max-' + test).focus();
+                        toastErr('Check the ' + TEST_LABELS[test], 'Enter the highest possible score above the table.');
+                    } else {
+                        pair.querySelector('[data-part="raw"]').focus();
+                        toastErr('Check the ' + TEST_LABELS[test],
+                            rows[i].getAttribute('data-name') + ': ' + read.error);
+                    }
                     return;
                 }
 
-                /* Unchanged, or still blank (a blank raw score ignores the max
-                   that "Apply to all" put beside it). */
+                /* Unchanged, or still blank (a blank raw score means no score,
+                   whatever the section's maximum says). */
                 if (sameNumber(read.raw, pair.getAttribute('data-initial-raw')) &&
                     sameNumber(read.max, read.raw == null ? '' : pair.getAttribute('data-initial-max'))) { continue; }
 
@@ -4035,69 +4020,6 @@
         toastOk('Scores saved', updates.length + ' student' + (updates.length === 1 ? '' : 's') +
             ' updated for ' + state.activeSection + '.');
         refreshAll();
-    }
-
-    /* ---- Section broadcast ---- */
-
-    async function broadcastSection(sectionName, sourceBtn) {
-        var res = await sb.from('profiles')
-            .select('email')
-            .eq('section', sectionName)
-            .eq('status', 'inactive');
-
-        if (res.error) {
-            toastErr('Broadcast failed', friendlyDbError(res.error, 'Could not read the section roster.'));
-            return;
-        }
-
-        var recipients = res.data || [];
-
-        if (!recipients.length) {
-            toastOk('Nothing to send', 'Every student in ' + sectionName + ' has already activated.');
-            return;
-        }
-
-        var ok = await confirmAction({
-            title: 'Email section roster',
-            heading: 'Send ' + recipients.length + ' activation email' + (recipients.length === 1 ? '' : 's') + '?',
-            message: 'One email per inactive student in ' + sectionName +
-                '. Sending is paced at roughly one per 1.5 seconds to stay inside the provider rate limit.',
-            confirmLabel: 'Send emails',
-            tone: 'accent'
-        });
-        if (!ok) { return; }
-
-        var release = setBusy(sourceBtn, 'Sending…');
-        var redirect = activationRedirect();
-        var sent = 0;
-        var failures = [];
-
-        for (var i = 0; i < recipients.length; i++) {
-            var mail = await sb.auth.signInWithOtp({
-                email: recipients[i].email,
-                options: { shouldCreateUser: false, emailRedirectTo: redirect }
-            });
-
-            if (mail.error) { failures.push(recipients[i].email + ' — ' + mail.error.message); }
-            else { sent++; }
-
-            /* Rate-limit pacing, ported from the original broadcast loop. */
-            await new Promise(function (resolve) { setTimeout(resolve, 1500); });
-        }
-
-        release();
-
-        if (!failures.length) {
-            toastOk('Broadcast complete', sent + ' activation email' + (sent === 1 ? '' : 's') +
-                ' sent to ' + sectionName + '.');
-            return;
-        }
-
-        showNotice('Broadcast finished with errors',
-            'Sent: ' + sent + '\nFailed: ' + failures.length + '\n\n' +
-            failures.slice(0, 8).join('\n') +
-            (failures.length > 8 ? '\n…and ' + (failures.length - 8) + ' more.' : ''),
-            'danger');
     }
 
     /* ============================================== 13. REALTIME ======== */
@@ -4174,7 +4096,7 @@
                         else { console.warn('[PIA device] realtime update had no active_devices; list left as is'); }
                     }
                 })
-                .subscribe(function (status) { paintConnection(status); });
+                .subscribe();
         });
 
         /* Students listen to `settings`; the admin never did, so the three
@@ -4187,23 +4109,6 @@
                 })
                 .subscribe();
         });
-    }
-
-    function paintConnection(status) {
-        var dot = $('#live-dot');
-        var label = $('#live-label');
-        if (!dot || !label) { return; }
-
-        if (status === 'SUBSCRIBED') {
-            dot.className = 'dot dot-live';
-            label.textContent = 'Live';
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            dot.className = 'dot dot-warn';
-            label.textContent = 'Reconnecting…';
-        } else if (status === 'CLOSED') {
-            dot.className = 'dot dot-off';
-            label.textContent = 'Offline';
-        }
     }
 
     /* ================================================ 14. CSV EXPORT ==== */
@@ -5554,8 +5459,8 @@
             var pair = event.target.closest('.score-pair');
             if (pair) { paintScorePair(pair); }
         });
-        $$('[data-scores-apply]').forEach(function (btn) {
-            btn.addEventListener('click', function () { applyScoreMax(btn.getAttribute('data-scores-apply')); });
+        ['pre', 'post'].forEach(function (test) {
+            $('#scores-max-' + test).addEventListener('input', function () { repaintScores(test); });
         });
         $('#revoke-all-btn').addEventListener('click', revokeAllStudentSessions);
         $('#signout-confirm').addEventListener('click', signOut);
@@ -5567,25 +5472,8 @@
             setTimeout(function () { openScoresModal(section); }, 200);
         });
 
-        $('#section-broadcast-btn').addEventListener('click', function () {
-            broadcastSection(state.activeSection, this);
-        });
-
         $('#export-overview').addEventListener('click', exportCohortCsv);
         $('#export-roster').addEventListener('click', exportCohortCsv);
-
-        $('#refresh-btn').addEventListener('click', async function () {
-            /* The icon keeps its place and turns; the button is inert until
-               everything has landed. */
-            var btn = this;
-            if (btn.classList.contains('is-busy')) { return; }
-            btn.classList.add('is-busy');
-            btn.setAttribute('aria-disabled', 'true');
-            await Promise.all([refreshAll(), loadMathTask()]);
-            btn.classList.remove('is-busy');
-            btn.removeAttribute('aria-disabled');
-            toastOk('Refreshed', 'Every panel is showing current data.');
-        });
     }
 
     async function boot() {
