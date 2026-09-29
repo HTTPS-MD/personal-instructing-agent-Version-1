@@ -282,7 +282,10 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-main">
+                        <!-- The two columns share one row height and the last card in
+                             each fills it (.overview-split), so neither leaves a hole
+                             beneath it. -->
+                        <div class="grid grid-main overview-split">
                             <div class="stack">
                                 <div class="card" data-region="cohort">
                                     <div class="card-head">
@@ -332,15 +335,21 @@
                                     </div>
                                     <div class="card-body stack" id="gate-summary"></div>
                                 </div>
+                            </div>
+                        </div>
 
-                                <div class="card" data-region="cohort sections">
-                                    <div class="card-head">
-                                        <div class="card-head-text">
-                                            <h2 class="card-title">OCEAN by section</h2>
-                                        </div>
-                                    </div>
-                                    <div class="card-body stack" id="section-health"></div>
+                        <!-- One tile per section in a grid that fills the width, so a new
+                             section adds a column (then a row) instead of lengthening
+                             the page. Past three rows it scrolls inside the card. -->
+                        <div class="card" data-region="cohort sections">
+                            <div class="card-head">
+                                <div class="card-head-text">
+                                    <h2 class="card-title">OCEAN by section</h2>
                                 </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="health-grid" id="section-health" role="region"
+                                    aria-label="OCEAN completion by section" tabindex="0"></div>
                             </div>
                         </div>
                     </div>
@@ -512,7 +521,6 @@
                                         <th>Department</th>
                                         <th>Section</th>
                                         <th>Status</th>
-                                        <th class="col-right col-w-actions">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="faculty-tbody"></tbody>

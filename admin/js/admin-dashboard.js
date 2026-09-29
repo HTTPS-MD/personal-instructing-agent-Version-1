@@ -267,6 +267,7 @@
         overrides: undefined, // stage_overrides rows; undefined = loading, null = unavailable
         overridesMissing: false,
         cohortLoaded: false,
+        sectionsLoaded: false,
         loading: { roster: false, cohort: false }
     };
 
@@ -810,7 +811,7 @@
                      ['#section-health', 'block'], ['#sections-grid', 'block']],
             sections: [['#sections-grid', 'block'], ['#section-health', 'block']],
             roster: [['#student-tbody', 'rows', 7]],
-            faculty: [['#faculty-tbody', 'rows', 5]],
+            faculty: [['#faculty-tbody', 'rows', 4]],
             settings: [['#gates-grid', 'block'], ['#gate-summary', 'block']],
             admins: [['#admin-tbody', 'rows', 4]],
             audit: [['#audit-tbody', 'rows', 4]],
@@ -936,9 +937,10 @@
     }
 
     function skeletonHealth() {
-        return '<div aria-hidden="true"><div class="trait-top">' +
-            '<span class="trait-name">' + sk('Section name') + '</span>' +
-            '<span class="trait-val tnum">' + sk('00%') + '</span></div><div class="bar"></div></div>';
+        return '<div class="health-tile" aria-hidden="true"><div class="health-top">' +
+            '<span class="health-name">' + sk('Section name') + '</span>' +
+            '<span class="health-val tnum">' + sk('00%') + '</span></div><div class="bar"></div>' +
+            '<p class="health-meta">' + sk('00 of 00 done') + '</p></div>';
     }
 
     function skeletonSectionCard() {
@@ -998,11 +1000,11 @@
             .map(function (key) { return skeletonStep(STAGE_META[key].label); }).join(''));
         fill('#live-tbody', skeletonRows(4, 3));
         fill('#gate-summary', GATES.map(skeletonGateRow).join(''));
-        fill('#section-health', times(3, skeletonHealth));
+        fill('#section-health', times(4, skeletonHealth));
         fill('#sections-grid', times(3, skeletonSectionCard));
         fill('#gates-grid', GATES.map(skeletonGate).join(''));
         fill('#student-tbody', skeletonRows(7, 6));
-        fill('#faculty-tbody', skeletonRows(5, 4));
+        fill('#faculty-tbody', skeletonRows(4, 4));
         fill('#admin-tbody', skeletonRows(4, 2));
         fill('#audit-tbody', skeletonRows(4, 4));
         fill('#admin-device-list', skeletonDevice());
@@ -1108,6 +1110,7 @@
         if (res.error) { throw res.error; }
 
         state.sections = res.data || [];
+        state.sectionsLoaded = true;
         fillSectionSelects();
         renderSections();
         renderSectionHealth();
@@ -1417,10 +1420,15 @@
         }).join('');
     }
 
+    /* One tile per section. Sections and the cohort load separately; until
+       both are in, every section would read "0%", which means "not loaded
+       yet" rather than "no progress", so the placeholders stay. */
     function renderSectionHealth() {
         var container = $('#section-health');
+        if (!state.sectionsLoaded || !state.cohortLoaded) { return; }
+
         if (!state.sections.length) {
-            container.innerHTML = '<p class="state-desc">No sections yet</p>';
+            container.innerHTML = '<p class="state-desc health-empty">No sections yet</p>';
             return;
         }
 
@@ -1429,12 +1437,14 @@
             var done = members.filter(hasCurrentResult).length;
             var share = pct(done, members.length);
             return '' +
-                '<div>' +
-                '<div class="trait-top">' +
-                '<span class="trait-name">' + esc(section.name) + '</span>' +
-                '<span class="trait-val tnum">' + share + '%</span>' +
+                '<div class="health-tile">' +
+                '<div class="health-top">' +
+                '<span class="health-name" title="' + esc(section.name) + '">' + esc(section.name) + '</span>' +
+                '<span class="health-val tnum">' + share + '%</span>' +
                 '</div>' +
                 '<div class="bar"><div class="bar-fill" style="width:' + share + '%"></div></div>' +
+                '<p class="health-meta">' +
+                (members.length ? done + ' of ' + members.length + ' done' : 'No students') + '</p>' +
                 '</div>';
         }).join('');
     }
@@ -2555,24 +2565,21 @@
 
         $('#faculty-empty').classList.toggle('is-hidden', rows.length !== 0);
 
+        /* The whole row opens the profile dialog, which holds the reset,
+           sign-out and remove actions; there are no buttons in the row. With
+           them gone the row is the only control, so it takes focus itself
+           (see initFaculty) — otherwise a keyboard could not reach any of it. */
         $('#faculty-tbody').innerHTML = rows.map(function (f) {
             var active = (f.status || '') === 'active';
             return '' +
-                '<tr class="is-clickable" data-faculty="' + esc(f.email) + '">' +
+                '<tr class="is-clickable" tabindex="0" data-faculty="' + esc(f.email) + '"' +
+                ' aria-label="Open profile: ' + esc(f.name || f.email) + '">' +
                 '<td>' + userCell({ full_name: f.name, email: f.email }) + '</td>' +
                 '<td class="muted">' + esc(f.department || '—') + '</td>' +
                 '<td><span class="badge">' + esc(f.assigned_section || 'Unassigned') + '</span></td>' +
                 '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
                 '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
                 (active ? 'Active' : 'Inactive') + '</span></td>' +
-                '<td class="col-right"><span class="row-actions">' +
-                '<button class="btn-icon" title="Send password-reset email" data-fac-act="reset" data-email="' + esc(f.email) + '">' +
-                icon('key', 'icon-sm') + '</button>' +
-                '<button class="btn-icon" title="Sign out everywhere" data-fac-act="signout" data-email="' + esc(f.email) + '">' +
-                icon('logout', 'icon-sm') + '</button>' +
-                '<button class="btn-icon" title="Remove faculty" data-fac-act="delete" data-email="' + esc(f.email) + '">' +
-                icon('trash', 'icon-sm') + '</button>' +
-                '</span></td>' +
                 '</tr>';
         }).join('');
     }
@@ -2583,23 +2590,16 @@
         }, 200));
 
         $('#faculty-tbody').addEventListener('click', function (event) {
-            var actionBtn = event.target.closest('[data-fac-act]');
-            if (actionBtn) {
-                event.stopPropagation();
-                var email = actionBtn.getAttribute('data-email');
-                var act = actionBtn.getAttribute('data-fac-act');
-                if (act === 'reset') {
-                    sendPasswordReset(email, actionBtn);
-                } else if (act === 'signout') {
-                    signOutFacultyEverywhere(email, actionBtn);
-                } else {
-                    deleteFaculty(email);
-                }
-                return;
-            }
-
             var row = event.target.closest('[data-faculty]');
             if (row) { openFacultyProfile(row.getAttribute('data-faculty')); }
+        });
+
+        $('#faculty-tbody').addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') { return; }
+            var row = event.target.closest('[data-faculty]');
+            if (!row || event.target !== row) { return; }
+            event.preventDefault();
+            openFacultyProfile(row.getAttribute('data-faculty'));
         });
 
         $('#faculty-reset').addEventListener('click', function () {

@@ -42,6 +42,15 @@
 .table tbody tr:nth-child(even):hover { background: var(--bg-surface-hover); }
 .table tbody tr.is-clickable { cursor: pointer; }
 
+/* A row that opens something takes focus itself (Faculty has no other
+   control in it). The ring is drawn inside the row so the table's scroll
+   container never clips it. */
+.table tbody tr.is-clickable:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+    background: var(--bg-surface-hover);
+}
+
 .col-right { text-align: right; }
 /* One 36px button plus the cell's padding. Was 116px, sized for two. */
 .col-w-actions { width: 72px; }
@@ -125,6 +134,56 @@
 .funnel-name { margin-top: 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); line-height: 1.35; }
 .funnel-foot { margin-top: var(--sp-4); }
 .funnel-meta { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-faint); }
+
+/* Overview: both columns take the row's height and the last card in each
+   fills what its column has left, so the shorter one never leaves a hole. */
+.overview-split > .stack > .card:last-child { flex: 1 1 auto; }
+
+/* OCEAN by section: a tile per section. auto-fill packs as many columns as
+   the width allows, so a new section fills a column, then a row. The grid
+   stops growing at 24rem: three full rows (3 x 98px + 2 gaps) plus half of
+   the next, and scrolls inside itself past that. The half row is deliberate --
+   overlay scrollbars (macOS, phones) are invisible until touched, and a clean
+   cut after row three would hide sections with nothing to say they exist. */
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: var(--sp-3);
+    max-height: 24rem;
+    overflow-y: auto;
+}
+
+.health-grid:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.health-empty { grid-column: 1 / -1; }
+
+.health-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-width: 0;
+    padding: var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+}
+
+.health-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+
+/* A long section name ends in an ellipsis (its full text is the title) so
+   every tile keeps the same height. */
+.health-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+
+.health-val { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 700; }
+.health-meta { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* The tile is already the inset-well colour; the track needs a lighter one. */
+.health-tile .bar { background: var(--bg-chip); }
 
 /* Section cards */
 .section-card {
