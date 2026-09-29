@@ -581,6 +581,77 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     font-variant-numeric: tabular-nums;
 }
 
+/* Input scores: one "highest possible" per test, applied to every row. */
+.scores-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+@media (min-width: 40rem) { .scores-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.scores-toolbar-field { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.scores-toolbar-row { display: flex; align-items: center; gap: var(--sp-2); }
+.scores-toolbar-row .score-input { flex: 1 1 auto; width: auto; min-width: 0; max-width: 160px; }
+.scores-toolbar-row .btn { flex: 0 0 auto; }
+
+/* Raw / highest possible, with the transmuted score underneath. */
+/* Four inputs per row do not fit a phone: the table scrolls sideways (the
+   .table-wrap) rather than squeezing the names to one letter per line. */
+.scores-table .col-score { min-width: 200px; }
+.scores-table th:first-child, .scores-table td:first-child { min-width: 180px; }
+.th-sub { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-faint); }
+
+.score-pair {
+    display: grid;
+    grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
+    align-items: center;
+    gap: 6px;
+}
+
+.score-pair .score-input { width: 100%; }
+.score-of { color: var(--text-faint); font-size: var(--fs-sm); }
+
+.score-out {
+    grid-column: 1 / -1;
+    min-height: 18px;
+    font-size: var(--fs-xs);
+    line-height: 18px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--accent);
+}
+
+.score-out.is-legacy { color: var(--warning); }
+.score-pair.is-invalid .score-out { color: var(--danger); font-weight: 500; }
+
+/* Edit participant: the same pair, with room to explain the calculation. */
+.score-formula { margin-top: calc(-1 * var(--sp-2)); margin-bottom: var(--sp-4); }
+
+.score-entry { min-width: 0; margin: 0; padding: 0; border: 0; }
+.score-entry + .score-entry { margin-top: var(--sp-5); }
+.score-entry-title { padding: 0; margin-bottom: var(--sp-3); font-size: var(--fs-sm); font-weight: 700; }
+
+/* Two short number fields stay side by side even on a phone. */
+.score-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+
+.score-result {
+    min-height: 40px;           /* two lines reserved: no jump between messages */
+    margin-top: var(--sp-2);
+    font-size: var(--fs-sm);
+    line-height: 1.45;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.score-result strong { color: var(--accent); font-weight: 700; }
+.score-result-sum { font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; }
+.score-result.is-error { color: var(--danger); }
+
+.kv-sub { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
+
 /* ---- 16.6 Notice modal body text ----
    `pre-wrap` so multi-line RPC results (granted / skipped lists) keep their
    line breaks without any HTML in the message string. */

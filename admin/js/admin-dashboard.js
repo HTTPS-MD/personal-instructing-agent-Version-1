@@ -103,20 +103,63 @@
         return msg || fallback;
     }
 
-    /* A score is blank (not taken yet) or a number that is not negative. The
-       pre-test has no ceiling, because its scoring format can go past 100;
-       the post-test passes max = 100, where a mistyped 1000 would otherwise
-       go straight into the research data. */
-    var POST_TEST_MAX = 100;
+    /* ---- Test scores (migration 0034) ----
+       Each test is entered as a raw score and the highest possible score, and
+       the study reports the transmuted score:
 
-    function parseScore(raw, max) {
-        if (raw === null || raw === undefined || String(raw).trim() === '') {
-            return { ok: true, value: null };
-        }
-        var n = Number(String(raw).trim());
-        if (!Number.isFinite(n) || n < 0 || (max != null && n > max)) { return { ok: false, value: null }; }
-        return { ok: true, value: n };
+           transmuted = (raw / highest possible) * 50 + 50        (50 – 100)
+
+       The database calculates and stores it (trg_compute_test_scores) and
+       refuses one typed by hand; transmute() here only previews it while the
+       admin types, rounded to 2 decimals the same way. */
+    var TEST_LABELS = { pre: 'pre-test', post: 'post-test' };
+
+    function transmute(raw, max) {
+        return Math.round((raw / max * 50 + 50 + Number.EPSILON) * 100) / 100;
     }
+
+    function formatScore(n) {
+        return n == null || n === '' ? '—' : String(Math.round(Number(n) * 100) / 100);
+    }
+
+    function sameNumber(a, b) {
+        if (a == null || a === '' || b == null || b === '') { return (a == null || a === '') && (b == null || b === ''); }
+        return Number(a) === Number(b);
+    }
+
+    /* One test's two fields. Both blank = not taken yet. With rawDecides (the
+       Input scores table, where "Apply to all" fills every row's highest
+       possible score) a blank raw score means no score, whatever the other
+       field holds. */
+    function readScorePair(rawValue, maxValue, rawDecides) {
+        var rawText = String(rawValue == null ? '' : rawValue).trim();
+        var maxText = String(maxValue == null ? '' : maxValue).trim();
+        if (!rawText && (!maxText || rawDecides)) { return { ok: true, raw: null, max: null, score: null }; }
+        if (!rawText) { return { ok: false, error: 'Enter the raw score too, or clear both fields.' }; }
+        if (!maxText) { return { ok: false, error: 'Enter the highest possible score too.' }; }
+
+        var raw = Number(rawText);
+        var max = Number(maxText);
+        if (!Number.isFinite(raw) || !Number.isFinite(max)) { return { ok: false, error: 'Scores must be numbers.' }; }
+        if (max <= 0) { return { ok: false, error: 'The highest possible score must be more than 0.' }; }
+        if (raw < 0 || raw > max) {
+            return { ok: false, error: 'The raw score must be between 0 and ' + formatScore(max) + '.' };
+        }
+        return { ok: true, raw: raw, max: max, score: transmute(raw, max) };
+    }
+
+    /* A stored test for display: "90" with "40 / 50", or a score that was
+       entered as a single number before raw scores were kept. */
+    function scoreParts(s, test) {
+        var score = s[test + '_test_score'];
+        var raw = s[test + '_test_raw_score'];
+        var max = s[test + '_test_max_score'];
+        if (score == null) { return { value: 'n/a', detail: '' }; }
+        if (raw == null || max == null) { return { value: formatScore(score), detail: 'Single score, no raw data' }; }
+        return { value: formatScore(score), detail: formatScore(raw) + ' / ' + formatScore(max) };
+    }
+
+    var MIGRATION_MISSING = 'The database is missing the newest migrations. Apply 0033 and 0034, then try again.';
 
     function isEmail(value) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -900,10 +943,12 @@
     var COHORT_COLUMNS = 'full_name, email, section, group_type, status, current_stage, is_in_game,' +
         ' stage_started_at, active_devices, is_ocean_done, pre_test_score, post_test_score';
 
-    /* Added by migration 0033. Until it runs they do not exist, and naming a
-       missing column fails the whole read -- so the cohort falls back to the
-       columns above rather than taking the overview down with it. */
+    /* Added by migrations 0033 and 0034. Until they run the columns do not
+       exist, and naming a missing column fails the whole read -- so the
+       cohort drops them, newest first, rather than taking the overview down
+       with it. */
     var CONSENT_COLUMNS = ', parental_consent, student_assent';
+    var RAW_SCORE_COLUMNS = ', pre_test_raw_score, pre_test_max_score, post_test_raw_score, post_test_max_score';
 
     function isMissingColumn(error) {
         return !!error && (error.code === '42703' || error.code === 'PGRST204' ||
@@ -926,7 +971,7 @@
         }
 
         var both = await Promise.all([
-            readProfiles(COHORT_COLUMNS + CONSENT_COLUMNS),
+            readProfiles(COHORT_COLUMNS + CONSENT_COLUMNS + RAW_SCORE_COLUMNS),
             sb.from('ocean_submissions')
                 .select('email')
                 .limit(5000)
@@ -934,6 +979,10 @@
         var res = both[0];
         var results = both[1];
 
+        if (res.error && isMissingColumn(res.error)) {
+            console.warn('[PIA] raw score columns missing; apply migration 0034. Cohort read without them.');
+            res = await readProfiles(COHORT_COLUMNS + CONSENT_COLUMNS);
+        }
         if (res.error && isMissingColumn(res.error)) {
             console.warn('[PIA] consent columns missing; apply migration 0033. Cohort read without them.');
             res = await readProfiles(COHORT_COLUMNS);
@@ -1668,8 +1717,11 @@
             (s.must_change_password === true ? ' · Must change temporary password' : '');
         $('#drawer-consent').textContent = consentLabel(s.parental_consent);
         $('#drawer-assent').textContent = consentLabel(s.student_assent);
-        $('#drawer-pre').textContent = s.pre_test_score == null ? 'n/a' : s.pre_test_score;
-        $('#drawer-post').textContent = s.post_test_score == null ? 'n/a' : s.post_test_score;
+        ['pre', 'post'].forEach(function (test) {
+            var parts = scoreParts(s, test);
+            $('#drawer-' + test).textContent = parts.value;
+            $('#drawer-' + test + '-detail').textContent = parts.detail;
+        });
 
         renderTraits(s);
         openModal('drawer-student');
@@ -2098,7 +2150,7 @@
 
             if (existing.error) {
                 toastErr('Registration stopped', isMissingColumn(existing.error)
-                    ? 'The database cannot store consent and assent yet. Apply migration 0033, then try again.'
+                    ? MIGRATION_MISSING
                     : friendlyDbError(existing.error, 'Could not check the roster for this email.'));
                 return;
             }
@@ -2171,8 +2223,16 @@
         $('#es-middle').value = middle;
         $('#es-last').value = last;
         $('#es-email').value = s.email;
-        $('#es-pretest').value = s.pre_test_score == null ? '' : s.pre_test_score;
         $('#es-device').value = toInt(s.max_devices, 1);
+        ['pre', 'post'].forEach(function (test) {
+            fillScoreField('es-' + test + '-raw', s[test + '_test_raw_score']);
+            fillScoreField('es-' + test + '-max', s[test + '_test_max_score']);
+            /* A score entered before 0034 has no raw data; say so under the
+               empty fields rather than pretending it is not there. */
+            $('#es-' + test + '-result').setAttribute('data-legacy',
+                s[test + '_test_score'] != null && s[test + '_test_raw_score'] == null ? formatScore(s[test + '_test_score']) : '');
+            paintScorePreview(test);
+        });
         fillConsentBox('es-consent', s.parental_consent, 'Signed consent form from a parent or guardian.');
         fillConsentBox('es-assent', s.student_assent, 'The student agreed to take part.');
 
@@ -2192,6 +2252,41 @@
         if (radio) { radio.checked = true; }
 
         openModal('modal-edit-student');
+    }
+
+    function fillScoreField(id, value) {
+        var input = $('#' + id);
+        input.value = value == null ? '' : value;
+        input.setAttribute('data-initial', input.value);
+    }
+
+    /* The live transmuted score under a test's two fields. */
+    function paintScorePreview(test) {
+        var out = $('#es-' + test + '-result');
+        var raw = $('#es-' + test + '-raw').value;
+        var max = $('#es-' + test + '-max').value;
+        var pair = readScorePair(raw, max);
+        var legacy = out.getAttribute('data-legacy');
+
+        out.classList.toggle('is-error', !pair.ok);
+        if (!pair.ok) {
+            out.textContent = pair.error;
+        } else if (pair.score == null) {
+            out.textContent = legacy
+                ? 'Entered before raw scores were kept: ' + legacy + '. Enter the raw and highest possible score to replace it.'
+                : 'Not taken yet.';
+        } else {
+            out.innerHTML = 'Transmuted score: <strong class="tnum">' + esc(formatScore(pair.score)) + '</strong>' +
+                ' <span class="score-result-sum tnum">= (' + esc(formatScore(pair.raw)) + ' ÷ ' +
+                esc(formatScore(pair.max)) + ') × 50 + 50</span>';
+        }
+        markScoreInvalid(test, false);
+    }
+
+    /* The preview line doubles as the error message; this marks the fields. */
+    function markScoreInvalid(test, invalid) {
+        $('#es-' + test + '-raw').classList.toggle('is-invalid', invalid);
+        $('#es-' + test + '-max').classList.toggle('is-invalid', invalid);
     }
 
     /* null = registered before consent was stored (0033), shown as "not
@@ -2224,12 +2319,20 @@
         var section = $('#es-section').value;
         var groupType = ($('input[name="es-condition"]:checked') || {}).value;
         var maxDevices = toInt($('#es-device').value, 1);
-        var score = parseScore($('#es-pretest').value);
+        var pairs = {};
 
         var valid = true;
         valid = setFieldError('es-first', first ? '' : 'First name is required.') && valid;
         valid = setFieldError('es-last', last ? '' : 'Last name is required.') && valid;
-        valid = setFieldError('es-pretest', score.ok ? '' : 'Enter a number of 0 or more, or leave it blank.') && valid;
+        ['pre', 'post'].forEach(function (test) {
+            pairs[test] = readScorePair($('#es-' + test + '-raw').value, $('#es-' + test + '-max').value);
+            if (!pairs[test].ok) {
+                paintScorePreview(test);
+                markScoreInvalid(test, true);
+                if (valid) { $('#es-' + test + '-raw').focus(); }
+                valid = false;
+            }
+        });
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2246,10 +2349,20 @@
             var payload = {
                 full_name: fullName,
                 section: section,
-                pre_test_score: score.value,
                 group_type: groupType,
                 max_devices: maxDevices
             };
+            /* Only a test whose fields changed is sent, and only its raw data:
+               the database calculates the transmuted score. Untouched fields
+               leave a score entered before 0034 as it was. */
+            ['pre', 'post'].forEach(function (test) {
+                var rawInput = $('#es-' + test + '-raw');
+                var maxInput = $('#es-' + test + '-max');
+                if (sameNumber(pairs[test].raw, rawInput.getAttribute('data-initial')) &&
+                    sameNumber(pairs[test].max, maxInput.getAttribute('data-initial'))) { return; }
+                payload[test + '_test_raw_score'] = pairs[test].raw;
+                payload[test + '_test_max_score'] = pairs[test].max;
+            });
             var consent = consentChange('es-consent');
             var assent = consentChange('es-assent');
             if (consent !== undefined) { payload.parental_consent = consent; }
@@ -2259,7 +2372,7 @@
 
             if (updateRes.error) {
                 toastErr('Update failed', isMissingColumn(updateRes.error)
-                    ? 'The database cannot store consent and assent yet. Apply migration 0033, then try again.'
+                    ? MIGRATION_MISSING
                     : friendlyDbError(updateRes.error, 'Could not update the profile.'));
                 return;
             }
@@ -3561,20 +3674,86 @@
 
     /* ============================================ 12. SCORES ENCODING === */
 
+    /* The value most rows share, to prefill a test's "highest possible". */
+    function commonValue(values) {
+        var counts = {};
+        var best = null;
+        values.forEach(function (v) {
+            if (v == null) { return; }
+            var key = String(v);
+            counts[key] = (counts[key] || 0) + 1;
+            if (best === null || counts[key] > counts[best]) { best = key; }
+        });
+        return best === null ? '' : best;
+    }
+
+    function scorePairCell(s, test) {
+        var raw = s[test + '_test_raw_score'];
+        var max = s[test + '_test_max_score'];
+        var legacy = s[test + '_test_score'] != null && raw == null ? formatScore(s[test + '_test_score']) : '';
+        var who = s.full_name || s.email;
+        var label = test === 'pre' ? 'Pre-test' : 'Post-test';
+        return '' +
+            '<td class="col-score">' +
+            '<div class="score-pair" data-test="' + test + '" data-legacy="' + esc(legacy) + '"' +
+            ' data-initial-raw="' + esc(raw == null ? '' : raw) + '" data-initial-max="' + esc(max == null ? '' : max) + '">' +
+            '<input class="input score-input" type="number" step="any" min="0" inputmode="decimal" data-part="raw"' +
+            ' aria-label="' + esc(label + ' raw score, ' + who) + '" value="' + esc(raw == null ? '' : raw) + '">' +
+            '<span class="score-of" aria-hidden="true">/</span>' +
+            '<input class="input score-input" type="number" step="any" min="0" inputmode="decimal" data-part="max"' +
+            ' aria-label="' + esc(label + ' highest possible score, ' + who) + '" value="' + esc(max == null ? '' : max) + '">' +
+            '<output class="score-out tnum"></output>' +
+            '</div>' +
+            '</td>';
+    }
+
+    /* The live transmuted score under one pair of fields. */
+    function paintScorePair(pair) {
+        var out = pair.querySelector('.score-out');
+        var read = readScorePair(pair.querySelector('[data-part="raw"]').value,
+            pair.querySelector('[data-part="max"]').value, true);
+        var legacy = pair.getAttribute('data-legacy');
+
+        pair.classList.toggle('is-invalid', !read.ok);
+        $$('.score-input', pair).forEach(function (input) { input.classList.toggle('is-invalid', !read.ok); });
+        out.classList.remove('is-legacy');
+        out.removeAttribute('title');
+        if (!read.ok) {
+            out.textContent = read.error;
+        } else if (read.score != null) {
+            out.textContent = '= ' + formatScore(read.score);
+        } else if (legacy) {
+            out.textContent = legacy + ' · single score';
+            out.title = 'Entered before raw scores were kept. Type the raw score to replace it.';
+            out.classList.add('is-legacy');
+        } else {
+            out.textContent = 'Not taken';
+        }
+    }
+
     async function openScoresModal(sectionName) {
         state.activeSection = sectionName;
         $('#scores-title').textContent = 'Input scores — ' + sectionName;
         $('#scores-tbody').innerHTML = skeletonRows(4, 5);
+        $('#scores-max-pre').value = '';
+        $('#scores-max-post').value = '';
+        $('#scores-save').disabled = true;
         openModal('modal-scores');
 
         var res = await sb.from('profiles')
-            .select('role, full_name, email, group_type, pre_test_score, post_test_score')
+            .select('role, full_name, email, group_type, pre_test_score, post_test_score' + RAW_SCORE_COLUMNS)
             .eq('section', sectionName)
             .order('full_name', { ascending: true });
 
         if (res.error) {
-            $('#scores-tbody').innerHTML = '';
-            toastErr('Could not load scores', friendlyDbError(res.error, 'Unknown database error.'));
+            var missing = isMissingColumn(res.error);
+            $('#scores-tbody').innerHTML = '<tr><td colspan="4">' +
+                '<div class="state-block" style="min-height:200px">' +
+                '<p class="state-title">' + (missing ? 'Raw scores are not set up yet' : 'Could not load scores') + '</p>' +
+                '<p class="state-desc">' + esc(missing
+                    ? 'Apply supabase/migrations/20260929_0034_raw_and_transmuted_test_scores.sql, then reopen this dialog.'
+                    : friendlyDbError(res.error, 'Unknown database error.')) + '</p>' +
+                '</div></td></tr>';
             return;
         }
 
@@ -3588,69 +3767,101 @@
                 '<p class="state-title">No students in this section</p>' +
                 '<p class="state-desc">Assign participants to ' + esc(sectionName) + ' first.</p>' +
                 '</div></td></tr>';
-            $('#scores-save').disabled = true;
             return;
         }
 
         $('#scores-save').disabled = false;
-        $('#scores-note').textContent = students.length + ' row' + (students.length === 1 ? '' : 's') +
-            ' · pre-test 0 or more · post-test 0–' + POST_TEST_MAX;
+        $('#scores-note').textContent = students.length + ' student' + (students.length === 1 ? '' : 's') +
+            ' · only changed rows are saved';
+        $('#scores-max-pre').value = commonValue(students.map(function (s) { return s.pre_test_max_score; }));
+        $('#scores-max-post').value = commonValue(students.map(function (s) { return s.post_test_max_score; }));
 
         $('#scores-tbody').innerHTML = students.map(function (s) {
             var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
             return '' +
-                '<tr>' +
+                '<tr data-email="' + esc(s.email) + '" data-name="' + esc(s.full_name || s.email) + '">' +
                 '<td>' + userCell(s) + '</td>' +
                 '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
-                '<td class="col-right"><input class="input score-input" type="number" step="any" min="0"' +
-                ' inputmode="decimal" data-score="pre" data-email="' + esc(s.email) + '"' +
-                ' value="' + esc(s.pre_test_score == null ? '' : s.pre_test_score) + '"></td>' +
-                '<td class="col-right"><input class="input score-input" type="number" step="any" min="0"' +
-                ' max="' + POST_TEST_MAX + '" inputmode="decimal" data-score="post" data-email="' + esc(s.email) + '"' +
-                ' value="' + esc(s.post_test_score == null ? '' : s.post_test_score) + '"></td>' +
+                scorePairCell(s, 'pre') +
+                scorePairCell(s, 'post') +
                 '</tr>';
         }).join('');
+
+        $$('#scores-tbody .score-pair').forEach(paintScorePair);
+    }
+
+    /* Fills every row's "highest possible" for one test. Explicit, and
+       visible before anything is saved: a student who sat a different
+       version can still be corrected in their own row. A row left without a
+       raw score still has no score. */
+    function applyScoreMax(test) {
+        var value = $('#scores-max-' + test).value.trim();
+        var check = readScorePair('0', value);
+        if (!value || !check.ok) {
+            toastErr('Enter the highest possible score', 'Type a number above 0 for the ' + TEST_LABELS[test] + ' first.');
+            $('#scores-max-' + test).focus();
+            return;
+        }
+        $$('#scores-tbody .score-pair[data-test="' + test + '"]').forEach(function (pair) {
+            pair.querySelector('[data-part="max"]').value = value;
+            paintScorePair(pair);
+        });
     }
 
     /* UPDATE per row, never upsert. An upsert INSERTS when nothing matches: if
        another admin deletes a student while this modal is open, saving would
        resurrect them as a ghost row — email and score only, NULL name, and
        role defaulting to 'student' — which then shows up in the research
-       export. An UPDATE that matches nothing simply touches zero rows. */
+       export. An UPDATE that matches nothing simply touches zero rows.
+
+       Only the raw data of a test that changed is sent; the database
+       calculates the transmuted score (0034). A blank raw score is "no score":
+       it leaves an untouched row alone, and clears a test that had one. */
     async function saveBatchScores() {
-        var rows = $$('#scores-tbody tr');
+        var rows = $$('#scores-tbody tr[data-email]');
         var updates = [];
 
         for (var i = 0; i < rows.length; i++) {
-            var preInput = rows[i].querySelector('[data-score="pre"]');
-            var postInput = rows[i].querySelector('[data-score="post"]');
-            if (!preInput || !postInput) { continue; }
+            var email = rows[i].getAttribute('data-email');
+            var change = {};
 
-            var email = preInput.getAttribute('data-email');
-            var pre = parseScore(preInput.value);
-            var post = parseScore(postInput.value, POST_TEST_MAX);
+            var pairs = $$('.score-pair', rows[i]);
+            for (var j = 0; j < pairs.length; j++) {
+                var pair = pairs[j];
+                var test = pair.getAttribute('data-test');
+                var read = readScorePair(pair.querySelector('[data-part="raw"]').value,
+                    pair.querySelector('[data-part="max"]').value, true);
 
-            preInput.classList.toggle('is-invalid', !pre.ok);
-            postInput.classList.toggle('is-invalid', !post.ok);
+                paintScorePair(pair);
+                if (!read.ok) {
+                    pair.querySelector('[data-part="raw"]').focus();
+                    toastErr('Check the ' + TEST_LABELS[test],
+                        rows[i].getAttribute('data-name') + ': ' + read.error);
+                    return;
+                }
 
-            if (!pre.ok || !post.ok) {
-                toastErr('Score out of range', 'For ' + email + ': ' + (!pre.ok
-                    ? 'the pre-test score must be a number of 0 or more.'
-                    : 'the post-test score must be between 0 and ' + POST_TEST_MAX + '.'));
-                return;
+                /* Unchanged, or still blank (a blank raw score ignores the max
+                   that "Apply to all" put beside it). */
+                if (sameNumber(read.raw, pair.getAttribute('data-initial-raw')) &&
+                    sameNumber(read.max, read.raw == null ? '' : pair.getAttribute('data-initial-max'))) { continue; }
+
+                change[test + '_test_raw_score'] = read.raw;
+                change[test + '_test_max_score'] = read.max;
             }
 
-            updates.push({ email: email, pre_test_score: pre.value, post_test_score: post.value });
+            if (Object.keys(change).length) { updates.push({ email: email, change: change }); }
         }
 
-        if (!updates.length) { closeModal('modal-scores'); return; }
+        if (!updates.length) {
+            closeModal('modal-scores');
+            toastOk('Nothing to save', 'No score was changed.');
+            return;
+        }
 
         var release = setBusy($('#scores-save'), 'Saving…');
 
         var results = await Promise.all(updates.map(function (u) {
-            return sb.from('profiles')
-                .update({ pre_test_score: u.pre_test_score, post_test_score: u.post_test_score })
-                .eq('email', u.email);
+            return sb.from('profiles').update(u.change).eq('email', u.email);
         }));
 
         release();
@@ -3660,13 +3871,14 @@
         if (failed.length) {
             console.error('Batch score save failed:', failed[0].error);
             toastErr('Scores not saved',
-                friendlyDbError(failed[0].error, 'Could not save the scores.') +
+                (isMissingColumn(failed[0].error) ? MIGRATION_MISSING
+                    : friendlyDbError(failed[0].error, 'Could not save the scores.')) +
                 (failed.length > 1 ? ' (' + failed.length + ' rows failed)' : ''));
             return;
         }
 
         closeModal('modal-scores');
-        toastOk('Scores saved', updates.length + ' record' + (updates.length === 1 ? '' : 's') +
+        toastOk('Scores saved', updates.length + ' student' + (updates.length === 1 ? '' : 's') +
             ' updated for ' + state.activeSection + '.');
         refreshAll();
     }
@@ -3874,7 +4086,8 @@
 
         var base = ['full_name', 'email', 'section', 'group_type', 'status',
             'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'is_ocean_done',
-            'parental_consent', 'student_assent'];
+            'parental_consent', 'student_assent',
+            'pre_test_raw_score', 'pre_test_max_score', 'post_test_raw_score', 'post_test_max_score'];
         var scores = ['ocean_e', 'ocean_a', 'ocean_c', 'ocean_n', 'ocean_o'];
         var items = [];
         for (var i = 1; i <= 50; i++) { items.push('item_' + (i < 10 ? '0' : '') + i); }
@@ -5138,6 +5351,9 @@
 
         $('#register-student-form').addEventListener('submit', handleRegisterStudent);
         $('#edit-student-form').addEventListener('submit', handleUpdateStudent);
+        $$('#edit-student-form [data-score-test]').forEach(function (input) {
+            input.addEventListener('input', function () { paintScorePreview(input.getAttribute('data-score-test')); });
+        });
         $('#add-professor-form').addEventListener('submit', handleRegisterProfessor);
         $('#add-admin-form').addEventListener('submit', handleAddAdmin);
         $('#admin-tbody').addEventListener('click', function (event) {
@@ -5177,6 +5393,13 @@
         });
 
         $('#scores-save').addEventListener('click', saveBatchScores);
+        $('#scores-tbody').addEventListener('input', function (event) {
+            var pair = event.target.closest('.score-pair');
+            if (pair) { paintScorePair(pair); }
+        });
+        $$('[data-scores-apply]').forEach(function (btn) {
+            btn.addEventListener('click', function () { applyScoreMax(btn.getAttribute('data-scores-apply')); });
+        });
         $('#revoke-all-btn').addEventListener('click', revokeAllStudentSessions);
         $('#signout-confirm').addEventListener('click', signOut);
         $('#device-limit-signout').addEventListener('click', signOut);

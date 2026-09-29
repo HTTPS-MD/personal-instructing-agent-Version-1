@@ -368,8 +368,10 @@ begin
       end if;
     end;
 
-    -- C. An administrator reads the overrides and writes consent, assent and
-    --    a pre-test above 100.
+    -- C. An administrator reads the overrides and writes consent and assent.
+    --    (No pre-test here: since 0034 a score is only written through its raw
+    --    score, and 0034 rehearses that itself -- so this file stays safe to
+    --    re-run after 0034.)
     select count(*) into v_n from public.stage_overrides where section = 'PIA-0033-probe';
     if v_n <> 2 then
       v_fail := v_fail || 'an administrator cannot read the overrides; ';
@@ -377,11 +379,11 @@ begin
 
     if v_student is not null then
       update public.profiles
-         set parental_consent = true, student_assent = false, pre_test_score = 250.5
+         set parental_consent = true, student_assent = false
        where email = v_student;
       get diagnostics v_n = row_count;
       if v_n <> 1 then
-        v_fail := v_fail || 'an administrator could not record consent and a 250.5 pre-test; ';
+        v_fail := v_fail || 'an administrator could not record consent and assent; ';
       end if;
     end if;
 

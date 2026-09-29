@@ -987,7 +987,7 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="edit-student-title">Edit participant</h2>
-                    <p class="modal-sub">Update placement, the pre-test score and consent. The email stays fixed.</p>
+                    <p class="modal-sub">Update placement, test scores and consent. The email stays fixed.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1071,20 +1071,52 @@
                         </div>
                     </div>
 
+                    <!-- Raw score + highest possible score per test. The transmuted
+                         score is previewed here and calculated by the database
+                         (migration 0034); it is never typed. -->
                     <div class="form-section">
-                        <p class="form-section-title">Baseline &amp; consent</p>
-                        <div class="form-grid form-grid-2">
-                            <div class="field">
-                                <label class="label" for="es-pretest">Pre-test score</label>
-                                <input class="input tnum" type="number" step="any" min="0" id="es-pretest"
-                                    inputmode="decimal" placeholder="Not taken yet" aria-describedby="es-pretest-help">
-                                <p class="qb-help" id="es-pretest-help">Leave blank until the student has taken the
-                                    pre-test. Enter the score as your instrument reports it.</p>
-                                <p class="field-msg" data-msg-for="es-pretest"></p>
-                            </div>
-                        </div>
+                        <p class="form-section-title">Test scores</p>
+                        <p class="qb-help score-formula">Transmuted score = (raw score ÷ highest possible score) × 50 + 50.
+                            Leave both fields blank until the student has taken the test.</p>
 
-                        <label class="check" style="margin-top:4px">
+                        <fieldset class="score-entry">
+                            <legend class="score-entry-title">Pre-test</legend>
+                            <div class="score-fields">
+                                <div class="field">
+                                    <label class="label" for="es-pre-raw">Raw score</label>
+                                    <input class="input tnum" type="number" step="any" min="0" id="es-pre-raw"
+                                        inputmode="decimal" placeholder="e.g. 40" data-score-test="pre" data-score-part="raw">
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="es-pre-max">Highest possible</label>
+                                    <input class="input tnum" type="number" step="any" min="0" id="es-pre-max"
+                                        inputmode="decimal" placeholder="e.g. 50" data-score-test="pre" data-score-part="max">
+                                </div>
+                            </div>
+                            <p class="score-result" id="es-pre-result" aria-live="polite">Not taken yet.</p>
+                        </fieldset>
+
+                        <fieldset class="score-entry">
+                            <legend class="score-entry-title">Post-test</legend>
+                            <div class="score-fields">
+                                <div class="field">
+                                    <label class="label" for="es-post-raw">Raw score</label>
+                                    <input class="input tnum" type="number" step="any" min="0" id="es-post-raw"
+                                        inputmode="decimal" placeholder="e.g. 45" data-score-test="post" data-score-part="raw">
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="es-post-max">Highest possible</label>
+                                    <input class="input tnum" type="number" step="any" min="0" id="es-post-max"
+                                        inputmode="decimal" placeholder="e.g. 50" data-score-test="post" data-score-part="max">
+                                </div>
+                            </div>
+                            <p class="score-result" id="es-post-result" aria-live="polite">Not taken yet.</p>
+                        </fieldset>
+                    </div>
+
+                    <div class="form-section">
+                        <p class="form-section-title">Consent</p>
+                        <label class="check">
                             <input type="checkbox" id="es-consent">
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
@@ -1341,7 +1373,8 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="scores-title">Input scores</h2>
-                    <p class="modal-sub">Pre-test: any score of 0 or more. Post-test: 0 to 100.</p>
+                    <p class="modal-sub">Enter each raw score and the highest possible score. Transmuted score =
+                        (raw ÷ highest possible) × 50 + 50, calculated as you type.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1349,14 +1382,35 @@
             </header>
 
             <div class="modal-body modal-body-flush">
+                <!-- Usually the whole section took the same test: set its highest
+                     possible score once, then type only the raw scores. -->
+                <div class="scores-toolbar" id="scores-toolbar">
+                    <div class="scores-toolbar-field">
+                        <label class="label" for="scores-max-pre">Pre-test · highest possible</label>
+                        <div class="scores-toolbar-row">
+                            <input class="input score-input tnum" type="number" step="any" min="0" inputmode="decimal"
+                                id="scores-max-pre" placeholder="e.g. 50">
+                            <button class="btn btn-secondary btn-sm" type="button" data-scores-apply="pre">Apply to all</button>
+                        </div>
+                    </div>
+                    <div class="scores-toolbar-field">
+                        <label class="label" for="scores-max-post">Post-test · highest possible</label>
+                        <div class="scores-toolbar-row">
+                            <input class="input score-input tnum" type="number" step="any" min="0" inputmode="decimal"
+                                id="scores-max-post" placeholder="e.g. 50">
+                            <button class="btn btn-secondary btn-sm" type="button" data-scores-apply="post">Apply to all</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-wrap" style="border-top:0">
-                    <table class="table">
+                    <table class="table scores-table">
                         <thead>
                             <tr>
                                 <th>Student</th>
                                 <th>Condition</th>
-                                <th class="col-right">Pre-test</th>
-                                <th class="col-right">Post-test</th>
+                                <th class="col-score">Pre-test <span class="th-sub">raw / highest</span></th>
+                                <th class="col-score">Post-test <span class="th-sub">raw / highest</span></th>
                             </tr>
                         </thead>
                         <tbody id="scores-tbody"></tbody>
@@ -1889,10 +1943,12 @@
                         <div class="kv">
                             <p class="kv-label">Pre-test</p>
                             <p class="kv-value tnum" id="drawer-pre">—</p>
+                            <p class="kv-sub tnum" id="drawer-pre-detail"></p>
                         </div>
                         <div class="kv" style="border-color:var(--accent-line);background:var(--accent-soft)">
                             <p class="kv-label">Post-test</p>
                             <p class="kv-value tnum" id="drawer-post" style="color:var(--accent)">—</p>
+                            <p class="kv-sub tnum" id="drawer-post-detail"></p>
                         </div>
                     </div>
                 </div>

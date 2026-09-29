@@ -127,6 +127,9 @@ begin
   perform pg_temp.pia_try('FORGE: pre_test_score = 100', 'BLOCKED', s, format(
     $q$update public.profiles set pre_test_score = 100 where email = %L$q$, s));
 
+  perform pg_temp.pia_try('FORGE: pre_test_raw_score (0034)', 'BLOCKED', s, format(
+    $q$update public.profiles set pre_test_raw_score = 50, pre_test_max_score = 50 where email = %L$q$, s));
+
   perform pg_temp.pia_try('FORGE: group_type = control', 'BLOCKED', s, format(
     $q$update public.profiles set group_type = 'control' where email = %L$q$, s));
 
@@ -184,8 +187,14 @@ begin
     perform pg_temp.pia_try('admin: score sa profiles (0018: dapat BLOCKED)', 'BLOCKED', a, format(
       $q$update public.profiles set ocean_o = 21 where email = %L$q$, s));
 
-    perform pg_temp.pia_try('admin: batch scores', 'ALLOWED', a, format(
-      $q$update public.profiles set pre_test_score = 55, post_test_score = 77 where email = %L$q$, s));
+    -- 0034: raw + highest possible score; ang database ang nagkukuwenta ng
+    -- transmuted score, kaya BLOCKED na ang direktang pagsulat nito.
+    perform pg_temp.pia_try('admin: batch scores (raw / max)', 'ALLOWED', a, format(
+      $q$update public.profiles set pre_test_raw_score = 40, pre_test_max_score = 50,
+          post_test_raw_score = 45, post_test_max_score = 50 where email = %L$q$, s));
+
+    perform pg_temp.pia_try('admin: transmuted score by hand (0034: dapat BLOCKED)', 'BLOCKED', a, format(
+      $q$update public.profiles set pre_test_score = 55 where email = %L$q$, s));
 
     perform pg_temp.pia_try('admin: retake character', 'ALLOWED', a, format(
       $q$update public.profiles set selected_character = null,
