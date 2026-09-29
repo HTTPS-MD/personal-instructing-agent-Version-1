@@ -2740,29 +2740,51 @@
 
     /* ================================= 11. SETTINGS AND ADMIN DEVICES === */
 
-    async function handlePasswordUpdate(event) {
-        event.preventDefault();
-        clearFormErrors('password-form');
+    /* The password is changed through an emailed link, never in a form here:
+       Supabase's updateUser() does not check the current password, so a form
+       would let anyone at an unlocked laptop change it. The link needs this
+       account's inbox too. It opens the site's set-password page (the same
+       one activation and "Forgot password" use), which signs the account out
+       everywhere once the new password is saved. */
+    var PW_RESET_COOLDOWN_S = 60;
+    var pwResetTimer = null;
 
-        var next = $('#new-password').value;
-        var confirmValue = $('#confirm-password').value;
+    async function sendMyPasswordReset() {
+        var btn = $('#pw-reset-send');
+        var status = $('#pw-reset-status');
+        if (btn.disabled) { return; }
 
-        var valid = true;
-        valid = setFieldError('new-password', next.length >= 8 ? '' : 'Use at least 8 characters.') && valid;
-        valid = setFieldError('confirm-password', next === confirmValue ? '' : 'Passwords do not match.') && valid;
-        if (!valid) { return; }
-
-        var release = setBusy($('#password-submit'), 'Updating…');
-        var res = await sb.auth.updateUser({ password: next });
+        var release = setBusy(btn, 'Sending…');
+        var res;
+        try { res = await sb.auth.resetPasswordForEmail(state.adminEmail, { redirectTo: activationRedirect() }); }
+        catch (err) { res = { error: { message: (err && err.message) || 'The request did not complete.' } }; }
         release();
 
         if (res.error) {
-            toastErr('Password not updated', res.error.message);
+            var rate = /rate limit|too many|security purposes/i.test(res.error.message || '');
+            status.textContent = rate
+                ? 'Too many emails were sent recently. Wait a few minutes, then try again.'
+                : 'The link was not sent: ' + (res.error.message || 'unknown error') + '.';
+            toastErr('Reset link not sent', status.textContent);
             return;
         }
 
-        $('#password-form').reset();
-        toastOk('Password updated', 'Use the new password the next time you sign in.');
+        /* One per minute: the email quota is shared by the whole project. */
+        var left = PW_RESET_COOLDOWN_S;
+        var sentAt = formatStamp(new Date().toISOString());
+        btn.disabled = true;
+        var paint = function () {
+            status.textContent = 'Sent to ' + state.adminEmail + ' at ' + sentAt + '.' +
+                (left > 0 ? ' You can send another in ' + left + ' s.' : '');
+        };
+        paint();
+        clearInterval(pwResetTimer);
+        pwResetTimer = setInterval(function () {
+            left -= 1;
+            paint();
+            if (left <= 0) { clearInterval(pwResetTimer); btn.disabled = false; }
+        }, 1000);
+        toastOk('Reset link sent', 'Check ' + state.adminEmail + '.');
     }
 
     /* ---- Device registration diagnostics ----
@@ -2770,7 +2792,7 @@
        "No registered devices", which reads as "nothing is wrong". Now every
        way this can go wrong is logged with the details needed to tell them
        apart, kept in window.PIA_DEVICE_DIAG (paste it into a bug report), and
-       shown in the Device policy card with a retry. */
+       shown in the Signed-in devices card with a retry. */
 
     function errorFields(err) {
         if (!err) { return {}; }
@@ -2817,7 +2839,7 @@
        -- and two racing sign-ins cannot both take the last slot. */
     async function loadAdminDevices() {
         var res = await sb.from('profiles')
-            .select('max_devices, active_devices')
+            .select('active_devices')
             .eq('email', state.adminEmail)
             .maybeSingle();
 
@@ -2830,7 +2852,6 @@
             return;
         }
 
-        $('#device-limit').value = toInt(res.data.max_devices, 1);
         var devices = res.data.active_devices || [];
 
         /* Storage can be blocked (a private window, a strict browser setting);
@@ -2847,11 +2868,10 @@
             return;
         }
 
-        if (devices.indexOf(deviceId) !== -1) {
-            renderAdminDevices(devices);
-            return;
-        }
-
+        /* Claimed on every load, not only when this browser is missing from
+           the list: the claim is also where the server forgets devices whose
+           login has ended (migration 0032), which keeps this list to the
+           browsers that can actually still use the account. */
         var claim;
         try { claim = await sb.rpc('claim_device', { p_device_id: deviceId }); }
         catch (err) { claim = { error: { message: (err && err.message) || 'The request did not complete.' } }; }
@@ -2861,7 +2881,7 @@
             deviceProblem('claim_device', Object.assign({ deviceId: deviceId, listedBefore: devices }, fields));
             renderAdminDevices(devices, { title: 'This browser was not registered', message: claimFailureText(fields) });
             toastErr('This browser was not registered', 'claim_device failed' +
-                (fields.code ? ' (' + fields.code + ')' : '') + '. Details are in the Device policy card.');
+                (fields.code ? ' (' + fields.code + ')' : '') + '. Details are in the Signed-in devices card.');
             return;
         }
 
@@ -2873,7 +2893,7 @@
 
         if (!claim.data || !Array.isArray(claim.data.devices)) {
             deviceProblem('claim_device-response', { deviceId: deviceId, response: claim.data });
-            toastErr('This browser was not registered', 'claim_device gave no usable answer. Details are in the Device policy card.');
+            toastErr('This browser was not registered', 'claim_device gave no usable answer. Details are in the Signed-in devices card.');
             renderAdminDevices(devices, {
                 title: 'This browser was not registered',
                 message: 'claim_device answered without a device list, so the registration cannot be confirmed. ' +
@@ -2892,7 +2912,7 @@
             deviceProblem('registration-lost', {
                 deviceId: deviceId, claimReturned: claim.data.devices, storedNow: stored
             });
-            toastErr('The registration did not stick', 'The server accepted this browser but it is not in the saved list. Details are in the Device policy card.');
+            toastErr('The registration did not stick', 'The server accepted this browser but it is not in the saved list. Details are in the Signed-in devices card.');
             renderAdminDevices(stored, {
                 title: 'The registration did not stick',
                 message: 'The server accepted this browser, but it is not in the saved list. ' +
@@ -3015,30 +3035,9 @@
         if (currentId === deviceId) { await signOut(); }
     }
 
-    async function saveAdminDeviceLimit() {
-        var value = toInt($('#device-limit').value, 0);
-
-        /* Never below 2 (migration 0031 enforces the same): with one slot, a
-           single lost or stolen device could leave no way to sign it out. */
-        if (!value || value < 2 || value > 10) {
-            setFieldError('device-limit', 'Choose a limit between 2 and 10.');
-            return;
-        }
-        setFieldError('device-limit', '');
-
-        var release = setBusy($('#save-device-limit'), 'Saving…');
-        var res = await sb.from('profiles').update({ max_devices: value }).eq('email', state.adminEmail);
-        release();
-
-        if (res.error) {
-            toastErr('Policy not saved', friendlyDbError(res.error, 'Could not update the device limit.'));
-            return;
-        }
-
-        toastOk('Device policy saved', 'Maximum of ' + value + ' concurrent session' + (value === 1 ? '' : 's') + '.');
-    }
-
-    /* Forced modal: the admin must free a slot before the console continues. */
+    /* Forced modal: the admin must free a slot before the console continues.
+       Since migration 0032 the server never refuses an administrator a device,
+       so this only appears while 0032 has not been applied yet. */
     function showDeviceLimitModal(devices) {
         var currentId = null;
         try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
@@ -3229,7 +3228,7 @@
                 '<span class="dot ' + (pending ? 'dot-off' : 'dot-live') + '"></span>' +
                 (pending ? 'Awaiting activation' : 'Active') + '</span>' +
                 (isYou ? ' <span class="badge">You</span>' : '') + '</td>' +
-                '<td class="tnum muted">' + (a.active_devices || []).length + ' of ' + toInt(a.max_devices, 1) + '</td>' +
+                '<td class="tnum muted">' + (function (n) { return n + (n === 1 ? ' device' : ' devices'); })((a.active_devices || []).length) + '</td>' +
                 '<td class="col-right"><span class="row-actions">' +
                 /* No remove, revoke or edit for another administrator: the
                    database refuses them (migration 0031), so the console does
@@ -3287,12 +3286,10 @@
 
         var name = $('#aa-name').value.trim();
         var email = normalizeEmail($('#aa-email').value);
-        var maxDevices = toInt($('#aa-devices').value, 0);
 
         var valid = true;
         valid = setFieldError('aa-name', name ? '' : 'Full name is required.') && valid;
         valid = setFieldError('aa-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
-        valid = setFieldError('aa-devices', (maxDevices >= 2 && maxDevices <= 10) ? '' : 'Choose between 2 and 10.') && valid;
         if (!valid) { return; }
 
         /* Checked BEFORE the auth user exists: profiles carries UNIQUE(email),
@@ -3340,8 +3337,7 @@
                 full_name: name,
                 email: email,
                 role: 'admin',
-                status: 'inactive',
-                max_devices: maxDevices
+                status: 'inactive'
             }]);
             if (insertRes.error) {
                 showNotice('Administrator not finished',
@@ -4924,6 +4920,7 @@
 
         $('#admin-name').textContent = name;
         $('#admin-email').textContent = email;
+        $('#pw-reset-to').textContent = email;
         $('#admin-initials').textContent = initialsOf(name, email);
         /* "Dr. Reyes" greeted as "Good morning, Dr." read as a typo. An
            honorific keeps the surname with it; otherwise the first name. */
@@ -4955,7 +4952,7 @@
             var email = btn.getAttribute('data-email');
             if (btn.getAttribute('data-admin-act') === 'link') { resendAdminLink(email, btn); }
         });
-        $('#password-form').addEventListener('submit', handlePasswordUpdate);
+        $('#pw-reset-send').addEventListener('click', sendMyPasswordReset);
 
         $('#new-section-form').addEventListener('submit', async function (event) {
             event.preventDefault();
@@ -4985,7 +4982,6 @@
             refreshAll();
         });
 
-        $('#save-device-limit').addEventListener('click', saveAdminDeviceLimit);
         $('#scores-save').addEventListener('click', saveBatchScores);
         $('#revoke-all-btn').addEventListener('click', revokeAllStudentSessions);
         $('#signout-confirm').addEventListener('click', signOut);

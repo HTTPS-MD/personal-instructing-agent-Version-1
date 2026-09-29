@@ -1103,6 +1103,11 @@ body[data-loading] #refresh-btn .icon,
    still land on it and hear its explanation. */
 .input.input-locked { background: var(--bg-chip); color: var(--text-muted); cursor: not-allowed; }
 
+/* Settings -> Password. The confirmation line keeps its space from the start
+   (up to three lines on a phone), so sending the link moves nothing. */
+.pw-reset-to { color: var(--text); overflow-wrap: anywhere; }
+.pw-reset-status { min-height: calc(3 * 1.5em); }
+
 /* A notice that reports a failure rather than a fact. */
 .notice-danger { background: var(--danger-soft); }
 .notice-danger .icon { color: var(--danger); }

@@ -577,69 +577,54 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Settings</h1>
-                            <p class="page-desc">Your own credentials and device policy, and who else has administrator access.</p>
+                            <p class="page-desc">Your password, the devices signed in to your account, and who else has administrator access.</p>
                         </div>
                     </div>
 
                     <div class="stack-lg">
                     <div class="grid grid-2">
+                        <!-- The password is changed through an emailed link, never in a
+                             form here: an unlocked laptop is not enough to change it --
+                             the person also needs this account's inbox. The link opens
+                             the site's set-password page, which then signs the account
+                             out everywhere. -->
                         <div class="card">
                             <div class="card-head">
                                 <div class="card-head-text">
-                                    <h2 class="card-title">Account security</h2>
-                                    <p class="card-sub">Update the password used to sign in to this console.</p>
+                                    <h2 class="card-title">Password</h2>
+                                    <p class="card-sub">Changed through a link sent to your email.</p>
                                 </div>
                             </div>
-                            <div class="card-body">
-                                <form id="password-form" novalidate>
-                                    <div class="form-grid">
-                                        <div class="field">
-                                            <label class="label" for="new-password">New password <span class="req">*</span></label>
-                                            <input class="input" type="password" id="new-password" minlength="8"
-                                                placeholder="At least 8 characters" autocomplete="new-password">
-                                            <p class="field-msg" data-msg-for="new-password"></p>
-                                        </div>
-                                        <div class="field">
-                                            <label class="label" for="confirm-password">Confirm password <span class="req">*</span></label>
-                                            <input class="input" type="password" id="confirm-password" minlength="8"
-                                                placeholder="Re-enter the new password" autocomplete="new-password">
-                                            <p class="field-msg" data-msg-for="confirm-password"></p>
-                                        </div>
-                                    </div>
-                                </form>
+                            <div class="card-body stack">
+                                <p class="notice-text">We&rsquo;ll send a reset link to
+                                    <strong class="pw-reset-to" id="pw-reset-to">your email</strong>. Open it, choose a
+                                    new password, then sign in again. Saving it signs this account out on every
+                                    device.</p>
+                                <!-- Reserved line: the confirmation appears here without moving anything. -->
+                                <p class="qb-help pw-reset-status" id="pw-reset-status" role="status" aria-live="polite"></p>
                             </div>
                             <div class="card-foot" style="justify-content:flex-end">
-                                <button class="btn btn-primary" type="submit" form="password-form" id="password-submit">
-                                    <svg class="icon"><use href="#i-key"></use></svg>
-                                    Update password
+                                <button class="btn btn-primary" type="button" id="pw-reset-send">
+                                    <svg class="icon"><use href="#i-mail"></use></svg>
+                                    Email me a reset link
                                 </button>
                             </div>
                         </div>
 
+                        <!-- No device limit for administrators (migration 0032): just
+                             the browsers signed in to this account, and a way to end
+                             any of them. Devices whose login has ended drop off the
+                             list by themselves. -->
                         <div class="card" data-region="admindevices">
                             <div class="card-head">
                                 <div class="card-head-text">
-                                    <h2 class="card-title">Device policy</h2>
-                                    <p class="card-sub">Concurrent sessions allowed for this administrator account.</p>
+                                    <h2 class="card-title">Signed-in devices</h2>
+                                    <p class="card-sub">Browsers signed in to your account. Revoke one you don&rsquo;t
+                                        recognise and it is signed out straight away.</p>
                                 </div>
                             </div>
-                            <div class="card-body stack">
-                                <div class="field" style="max-width:220px">
-                                    <label class="label" for="device-limit">Maximum devices</label>
-                                    <input class="input tnum" type="number" id="device-limit" min="2" max="10" value="2"
-                                        aria-describedby="device-limit-help">
-                                    <p class="field-msg" data-msg-for="device-limit"></p>
-                                    <p class="qb-help" id="device-limit-help">Between 2 and 10. Never below 2, so one
-                                        device can always be signed out from another.</p>
-                                </div>
-
-                                <div>
-                                    <p class="eyebrow" style="margin-bottom:12px">Your active devices</p>
-                                    <div id="admin-device-list"></div>
-                                </div>
-                            </div>
-                            <div class="card-foot" style="justify-content:flex-end">
-                                <button class="btn btn-secondary" id="save-device-limit">Save policy</button>
+                            <div class="card-body">
+                                <div id="admin-device-list"></div>
                             </div>
                         </div>
                     </div>
@@ -1208,11 +1193,6 @@
                             <label class="label" for="aa-email">Email address <span class="req">*</span></label>
                             <input class="input" type="email" id="aa-email" placeholder="a.reyes@ue.edu.ph" autocomplete="off">
                             <p class="field-msg" data-msg-for="aa-email"></p>
-                        </div>
-                        <div class="field" style="max-width:220px">
-                            <label class="label" for="aa-devices">Maximum devices</label>
-                            <input class="input tnum" type="number" id="aa-devices" min="2" max="10" value="2">
-                            <p class="field-msg" data-msg-for="aa-devices"></p>
                         </div>
                     </div>
 
