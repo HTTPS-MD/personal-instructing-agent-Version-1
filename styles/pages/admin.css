@@ -43,11 +43,10 @@
 .table tbody tr.is-clickable { cursor: pointer; }
 
 /* A row that opens something takes focus itself (Faculty has no other
-   control in it). The ring is drawn inside the row so the table's scroll
-   container never clips it. */
+   control in it). global.css draws the ring; it is pulled inside the row so
+   the table's scroll container never clips it. */
 .table tbody tr.is-clickable:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
+    outline-offset: -3px;
     background: var(--bg-surface-hover);
 }
 
@@ -153,7 +152,7 @@
     overflow-y: auto;
 }
 
-.health-grid:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.health-grid:focus-visible { outline-offset: -3px; }
 .health-empty { grid-column: 1 / -1; }
 
 .health-tile {
