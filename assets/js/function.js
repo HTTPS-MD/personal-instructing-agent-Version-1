@@ -177,6 +177,48 @@ async function enforceDeviceLimit(email, profile) {
     return { allowed: true };
 }
 
+// STUDENTS: ONE ACTIVE SESSION, THE LATEST SIGN-IN WINS (migration 0027).
+// Students no longer use the device slots above. Right after the password
+// check, this device claims the account; the server signs every other device
+// out (their tokens are refused at once, their refresh tokens deleted), and
+// their 10-second check (section 1C-6) shows them why. Teachers keep the
+// slots; the server ignores this call for staff.
+//
+// Returns { allowed: true } or { allowed: false, reason }. `missing` means
+// 0027 is not applied yet -- the caller falls back to enforceDeviceLimit, so
+// shipping this file before the SQL changes nothing.
+async function claimStudentSession() {
+    if (!window.supabaseClient) return { allowed: false, reason: 'No connection to the server.' };
+
+    const { error } = await supabaseClient.rpc('claim_student_session', {
+        p_device_id: getOrCreateDeviceId()
+    });
+
+    if (error) {
+        if (isMissingFunction(error)) return { allowed: false, missing: true };
+        return {
+            allowed: false,
+            reason: isNetworkFailure(error)
+                ? 'Can’t reach the server. Check your Wi-Fi, then try again.'
+                : 'We couldn’t start your session. Please try again.'
+        };
+    }
+    return { allowed: true };
+}
+
+// PGRST202 = PostgREST has no such function; 42883 = Postgres has none.
+function isMissingFunction(error) {
+    return !!error && (error.code === 'PGRST202' || error.code === '42883');
+}
+
+// supabase-js reports a failed fetch as an error with no code, rather than
+// throwing. Anything with a code is a real answer from the server.
+function isNetworkFailure(error) {
+    if (navigator.onLine === false) return true;
+    if (!error || error.code || error.status) return false;
+    return /fetch|network|load failed|timeout|offline/i.test(String(error.message || ''));
+}
+
 // I-wire ang isang set ng OTP digit inputs (auto-advance, backspace, paste-split).
 function wireOtpInputs(inputs) {
     if (!inputs || inputs.length === 0) return;
@@ -335,6 +377,17 @@ async function requireStudentSession(opts) {
         // Umaabot din dito ang na-revoke na session: hinaharangan ng
         // jwt_is_current() ang SELECT, kaya walang naibabalik na profile
         // kahit teknikal na hindi pa expired ang access token.
+        //
+        // Kasama na rito ang device na napalitan ng mas bagong sign-in
+        // (0027). Tinatanong muna ang server kung bakit, para masabi sa
+        // estudyante ang totoong dahilan -- at para LOCAL lang ang sign-out:
+        // ang global sa ibaba ay kayang i-sign out pati ang bagong device.
+        const why = await fetchSessionStatus();
+        if (why === 'replaced' || why === 'revoked') {
+            endStudentSession(why);
+            return null;
+        }
+
         const keptDeviceId = localStorage.getItem('pia_device_id');
         await supabaseClient.auth.signOut({ scope: 'global' });
         localStorage.clear();
@@ -366,6 +419,7 @@ async function requireStudentSession(opts) {
     renderSignOutControl(profile);
     startIdleWatchdog();
     startPresenceHeartbeat();
+    startSessionGuard();
 
     return profile;
 }
@@ -508,6 +562,7 @@ function startIdleWatchdog() {
     };
 
     const resetIdle = () => {
+        if (piaSessionEnded) return;   // nothing left to protect on this device
         clearTimeout(idleTimeoutId);
         dismissWarning();
         idleTimeoutId = setTimeout(showIdleWarning, IDLE_LIMIT_MS - IDLE_WARNING_MS);
@@ -563,7 +618,7 @@ const PRESENCE_EVERY_MS = 45 * 1000;
 let presenceTimerId = null;
 
 function beatPresence() {
-    if (!window.supabaseClient || document.hidden) return;
+    if (!window.supabaseClient || document.hidden || piaSessionEnded) return;
     window.supabaseClient.rpc('touch_presence', { p_online: true }).then(() => {}, () => {});
 }
 
@@ -572,6 +627,265 @@ function startPresenceHeartbeat() {
     beatPresence();
     presenceTimerId = setInterval(beatPresence, PRESENCE_EVERY_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) beatPresence(); });
+}
+
+// ==========================================
+// 1C-6. ONE ACTIVE SESSION (students, migration 0027)
+// Every 10 seconds a student page asks check_student_session() whether this
+// browser still holds the account. When another device has signed in since,
+// the answer is 'replaced', and this page:
+//   (1) stops every beat at once -- this check, presence, the idle timer and
+//       the realtime channels -- so nothing more is sent from here;
+//   (2) locks the page behind a notice that says why;
+//   (3) signs out LOCALLY and clears storage. Never 'global': that would end
+//       the new device's session too.
+// The database has already refused this device's token by then (0027 stamps
+// sessions_revoked_at), so an answer typed in the last few seconds is
+// rejected server-side; the notice is what tells the student.
+//
+// Only a definite answer from the server ends the session. A dropped request,
+// a server error or a missing function (0027 not applied) never does -- a
+// Wi-Fi blip in the lab must not sign a class out. A hidden tab skips its
+// checks and checks again the moment it is shown.
+// ==========================================
+const SESSION_CHECK_MS = 10 * 1000;
+let sessionCheckTimerId = null;
+let sessionCheckInFlight = false;
+let sessionGuardOff = false;
+let piaSessionEnded = false;
+let piaUserSigningOut = false;
+
+// The auth session a token belongs to (its session_id claim). Used only to
+// notice that THIS browser signed in again (in another tab) while a check was
+// in flight -- never trusted for anything the server decides.
+function tokenSessionId(token) {
+    try {
+        const part = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const json = JSON.parse(atob(part + '='.repeat((4 - (part.length % 4)) % 4)));
+        return json.session_id || 'unknown';
+    } catch (e) {
+        return 'unknown';
+    }
+}
+
+// null = this browser holds no session at all; undefined = could not tell.
+async function localSessionId() {
+    try {
+        const { data } = await supabaseClient.auth.getSession();
+        const session = data && data.session;
+        return session ? tokenSessionId(session.access_token) : null;
+    } catch (e) {
+        return undefined;
+    }
+}
+
+// 'active' | 'replaced' | 'revoked' | 'none', or null when there is no
+// definite answer (offline, server error, 0027 not applied).
+async function fetchSessionStatus() {
+    if (!window.supabaseClient) return null;
+    try {
+        const { data, error } = await supabaseClient.rpc('check_student_session');
+        if (error) {
+            if (isMissingFunction(error)) stopSessionGuard();
+            return null;
+        }
+        const status = data && data.status;
+        return ['active', 'replaced', 'revoked', 'none'].indexOf(status) === -1 ? null : status;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function checkStudentSession() {
+    if (piaSessionEnded || sessionGuardOff || sessionCheckInFlight) return;
+    if (document.hidden || navigator.onLine === false) return;
+
+    sessionCheckInFlight = true;
+    try {
+        const before = await localSessionId();
+        if (before === null) { endStudentSession('ended'); return; }
+
+        const status = await fetchSessionStatus();
+        if (status === null || status === 'active') return;
+
+        // Another tab of THIS browser signed in meanwhile: that session is
+        // this device's too. Ask again on the next beat instead.
+        const after = await localSessionId();
+        if (after !== null && after !== before) return;
+
+        endStudentSession(status === 'none' ? 'ended' : status);
+    } finally {
+        sessionCheckInFlight = false;
+    }
+}
+
+function stopSessionGuard() {
+    sessionGuardOff = true;
+    clearInterval(sessionCheckTimerId);
+}
+
+function startSessionGuard() {
+    if (sessionCheckTimerId !== null || piaSessionEnded || !window.supabaseClient) return;
+
+    sessionCheckTimerId = setInterval(checkStudentSession, SESSION_CHECK_MS);
+    checkStudentSession();
+
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkStudentSession(); });
+    window.addEventListener('online', checkStudentSession);
+
+    // The refresh token was deleted by a takeover or by "Sign out
+    // everywhere", or another tab signed out: supabase-js drops the session
+    // and says so. Deferred a tick -- calling back into the auth client from
+    // inside its own callback can deadlock it.
+    supabaseClient.auth.onAuthStateChange((event) => {
+        if (event !== 'SIGNED_OUT' || piaUserSigningOut) return;
+        setTimeout(() => endStudentSession('ended'), 0);
+    });
+}
+
+const SESSION_ENDED_COPY = {
+    replaced: {
+        title: 'Signed in on another device',
+        text: 'Your account was logged in from another device. You have been securely logged out here.',
+        note: 'To keep working on this device instead, sign in again. The other device will be signed out.'
+    },
+    revoked: {
+        title: 'You’ve been signed out',
+        text: 'Your teacher or the study team signed this account out. You have been securely logged out here.',
+        note: ''
+    },
+    ended: {
+        title: 'Your session has ended',
+        text: 'For your security, you have been signed out on this device.',
+        note: ''
+    }
+};
+
+// Local-only cleanup, shared by the notice's button. Keeps the device ID (the
+// device manager knows this PC by it) and the theme choice.
+function clearLocalSession() {
+    try {
+        const deviceId = localStorage.getItem('pia_device_id');
+        const theme = localStorage.getItem('pia_theme');
+        localStorage.clear();
+        sessionStorage.clear();
+        if (deviceId) localStorage.setItem('pia_device_id', deviceId);
+        if (theme) localStorage.setItem('pia_theme', theme);
+    } catch (e) { /* private mode */ }
+}
+
+async function endStudentSession(reason) {
+    if (piaSessionEnded) return;
+    piaSessionEnded = true;
+
+    // (1) Nothing more leaves this device.
+    stopSessionGuard();
+    clearInterval(presenceTimerId);
+    clearTimeout(idleTimeoutId);
+    clearInterval(idleCountdownId);
+    const idleModal = document.getElementById('pia-idle-modal');
+    if (idleModal) idleModal.remove();
+    removeAllChannels();
+
+    // (2) Say why, before any network call can stall.
+    showSessionEnded(SESSION_ENDED_COPY[reason] ? reason : 'ended');
+    window.dispatchEvent(new CustomEvent('pia:session-ended', { detail: { reason } }));
+
+    // (3) This device only. Capped, so a dead connection cannot keep the
+    //     token in storage: clearing storage signs this browser out anyway.
+    try {
+        await Promise.race([
+            supabaseClient.auth.signOut({ scope: 'local' }),
+            new Promise((resolve) => setTimeout(resolve, 4000))
+        ]);
+    } catch (e) { /* the storage clear below is what matters */ }
+    clearLocalSession();
+}
+
+// The notice. Fixed-position, so it cannot move anything behind it (zero
+// CLS); everything else on the page is made inert, so the only thing a
+// keyboard, mouse or screen reader can reach is the way back to sign-in.
+// Built with textContent -- no markup from anywhere reaches innerHTML except
+// the constant icon below.
+function showSessionEnded(reason) {
+    if (document.getElementById('pia-session-ended')) return;
+    const copy = SESSION_ENDED_COPY[reason];
+
+    Array.prototype.forEach.call(document.body.children, (node) => {
+        if (node.tagName !== 'SCRIPT') node.inert = true;
+    });
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+
+    // Stage pages stay transparent until their guard passes; the notice
+    // lives in <body>, so it must not inherit that.
+    document.body.classList.remove('opacity-0');
+
+    const root = document.createElement('div');
+    root.id = 'pia-session-ended';
+    root.className = 'session-ended';
+    root.setAttribute('role', 'alertdialog');
+    root.setAttribute('aria-modal', 'true');
+    root.setAttribute('aria-labelledby', 'pia-session-ended-title');
+    root.setAttribute('aria-describedby', 'pia-session-ended-text');
+
+    const card = document.createElement('div');
+    card.className = 'session-ended-card';
+
+    const glyph = document.createElement('span');
+    glyph.className = 'session-ended-glyph';
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.innerHTML =
+        '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+        'stroke-linecap="round" stroke-linejoin="round" focusable="false">' +
+        '<rect x="2.5" y="4" width="13" height="9.5" rx="1.5"/><path d="M6 17h6"/>' +
+        '<rect x="15.5" y="9" width="6" height="11" rx="1.5"/><path d="M18.5 17.5h.01"/></svg>';
+
+    const title = document.createElement('h2');
+    title.className = 'session-ended-title';
+    title.id = 'pia-session-ended-title';
+    title.textContent = copy.title;
+
+    const text = document.createElement('p');
+    text.className = 'session-ended-text';
+    text.id = 'pia-session-ended-text';
+    text.textContent = copy.text;
+
+    card.append(glyph, title, text);
+
+    if (copy.note) {
+        const note = document.createElement('p');
+        note.className = 'session-ended-note';
+        note.textContent = copy.note;
+        card.append(note);
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-primary session-ended-btn';
+    btn.textContent = 'Sign in again';
+    btn.addEventListener('click', () => {
+        btn.disabled = true;
+        btn.textContent = 'Opening sign-in…';
+        clearLocalSession();
+        window.location.replace('/index.html');
+    });
+    card.append(btn);
+
+    root.append(card);
+    document.body.append(root);
+
+    // A frame lets the fade run. rAF does not fire in a background tab, and
+    // a takeover can land there (SIGNED_OUT from a failed refresh), so a
+    // timer opens it too -- whichever comes first.
+    let opened = false;
+    const open = () => {
+        if (opened) return;
+        opened = true;
+        root.classList.add('is-open');
+        btn.focus({ preventScroll: true });
+    };
+    requestAnimationFrame(open);
+    setTimeout(open, 100);
 }
 
 // ==========================================
@@ -699,10 +1013,21 @@ async function validateDeviceOnLoad() {
 
         if (data && data.active_devices) {
             if (!data.active_devices.includes(currentDeviceId)) {
-                showRevokeModal("Session Revoked", "Your device session was revoked by the administrator.");
+                deviceDropped("Your device session was revoked by the administrator.");
             }
         }
     }
+}
+
+// This device fell off the account's device list. For a student that now
+// usually means a newer sign-in took over (0027), not an admin -- ask the
+// server which, and say the right thing. Staff always get the admin message
+// (check_student_session answers 'active' for them).
+async function deviceDropped(adminMessage) {
+    if (piaSessionEnded) return;
+    const status = localStorage.getItem('pia_user_role') === 'student' ? await fetchSessionStatus() : null;
+    if (status === 'replaced') { endStudentSession('replaced'); return; }
+    showRevokeModal("Session Revoked", adminMessage);
 }
 
 async function watchDeviceSession() {
@@ -742,7 +1067,7 @@ async function watchDeviceSession() {
             const activeDevices = updatedProfile.active_devices || [];
             if (!activeDevices.includes(currentDeviceId)) {
                 if (sessionStorage.getItem('is_signing_out') === 'true') return;
-                showRevokeModal("Session Revoked", "Your device session was disconnected by the administrator.");
+                deviceDropped("Your device session was disconnected by the administrator.");
             }
         })
         .subscribe());
@@ -759,6 +1084,16 @@ async function watchDeviceSession() {
 //   (4) absolute path na redirect -- ang '../../index.html' ay mali kapag
 //       tinawag mula sa root.
 async function executeForceLogout() {
+    // Already signed out here by a newer sign-in elsewhere (section 1C-6).
+    // Everything below would act on the account -- global sign-out, presence,
+    // the device list -- and the account now belongs to the other device.
+    if (piaSessionEnded) {
+        clearLocalSession();
+        window.location.replace('/index.html');
+        return;
+    }
+    piaUserSigningOut = true;
+
     // Sinasabihan ang realtime watcher na huwag magpakita ng "Session Revoked"
     // modal habang tayo mismo ang nag-aalis ng device sa listahan.
     sessionStorage.setItem('is_signing_out', 'true');

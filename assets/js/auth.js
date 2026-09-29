@@ -391,9 +391,9 @@
 
     /* Two areas — student, and staff (teacher or admin) — and one pipeline:
          signInWithPassword → profiles lookup → role → AREA CHECK
-           → device claim → redirect
-       The device claim is skipped for admins, matching enforceDeviceLimit's
-       contract in function.js. */
+           → device claim (claimSeat) → redirect
+       Students take the account's one active session; teachers take a
+       device slot; admins skip the claim. */
 
     /* Anything that is not explicitly staff routes as a student, exactly as
        the redirect below always has. Normalising once means the area check
@@ -508,26 +508,26 @@
                 localStorage.setItem('pia_user_role', role);
             } catch (err) { /* private mode */ }
 
-            if (role !== 'admin' && typeof enforceDeviceLimit === 'function') {
-                var check = await enforceDeviceLimit(auth.data.user.email, profile);
-                if (!check.allowed) {
-                    /* Device limit: the OTHER device keeps its session and
-                       its slot; only this refused attempt is undone. */
-                    await sb.auth.signOut({ scope: 'local' });
-                    try {
-                        localStorage.removeItem('pia_user_email');
-                        localStorage.removeItem('pia_user_role');
-                    } catch (err) { /* private mode */ }
-                    setStatus(opts.statusId, check.reason, 'error');
+            var check = await claimSeat(auth.data.user.email, profile, role);
+            if (!check.allowed) {
+                /* Only this refused attempt is undone; any other device
+                   keeps its session. */
+                await sb.auth.signOut({ scope: 'local' });
+                try {
+                    localStorage.removeItem('pia_user_email');
+                    localStorage.removeItem('pia_user_role');
+                } catch (err) { /* private mode */ }
+                setStatus(opts.statusId, check.reason, 'error');
 
-                    /* Most often the "other device" is a lab PC whose browser
-                       was closed without signing out. Offer the way out that
-                       needs no admin: an email code (section 3b). */
+                /* At the device limit, the "other device" is most often a lab
+                   PC whose browser was closed without signing out. Offer the
+                   way out that needs no admin: an email code (section 3b). */
+                if (check.deviceLimit) {
                     deviceReset.email = email;
                     deviceReset.area = opts.area;
                     if (offer) { offer.hidden = false; }
-                    return;
                 }
+                return;
             }
 
             await routeAfterSignIn(profile, role, function (message, tone) {
@@ -539,6 +539,26 @@
         } finally {
             release();
         }
+    }
+
+    /* Who may hold how many devices:
+         student  one active session; this sign-in takes the account over and
+                  the older device is signed out within ten seconds (0027);
+         teacher  the device slots of claim_device (max_devices);
+         admin    no limit.
+       If 0027 is not applied yet, students fall back to the device slots, so
+       the order in which the SQL and this file ship does not matter. */
+    async function claimSeat(email, profile, role) {
+        if (role === 'admin') { return { allowed: true }; }
+
+        if (role === 'student' && typeof claimStudentSession === 'function') {
+            var claim = await claimStudentSession();
+            if (!claim.missing) { return claim; }
+        }
+
+        if (typeof enforceDeviceLimit !== 'function') { return { allowed: true }; }
+        var slots = await enforceDeviceLimit(email, profile);
+        return slots.allowed ? slots : { allowed: false, reason: slots.reason, deviceLimit: true };
     }
 
     function handleStudentSignIn(event) {
@@ -694,6 +714,15 @@
         var role = normalizeRole(profile.role);
         var mismatch = area ? areaMismatch(area, role) : '';
         if (mismatch) { return fail(mismatch); }
+
+        /* reset_my_devices registered this device, but a student's account
+           also names ONE active session (0027). Without this, the student's
+           own heartbeat would read the older session as the active one and
+           sign this device straight back out. */
+        if (role === 'student' && typeof claimStudentSession === 'function') {
+            var claim = await claimStudentSession();
+            if (!claim.allowed && !claim.missing) { return fail(claim.reason); }
+        }
 
         try {
             localStorage.setItem('pia_user_email', email);

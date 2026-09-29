@@ -295,6 +295,7 @@
     --z-toast: 300;
     --z-banner: 350;
     --z-boot: 400;
+    --z-lockout: 450;   /* "signed in elsewhere" notice: above even the boot veil */
 
     --scrollbar-w: 0px;
 }
@@ -1520,9 +1521,10 @@ body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
 }
 
 /* ------------------------------------------ 16. JS-INJECTED GLOBAL OVERLAYS
-   assets/js/function.js runs on every page and builds two overlays at
+   assets/js/function.js runs on every page and builds three overlays at
    runtime: the session-revoke dialog (forced logout when a device claim is
-   withdrawn) and the idle-timeout warning.
+   withdrawn), the idle-timeout warning, and the student "signed in on
+   another device" notice (.session-ended, below).
 
    Their styles used to live in styles/components.css (since deleted), which
    only ever shipped on the tutoring page — so on the other pages this security
@@ -1596,6 +1598,101 @@ body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
 }
 
 .revoke-modal-actions { padding-top: var(--sp-2); }
+
+/* "Signed in on another device" (function.js, section 1C-6).
+   Mobile first: a 16px gutter and a card that fills the width, capped at
+   26rem. Fixed to the viewport, so showing it moves nothing behind it; the
+   page underneath is inert, so there is nothing else to reach. It cannot be
+   dismissed -- the session is already gone -- only left for sign-in. */
+.session-ended {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-lockout);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-4);
+    padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: color-mix(in srgb, var(--bg-body) 88%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity var(--t-base);
+}
+
+.session-ended.is-open { opacity: 1; }
+
+.session-ended-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    width: 100%;
+    max-width: 26rem;
+    margin: auto;                    /* stays reachable when taller than the screen */
+    padding: var(--sp-7) var(--sp-6);
+    text-align: center;
+    background: var(--bg-surface);
+    color: var(--text);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-dialog);
+    transform: translateY(8px);
+    transition: transform var(--t-base);
+}
+
+.session-ended.is-open .session-ended-card { transform: translateY(0); }
+
+.session-ended-glyph {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--sp-1);
+    border-radius: var(--r-pill);
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.session-ended-title {
+    font-size: var(--fs-h4);
+    font-weight: 800;
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+.session-ended-text {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    text-wrap: pretty;
+}
+
+.session-ended-note {
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+    text-wrap: pretty;
+}
+
+.session-ended-btn {
+    width: 100%;
+    min-height: var(--icon-btn);
+    margin-top: var(--sp-3);
+}
+
+@media (min-width: 30rem) {
+    .session-ended { padding: var(--sp-6); }
+    .session-ended-card { padding: var(--sp-8) var(--sp-7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .session-ended,
+    .session-ended-card { transition: none; }
+    .session-ended-card { transform: none; }
+}
 
 .spin { animation: spin 1s linear infinite; }
 

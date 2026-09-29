@@ -66,8 +66,14 @@
         attemptsUsed: 0,
         servedIds: [],
         submitting: false,
-        finished: false
+        finished: false,
+        ended: false        /* another device took the account (function.js 1C-6) */
     };
+
+    /* The database already refuses this device's writes; this stops the page
+       queuing more of them (the next problem, a progress sync) behind the
+       notice. */
+    window.addEventListener('pia:session-ended', function () { state.ended = true; });
 
     /* ============================================ 1. SCREENS =========== */
 
@@ -390,6 +396,7 @@
     }
 
     async function nextProblem() {
+        if (state.ended) { return; }
         if (state.answered >= SESSION_TARGET) { return endSession(); }
 
         var problem = pickProblem();
@@ -563,6 +570,7 @@
     }
 
     function advance() {
+        if (state.ended) { return; }
         if (state.answered >= SESSION_TARGET) { endSession(); }
         else { nextProblem(); }
     }
@@ -616,7 +624,7 @@
     /* Feeds the admin console's live view. Display fields only — nothing the
        research data is derived from. */
     async function syncProgress() {
-        if (!state.email) { return; }
+        if (!state.email || state.ended) { return; }
         await sb.from('profiles').update({
             current_problem: state.problemNumber,
             current_difficulty: 'Level ' + state.level,
