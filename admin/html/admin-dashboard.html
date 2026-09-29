@@ -233,8 +233,6 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title" id="overview-greeting">Overview</h1>
-                            <p class="page-desc">Live state of the PIA experiment across all sections — cohort size,
-                                stage progression and open access gates.</p>
                         </div>
                         <div class="page-actions">
                             <button class="btn btn-secondary" id="export-overview">
@@ -256,7 +254,6 @@
                                     <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-users"></use></svg></span>
                                 </div>
                                 <p class="stat-value" id="kpi-enrolled"><span class="skeleton skeleton-line"></span></p>
-                                <p class="stat-foot" id="kpi-enrolled-foot">Across all sections</p>
                             </div>
 
                             <div class="stat" data-region="cohort sections">
@@ -265,7 +262,6 @@
                                     <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-activity"></use></svg></span>
                                 </div>
                                 <p class="stat-value" id="kpi-online"><span class="skeleton skeleton-line"></span></p>
-                                <p class="stat-foot">Students with a registered device session</p>
                             </div>
 
                             <div class="stat" data-region="cohort sections">
@@ -283,7 +279,6 @@
                                     <span class="stat-glyph g-danger"><svg class="icon"><use href="#i-mail"></use></svg></span>
                                 </div>
                                 <p class="stat-value" id="kpi-inactive"><span class="skeleton skeleton-line"></span></p>
-                                <p class="stat-foot">Accounts that have not set a password yet</p>
                             </div>
                         </div>
 
@@ -293,7 +288,6 @@
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Study pipeline</h2>
-                                            <p class="card-sub">Where the cohort currently sits in the four-stage protocol.</p>
                                         </div>
                                         <div class="card-tools">
                                             <button class="btn btn-secondary btn-sm" data-view-link="controls">Manage gates</button>
@@ -308,7 +302,6 @@
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Live sessions</h2>
-                                            <p class="card-sub">Students in an active stage, longest running first.</p>
                                         </div>
                                         <div class="card-tools">
                                             <button class="btn btn-secondary btn-sm" data-view-link="students">Open roster</button>
@@ -335,7 +328,6 @@
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Access gates</h2>
-                                            <p class="card-sub">Global stage availability.</p>
                                         </div>
                                     </div>
                                     <div class="card-body stack" id="gate-summary"></div>
@@ -344,8 +336,7 @@
                                 <div class="card" data-region="cohort sections">
                                     <div class="card-head">
                                         <div class="card-head-text">
-                                            <h2 class="card-title">Section health</h2>
-                                            <p class="card-sub">OCEAN completion by section.</p>
+                                            <h2 class="card-title">OCEAN by section</h2>
                                         </div>
                                     </div>
                                     <div class="card-body stack" id="section-health"></div>
@@ -360,7 +351,6 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Sections</h1>
-                            <p class="page-desc">Class groupings used to assign students, faculty and targeted stage overrides.</p>
                         </div>
                         <div class="page-actions">
                             <button class="btn btn-primary" data-modal-open="modal-new-section">
@@ -378,8 +368,6 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Student roster</h1>
-                            <p class="page-desc">Every enrolled participant with their assigned condition, current stage
-                                and device usage. Select a row to open the participant profile and actions.</p>
                         </div>
                         <div class="page-actions">
                             <button class="btn btn-secondary" id="export-roster">
@@ -403,7 +391,6 @@
                                     <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-brain"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="OCEAN"><span class="skeleton skeleton-line"></span></span>
-                                <span class="stat-foot">Answering the inventory</span>
                             </button>
                             <button class="stat" data-stage-filter="Character Selection" data-region="stages">
                                 <span class="stat-top">
@@ -411,7 +398,6 @@
                                     <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-user"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="Character Selection"><span class="skeleton skeleton-line"></span></span>
-                                <span class="stat-foot">Choosing an agent persona</span>
                             </button>
                             <button class="stat" data-stage-filter="Tutoring Dashboard" data-region="stages">
                                 <span class="stat-top">
@@ -419,7 +405,6 @@
                                     <span class="stat-glyph"><svg class="icon"><use href="#i-grid"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="Tutoring Dashboard"><span class="skeleton skeleton-line"></span></span>
-                                <span class="stat-foot">Browsing problem sets</span>
                             </button>
                             <button class="stat" data-stage-filter="Active Game" data-region="stages">
                                 <span class="stat-top">
@@ -427,7 +412,6 @@
                                     <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-gamepad"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="Active Game"><span class="skeleton skeleton-line"></span></span>
-                                <span class="stat-foot">Solving math problems</span>
                             </button>
                         </div>
 
@@ -435,7 +419,6 @@
                             <div class="card-head">
                                 <div class="card-head-text">
                                     <h2 class="card-title" id="roster-title">All students</h2>
-                                    <p class="card-sub" id="roster-sub">Showing the full cohort.</p>
                                 </div>
                                 <div class="card-tools">
                                     <button class="btn btn-secondary btn-sm is-hidden" id="clear-stage-filter">
@@ -472,8 +455,6 @@
                                 <div id="student-empty" class="state-block is-hidden">
                                     <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-search"></use></svg></span>
                                     <p class="state-title">No matching students</p>
-                                    <p class="state-desc">Adjust the search term or clear the active filters to see the
-                                        full roster again.</p>
                                     <button class="btn btn-secondary btn-sm" id="reset-filters">Reset filters</button>
                                 </div>
                             </div>
@@ -498,7 +479,6 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Faculty</h1>
-                            <p class="page-desc">Professors with observer access to a section's roster and results.</p>
                         </div>
                         <div class="page-actions">
                             <button class="btn btn-primary" data-modal-open="modal-add-professor">
@@ -511,8 +491,10 @@
                     <div class="card" data-region="faculty">
                         <div class="card-head">
                             <div class="card-head-text">
-                                <h2 class="card-title">Faculty roster</h2>
-                                <p class="card-sub">Access is scoped to the assigned section only.</p>
+                                <div class="with-tip">
+                                    <h2 class="card-title">Faculty roster</h2>
+                                    <button type="button" class="info-tip" data-tip="Each professor sees only their assigned section." aria-label="About faculty access"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                </div>
                             </div>
                             <div class="card-tools">
                                 <label class="search">
@@ -538,7 +520,6 @@
                             <div id="faculty-empty" class="state-block is-hidden">
                                 <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-cap"></use></svg></span>
                                 <p class="state-title">No faculty yet</p>
-                                <p class="state-desc">Add a professor to give them observer access to one section.</p>
                             </div>
                         </div>
                     </div>
@@ -549,24 +530,10 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Stage controls</h1>
-                            <p class="page-desc">Open or close each stage of the protocol globally, or grant a targeted
-                                override to one section or one participant.</p>
                         </div>
                     </div>
 
                     <div class="stack-lg">
-                        <div class="notice notice-accent">
-                            <svg class="icon"><use href="#i-shield"></use></svg>
-                            <div>
-                                <p class="notice-title">Account password policy</p>
-                                <p class="notice-text">Every new student and professor account is issued a random,
-                                    unguessable initial password that is never displayed or stored. Account owners set
-                                    their own password through the <strong>Send activation email</strong> or
-                                    <strong>Reset password</strong> action, which delivers a secure one-time link.
-                                    A student with no email access can be given a temporary password instead; they
-                                    must replace it with one only they know before they can do anything else.</p>
-                            </div>
-                        </div>
 
                         <div class="grid grid-3" id="gates-grid" data-region="settings"></div>
                     </div>
@@ -577,7 +544,6 @@
                     <div class="page-head">
                         <div class="page-head-text">
                             <h1 class="page-title">Settings</h1>
-                            <p class="page-desc">Your password, the devices signed in to your account, and who else has administrator access.</p>
                         </div>
                     </div>
 
@@ -591,15 +557,15 @@
                         <div class="card">
                             <div class="card-head">
                                 <div class="card-head-text">
-                                    <h2 class="card-title">Password</h2>
-                                    <p class="card-sub">Changed through a link sent to your email.</p>
+                                    <div class="with-tip">
+                                        <h2 class="card-title">Password</h2>
+                                        <button type="button" class="info-tip" data-tip="Saving the new password signs this account out on every device." aria-label="About password changes"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-body stack">
-                                <p class="notice-text">We&rsquo;ll send a reset link to
-                                    <strong class="pw-reset-to" id="pw-reset-to">your email</strong>. Open it, choose a
-                                    new password, then sign in again. Saving it signs this account out on every
-                                    device.</p>
+                                <p class="notice-text">Reset link goes to
+                                    <strong class="pw-reset-to" id="pw-reset-to">your email</strong></p>
                                 <!-- Reserved line: the confirmation appears here without moving anything. -->
                                 <p class="qb-help pw-reset-status" id="pw-reset-status" role="status" aria-live="polite"></p>
                             </div>
@@ -619,8 +585,6 @@
                             <div class="card-head">
                                 <div class="card-head-text">
                                     <h2 class="card-title">Signed-in devices</h2>
-                                    <p class="card-sub">Browsers signed in to your account. Revoke one you don&rsquo;t
-                                        recognise and it is signed out straight away.</p>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -636,10 +600,10 @@
                     <div class="card" data-region="admins">
                         <div class="card-head">
                             <div class="card-head-text">
-                                <h2 class="card-title">Administrators</h2>
-                                <p class="card-sub">Full access to every participant, stage and result. Keep this list short.
-                                    Administrators cannot remove, change or sign out one another; the project owner does
-                                    that from the Supabase dashboard.</p>
+                                <div class="with-tip">
+                                    <h2 class="card-title">Administrators</h2>
+                                    <button type="button" class="info-tip" data-tip="Full access to every participant and result. Administrators can’t remove, change or sign out one another — the project owner does that in Supabase." aria-label="About administrators"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                </div>
                             </div>
                             <div class="card-tools">
                                 <button class="btn btn-primary" data-modal-open="modal-add-admin">
@@ -670,9 +634,10 @@
                     <div class="card" data-region="audit">
                         <div class="card-head">
                             <div class="card-head-text">
-                                <h2 class="card-title">Security log</h2>
-                                <p class="card-sub">Account changes: staff accounts created, accounts deleted, roles,
-                                    device limits, emails, and devices or sessions ended. The latest 50.</p>
+                                <div class="with-tip">
+                                    <h2 class="card-title">Security log</h2>
+                                    <button type="button" class="info-tip" data-tip="Staff accounts created, accounts deleted, role and email changes, and devices or sessions ended. Latest 50." aria-label="About the security log"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                </div>
                             </div>
                         </div>
                         <div class="table-wrap">
@@ -699,10 +664,10 @@
                 <section class="page is-hidden" id="view-mathtask" data-view-panel="mathtask">
                     <div class="page-head">
                         <div class="page-head-text">
-                            <h1 class="page-title">Math task bank</h1>
-                            <p class="page-desc">Sentence problems for the three percentage topics, each with a
-                                step-by-step breakdown and three tiers of hints, and the rules for moving a student
-                                between topics.</p>
+                            <div class="with-tip">
+                                <h1 class="page-title">Math task bank</h1>
+                                <button type="button" class="info-tip" data-tip="Live: every tutoring session is served from this bank. Changes apply from the next question a student gets. Keep at least 10 questions per topic." aria-label="About the math task bank"><svg class="icon"><use href="#i-info"></use></svg></button>
+                            </div>
                         </div>
                         <div class="page-actions">
                             <button class="btn btn-secondary" type="button" id="qb-generate-btn">
@@ -717,17 +682,6 @@
                     </div>
 
                     <div class="stack-lg">
-                        <div class="notice notice-accent">
-                            <svg class="icon"><use href="#i-info"></use></svg>
-                            <div>
-                                <p class="notice-title">Live: students are served from this bank</p>
-                                <p class="notice-text">Every tutoring session takes its questions from here, and these
-                                    rules decide when a student moves between topics. Changes apply from the next
-                                    question a student is given; a question already on a student's screen keeps the
-                                    wording and answer it was served with. Keep at least 10 questions in each topic.
-                                    Only administrators can read this bank &mdash; it holds every answer.</p>
-                            </div>
-                        </div>
 
                         <div class="segment qb-topics" role="group" aria-label="Topic">
                             <button class="segment-btn is-active" type="button" data-qb-topic="EASY" aria-pressed="true">
@@ -783,7 +737,7 @@
                                     <div id="qb-empty" class="state-block is-hidden">
                                         <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-math"></use></svg></span>
                                         <p class="state-title" id="qb-empty-title">No questions in this topic yet</p>
-                                        <p class="state-desc" id="qb-empty-desc">Add one by hand, or let Auto-generate draft a set you can review first.</p>
+                                        <p class="state-desc" id="qb-empty-desc"></p>
                                     </div>
                                 </div>
                             </div>
@@ -803,12 +757,14 @@
                                 <div class="card-body stack">
                                     <div class="field">
                                         <div class="qb-range-top">
-                                            <label class="label" for="qb-mastery">Mastery threshold</label>
+                                            <span class="with-tip">
+                                                <label class="label" for="qb-mastery">Mastery threshold</label>
+                                                <button type="button" class="info-tip" data-tip="Accuracy a student needs on this topic to move up." aria-label="About the mastery threshold"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                            </span>
                                             <output class="qb-range-val tnum" id="qb-mastery-out" for="qb-mastery">80%</output>
                                         </div>
                                         <input class="qb-range" type="range" id="qb-mastery" min="50" max="100" step="5"
-                                            value="80" aria-describedby="qb-mastery-help" disabled>
-                                        <p class="qb-help" id="qb-mastery-help">Accuracy a student needs on this topic to move up.</p>
+                                            value="80" disabled>
                                     </div>
 
                                     <div class="form-grid form-grid-2">
@@ -861,8 +817,6 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="register-student-title">Register student</h2>
-                    <p class="modal-sub">Creates the auth user and the profile row, then queues an activation email.
-                        No password is ever set or displayed here.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -921,22 +875,18 @@
                             <label class="choice">
                                 <input type="radio" name="rs-condition" value="assigned" checked>
                                 <span class="choice-title">EXP · Assigned persona</span>
-                                <span class="choice-desc">Agent matched to the student's OCEAN profile.</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="rs-condition" value="non-assigned">
                                 <span class="choice-title">EXP · Free choice</span>
-                                <span class="choice-desc">Student picks their own agent persona.</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="rs-condition" value="neutral">
                                 <span class="choice-title">EXP · Neutral persona</span>
-                                <span class="choice-desc">Agent with no personality alignment.</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="rs-condition" value="control">
                                 <span class="choice-title">CTRL · Traditional</span>
-                                <span class="choice-desc">No agent. Standard problem set only.</span>
                             </label>
                         </div>
                     </div>
@@ -949,8 +899,7 @@
                             <input type="checkbox" id="rs-consent">
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
-                                Parental consent received
-                                <small>Required before the participant can enter any stage of the study.</small>
+                                Parental consent received <span class="req">*</span>
                             </span>
                         </label>
                         <p class="field-msg" data-msg-for="rs-consent"></p>
@@ -960,16 +909,13 @@
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
                                 Student assent received
-                                <small>The student agreed to take part. If you have not met them yet, record it later in
-                                    Edit participant.</small>
                             </span>
                         </label>
                     </div>
                 </form>
             </div>
 
-            <footer class="modal-foot modal-foot-split">
-                <p class="modal-foot-note">The account stays inactive until the student uses the activation link.</p>
+            <footer class="modal-foot">
                 <div class="modal-foot-actions">
                     <button class="btn btn-secondary" data-modal-close>Cancel</button>
                     <button class="btn btn-primary" type="submit" form="register-student-form" id="rs-submit">
@@ -987,7 +933,6 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="edit-student-title">Edit participant</h2>
-                    <p class="modal-sub">Update placement, test scores and consent. The email stays fixed.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1020,12 +965,11 @@
 
                         <div class="form-grid" style="margin-top:16px">
                             <div class="field">
-                                <label class="label" for="es-email">School email</label>
-                                <input class="input input-locked" type="email" id="es-email" autocomplete="off" readonly
-                                    aria-describedby="es-email-help">
-                                <p class="qb-help" id="es-email-help">Email changes are disabled to keep this
-                                    participant's research data linked to their account. If an address was entered
-                                    wrongly before they activated, delete the account and register it again.</p>
+                                <div class="with-tip">
+                                    <label class="label" for="es-email">School email</label>
+                                    <button type="button" class="info-tip" data-tip="Locked so this participant’s research data stays linked. If it was entered wrongly, delete the account and register it again before they activate." aria-label="About the locked email"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                </div>
+                                <input class="input input-locked" type="email" id="es-email" autocomplete="off" readonly>
                                 <p class="field-msg" data-msg-for="es-email"></p>
                             </div>
                         </div>
@@ -1051,22 +995,18 @@
                             <label class="choice">
                                 <input type="radio" name="es-condition" value="assigned">
                                 <span class="choice-title">EXP · Assigned persona</span>
-                                <span class="choice-desc">Agent matched to the student's OCEAN profile.</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="es-condition" value="non-assigned">
                                 <span class="choice-title">EXP · Free choice</span>
-                                <span class="choice-desc">Student picks their own agent persona.</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="es-condition" value="neutral">
                                 <span class="choice-title">EXP · Neutral persona</span>
-                                <span class="choice-desc">Agent with no personality alignment.</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="es-condition" value="control">
                                 <span class="choice-title">CTRL · Traditional</span>
-                                <span class="choice-desc">No agent. Standard problem set only.</span>
                             </label>
                         </div>
                     </div>
@@ -1075,9 +1015,10 @@
                          score is previewed here and calculated by the database
                          (migration 0034); it is never typed. -->
                     <div class="form-section">
-                        <p class="form-section-title">Test scores</p>
-                        <p class="qb-help score-formula">Transmuted score = (raw score ÷ highest possible score) × 50 + 50.
-                            Leave both fields blank until the student has taken the test.</p>
+                        <div class="with-tip form-section-head">
+                            <p class="form-section-title">Test scores</p>
+                            <button type="button" class="info-tip" data-tip="Transmuted score = (raw ÷ highest possible) × 50 + 50. Leave both fields blank until the student takes the test." aria-label="About transmuted scores"><svg class="icon"><use href="#i-info"></use></svg></button>
+                        </div>
 
                         <fieldset class="score-entry">
                             <legend class="score-entry-title">Pre-test</legend>
@@ -1093,7 +1034,7 @@
                                         inputmode="decimal" placeholder="e.g. 50" data-score-test="pre" data-score-part="max">
                                 </div>
                             </div>
-                            <p class="score-result" id="es-pre-result" aria-live="polite">Not taken yet.</p>
+                            <p class="score-result" id="es-pre-result" aria-live="polite"></p>
                         </fieldset>
 
                         <fieldset class="score-entry">
@@ -1110,7 +1051,7 @@
                                         inputmode="decimal" placeholder="e.g. 50" data-score-test="post" data-score-part="max">
                                 </div>
                             </div>
-                            <p class="score-result" id="es-post-result" aria-live="polite">Not taken yet.</p>
+                            <p class="score-result" id="es-post-result" aria-live="polite"></p>
                         </fieldset>
                     </div>
 
@@ -1121,7 +1062,7 @@
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
                                 Parental consent received
-                                <small id="es-consent-note">Signed consent form from a parent or guardian.</small>
+                                <small id="es-consent-note"></small>
                             </span>
                         </label>
 
@@ -1130,7 +1071,7 @@
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
                                 Student assent received
-                                <small id="es-assent-note">The student agreed to take part.</small>
+                                <small id="es-assent-note"></small>
                             </span>
                         </label>
                     </div>
@@ -1150,7 +1091,6 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="new-section-title">New section</h2>
-                    <p class="modal-sub">Sections group students for assignment and overrides.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1180,7 +1120,6 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="add-prof-title">Add professor</h2>
-                    <p class="modal-sub">Creates the auth user plus the faculty and profile rows in one transaction.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1229,7 +1168,6 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="add-admin-title">Add administrator</h2>
-                    <p class="modal-sub">Creates a new account with full access to this console.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1245,19 +1183,12 @@
                             <p class="field-msg" data-msg-for="aa-name"></p>
                         </div>
                         <div class="field">
-                            <label class="label" for="aa-email">Email address <span class="req">*</span></label>
+                            <div class="with-tip">
+                                <label class="label" for="aa-email">Email address <span class="req">*</span></label>
+                                <button type="button" class="info-tip" data-tip="They get a one-time link to choose their own password. Emails already used by a professor or participant are refused." aria-label="About new administrator accounts"><svg class="icon"><use href="#i-info"></use></svg></button>
+                            </div>
                             <input class="input" type="email" id="aa-email" placeholder="a.reyes@ue.edu.ph" autocomplete="off">
                             <p class="field-msg" data-msg-for="aa-email"></p>
-                        </div>
-                    </div>
-
-                    <div class="notice notice-accent" style="margin-top:16px">
-                        <svg class="icon"><use href="#i-shield"></use></svg>
-                        <div>
-                            <p class="notice-title">What happens next</p>
-                            <p class="notice-text">The account starts with a random password nobody knows. They get a
-                                one-time link to choose their own, then sign in with <strong>Admin sign in</strong> on
-                                the home page. Emails that already belong to a professor or a participant are refused.</p>
                         </div>
                     </div>
                 </form>
@@ -1372,9 +1303,10 @@
         <div class="modal modal-lg">
             <header class="modal-head">
                 <div class="modal-head-text">
-                    <h2 class="modal-title" id="scores-title">Input scores</h2>
-                    <p class="modal-sub">Enter each raw score and the highest possible score. Transmuted score =
-                        (raw ÷ highest possible) × 50 + 50, calculated as you type.</p>
+                    <div class="with-tip">
+                        <h2 class="modal-title" id="scores-title">Input scores</h2>
+                        <button type="button" class="info-tip" data-tip="Transmuted score = (raw ÷ highest possible) × 50 + 50. Only changed rows are saved." aria-label="About transmuted scores"><svg class="icon"><use href="#i-info"></use></svg></button>
+                    </div>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1419,7 +1351,7 @@
             </div>
 
             <footer class="modal-foot modal-foot-split">
-                <p class="modal-foot-note" id="scores-note">Only changed rows are written.</p>
+                <p class="modal-foot-note" id="scores-note"></p>
                 <div class="modal-foot-actions">
                     <button class="btn btn-secondary" data-modal-close>Cancel</button>
                     <button class="btn btn-primary" id="scores-save">Save scores</button>
@@ -1445,8 +1377,7 @@
                 <div id="student-device-list"></div>
             </div>
 
-            <footer class="modal-foot modal-foot-split">
-                <p class="modal-foot-note">Signing out ends every session for this account.</p>
+            <footer class="modal-foot">
                 <div class="modal-foot-actions">
                     <button class="btn btn-secondary" data-modal-close>Close</button>
                     <button class="btn btn-danger-soft" id="revoke-all-btn">Sign out of all devices</button>
@@ -1504,8 +1435,6 @@
                 <section class="reset-route">
                     <p class="reset-route-title"><svg class="icon"><use href="#i-mail"></use></svg>
                         Email a reset link and code</p>
-                    <p class="reset-route-text">Best whenever the student can open their school email. They
-                        choose the new password themselves — you never see it.</p>
                     <button type="button" class="btn btn-secondary" id="reset-pw-email">
                         <svg class="icon"><use href="#i-send"></use></svg> Send reset email
                     </button>
@@ -1513,10 +1442,8 @@
 
                 <section class="reset-route">
                     <p class="reset-route-title"><svg class="icon"><use href="#i-key"></use></svg>
-                        Set a temporary password</p>
-                    <p class="reset-route-text">For a student who can't receive the email. Tell them the password
-                        in person. They are signed out everywhere now, and at their next sign-in they must
-                        replace it with one only they know.</p>
+                        Set a temporary password
+                        <button type="button" class="info-tip" data-tip="For a student who can’t receive email. Tell them in person. They are signed out everywhere now and must replace it at their next sign-in." aria-label="About temporary passwords"><svg class="icon"><use href="#i-info"></use></svg></button></p>
 
                     <form id="reset-pw-form" novalidate>
                         <div class="field">
@@ -1539,8 +1466,7 @@
                         <svg class="icon"><use href="#i-check"></use></svg>
                         <div>
                             <p class="notice-title">Temporary password set</p>
-                            <p class="notice-text">Give it to the student in person — not by email or chat. PIA does
-                                not keep a copy; once you close this box it can't be shown again.</p>
+                            <p class="notice-text">Share it in person. It can&rsquo;t be shown again after you close this.</p>
                             <button type="button" class="btn btn-secondary btn-sm" id="temp-password-copy">
                                 <svg class="icon"><use href="#i-copy"></use></svg> Copy password
                             </button>
@@ -1755,7 +1681,6 @@
                 <div class="state-block qb-gen-empty" id="qb-gen-empty">
                     <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-sparkle"></use></svg></span>
                     <p class="state-title">No drafts yet</p>
-                    <p class="state-desc">Choose how many, then Generate drafts. You can edit or remove each one before saving.</p>
                 </div>
             </div>
 
@@ -1798,7 +1723,6 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="signout-title">Sign out</h2>
-                    <p class="modal-sub">End this administrator session.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1808,8 +1732,6 @@
                 <div class="modal-hero">
                     <span class="modal-hero-glyph g-accent"><svg class="icon icon-lg"><use href="#i-logout"></use></svg></span>
                     <p class="modal-hero-title">Sign out of the console?</p>
-                    <p class="modal-hero-text">This releases your device slot and revokes the session on the server.
-                        Running student sessions are not affected.</p>
                 </div>
             </div>
             <footer class="modal-foot">
@@ -1825,7 +1747,7 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="confirm-title">Confirm action</h2>
-                    <p class="modal-sub" id="confirm-subtitle">Please review before continuing.</p>
+                    <p class="modal-sub" id="confirm-subtitle"></p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1855,7 +1777,7 @@
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="notice-title">Notice</h2>
-                    <p class="modal-sub" id="notice-subtitle">Result of the last action.</p>
+                    <p class="modal-sub" id="notice-subtitle"></p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>

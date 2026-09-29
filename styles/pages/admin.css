@@ -181,7 +181,6 @@
 .gate {
     display: flex;
     flex-direction: column;
-    min-height: 268px;
     background: var(--bg-surface);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-card);
@@ -190,7 +189,6 @@
 .gate-body { flex: 1 1 auto; padding: var(--sp-5); }
 .gate-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .gate-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
-.gate-desc { margin-top: var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.55; }
 
 .gate-control {
     display: flex;
@@ -205,7 +203,6 @@
 }
 
 .gate-control-label { font-size: var(--fs-sm); font-weight: 600; }
-.gate-control-sub { font-size: var(--fs-xs); color: var(--text-muted); }
 
 .gate-foot {
     display: grid;
@@ -627,8 +624,9 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 .score-out.is-legacy { color: var(--warning); }
 .score-pair.is-invalid .score-out { color: var(--danger); font-weight: 500; }
 
-/* Edit participant: the same pair, with room to explain the calculation. */
-.score-formula { margin-top: calc(-1 * var(--sp-2)); margin-bottom: var(--sp-4); }
+/* Edit participant: the same pair. The formula is behind the section's (i). */
+.form-section-head { margin-bottom: var(--sp-4); }
+.form-section-head .form-section-title { margin-bottom: 0; }
 
 .score-entry { min-width: 0; margin: 0; padding: 0; border: 0; }
 .score-entry + .score-entry { margin-top: var(--sp-5); }
@@ -638,7 +636,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 .score-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
 
 .score-result {
-    min-height: 40px;           /* two lines reserved: no jump between messages */
+    min-height: 20px;           /* one line reserved: the result never moves the form */
     margin-top: var(--sp-2);
     font-size: var(--fs-sm);
     line-height: 1.45;
@@ -647,7 +645,6 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 }
 
 .score-result strong { color: var(--accent); font-weight: 700; }
-.score-result-sum { font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; }
 .score-result.is-error { color: var(--danger); }
 
 .kv-sub { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
@@ -1248,7 +1245,7 @@ body[data-loading] #refresh-btn .icon,
 .region-error .btn { margin-top: var(--sp-1); }
 
 /* ---- 19.5 Long strings in the console ---- */
-.section-name, .section-prof, .gate-title, .gate-desc,
+.section-name, .section-prof, .gate-title,
 .device-name, .device-meta, .trait-name, .funnel-name, .funnel-meta,
 .metric-label, .kv-label, .kv-value, .notice-title, .notice-text,
 .state-title, .state-desc, .qb-help, .qb-q {
@@ -1332,3 +1329,64 @@ body[data-loading] #refresh-btn .icon,
     body[data-loading] #refresh-btn .icon,
     #refresh-btn.is-busy .icon { animation: none; }
 }
+
+/* ---- 19.8 Info tips ----
+   Context that used to sit permanently under titles and labels now lives
+   behind a small (i). The bubble is a single fixed-position element on
+   <body> (admin-dashboard.js, "Info tips"), so a scrolling modal body or a
+   card's clipping never cuts it off. The icon is 20px; its ::before reaches
+   the 44px touch floor without changing any row's height. */
+.with-tip { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.with-tip > :first-child { min-width: 0; }
+
+.info-tip {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    padding: 0;
+    border-radius: 50%;
+    color: var(--text-faint);
+    cursor: help;
+    vertical-align: middle;
+    transition: color var(--t-fast);
+}
+
+.info-tip::before { content: ''; position: absolute; inset: -12px; }
+.info-tip .icon { width: 16px; height: 16px; }
+.info-tip:hover,
+.info-tip[aria-describedby] { color: var(--accent); }
+.info-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.tip-bubble {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: calc(var(--z-toast) + 10);
+    max-width: min(280px, calc(100vw - 16px));
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md);
+    background: var(--text);
+    color: var(--bg-surface);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    /* --t-fast carries its own easing, so the hide delay is spelled out. */
+    transition: opacity 140ms ease, visibility 0s linear 140ms;
+}
+
+.tip-bubble.is-shown { opacity: 1; visibility: visible; transition: opacity 140ms ease; }
+
+/* Sub-lines that are now often empty collapse instead of leaving a gap. */
+.check-text .req { color: var(--danger); margin-left: 2px; }
+
+.modal-sub:empty,
+.state-desc:empty,
+.modal-foot-note:empty,
+.check-text small:empty { display: none; }

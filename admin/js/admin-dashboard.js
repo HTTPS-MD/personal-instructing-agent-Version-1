@@ -66,6 +66,12 @@
         return '<svg class="icon ' + (extraClass || '') + '"><use href="#i-' + name + '"></use></svg>';
     }
 
+    /* A small (i) whose text shows on hover, focus or tap (see "Info tips"). */
+    function infoTip(text, about) {
+        return '<button type="button" class="info-tip" data-tip="' + esc(text) + '" aria-label="About ' +
+            esc(about) + '">' + icon('info') + '</button>';
+    }
+
     function initialsOf(fullName, email) {
         /* Honorifics are part of the stored name for faculty, so 'Dr. Alan
            Reyes' would otherwise initial as "DR" instead of "AR". */
@@ -155,7 +161,7 @@
         var raw = s[test + '_test_raw_score'];
         var max = s[test + '_test_max_score'];
         if (score == null) { return { value: 'n/a', detail: '' }; }
-        if (raw == null || max == null) { return { value: formatScore(score), detail: 'Single score, no raw data' }; }
+        if (raw == null || max == null) { return { value: formatScore(score), detail: 'Legacy' }; }
         return { value: formatScore(score), detail: formatScore(raw) + ' / ' + formatScore(max) };
     }
 
@@ -234,12 +240,9 @@
        admin_grant_stage — do not rename them. `label` is the profiles.current_stage
        value of a student inside that stage. */
     var GATES = [
-        { key: 'ocean', stage: 'Stage 1', title: 'OCEAN personality test', open: false, label: 'OCEAN',
-          desc: 'Allows students to answer the Big Five Inventory. Responses are scored server-side.' },
-        { key: 'char', stage: 'Stage 2', title: 'Character selection', open: false, label: 'Character Selection',
-          desc: 'Allows the free-choice group to pick their preferred agent persona.' },
-        { key: 'dash', stage: 'Stage 3', title: 'Tutoring dashboard', open: false, label: 'Tutoring Dashboard',
-          desc: 'Allows students to open the problem sets and begin a tutoring session.' }
+        { key: 'ocean', stage: 'Stage 1', title: 'OCEAN personality test', open: false, label: 'OCEAN' },
+        { key: 'char', stage: 'Stage 2', title: 'Character selection', open: false, label: 'Character Selection' },
+        { key: 'dash', stage: 'Stage 3', title: 'Tutoring dashboard', open: false, label: 'Tutoring Dashboard' }
     ];
 
     var PAGE_SIZE = 50;
@@ -409,7 +412,8 @@
         void overlay.offsetWidth;
         overlay.classList.add('is-open');
 
-        var first = overlay.querySelector('input:not([type="hidden"]), select, textarea, button');
+        /* Never an (i): focusing one opens its tip the moment the dialog does. */
+        var first = overlay.querySelector('input:not([type="hidden"]), select, textarea, button:not(.info-tip)');
         if (first) { first.focus({ preventScroll: true }); }
     }
 
@@ -525,7 +529,7 @@
             var accept = $('#confirm-accept');
 
             $('#confirm-title').textContent = options.title || 'Confirm action';
-            $('#confirm-subtitle').textContent = options.subtitle || 'Please review before continuing.';
+            $('#confirm-subtitle').textContent = options.subtitle || '';
             $('#confirm-heading').textContent = options.heading || options.title || 'Are you sure?';
             $('#confirm-text').textContent = options.message || '';
 
@@ -582,6 +586,97 @@
             (danger ? 'alert' : 'info') + '"></use></svg>';
 
         openModal('modal-notice');
+    }
+
+    /* ---- 3.6b Info tips ----
+       Context that used to sit permanently under titles and labels lives
+       behind a small (i) (.info-tip, data-tip="…"). One shared bubble on
+       <body>, fixed-positioned, so a scrolling modal body or a clipped card
+       never cuts it off. Hover or keyboard focus shows it; a tap pins it,
+       since touch has no hover; Escape, a tap elsewhere or any scroll hides
+       it. While a tip is open, Escape closes the tip, not the dialog. */
+    var tip = { bubble: null, owner: null, pinned: false, hideTimer: null };
+
+    function tipBubble() {
+        if (!tip.bubble) {
+            tip.bubble = document.createElement('div');
+            tip.bubble.className = 'tip-bubble';
+            tip.bubble.id = 'pia-tip';
+            tip.bubble.setAttribute('role', 'tooltip');
+            document.body.appendChild(tip.bubble);
+        }
+        return tip.bubble;
+    }
+
+    function showTip(btn, pinned) {
+        clearTimeout(tip.hideTimer);
+        var bubble = tipBubble();
+        if (tip.owner && tip.owner !== btn) { tip.owner.removeAttribute('aria-describedby'); }
+        tip.owner = btn;
+        tip.pinned = !!pinned;
+        bubble.textContent = btn.getAttribute('data-tip') || '';
+        btn.setAttribute('aria-describedby', 'pia-tip');
+
+        /* Above the icon when it fits, otherwise below; never off-screen. */
+        var margin = 8;
+        var r = btn.getBoundingClientRect();
+        var width = bubble.offsetWidth;
+        var height = bubble.offsetHeight;
+        var viewW = document.documentElement.clientWidth;
+        var left = Math.max(margin, Math.min(r.left + r.width / 2 - width / 2, viewW - width - margin));
+        var top = r.top - height - margin;
+        if (top < margin) { top = r.bottom + margin; }
+        bubble.style.left = Math.round(left) + 'px';
+        bubble.style.top = Math.round(top) + 'px';
+        bubble.classList.add('is-shown');
+    }
+
+    function hideTip() {
+        clearTimeout(tip.hideTimer);
+        if (tip.owner) { tip.owner.removeAttribute('aria-describedby'); }
+        tip.owner = null;
+        tip.pinned = false;
+        if (tip.bubble) { tip.bubble.classList.remove('is-shown'); }
+    }
+
+    function tipOf(target) {
+        return target && target.closest ? target.closest('.info-tip') : null;
+    }
+
+    function initInfoTips() {
+        document.addEventListener('mouseover', function (event) {
+            var btn = tipOf(event.target);
+            if (btn && !tip.pinned) { showTip(btn, false); }
+        });
+        document.addEventListener('mouseout', function (event) {
+            var btn = tipOf(event.target);
+            if (!btn || btn !== tip.owner || tip.pinned || btn.contains(event.relatedTarget)) { return; }
+            tip.hideTimer = setTimeout(hideTip, 80);
+        });
+        document.addEventListener('focusin', function (event) {
+            var btn = tipOf(event.target);
+            if (btn && !tip.pinned) { showTip(btn, false); }
+        });
+        document.addEventListener('focusout', function (event) {
+            if (event.target === tip.owner && !tip.pinned) { hideTip(); }
+        });
+        document.addEventListener('click', function (event) {
+            var btn = tipOf(event.target);
+            if (btn) {
+                event.preventDefault();
+                if (tip.owner === btn && tip.pinned) { hideTip(); } else { showTip(btn, true); }
+                return;
+            }
+            if (tip.owner) { hideTip(); }
+        });
+        window.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && tip.owner) {
+                event.stopPropagation();
+                hideTip();
+            }
+        }, true);
+        window.addEventListener('scroll', function () { if (tip.owner) { hideTip(); } }, true);
+        window.addEventListener('resize', function () { if (tip.owner) { hideTip(); } });
     }
 
     /* ---- 3.7 Busy buttons ----
@@ -864,10 +959,10 @@
         return '<article class="gate" aria-hidden="true"><div class="gate-body">' +
             '<div class="gate-top">' + skeletonPill(64) + skeletonPill(56) + '</div>' +
             '<h3 class="gate-title">' + sk(gate.title) + '</h3>' +
-            '<p class="gate-desc">' + sk(gate.desc) + '</p>' +
-            '<div class="gate-control"><span><span class="gate-control-label">' + sk('Global access') + '</span><br>' +
-            '<span class="gate-control-sub">' + sk('Applies to every section') + '</span></span>' +
-            '<span class="skeleton" style="width:44px;height:24px;border-radius:var(--r-pill)"></span></div></div>' +
+            '<div class="gate-control"><span class="gate-control-label">' + sk('Global access') + '</span>' +
+            '<span class="skeleton" style="width:44px;height:24px;border-radius:var(--r-pill)"></span></div>' +
+            '<div class="gate-access"><p class="gate-access-label">' + sk('Section overrides') + '</p>' +
+            '<span class="skeleton-text gate-access-skeleton"></span></div></div>' +
             '<div class="gate-foot"><span class="skeleton skeleton-btn"></span><span class="skeleton skeleton-btn"></span></div>' +
             '</article>';
     }
@@ -1181,8 +1276,6 @@
         $('#kpi-ocean').textContent = pct(oceanDone, total) + '%';
         $('#kpi-ocean-bar').style.width = pct(oceanDone, total) + '%';
         $('#kpi-inactive').textContent = inactive;
-        $('#kpi-enrolled-foot').textContent = 'Across ' + state.sections.length + ' section' +
-            (state.sections.length === 1 ? '' : 's');
     }
 
     function stageOf(profile) {
@@ -1286,7 +1379,6 @@
                 '<div class="state-block" style="min-height:180px">' +
                 '<span class="state-glyph">' + icon('clock', 'icon-lg') + '</span>' +
                 '<p class="state-title">No sessions running</p>' +
-                '<p class="state-desc">Students appear here as soon as they enter a stage.</p>' +
                 '</div></td></tr>';
             return;
         }
@@ -1328,7 +1420,7 @@
     function renderSectionHealth() {
         var container = $('#section-health');
         if (!state.sections.length) {
-            container.innerHTML = '<p class="state-desc">No sections yet.</p>';
+            container.innerHTML = '<p class="state-desc">No sections yet</p>';
             return;
         }
 
@@ -1356,7 +1448,6 @@
             grid.innerHTML = '<div class="card"><div class="state-block">' +
                 '<span class="state-glyph">' + icon('layers', 'icon-lg') + '</span>' +
                 '<p class="state-title">No sections yet</p>' +
-                '<p class="state-desc">Create a section before registering students — every participant must belong to one.</p>' +
                 '</div></div>';
             return;
         }
@@ -1442,7 +1533,6 @@
                 '<div class="state-block" style="min-height:200px">' +
                 '<span class="state-glyph">' + icon('users', 'icon-lg') + '</span>' +
                 '<p class="state-title">No students in this section</p>' +
-                '<p class="state-desc">Register a participant and assign them to ' + esc(sectionName) + '.</p>' +
                 '</div></td></tr>';
             return;
         }
@@ -1663,9 +1753,6 @@
         $('#clear-stage-filter').classList.toggle('is-hidden', !drill);
         $('#roster-filter-bar').classList.toggle('is-hidden', !!drill);
         $('#roster-title').textContent = drill ? stageLabel(drill) + ' — live view' : 'All students';
-        $('#roster-sub').textContent = drill
-            ? 'Participants currently at this stage.'
-            : 'Showing the full cohort.';
     }
 
     /* Ticks every second so live durations stay honest without a refetch. */
@@ -1747,8 +1834,8 @@
     ];
 
     function noticeHtml(iconName, title, text) {
-        return '<div class="notice">' + icon(iconName) + '<div><p class="notice-title">' + esc(title) +
-            '</p><p class="notice-text">' + esc(text) + '</p></div></div>';
+        return '<div class="notice">' + icon(iconName) + '<div><p class="notice-title">' + esc(title) + '</p>' +
+            (text ? '<p class="notice-text">' + esc(text) + '</p>' : '') + '</div></div>';
     }
 
     function formatStamp(iso) {
@@ -1789,7 +1876,7 @@
         if (!rows.length) {
             box.innerHTML = noticeHtml('info', 'No result yet', s.is_ocean_done
                 ? 'Marked complete, but no stored result was found. Allow a retake to collect one.'
-                : 'This participant has not completed the questionnaire.');
+                : '');
             return;
         }
 
@@ -2233,8 +2320,8 @@
                 s[test + '_test_score'] != null && s[test + '_test_raw_score'] == null ? formatScore(s[test + '_test_score']) : '');
             paintScorePreview(test);
         });
-        fillConsentBox('es-consent', s.parental_consent, 'Signed consent form from a parent or guardian.');
-        fillConsentBox('es-assent', s.student_assent, 'The student agreed to take part.');
+        fillConsentBox('es-consent', s.parental_consent);
+        fillConsentBox('es-assent', s.student_assent);
 
         /* A section that was deleted from `sections` must still be selectable,
            otherwise saving would silently move the student. */
@@ -2272,13 +2359,9 @@
         if (!pair.ok) {
             out.textContent = pair.error;
         } else if (pair.score == null) {
-            out.textContent = legacy
-                ? 'Entered before raw scores were kept: ' + legacy + '. Enter the raw and highest possible score to replace it.'
-                : 'Not taken yet.';
+            out.textContent = legacy ? 'Legacy score: ' + legacy : '';
         } else {
-            out.innerHTML = 'Transmuted score: <strong class="tnum">' + esc(formatScore(pair.score)) + '</strong>' +
-                ' <span class="score-result-sum tnum">= (' + esc(formatScore(pair.raw)) + ' ÷ ' +
-                esc(formatScore(pair.max)) + ') × 50 + 50</span>';
+            out.innerHTML = 'Transmuted: <strong class="tnum">' + esc(formatScore(pair.score)) + '</strong>';
         }
         markScoreInvalid(test, false);
     }
@@ -2293,13 +2376,11 @@
        recorded". The box can only be ticked or not, so the save sends a
        value only when the admin changes the box: opening Edit to add a score
        must not turn "not recorded" into "not received". */
-    function fillConsentBox(id, value, hint) {
+    function fillConsentBox(id, value) {
         var box = $('#' + id);
         box.checked = value === true;
         box.setAttribute('data-initial', box.checked ? 'true' : 'false');
-        $('#' + id + '-note').textContent = value == null
-            ? 'Not recorded yet. Tick it once you have it on file.'
-            : hint;
+        $('#' + id + '-note').textContent = value == null ? 'Not recorded' : '';
     }
 
     function consentChange(id) {
@@ -2414,8 +2495,7 @@
         if (!devices.length) {
             container.innerHTML = '<div class="state-block" style="min-height:160px">' +
                 '<span class="state-glyph">' + icon('monitor', 'icon-lg') + '</span>' +
-                '<p class="state-title">No active devices</p>' +
-                '<p class="state-desc">This account is not signed in anywhere right now.</p></div>';
+                '<p class="state-title">No active devices</p></div>';
             return;
         }
 
@@ -2695,12 +2775,8 @@
                 (gate.open ? 'Open' : 'Closed') + '</span>' +
                 '</div>' +
                 '<h3 class="gate-title">' + esc(gate.title) + '</h3>' +
-                '<p class="gate-desc">' + esc(gate.desc) + '</p>' +
                 '<div class="gate-control">' +
-                '<span>' +
-                '<span class="gate-control-label">Global access</span><br>' +
-                '<span class="gate-control-sub">Applies to every section</span>' +
-                '</span>' +
+                '<span class="gate-control-label">Global access</span>' +
                 '<label class="switch">' +
                 '<input type="checkbox" data-gate="' + gate.key + '"' + (gate.open ? ' checked' : '') + '>' +
                 '<span class="switch-track"></span>' +
@@ -2764,11 +2840,15 @@
         return { sections: sections, others: others };
     }
 
+    var GATE_ACCESS_TIP = 'Sections let in while the stage is closed. Opening or closing the stage for ' +
+        'everyone clears them.';
+
     function gateAccessHtml(gate) {
-        var head = '<p class="gate-access-label">Section overrides</p>';
+        var head = '<div class="with-tip"><p class="gate-access-label">Section overrides</p>' +
+            infoTip(GATE_ACCESS_TIP, 'section overrides') + '</div>';
 
         if (gate.open) {
-            return head + '<p class="gate-access-note">Not needed while the stage is open to every section.</p>';
+            return head + '<p class="gate-access-note">—</p>';
         }
 
         var access = gateAccess(gate);
@@ -2780,8 +2860,8 @@
 
         if (state.overrides === null) {
             html += '<p class="gate-access-note">' + (state.overridesMissing
-                ? 'Apply migration 0033 to list section overrides here.'
-                : 'Section overrides could not be loaded. Refresh to try again.') + '</p>';
+                ? 'Needs migration 0033'
+                : 'Couldn’t load. Refresh to retry.') + '</p>';
         } else if (access.sections.length) {
             html += '<ul class="gate-chips" aria-label="Sections opened into this stage">' +
                 access.sections.map(function (o) {
@@ -2794,7 +2874,7 @@
                 }).join('') +
                 '</ul>';
         } else if (!access.others.length) {
-            html += '<p class="gate-access-note">None. No section or student can enter while it is closed.</p>';
+            html += '<p class="gate-access-note">None</p>';
         }
 
         if (access.others.length) {
@@ -2803,8 +2883,7 @@
             }).join('\n') + (access.others.length > 12 ? '\n…and ' + (access.others.length - 12) + ' more' : '');
             html += '<p class="gate-access-note" title="' + esc(names) + '">' +
                 (access.sections.length ? '+ ' : '') +
-                access.others.length + ' student' + (access.others.length === 1 ? '' : 's') +
-                ' with individual access</p>';
+                access.others.length + ' student override' + (access.others.length === 1 ? '' : 's') + '</p>';
         }
 
         return html;
@@ -2877,7 +2956,7 @@
         targeted.email = null;
         targeted.name = null;
 
-        $('#targeted-sub').textContent = 'Open "' + gate.title + '" for a single section or participant.';
+        $('#targeted-sub').textContent = gate.title;
         $('#tg-search').value = '';
         $('#tg-list').innerHTML = '';
         setTargetMode(mode || 'section');
@@ -2931,8 +3010,7 @@
 
         if (!rows.length) {
             list.innerHTML = '<div class="state-block" style="min-height:120px">' +
-                '<p class="state-title">No participant found</p>' +
-                '<p class="state-desc">Try a different name or email fragment.</p></div>';
+                '<p class="state-title">No participant found</p></div>';
             return;
         }
 
@@ -3252,8 +3330,7 @@
 
         if (!devices || !devices.length) {
             container.innerHTML = banner || ('<div class="notice">' + icon('info') +
-                '<div><p class="notice-title">No registered devices</p>' +
-                '<p class="notice-text">This browser registers itself the next time the console loads.</p></div></div>');
+                '<div><p class="notice-title">No registered devices</p></div></div>');
             return;
         }
 
@@ -3465,7 +3542,8 @@
     function auditMessage(title, text, glyph) {
         return '<tr><td colspan="4"><div class="state-block" style="min-height:180px">' +
             '<span class="state-glyph">' + icon(glyph || 'shield', 'icon-lg') + '</span>' +
-            '<p class="state-title">' + esc(title) + '</p><p class="state-desc">' + esc(text) + '</p></div></td></tr>';
+            '<p class="state-title">' + esc(title) + '</p>' +
+            (text ? '<p class="state-desc">' + esc(text) + '</p>' : '') + '</div></td></tr>';
     }
 
     async function loadAudit() {
@@ -3488,8 +3566,7 @@
 
         var rows = res.data || [];
         if (!rows.length) {
-            $('#audit-tbody').innerHTML = auditMessage('Nothing recorded yet',
-                'Account changes appear here as they happen.');
+            $('#audit-tbody').innerHTML = auditMessage('Nothing recorded yet', '');
             return;
         }
 
@@ -3723,11 +3800,11 @@
         } else if (read.score != null) {
             out.textContent = '= ' + formatScore(read.score);
         } else if (legacy) {
-            out.textContent = legacy + ' · single score';
+            out.textContent = legacy + ' · legacy';
             out.title = 'Entered before raw scores were kept. Type the raw score to replace it.';
             out.classList.add('is-legacy');
         } else {
-            out.textContent = 'Not taken';
+            out.textContent = '—';
         }
     }
 
@@ -3765,14 +3842,12 @@
             $('#scores-tbody').innerHTML = '<tr><td colspan="4">' +
                 '<div class="state-block" style="min-height:200px">' +
                 '<p class="state-title">No students in this section</p>' +
-                '<p class="state-desc">Assign participants to ' + esc(sectionName) + ' first.</p>' +
                 '</div></td></tr>';
             return;
         }
 
         $('#scores-save').disabled = false;
-        $('#scores-note').textContent = students.length + ' student' + (students.length === 1 ? '' : 's') +
-            ' · only changed rows are saved';
+        $('#scores-note').textContent = students.length + ' student' + (students.length === 1 ? '' : 's');
         $('#scores-max-pre').value = commonValue(students.map(function (s) { return s.pre_test_max_score; }));
         $('#scores-max-post').value = commonValue(students.map(function (s) { return s.post_test_max_score; }));
 
@@ -4377,7 +4452,7 @@
         } else if (!list.length) {
             empty.classList.remove('is-hidden');
             $('#qb-empty-title').textContent = 'No questions in this topic yet';
-            $('#qb-empty-desc').textContent = 'Add one by hand, or let Auto-generate draft a set you can review first.';
+            $('#qb-empty-desc').textContent = '';
             $('#qb-sub').textContent = 'No questions';
         } else {
             var frag = document.createDocumentFragment();
@@ -5502,6 +5577,7 @@
         PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
         initRouter();
         initModals();
+        initInfoTips();
         initRoster();
         initDrawerActions();
         initFaculty();
