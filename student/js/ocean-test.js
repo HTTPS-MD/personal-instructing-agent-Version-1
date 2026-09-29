@@ -119,6 +119,11 @@ async function checkAccessAndInit() {
 
     isTestAllowed = true;
 
+    // Time in this stage is counted from now (active time only; function.js
+    // 1C-5b), and a stage closed mid-test lets them finish (1C-5c).
+    window.PIA_HAS_ACTIVE_WORK = isTestInProgress;
+    startStageHeartbeat('OCEAN');
+
     // May naiwang sagot? Diretso na sa tanong na tinigilan nila.
     if (loadOceanProgress()) {
         gatekeeperScreen.classList.add('hidden');
@@ -183,7 +188,10 @@ function setupRealtimeListener() {
                     // LAHAT ng estudyanteng nasa gitna ng test. Ligtas na ang
                     // progreso sa localStorage, pero mas mabuting huwag na
                     // silang gambalain.
-                    if (isTestInProgress()) return;
+                    if (isTestInProgress()) {
+                        if (!isOpen) showStageClosedNotice();
+                        return;
+                    }
 
                     if (isOpen) {
                         window.location.reload();
@@ -524,6 +532,9 @@ async function submitTestResults() {
     // Tapos na -- linisin ang naka-save na progreso para hindi na ito mabuhay
     // muli kung babalik sila sa page na ito.
     clearOceanProgress();
+
+    // The final payload: locks the seconds spent on this stage.
+    await finalizeStageTime('OCEAN');
 
     // Diretso sa simpleng thank-you screen. replace(), hindi href: ang Back
     // button ay hindi dapat magbalik sa isang questionnaire na naisumite na.

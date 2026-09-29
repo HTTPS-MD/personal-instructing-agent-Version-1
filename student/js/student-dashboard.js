@@ -78,6 +78,7 @@
         awaitingNext: false,
         bankEmpty: false,
         finished: false,
+        inSession: false,   /* a lesson has been started and not yet ended (see PIA_HAS_ACTIVE_WORK) */
         ended: false        /* another device took the account (function.js 1C-6) */
     };
 
@@ -849,6 +850,9 @@
         if (state.sessionId) {
             await sb.rpc('end_game_session', { p_session_id: state.sessionId });
         }
+
+        /* The final payload: locks the seconds spent on this stage. */
+        await finalizeStageTime('Tutoring Dashboard');
     }
 
     /* ============================================ 9. SIGN OUT ========== */
@@ -891,6 +895,10 @@
         state.profile = profile;
         state.email = profile.email;
 
+        /* A stage closed mid-lesson lets the student finish it (function.js
+           1C-5c); time in the stage is counted while the tab is visible. */
+        window.PIA_HAS_ACTIVE_WORK = function () { return state.inSession && !state.finished; };
+
         /* Tell the admin view where this student is. If the stage was closed
            in the meantime the server says so, and we follow it. */
         var stageRes = await sb.rpc('set_student_stage', { p_stage: 'Tutoring Dashboard' });
@@ -898,6 +906,7 @@
             window.location.replace('waiting-room.html');
             return;
         }
+        startStageHeartbeat('Tutoring Dashboard');
 
         /* Deliberately narrow: full_name and selected_character only. ocean_*
            must not enter this page — see the header note. */
@@ -956,7 +965,9 @@
                     event: 'UPDATE', schema: 'public', table: 'settings', filter: 'key=eq.stage_dash'
                 }, function (payload) {
                     var open = payload.new.value === true || payload.new.value === 'true';
-                    if (!open) { window.location.replace('waiting-room.html'); }
+                    if (open) { return; }
+                    if (window.PIA_HAS_ACTIVE_WORK()) { showStageClosedNotice(); return; }
+                    window.location.replace('waiting-room.html');
                 }).subscribe();
             });
         }
@@ -976,6 +987,7 @@
         }).eq('email', state.email);
 
         release();
+        state.inSession = true;
         showScreen('session');
         setSpeech('Let’s begin. Read the problem carefully, then work it out step by step.');
         await nextProblem();

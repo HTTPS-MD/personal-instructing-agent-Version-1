@@ -297,6 +297,11 @@
 .gate-section .check-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .gate-section .badge { flex: 0 0 auto; }
 
+/* Square boxes, not the circles the shared checkbox draws: a ring beside a
+   name reads as a radio button (pick one). These are pick-any, and the list
+   stays open so the Open / not-open badges can be read at a glance. */
+.gate-section .check-box { width: 20px; height: 20px; flex: 0 0 20px; border-radius: 4px; }
+
 .gate-access-note {
     margin-top: var(--sp-2);
     font-size: var(--fs-xs);
@@ -352,16 +357,7 @@
 .sidebar-user.is-active { background: var(--accent-soft); }
 
 .profile-password-foot { justify-content: flex-end; }
-.profile-forgot {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-2);
-    padding: var(--sp-4) var(--sp-5) var(--sp-5);
-    box-shadow: inset 0 1px 0 var(--line-soft);
-}
 
-.profile-forgot .notice-text { margin-top: 0; }
 
 /* Device rows */
 .device-row {
@@ -1328,10 +1324,6 @@ body[data-loading] .loadbar { opacity: 1; transition-delay: 120ms; }
    still land on it and hear its explanation. */
 .input.input-locked { background: var(--bg-chip); color: var(--text-muted); cursor: not-allowed; }
 
-/* Profile -> reset link. The confirmation line keeps its space from the start
-   (up to three lines on a phone), so sending the link moves nothing. */
-.pw-reset-to { color: var(--text); overflow-wrap: anywhere; }
-.pw-reset-status { min-height: calc(3 * 1.5em); }
 
 /* A notice that reports a failure rather than a fact. */
 .notice-danger { background: var(--danger-soft); }

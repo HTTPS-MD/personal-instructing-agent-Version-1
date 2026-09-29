@@ -269,6 +269,7 @@
         gateSelected: { ocean: [], char: [], dash: [] }, // ticked section names per stage card; kept here so a repaint keeps them
         cohortLoaded: false,
         sectionsLoaded: false,
+        stageTimes: undefined, // student_stage_time by lower-cased email; undefined = loading, null = table missing (0035)
         loading: { roster: false, cohort: false }
     };
 
@@ -1097,6 +1098,7 @@
         });
 
         state.cohort = res.data || [];
+        await loadStageTimes();
         state.cohortLoaded = true;
         renderKpis();
         renderPipeline();
@@ -1104,6 +1106,35 @@
         renderSectionHealth();
         renderSections();
         renderGateAccess();
+    }
+
+    /* Active seconds per stage and the last heartbeat (migration 0035). Read
+       apart from the cohort and on its own timer: a student's page pings every
+       30 seconds, and none of it belongs in the profiles table, whose every
+       write makes this console reload. A read that fails leaves the previous
+       numbers in place; a table that does not exist yet is remembered as such
+       so the card can say what to apply. */
+    var STAGE_TIME_FIELD = {
+        'OCEAN': 'ocean_time',
+        'Character Selection': 'character_select_time',
+        'Tutoring Dashboard': 'tutoring_time'
+    };
+    var LIVE_WINDOW_MS = 60 * 1000;
+
+    async function loadStageTimes() {
+        var res = await sb.from('student_stage_time')
+            .select('student_email, ocean_time, character_select_time, tutoring_time, heartbeat_stage, last_heartbeat_timestamp')
+            .limit(5000);
+
+        if (res.error) {
+            if (qbMissingTable(res.error)) { state.stageTimes = null; }
+            else { console.error('[PIA] stage times could not be read:', res.error); }
+            return;
+        }
+
+        var byEmail = {};
+        (res.data || []).forEach(function (row) { byEmail[String(row.student_email || '').toLowerCase()] = row; });
+        state.stageTimes = byEmail;
     }
 
     async function loadSections() {
@@ -1370,32 +1401,72 @@
             esc(STAGE_META[stageKey].label) + '</span>';
     }
 
-    function renderLiveSessions() {
-        var rows = state.cohort
-            .filter(function (s) { return stageOf(s) && s.stage_started_at; })
-            .sort(function (a, b) { return new Date(a.stage_started_at) - new Date(b.stage_started_at); })
-            .slice(0, 6);
+    /* Whole seconds as "4m 20s" / "1h 5m". */
+    function formatSeconds(total) {
+        var n = Math.max(0, Math.floor(Number(total) || 0));
+        var h = Math.floor(n / 3600);
+        var m = Math.floor((n % 3600) / 60);
+        if (h > 0) { return h + 'h ' + m + 'm'; }
+        if (m > 0) { return m + 'm ' + (n % 60) + 's'; }
+        return n + 's';
+    }
 
+    /* Only students whose page has checked in during the last minute: the
+       heartbeat (function.js 1C-5b) stops when a tab is hidden, closed or
+       offline, so this list is who is working right now, not who once was.
+       Active time is the counted time for the stage they are in. */
+    function renderLiveSessions() {
         var tbody = $('#live-tbody');
 
-        if (!rows.length) {
-            tbody.innerHTML = '<tr><td colspan="4">' +
-                '<div class="state-block" style="min-height:180px">' +
-                '<span class="state-glyph">' + icon('clock', 'icon-lg') + '</span>' +
-                '<p class="state-title">No sessions running</p>' +
+        function message(glyph, title, text) {
+            tbody.innerHTML = '<tr><td colspan="4"><div class="state-block" style="min-height:180px">' +
+                '<span class="state-glyph">' + icon(glyph, 'icon-lg') + '</span>' +
+                '<p class="state-title">' + esc(title) + '</p>' +
+                (text ? '<p class="state-desc">' + esc(text) + '</p>' : '') +
                 '</div></td></tr>';
+        }
+
+        if (state.stageTimes === null) {
+            message('clock', 'Active time is not set up yet',
+                'Apply supabase/migrations/20260929_0035_stage_time_tracking.sql, then refresh.');
             return;
         }
 
-        tbody.innerHTML = rows.map(function (s) {
+        var times = state.stageTimes || {};
+        var cutoff = Date.now() - LIVE_WINDOW_MS;
+        var rows = state.cohort.map(function (s) {
+            return { student: s, time: times[String(s.email || '').toLowerCase()] };
+        }).filter(function (r) {
+            return r.time && STAGE_TIME_FIELD[r.time.heartbeat_stage] &&
+                new Date(r.time.last_heartbeat_timestamp).getTime() >= cutoff;
+        }).sort(function (a, b) {
+            return String(a.student.full_name || a.student.email).localeCompare(String(b.student.full_name || b.student.email));
+        }).slice(0, 10);
+
+        if (!rows.length) {
+            message('clock', 'No students active right now');
+            return;
+        }
+
+        tbody.innerHTML = rows.map(function (r) {
+            var stage = r.time.heartbeat_stage;
             return '' +
-                '<tr data-started-at="' + esc(s.stage_started_at) + '">' +
-                '<td>' + userCell(s) + '</td>' +
-                '<td class="muted">' + esc(s.section || '—') + '</td>' +
-                '<td>' + stageBadge(stageOf(s)) + '</td>' +
-                '<td class="duration-cell" data-duration>' + esc(formatDuration(s.stage_started_at)) + '</td>' +
+                '<tr>' +
+                '<td>' + userCell(r.student) + '</td>' +
+                '<td class="muted">' + esc(r.student.section || '—') + '</td>' +
+                '<td>' + stageBadge(stage) + '</td>' +
+                '<td class="duration-cell tnum">' + esc(formatSeconds(r.time[STAGE_TIME_FIELD[stage]])) + '</td>' +
                 '</tr>';
         }).join('');
+    }
+
+    /* The list is re-read every 20 seconds, on its own: a heartbeat is not a
+       profiles change, so nothing else here would notice one. */
+    function startLiveSessionsTimer() {
+        setInterval(function () {
+            if (document.hidden || !state.cohortLoaded) { return; }
+            loadStageTimes().then(renderLiveSessions).catch(function () { /* the next tick tries again */ });
+        }, 20000);
     }
 
     function renderGateSummary() {
@@ -1546,15 +1617,11 @@
         }
 
         $('#section-students-tbody').innerHTML = students.map(function (s) {
-            var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
-            var active = (s.status || '') === 'active';
             return '' +
                 '<tr>' +
                 '<td>' + userCell(s) + '</td>' +
-                '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
-                '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
-                '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
-                (active ? 'Active' : 'Inactive') + '</span></td>' +
+                conditionCell(s) +
+                '<td>' + activationBadge(s) + '</td>' +
                 '<td class="tnum muted">' + esc(s.pre_test_score == null ? '—' : s.pre_test_score) + '</td>' +
                 '<td class="tnum muted">' + esc(s.post_test_score == null ? '—' : s.post_test_score) + '</td>' +
                 '</tr>';
@@ -1563,14 +1630,25 @@
 
     /* ============================================== 7. STUDENT ROSTER === */
 
+    /* Whether the student has activated their account, in words that say so.
+       "Inactive" read as a fault; this is registration state: a registered
+       student is Pending until their first sign-in, after which the database
+       marks them active and this reads Activated. */
+    function activationBadge(s) {
+        var activated = (s.status || '') === 'active';
+        return '<span class="badge ' + (activated ? 'badge-accent' : '') + '">' +
+            '<span class="dot ' + (activated ? 'dot-live' : 'dot-off') + '"></span>' +
+            (activated ? 'Activated' : 'Pending') + '</span>';
+    }
+
     var ROSTER_HEADS = {
         default:
             '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Stage</th><th>Status</th></tr>',
         'Active Game':
-            '<tr><th>Student</th><th>Problem</th><th>Difficulty</th><th>Hints</th>' +
+            '<tr><th>Student</th><th>Condition</th><th>Problem</th><th>Difficulty</th><th>Hints</th>' +
             '<th>Streak</th><th>Duration</th></tr>',
         stage:
-            '<tr><th>Student</th><th>Section</th><th>Activity</th><th>Duration</th></tr>'
+            '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Activity</th><th>Duration</th></tr>'
     };
 
     /* A row has no buttons: it opens the participant panel, whose Actions
@@ -1582,6 +1660,12 @@
         return '<tr class="is-clickable" tabindex="0" data-student="' + esc(s.email) + '"' +
             ' data-started-at="' + esc(started) + '" aria-label="Open profile: ' + esc(s.full_name || s.email) + '">' +
             '<td>' + userCell(s) + '</td>' + cells + '</tr>';
+    }
+
+    /* The student's experimental group, as the same badge everywhere. */
+    function conditionCell(s) {
+        var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
+        return '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>';
     }
 
     function renderRoster() {
@@ -1600,6 +1684,7 @@
 
             if (drill === 'Active Game') {
                 return rosterRow(s,
+                    conditionCell(s) +
                     '<td class="tnum muted">Question ' + toInt(s.current_problem, 1) + '</td>' +
                     '<td><span class="badge badge">' + esc(s.current_difficulty || 'Normal') + '</span></td>' +
                     '<td class="tnum muted">' + toInt(s.hints_used, 0) + '</td>' +
@@ -1615,22 +1700,16 @@
 
                 return rosterRow(s,
                     '<td class="muted">' + esc(s.section || '—') + '</td>' +
+                    conditionCell(s) +
                     '<td><span class="badge badge-accent">' + esc(activity) + '</span></td>' +
                     '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>');
             }
 
-            var condition = CONDITIONS[s.group_type] || { short: s.group_type || '—', badge: '' };
-            /* Who has activated their account: the one roster fact an admin
-               acts on (send the activation email). */
-            var active = (s.status || '') === 'active';
-
             return rosterRow(s,
                 '<td class="muted">' + esc(s.section || '—') + '</td>' +
-                '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>' +
+                conditionCell(s) +
                 '<td>' + stageBadge(stageOf(s)) + '</td>' +
-                '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
-                '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
-                (active ? 'Active' : 'Awaiting activation') + '</span></td>');
+                '<td>' + activationBadge(s) + '</td>');
         }).join('');
 
         var pages = Math.max(1, Math.ceil(state.totalStudents / PAGE_SIZE));
@@ -1677,6 +1756,9 @@
             });
         });
 
+        /* The four tiles are the stage filter, and they toggle: pressing the
+           lit one clears it and returns the full roster. There is no separate
+           "clear filter" button. */
         $$('[data-stage-filter]').forEach(function (tile) {
             tile.addEventListener('click', function () {
                 var key = tile.getAttribute('data-stage-filter');
@@ -1684,7 +1766,9 @@
                 state.filters.stage = isSame ? null : key;
 
                 $$('[data-stage-filter]').forEach(function (t) {
-                    t.classList.toggle('is-active', !isSame && t === tile);
+                    var on = !isSame && t === tile;
+                    t.classList.toggle('is-active', on);
+                    t.setAttribute('aria-pressed', on ? 'true' : 'false');
                 });
 
                 applyDrilldownChrome();
@@ -1693,21 +1777,16 @@
             });
         });
 
-        $('#clear-stage-filter').addEventListener('click', function () {
-            state.filters.stage = null;
-            $$('[data-stage-filter]').forEach(function (t) { t.classList.remove('is-active'); });
-            applyDrilldownChrome();
-            state.page = 1;
-            loadRoster();
-        });
-
         $('#reset-filters').addEventListener('click', function () {
             state.filters = { group: 'all', sub: 'all', stage: null, search: '' };
             $('#student-search').value = '';
             $$('[data-group-filter]').forEach(function (b) {
                 b.classList.toggle('is-active', b.getAttribute('data-group-filter') === 'all');
             });
-            $$('[data-stage-filter]').forEach(function (t) { t.classList.remove('is-active'); });
+            $$('[data-stage-filter]').forEach(function (t) {
+                t.classList.remove('is-active');
+                t.setAttribute('aria-pressed', 'false');
+            });
             $('#subgroup-segment').classList.add('is-hidden');
             applyDrilldownChrome();
             state.page = 1;
@@ -1740,7 +1819,6 @@
 
     function applyDrilldownChrome() {
         var drill = state.filters.stage;
-        $('#clear-stage-filter').classList.toggle('is-hidden', !drill);
         $('#roster-filter-bar').classList.toggle('is-hidden', !!drill);
         $('#roster-title').textContent = drill ? stageLabel(drill) + ' — live view' : 'All students';
     }
@@ -2198,15 +2276,17 @@
         var email = normalizeEmail($('#rs-email').value);
         var section = $('#rs-section').value;
         var groupType = ($('input[name="rs-condition"]:checked') || {}).value;
-        var maxDevices = toInt($('#rs-device').value, 1);
-        var assent = $('#rs-assent').checked;
 
         var valid = true;
         valid = setFieldError('rs-first', first ? '' : 'First name is required.') && valid;
         valid = setFieldError('rs-last', last ? '' : 'Last name is required.') && valid;
         valid = setFieldError('rs-email', isEmail(email) ? '' : 'Enter a valid school email address.') && valid;
         valid = setFieldError('rs-section', section ? '' : 'Create a section first.') && valid;
+        /* Both are required, not just consent: nobody is registered without
+           the parent's consent AND the student's own assent. The database
+           refuses the row without both as well (migration 0037). */
         valid = setFieldError('rs-consent', $('#rs-consent').checked ? '' : 'Parental consent must be recorded first.') && valid;
+        valid = setFieldError('rs-assent', $('#rs-assent').checked ? '' : 'Student assent must be recorded first.') && valid;
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2254,8 +2334,8 @@
                 section: section,
                 group_type: groupType,
                 parental_consent: true,
-                student_assent: assent,
-                max_devices: maxDevices,
+                student_assent: true,
+                max_devices: 1,   /* one device per student; enforced by the database (0027, 0037) */
                 status: 'inactive',
                 role: 'student'
             }]);
@@ -2300,7 +2380,6 @@
         $('#es-middle').value = middle;
         $('#es-last').value = last;
         $('#es-email').value = s.email;
-        $('#es-device').value = toInt(s.max_devices, 1);
         ['pre', 'post'].forEach(function (test) {
             fillScoreField('es-' + test + '-raw', s[test + '_test_raw_score']);
             fillScoreField('es-' + test + '-max', s[test + '_test_max_score']);
@@ -2389,7 +2468,6 @@
         var last = $('#es-last').value.trim();
         var section = $('#es-section').value;
         var groupType = ($('input[name="es-condition"]:checked') || {}).value;
-        var maxDevices = toInt($('#es-device').value, 1);
         var pairs = {};
 
         var valid = true;
@@ -2420,8 +2498,7 @@
             var payload = {
                 full_name: fullName,
                 section: section,
-                group_type: groupType,
-                max_devices: maxDevices
+                group_type: groupType
             };
             /* Only a test whose fields changed is sent, and only its raw data:
                the database calculates the transmuted score. Untouched fields
@@ -2580,10 +2657,6 @@
             if (!row || event.target !== row) { return; }
             event.preventDefault();
             openFacultyProfile(row.getAttribute('data-faculty'));
-        });
-
-        $('#faculty-reset').addEventListener('click', function () {
-            if (state.activeFaculty) { sendPasswordReset(state.activeFaculty.email, this); }
         });
 
         $('#faculty-signout').addEventListener('click', function () {
@@ -2750,16 +2823,20 @@
        the section in stage_overrides (0033). A section can be granted again
        to let in students who became eligible later.
 
-       Taking access back is the one thing the database only does for a whole
-       stage: admin_set_stage_open(false) returns everyone inside to the
-       Waiting Room and clears every section's record. That is "Close stage".
-       There is no per-section close, and no switch that opens a stage for
-       everyone; a stage a previous version left globally open (gate.open)
-       shows as open for all sections until it is closed. */
+       "Revoke access" is the other half, and it is just as targeted: it runs
+       admin_revoke_stage (migration 0036) for the ticked sections that are
+       open, and for no others. Their students go back to the Waiting Room;
+       nothing they have submitted is touched, and a student part-way through
+       a test or lesson may finish it (function.js 1C-5c). There is no switch
+       that opens a stage for everyone; a stage a previous version left
+       globally open (gate.open) shows as open for all sections, and Revoke
+       access then closes it for all of them (there is nothing per-section to
+       revoke). After a successful Grant or Revoke every tick is cleared, so a
+       second press cannot repeat the action on the same sections. */
 
     var GATE_ACCESS_TIP = 'Granting moves a section’s eligible students in right away. Grant a section ' +
-        'again to let in students who finished the previous stage later. Close stage ends access for ' +
-        'every section.';
+        'again to let in students who finished the previous stage later. Revoke access ends access for ' +
+        'the ticked sections only; nothing already submitted is affected.';
 
     function gateByKey(key) {
         return GATES.filter(function (g) { return g.key === key; })[0];
@@ -2825,7 +2902,7 @@
                 '</div>' +
                 '<div class="gate-foot">' +
                 '<button class="btn btn-primary btn-sm" type="button" data-gate-grant="' + gate.key + '">Grant access</button>' +
-                '<button class="btn btn-danger-soft btn-sm" type="button" data-gate-close="' + gate.key + '">Close stage</button>' +
+                '<button class="btn btn-danger-soft btn-sm" type="button" data-gate-revoke="' + gate.key + '">Revoke access</button>' +
                 '</div>' +
                 '</article>';
         }).join('');
@@ -2899,20 +2976,24 @@
         return html;
     }
 
-    /* The buttons follow what is ticked and what is open. */
+    /* The buttons follow what is ticked and what is open. Grant acts on the
+       ticked sections; Revoke on the ticked sections that are open. */
+    function tickedOpen(gate) {
+        return state.gateSelected[gate.key].filter(function (name) { return sectionOpen(gate, name); });
+    }
+
     function paintGateFoot(gate) {
         var grant = $('[data-gate-grant="' + gate.key + '"]');
-        var close = $('[data-gate-close="' + gate.key + '"]');
-        if (!grant || !close) { return; }
+        var revoke = $('[data-gate-revoke="' + gate.key + '"]');
+        if (!grant || !revoke) { return; }
 
         var n = state.gateSelected[gate.key].length;
         grant.textContent = n ? 'Grant access · ' + n : 'Grant access';
         grant.disabled = gate.open || n === 0;
 
-        var access = gateAccess(gate);
-        var anyOpen = gate.open || (access && (access.sections.length || access.others.length)) ||
-            (Array.isArray(state.overrides) && state.overrides.some(function (o) { return o.stage === gate.key; }));
-        close.disabled = !anyOpen;
+        var open = tickedOpen(gate).length;
+        revoke.textContent = open ? 'Revoke access · ' + open : 'Revoke access';
+        revoke.disabled = !(gate.open || open);
     }
 
     /* Repaints the section lists, badges and buttons, and the Overview's
@@ -2961,8 +3042,8 @@
             var grant = event.target.closest('[data-gate-grant]');
             if (grant) { grantSections(grant.getAttribute('data-gate-grant'), grant); return; }
 
-            var close = event.target.closest('[data-gate-close]');
-            if (close) { closeStage(close.getAttribute('data-gate-close'), close); }
+            var revoke = event.target.closest('[data-gate-revoke]');
+            if (revoke) { revokeSections(revoke.getAttribute('data-gate-revoke'), revoke); }
         });
     }
 
@@ -2993,8 +3074,9 @@
         }
         release();
 
-        /* Sections that went through are unticked; a failed one stays ticked
-           so the same button retries it. */
+        /* Every section that went through is unticked -- all of them, when
+           all did -- so the next press cannot repeat this on the same
+           sections. A section that failed stays ticked to be retried. */
         state.gateSelected[gateKey] = names.filter(function (name) {
             return failed.some(function (f) { return f.section === name; });
         });
@@ -3026,101 +3108,75 @@
         );
     }
 
-    /* Closing through the settings table alone would not evict the students
-       already inside — their own current_stage acts as a grant, so they keep
-       re-entering by direct URL. admin_set_stage_open returns them to the
-       Waiting Room as part of closing, and clears every section's record. */
-    async function closeStage(gateKey, sourceBtn) {
+    /* Revoke: the ticked sections that are open, and no others. The database
+       (admin_revoke_stage) removes their records and returns their students
+       to the Waiting Room -- and changes nothing else. A stage left globally
+       open by the old switch has no per-section access to remove, so there
+       it closes the stage for everyone (admin_set_stage_open), which also
+       returns those inside to the Waiting Room. Neither touches a submitted
+       answer, a score or a tutoring result. */
+    async function revokeSections(gateKey, sourceBtn) {
         var gate = gateByKey(gateKey);
-        var inside = state.cohort.filter(function (s) { return s.current_stage === gate.label; }).length;
+        var everyone = gate.open;
+        var names = everyone ? [] : tickedOpen(gate);
+        if (!everyone && !names.length) { return; }
+
+        var inside = state.cohort.filter(function (s) {
+            return s.current_stage === gate.label && (everyone || names.indexOf(s.section) !== -1);
+        }).length;
 
         var ok = await confirmAction({
-            title: 'Close stage',
-            heading: 'Close ' + gate.title + ' for every section?',
+            title: 'Revoke access',
+            heading: everyone
+                ? 'Close ' + gate.title + ' for every section?'
+                : 'Revoke ' + gate.title + ' for ' + names.join(', ') + '?',
             message: (inside
                 ? inside + ' student' + (inside === 1 ? ' is' : 's are') + ' inside now and will return to the ' +
-                  'Waiting Room. '
+                  'Waiting Room. Anyone part-way through can still finish and submit what they started. '
                 : 'Nobody is inside right now. ') +
-                'Every section’s access ends; you can grant sections again afterwards.',
-            confirmLabel: 'Close stage'
+                'Nothing already submitted is changed or removed.' +
+                (everyone ? '' : ' Other sections keep their access.'),
+            confirmLabel: 'Revoke access'
         });
         if (!ok) { return; }
 
-        var release = setBusy(sourceBtn, 'Closing…');
-        var res = await sb.rpc('admin_set_stage_open', { p_stage: gateKey, p_open: false });
+        var release = setBusy(sourceBtn, 'Revoking…');
+        var res = everyone
+            ? await sb.rpc('admin_set_stage_open', { p_stage: gateKey, p_open: false })
+            : await sb.rpc('admin_revoke_stage', { p_stage: gateKey, p_sections: names });
         release();
 
         if (res.error) {
-            toastErr('Stage control failed', res.error.message);
+            toastErr('Access not revoked', res.error.code === 'PGRST202' || res.error.code === '42883'
+                ? 'The database is missing migration 0036 (admin_revoke_stage). Apply it, then try again.'
+                : friendlyDbError(res.error, 'The request did not complete.'));
             return;
         }
 
         gate.open = false;
-        /* The server cleared this stage's section records; show that now
-           rather than after the refresh. */
+        /* Show what the server just did rather than waiting for the refresh. */
         if (Array.isArray(state.overrides)) {
-            state.overrides = state.overrides.filter(function (o) { return o.stage !== gateKey; });
+            state.overrides = state.overrides.filter(function (o) {
+                return o.stage !== gateKey || (!everyone && names.indexOf(o.section) === -1);
+            });
         }
         state.cohort.forEach(function (s) {
-            if (s.current_stage === gate.label) { s.current_stage = 'Waiting Room'; }
+            if (s.current_stage === gate.label && (everyone || names.indexOf(s.section) !== -1)) {
+                s.current_stage = 'Waiting Room';
+            }
         });
+        state.gateSelected[gateKey] = [];
         renderGateAccess();
 
-        var evicted = (res.data && res.data.evicted) || 0;
-        toastOk(gate.title + ' closed', evicted > 0
-            ? evicted + ' student' + (evicted === 1 ? '' : 's') + ' returned to the Waiting Room.'
-            : 'No section has access now.');
+        var moved = (res.data && (res.data.moved != null ? res.data.moved : res.data.evicted)) || 0;
+        toastOk(gate.title + ' revoked',
+            (everyone ? 'For every section. ' : names.join(', ') + '. ') +
+            (moved ? moved + ' student' + (moved === 1 ? '' : 's') + ' returned to the Waiting Room.' : 'Nobody was inside.'));
 
         refreshAll();
     }
 
     /* ============= 11. PROFILE (PASSWORD, SESSIONS) AND SETTINGS (ADMINS) === */
-
-    /* The emailed reset link: the way back for an administrator who has
-       forgotten the current password (Profile -> Change password). It needs
-       this account's inbox. It opens the site's set-password page (the same
-       one activation and "Forgot password" use), which signs the account out
-       everywhere once the new password is saved. */
-    var PW_RESET_COOLDOWN_S = 60;
-    var pwResetTimer = null;
-
-    async function sendMyPasswordReset() {
-        var btn = $('#pw-reset-send');
-        var status = $('#pw-reset-status');
-        if (btn.disabled) { return; }
-
-        var release = setBusy(btn, 'Sending…');
-        var res;
-        try { res = await sb.auth.resetPasswordForEmail(state.adminEmail, { redirectTo: activationRedirect() }); }
-        catch (err) { res = { error: { message: (err && err.message) || 'The request did not complete.' } }; }
-        release();
-
-        if (res.error) {
-            var rate = /rate limit|too many|security purposes/i.test(res.error.message || '');
-            status.textContent = rate
-                ? 'Too many emails were sent recently. Wait a few minutes, then try again.'
-                : 'The link was not sent: ' + (res.error.message || 'unknown error') + '.';
-            toastErr('Reset link not sent', status.textContent);
-            return;
-        }
-
-        /* One per minute: the email quota is shared by the whole project. */
-        var left = PW_RESET_COOLDOWN_S;
-        var sentAt = formatStamp(new Date().toISOString());
-        btn.disabled = true;
-        var paint = function () {
-            status.textContent = 'Sent to ' + state.adminEmail + ' at ' + sentAt + '.' +
-                (left > 0 ? ' You can send another in ' + left + ' s.' : '');
-        };
-        paint();
-        clearInterval(pwResetTimer);
-        pwResetTimer = setInterval(function () {
-            left -= 1;
-            paint();
-            if (left <= 0) { clearInterval(pwResetTimer); btn.disabled = false; }
-        }, 1000);
-        toastOk('Reset link sent', 'Check ' + state.adminEmail + '.');
-    }
 
     /* ---- Change password ----
        Supabase's updateUser() never asks for the current password, so on its
@@ -5385,7 +5441,6 @@
 
         $('#admin-name').textContent = name;
         $('#admin-email').textContent = email;
-        $('#pw-reset-to').textContent = email;
         $('#profile-name').textContent = name;
         $('#profile-email').textContent = email;
         $('#admin-initials').textContent = initialsOf(name, email);
@@ -5422,7 +5477,6 @@
             var email = btn.getAttribute('data-email');
             if (btn.getAttribute('data-admin-act') === 'link') { resendAdminLink(email, btn); }
         });
-        $('#pw-reset-send').addEventListener('click', sendMyPasswordReset);
         initChangePassword();
         $('#audit-open').addEventListener('click', openAuditLog);
 
@@ -5570,6 +5624,7 @@
         loadMathTask();
 
         setupRealtime();
+        startLiveSessionsTimer();
         /* Ends this console the moment the server stops accepting its login
            (function.js 1C-7) -- a revoke from another device lands here. */
         startStaffSessionWatch();

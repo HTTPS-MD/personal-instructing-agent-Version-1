@@ -295,7 +295,10 @@
                                 <div class="card" data-region="cohort">
                                     <div class="card-head">
                                         <div class="card-head-text">
-                                            <h2 class="card-title">Live sessions</h2>
+                                            <div class="with-tip">
+                                                <h2 class="card-title">Live sessions</h2>
+                                                <button type="button" class="info-tip" data-tip="Students whose page has checked in within the last 60 seconds. Time counts only while their tab is visible, so a student on another tab or offline drops off." aria-label="About live sessions"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                            </div>
                                         </div>
                                         <div class="card-tools">
                                             <button class="btn btn-secondary btn-sm" data-view-link="students">Open roster</button>
@@ -308,7 +311,7 @@
                                                     <th>Student</th>
                                                     <th>Section</th>
                                                     <th>Stage</th>
-                                                    <th>Elapsed</th>
+                                                    <th>Active time</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="live-tbody"></tbody>
@@ -385,28 +388,28 @@
                         <!-- Stage drill-down tiles. The data-stage value is the exact
                              profiles.current_stage string the database stores. -->
                         <div class="grid grid-4 stat-grid" id="stage-tiles">
-                            <button class="stat" data-stage-filter="OCEAN" data-region="stages">
+                            <button class="stat" aria-pressed="false" data-stage-filter="OCEAN" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">OCEAN test</span>
                                     <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-brain"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="OCEAN"><span class="skeleton skeleton-line"></span></span>
                             </button>
-                            <button class="stat" data-stage-filter="Character Selection" data-region="stages">
+                            <button class="stat" aria-pressed="false" data-stage-filter="Character Selection" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">Character select</span>
                                     <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-user"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="Character Selection"><span class="skeleton skeleton-line"></span></span>
                             </button>
-                            <button class="stat" data-stage-filter="Tutoring Dashboard" data-region="stages">
+                            <button class="stat" aria-pressed="false" data-stage-filter="Tutoring Dashboard" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">Tutoring dashboard</span>
                                     <span class="stat-glyph"><svg class="icon"><use href="#i-grid"></use></svg></span>
                                 </span>
                                 <span class="stat-value" data-stage-count="Tutoring Dashboard"><span class="skeleton skeleton-line"></span></span>
                             </button>
-                            <button class="stat" data-stage-filter="Active Game" data-region="stages">
+                            <button class="stat" aria-pressed="false" data-stage-filter="Active Game" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">Active session</span>
                                     <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-gamepad"></use></svg></span>
@@ -421,10 +424,6 @@
                                     <h2 class="card-title" id="roster-title">All students</h2>
                                 </div>
                                 <div class="card-tools">
-                                    <button class="btn btn-secondary btn-sm is-hidden" id="clear-stage-filter">
-                                        <svg class="icon"><use href="#i-arrow-left"></use></svg>
-                                        Clear filter
-                                    </button>
                                     <label class="search">
                                         <svg class="icon"><use href="#i-search"></use></svg>
                                         <input type="search" class="input" id="student-search"
@@ -610,18 +609,6 @@
                                     <svg class="icon"><use href="#i-key"></use></svg>
                                     Update password
                                 </button>
-                            </div>
-                            <!-- Forgotten it? The emailed link is the way back in; it opens
-                                 the site's set-password page and signs the account out
-                                 everywhere. The confirmation line keeps its space. -->
-                            <div class="profile-forgot">
-                                <p class="notice-text">Forgot your current password? A reset link goes to
-                                    <strong class="pw-reset-to" id="pw-reset-to">your email</strong>.</p>
-                                <button class="btn btn-secondary btn-sm" type="button" id="pw-reset-send">
-                                    <svg class="icon"><use href="#i-mail"></use></svg>
-                                    Email me a reset link
-                                </button>
-                                <p class="qb-help pw-reset-status" id="pw-reset-status" role="status" aria-live="polite"></p>
                             </div>
                         </form>
 
@@ -892,16 +879,11 @@
 
                     <div class="form-section">
                         <p class="form-section-title">Placement</p>
-                        <div class="form-grid form-grid-2">
+                        <div class="form-grid">
                             <div class="field">
                                 <label class="label" for="rs-section">Section <span class="req">*</span></label>
                                 <select class="select" id="rs-section" data-section-select></select>
                                 <p class="field-msg" data-msg-for="rs-section"></p>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="rs-device">Device limit</label>
-                                <input class="input tnum" type="number" id="rs-device" value="1" min="1" max="5">
-                                <p class="field-msg" data-msg-for="rs-device"></p>
                             </div>
                         </div>
 
@@ -943,9 +925,10 @@
                             <input type="checkbox" id="rs-assent">
                             <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
                             <span class="check-text">
-                                Student assent received
+                                Student assent received <span class="req">*</span>
                             </span>
                         </label>
+                        <p class="field-msg" data-msg-for="rs-assent"></p>
                     </div>
                 </form>
             </div>
@@ -1012,16 +995,11 @@
 
                     <div class="form-section">
                         <p class="form-section-title">Placement</p>
-                        <div class="form-grid form-grid-2">
+                        <div class="form-grid">
                             <div class="field">
                                 <label class="label" for="es-section">Section</label>
                                 <select class="select" id="es-section" data-section-select></select>
                                 <p class="field-msg" data-msg-for="es-section"></p>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="es-device">Device limit</label>
-                                <input class="input tnum" type="number" id="es-device" min="1" max="5">
-                                <p class="field-msg" data-msg-for="es-device"></p>
                             </div>
                         </div>
 
@@ -1502,9 +1480,6 @@
                 </div>
 
                 <div class="action-list">
-                    <button class="action-list-item" id="faculty-reset">
-                        <svg class="icon"><use href="#i-key"></use></svg> Send password-reset email
-                    </button>
                     <!-- The same "Sign out everywhere" students have: ends every
                          session and frees every device slot (admin_revoke_sessions). -->
                     <button class="action-list-item" id="faculty-signout">

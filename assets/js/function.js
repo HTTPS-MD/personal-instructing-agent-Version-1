@@ -630,6 +630,81 @@ function startPresenceHeartbeat() {
 }
 
 // ==========================================
+// 1C-5b. STAGE HEARTBEAT (active time per stage, migration 0035)
+// The study reports how long a student actually WORKED in each stage, so a
+// stage page pings the server every 30 seconds with the stage it is on --
+// and only while the tab is visible. A hidden or minimised tab sends nothing,
+// which pauses the clock; a closed tab or a lost connection sends nothing
+// either, which freezes it. The ping carries no time at all: the server works
+// out what it is worth from its own clock (record_heartbeat), so a page
+// cannot claim more than it earned.
+//
+// When the student completes the stage the page calls finalizeStageTime(),
+// the final payload that locks that stage's seconds for good.
+// ==========================================
+const STAGE_HEARTBEAT_MS = 30 * 1000;
+let stageHeartbeatTimerId = null;
+let stageHeartbeatStage = null;
+
+function beatStage() {
+    if (!window.supabaseClient || !stageHeartbeatStage || piaSessionEnded) return;
+    if (document.hidden) return;   // tab switched away or minimised: the clock is paused
+    window.supabaseClient.rpc('record_heartbeat', { p_stage: stageHeartbeatStage }).then((res) => {
+        // Locked or completed on the server: nothing more to send.
+        if (res && res.data && (res.data.locked || res.data.reason === 'stage_completed')) stopStageHeartbeat();
+    }, () => {});   // a failed ping is a lost half-minute, never an interruption
+}
+
+function startStageHeartbeat(stage) {
+    if (stageHeartbeatTimerId !== null) return;
+    stageHeartbeatStage = stage;
+    beatStage();
+    stageHeartbeatTimerId = setInterval(beatStage, STAGE_HEARTBEAT_MS);
+}
+
+function stopStageHeartbeat() {
+    clearInterval(stageHeartbeatTimerId);
+    stageHeartbeatTimerId = null;
+    stageHeartbeatStage = null;
+}
+
+// The final payload. Awaited, but a failure never blocks the student's way on:
+// the server also stops counting a completed stage by itself.
+async function finalizeStageTime(stage) {
+    stopStageHeartbeat();
+    if (!window.supabaseClient) return;
+    try { await window.supabaseClient.rpc('finalize_stage_time', { p_stage: stage }); } catch (e) { /* see above */ }
+}
+
+// ==========================================
+// 1C-5c. A STAGE CLOSED UNDER SOMEONE WHO IS PART-WAY THROUGH
+// Revoking access must not throw away a half-finished questionnaire or lesson.
+// Nothing that SAVES work asks whether the stage is open (submit_ocean_results
+// and the tutoring functions look only at the student and their session), so
+// the student can finish and submit; what they cannot do is start again -- the
+// stage guard and set_student_stage refuse a new entry. A stage page that has
+// unsaved work says so by setting window.PIA_HAS_ACTIVE_WORK to a function
+// returning true; while it does, the page stays put and this notice explains.
+// ==========================================
+function pageHasActiveWork() {
+    try { return typeof window.PIA_HAS_ACTIVE_WORK === 'function' && !!window.PIA_HAS_ACTIVE_WORK(); }
+    catch (e) { return false; }
+}
+
+function showStageClosedNotice() {
+    if (document.getElementById('pia-stage-closed')) return;
+    const bar = document.createElement('div');
+    bar.id = 'pia-stage-closed';
+    bar.setAttribute('role', 'status');
+    bar.style.cssText = 'position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);z-index:9997;width:min(34rem,calc(100vw - 2rem));' +
+        'background:var(--bg-surface);color:var(--text);border-radius:var(--r-card);padding:var(--sp-4) var(--sp-5);' +
+        'box-shadow:var(--shadow-lg);font-size:var(--fs-sm);line-height:1.5';
+    bar.innerHTML = '<strong style="display:block;margin-bottom:2px">This stage has been closed by your teacher.</strong>' +
+        'You can finish and submit what you have started. It will not be lost, but you will not be able to start it again.';
+    document.body.appendChild(bar);
+}
+
+// ==========================================
 // 1C-6. ONE ACTIVE SESSION (students, migration 0027)
 // Every 10 seconds a student page asks check_student_session() whether this
 // browser still holds the account. When another device has signed in since,
@@ -1310,6 +1385,10 @@ function setupStudentRealtimeStageSync() {
 
             const target = STAGE_PAGES[stage];
             if (!target) return;
+
+            // Moved out of the stage they are working in (access revoked)? Let
+            // them finish what they started; see 1C-5c.
+            if (stage === 'Waiting Room' && pageHasActiveWork()) { showStageClosedNotice(); return; }
 
             const currentPath = window.location.pathname;
             if (target.pages.some(page => currentPath.endsWith('/' + page))) return; // nandito na

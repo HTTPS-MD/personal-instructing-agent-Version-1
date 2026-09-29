@@ -16,6 +16,7 @@ async function enforceStageLock() {
     const profile = await enforceStudentStage('char');
     if (!profile) return;
     verifiedEmail = profile.email;
+    startStageHeartbeat('Character Selection');
 }
 
 // Run check immediately
@@ -111,6 +112,9 @@ async function finalLockIn() {
     }
 
     localStorage.setItem('selected_character', selectedChar);
+
+    // The final payload: locks the seconds spent on this stage.
+    await finalizeStageTime('Character Selection');
 
     closeConfirmModal();
 
