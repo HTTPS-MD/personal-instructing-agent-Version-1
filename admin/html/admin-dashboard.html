@@ -182,7 +182,7 @@
             </div>
 
             <div class="sidebar-foot">
-                <button class="sidebar-user" data-modal-open="modal-signout">
+                <button class="sidebar-user" data-view="profile" title="Profile" aria-label="Profile">
                     <span class="rail-slot">
                         <span class="avatar" id="admin-initials" aria-hidden="true">··</span>
                     </span>
@@ -547,57 +547,122 @@
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 6 · SETTINGS ====== -->
-                <section class="page is-hidden" id="view-settings" data-view-panel="settings">
+                <!-- ============================== VIEW 6 · PROFILE ======= -->
+                <!-- The signed-in administrator's own account: who they are, their
+                     password, and the browsers signed in as them. Everything here
+                     is about this one person; system-wide administration is under
+                     Settings. -->
+                <section class="page is-hidden" id="view-profile" data-view-panel="profile">
                     <div class="page-head">
                         <div class="page-head-text">
-                            <h1 class="page-title">Settings</h1>
+                            <h1 class="page-title">Profile</h1>
                         </div>
                     </div>
 
-                    <div class="stack-lg">
-                    <div class="grid grid-2">
-                        <!-- The password is changed through an emailed link, never in a
-                             form here: an unlocked laptop is not enough to change it --
-                             the person also needs this account's inbox. The link opens
-                             the site's set-password page, which then signs the account
-                             out everywhere. -->
-                        <div class="card">
+                    <div class="profile-grid">
+                        <div class="card profile-details">
+                            <div class="card-head">
+                                <div class="card-head-text">
+                                    <h2 class="card-title">Personal details</h2>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="kv-grid">
+                                    <div class="kv">
+                                        <p class="kv-label">Name</p>
+                                        <p class="kv-value" id="profile-name">—</p>
+                                    </div>
+                                    <div class="kv">
+                                        <p class="kv-label">Email</p>
+                                        <p class="kv-value" id="profile-email">—</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- The current password is checked against Supabase Auth before
+                             anything changes (see handleChangePassword): updateUser()
+                             alone would let anyone at an unlocked laptop set a new one. -->
+                        <form class="card profile-password" id="change-password-form" novalidate>
                             <div class="card-head">
                                 <div class="card-head-text">
                                     <div class="with-tip">
-                                        <h2 class="card-title">Password</h2>
-                                        <button type="button" class="info-tip" data-tip="Saving the new password signs this account out on every device." aria-label="About password changes"><svg class="icon"><use href="#i-info"></use></svg></button>
+                                        <h2 class="card-title">Change password</h2>
+                                        <button type="button" class="info-tip" data-tip="At least 8 characters, with a letter and a number. Saving signs your other devices out; this one stays signed in." aria-label="About password changes"><svg class="icon"><use href="#i-info"></use></svg></button>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-body stack">
-                                <p class="notice-text">Reset link goes to
-                                    <strong class="pw-reset-to" id="pw-reset-to">your email</strong></p>
-                                <!-- Reserved line: the confirmation appears here without moving anything. -->
-                                <p class="qb-help pw-reset-status" id="pw-reset-status" role="status" aria-live="polite"></p>
+                                <div class="field">
+                                    <label class="label" for="cp-current">Current password</label>
+                                    <input class="input" type="password" id="cp-current" autocomplete="current-password">
+                                    <p class="field-msg" data-msg-for="cp-current"></p>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="cp-new">New password</label>
+                                    <input class="input" type="password" id="cp-new" autocomplete="new-password" maxlength="72">
+                                    <p class="field-msg" data-msg-for="cp-new"></p>
+                                </div>
+                                <div class="field">
+                                    <label class="label" for="cp-confirm">Confirm password</label>
+                                    <input class="input" type="password" id="cp-confirm" autocomplete="new-password" maxlength="72">
+                                    <p class="field-msg" data-msg-for="cp-confirm"></p>
+                                </div>
+                                <label class="check">
+                                    <input type="checkbox" id="cp-show">
+                                    <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                                    <span class="check-text">Show passwords</span>
+                                </label>
                             </div>
-                            <div class="card-foot" style="justify-content:flex-end">
-                                <button class="btn btn-primary" type="button" id="pw-reset-send">
+                            <div class="card-foot profile-password-foot">
+                                <button class="btn btn-primary" type="submit" id="cp-submit">
+                                    <svg class="icon"><use href="#i-key"></use></svg>
+                                    Update password
+                                </button>
+                            </div>
+                            <!-- Forgotten it? The emailed link is the way back in; it opens
+                                 the site's set-password page and signs the account out
+                                 everywhere. The confirmation line keeps its space. -->
+                            <div class="profile-forgot">
+                                <p class="notice-text">Forgot your current password? A reset link goes to
+                                    <strong class="pw-reset-to" id="pw-reset-to">your email</strong>.</p>
+                                <button class="btn btn-secondary btn-sm" type="button" id="pw-reset-send">
                                     <svg class="icon"><use href="#i-mail"></use></svg>
                                     Email me a reset link
                                 </button>
+                                <p class="qb-help pw-reset-status" id="pw-reset-status" role="status" aria-live="polite"></p>
                             </div>
-                        </div>
+                        </form>
 
                         <!-- No device limit for administrators (migration 0032): just
                              the browsers signed in to this account, and a way to end
                              any of them. Devices whose login has ended drop off the
                              list by themselves. -->
-                        <div class="card" data-region="admindevices">
+                        <div class="card profile-sessions" data-region="admindevices">
                             <div class="card-head">
                                 <div class="card-head-text">
-                                    <h2 class="card-title">Signed-in devices</h2>
+                                    <h2 class="card-title">Active sessions</h2>
                                 </div>
                             </div>
                             <div class="card-body">
                                 <div id="admin-device-list"></div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================== VIEW 7 · SETTINGS ====== -->
+                <section class="page is-hidden" id="view-settings" data-view-panel="settings">
+                    <div class="page-head">
+                        <div class="page-head-text">
+                            <h1 class="page-title">Settings</h1>
+                        </div>
+                        <div class="page-actions">
+                            <!-- Written by the database, read on demand: see the dialog. -->
+                            <button class="btn btn-secondary" type="button" id="audit-open">
+                                <svg class="icon"><use href="#i-shield"></use></svg>
+                                Security log
+                            </button>
                         </div>
                     </div>
 
@@ -634,38 +699,9 @@
                             </table>
                         </div>
                     </div>
-
-                    <!-- Security log (migration 0031). Written by the database,
-                         never by this page; administrators can only read it.
-                         Refused attempts are in the Postgres logs, not here:
-                         a refusal rolls back its own transaction. -->
-                    <div class="card" data-region="audit">
-                        <div class="card-head">
-                            <div class="card-head-text">
-                                <div class="with-tip">
-                                    <h2 class="card-title">Security log</h2>
-                                    <button type="button" class="info-tip" data-tip="Staff accounts created, accounts deleted, role and email changes, and devices or sessions ended. Latest 50." aria-label="About the security log"><svg class="icon"><use href="#i-info"></use></svg></button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="table-wrap">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>When</th>
-                                        <th>Action</th>
-                                        <th>Account</th>
-                                        <th>By</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="audit-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    </div>
                 </section>
 
-                <!-- ============================== VIEW 7 · MATH TASK ===== -->
+                <!-- ============================== VIEW 8 · MATH TASK ===== -->
                 <!-- The question bank for the three percentage topics, and the
                      adaptive rules per topic. Admin-only in the database
                      (migration 0028): every row carries its answers. -->
@@ -1678,6 +1714,47 @@
             <p class="qb-help qb-preview-meta"></p>
         </li>
     </template>
+
+    <!-- ============================================ MODAL · SECURITY LOG --
+         Migration 0031. Written by the database, never by this page; administrators
+         can only read it, and it is fetched when this opens, not at load. Refused
+         attempts are in the Postgres logs, not here: a refusal rolls back its own
+         transaction. -->
+    <div class="overlay" id="modal-audit" role="dialog" aria-modal="true" aria-labelledby="audit-title">
+        <div class="modal modal-xl">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <div class="with-tip">
+                        <h2 class="modal-title" id="audit-title">Security log</h2>
+                        <button type="button" class="info-tip" data-tip="Staff accounts created, accounts deleted, role and email changes, and devices or sessions ended. Latest 50." aria-label="About the security log"><svg class="icon"><use href="#i-info"></use></svg></button>
+                    </div>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon"><use href="#i-x"></use></svg>
+                </button>
+            </header>
+
+            <div class="modal-body modal-body-flush">
+                <div class="table-wrap" style="border-top:0" data-region="audit">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>Action</th>
+                                <th>Account</th>
+                                <th>By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close>Close</button>
+            </footer>
+        </div>
+    </div>
 
     <!-- ============================================== MODAL · SIGN OUT -->
     <div class="overlay" id="modal-signout" role="dialog" aria-modal="true" aria-labelledby="signout-title">

@@ -322,6 +322,48 @@
 .notice-title { font-size: var(--fs-sm); font-weight: 700; }
 .notice-text { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; }
 
+/* Profile. Details and sessions are short and the password form is tall, so
+   the form takes the right column and the two short cards stack in the left;
+   named areas keep the source order (details, password, sessions) that a
+   phone and a screen reader follow. */
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+        "details password"
+        "sessions password";
+    gap: var(--sp-4);
+}
+
+.profile-details { grid-area: details; }
+.profile-password { grid-area: password; align-self: start; }
+.profile-sessions { grid-area: sessions; }
+
+@media (max-width: 768px) {
+    .profile-grid {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: none;
+        grid-template-areas: "details" "password" "sessions";
+    }
+}
+
+/* The account block at the foot of the rail is the Profile link, so it wears
+   the active state like any other nav item (shell.css styles only its hover). */
+.sidebar-user.is-active { background: var(--accent-soft); }
+
+.profile-password-foot { justify-content: flex-end; }
+.profile-forgot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    padding: var(--sp-4) var(--sp-5) var(--sp-5);
+    box-shadow: inset 0 1px 0 var(--line-soft);
+}
+
+.profile-forgot .notice-text { margin-top: 0; }
+
 /* Device rows */
 .device-row {
     display: flex;
@@ -1262,7 +1304,7 @@ body[data-loading] #refresh-btn .icon,
    still land on it and hear its explanation. */
 .input.input-locked { background: var(--bg-chip); color: var(--text-muted); cursor: not-allowed; }
 
-/* Settings -> Password. The confirmation line keeps its space from the start
+/* Profile -> reset link. The confirmation line keeps its space from the start
    (up to three lines on a phone), so sending the link moves nothing. */
 .pw-reset-to { color: var(--text); overflow-wrap: anywhere; }
 .pw-reset-status { min-height: calc(3 * 1.5em); }

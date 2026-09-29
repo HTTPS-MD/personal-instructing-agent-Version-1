@@ -20,7 +20,7 @@
  *   8.  Student drawer and per-student actions
  *   9.  Faculty
  *   10. Stage controls (access by section)
- *   11. Settings and admin devices
+ *   11. Profile (password, sessions) and Settings (administrators)
  *   12. Scores encoding
  *   13. Realtime subscriptions
  *   14. CSV export
@@ -318,6 +318,7 @@
         students: 'Student Roster',
         faculty: 'Faculty',
         controls: 'Stage Controls',
+        profile: 'Profile',
         settings: 'Settings',
         mathtask: 'Math Task'
     };
@@ -328,7 +329,8 @@
         $$('[data-view-panel]').forEach(function (panel) {
             panel.classList.toggle('is-hidden', panel.getAttribute('data-view-panel') !== view);
         });
-        $$('.nav-item').forEach(function (item) {
+        /* The account block at the foot of the rail is the Profile link. */
+        $$('.nav-item, .sidebar-user').forEach(function (item) {
             item.classList.toggle('is-active', item.getAttribute('data-view') === view);
         });
 
@@ -351,7 +353,7 @@
     }
 
     function initRouter() {
-        $$('.nav-item').forEach(function (item) {
+        $$('.nav-item, .sidebar-user').forEach(function (item) {
             item.addEventListener('click', function () {
                 switchView(item.getAttribute('data-view'));
             });
@@ -3090,12 +3092,11 @@
         refreshAll();
     }
 
-    /* ================================= 11. SETTINGS AND ADMIN DEVICES === */
+    /* ============= 11. PROFILE (PASSWORD, SESSIONS) AND SETTINGS (ADMINS) === */
 
-    /* The password is changed through an emailed link, never in a form here:
-       Supabase's updateUser() does not check the current password, so a form
-       would let anyone at an unlocked laptop change it. The link needs this
-       account's inbox too. It opens the site's set-password page (the same
+    /* The emailed reset link: the way back for an administrator who has
+       forgotten the current password (Profile -> Change password). It needs
+       this account's inbox. It opens the site's set-password page (the same
        one activation and "Forgot password" use), which signs the account out
        everywhere once the new password is saved. */
     var PW_RESET_COOLDOWN_S = 60;
@@ -3137,6 +3138,108 @@
             if (left <= 0) { clearInterval(pwResetTimer); btn.disabled = false; }
         }, 1000);
         toastOk('Reset link sent', 'Check ' + state.adminEmail + '.');
+    }
+
+    /* ---- Change password ----
+       Supabase's updateUser() never asks for the current password, so on its
+       own a form would let anyone at an unlocked laptop set a new one. The
+       current password is therefore checked against Supabase Auth first, on a
+       second client that keeps nothing (no storage, no refresh): signing in
+       there cannot replace this console's session or touch its device
+       record, and the proof is a fresh login. That same fresh session makes
+       the update, which also keeps it valid where the project asks for a
+       recent sign-in before a password change. Afterwards the probe signs
+       itself out and this account's OTHER sessions are ended -- a password
+       change that leaves an old login working would not be much of one. */
+
+    function passwordProblem(next, current) {
+        var problem = tempPasswordProblem(next);
+        if (problem) { return problem; }
+        if (next === current) { return 'Choose a password different from your current one.'; }
+        return '';
+    }
+
+    function authFailureText(error, wrongPasswordText) {
+        var msg = (error && error.message) || '';
+        if ((error && error.status === 429) || /rate limit|too many|security purposes/i.test(msg)) {
+            return 'Too many attempts. Wait a few minutes, then try again.';
+        }
+        if ((error && error.status === 400) || /invalid login credentials/i.test(msg)) { return wrongPasswordText; }
+        return msg || 'The request did not complete.';
+    }
+
+    async function handleChangePassword(event) {
+        event.preventDefault();
+        clearFormErrors('change-password-form');
+
+        var current = $('#cp-current').value;
+        var next = $('#cp-new').value;
+        var confirm = $('#cp-confirm').value;
+
+        var valid = true;
+        valid = setFieldError('cp-current', current ? '' : 'Enter your current password.') && valid;
+        valid = setFieldError('cp-new', passwordProblem(next, current)) && valid;
+        valid = setFieldError('cp-confirm', confirm === next ? '' : 'The passwords do not match.') && valid;
+        if (!valid) { return; }
+
+        var release = setBusy($('#cp-submit'), 'Updating…');
+        var probe = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'pia-password-check' }
+        });
+
+        try {
+            var proof;
+            try { proof = await probe.auth.signInWithPassword({ email: state.adminEmail, password: current }); }
+            catch (err) { proof = { error: { message: (err && err.message) || 'The request did not complete.' } }; }
+
+            if (proof.error) {
+                setFieldError('cp-current', authFailureText(proof.error, 'That is not your current password.'));
+                return;
+            }
+
+            var update = await probe.auth.updateUser({ password: next });
+            if (update.error) {
+                setFieldError('cp-new', authFailureText(update.error, 'The password was not accepted.'));
+                toastErr('Password not changed', update.error.message);
+                return;
+            }
+
+            /* Done with the probe's login; end it so it does not linger. */
+            try { await probe.auth.signOut({ scope: 'local' }); } catch (err) { /* it expires by itself */ }
+
+            var others = null;
+            try { others = await sb.auth.signOut({ scope: 'others' }); }
+            catch (err) { others = { error: err }; }
+
+            $('#change-password-form').reset();
+            setPasswordsShown(false);
+
+            if (others && others.error) {
+                toastOk('Password updated', 'Your other devices could not be signed out. Revoke them under Active sessions.');
+            } else {
+                toastOk('Password updated', 'Your other devices were signed out. This one stays signed in.');
+            }
+            loadAdminDevices().catch(function () { /* the list shows its own error */ });
+        } finally {
+            release();
+        }
+    }
+
+    /* One checkbox for all three fields; reset to hidden after a save, so the
+       next person at the keyboard does not find them showing. */
+    function setPasswordsShown(shown) {
+        $('#cp-show').checked = shown;
+        ['cp-current', 'cp-new', 'cp-confirm'].forEach(function (id) {
+            $('#' + id).type = shown ? 'text' : 'password';
+        });
+    }
+
+    function initChangePassword() {
+        $('#change-password-form').addEventListener('submit', handleChangePassword);
+        $('#cp-show').addEventListener('change', function () { setPasswordsShown(this.checked); });
+        ['cp-current', 'cp-new', 'cp-confirm'].forEach(function (id) {
+            $('#' + id).addEventListener('input', function () { setFieldError(id, ''); });
+        });
     }
 
     /* ---- Device registration diagnostics ----
@@ -3485,7 +3588,8 @@
        admin access included, and a participant's row is research data. */
 
     /* ---- Security log (migration 0031) ----
-       Written only by the database; this page reads the latest 50. */
+       Written only by the database; this page reads the latest 50, and only
+       when the dialog is opened -- nobody needs it on every page load. */
     var AUDIT_ACTIONS = {
         'account.created': 'Account created',
         'account.deleted': 'Account deleted',
@@ -3553,6 +3657,11 @@
                 '<td>' + by + '</td>' +
                 '</tr>';
         }).join('');
+    }
+
+    function openAuditLog(event) {
+        openModal('modal-audit', event && event.currentTarget);
+        loadAudit().catch(function (err) { console.error('Security log failed to load:', err); });
     }
 
     async function loadAdmins() {
@@ -5340,7 +5449,6 @@
                     loadStageCounters(),
                     loadFaculty(),
                     loadAdmins(),
-                    loadAudit(),
                     loadSettings()
                 ];
             } finally {
@@ -5373,6 +5481,8 @@
         $('#admin-name').textContent = name;
         $('#admin-email').textContent = email;
         $('#pw-reset-to').textContent = email;
+        $('#profile-name').textContent = name;
+        $('#profile-email').textContent = email;
         $('#admin-initials').textContent = initialsOf(name, email);
         /* "Dr. Reyes" greeted as "Good morning, Dr." read as a typo. An
            honorific keeps the surname with it; otherwise the first name. */
@@ -5408,6 +5518,8 @@
             if (btn.getAttribute('data-admin-act') === 'link') { resendAdminLink(email, btn); }
         });
         $('#pw-reset-send').addEventListener('click', sendMyPasswordReset);
+        initChangePassword();
+        $('#audit-open').addEventListener('click', openAuditLog);
 
         $('#new-section-form').addEventListener('submit', async function (event) {
             event.preventDefault();
