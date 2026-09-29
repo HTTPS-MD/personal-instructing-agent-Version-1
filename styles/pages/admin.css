@@ -1330,6 +1330,44 @@ body[data-loading] #refresh-btn .icon,
     #refresh-btn.is-busy .icon { animation: none; }
 }
 
+/* ---- 19.7b Stat tiles on a phone ----
+   Below 30rem the tiles stack one per row (shell.css). With only a label
+   and a value left in each, the 132px card from global.css was mostly empty
+   space, so here each becomes a compact row: glyph, label, value, with the
+   OCEAN completion bar running underneath. The tile's own boxes are reused
+   (.stat-top just stops being a box), so loading and loaded still share one
+   height. Scoped to .stat-grid, which only the admin console's two tile
+   grids carry, in a stylesheet only the admin console loads: the teacher
+   console's shared .stat is untouched, and tablet and desktop keep the
+   132px card. */
+@media (max-width: 30rem) {
+    .stat-grid { gap: var(--sp-2); }
+
+    .stat-grid > .stat {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        justify-content: normal;
+        gap: var(--sp-2) var(--sp-3);
+        min-height: 64px;
+        padding: var(--sp-3) var(--sp-4);
+    }
+
+    .stat-grid > .stat > .stat-top { display: contents; }
+    .stat-grid .stat-glyph { grid-column: 1; grid-row: 1; }
+    .stat-grid .stat-label { grid-column: 2; grid-row: 1; font-size: var(--fs-sm); }
+    .stat-grid .stat-value {
+        grid-column: 3;
+        grid-row: 1;
+        font-size: var(--fs-h3);
+        line-height: 32px;
+        text-align: right;
+    }
+
+    /* Only the OCEAN completion tile has one; it adds a second, thin row. */
+    .stat-grid > .stat > .bar { grid-column: 1 / -1; grid-row: 2; }
+}
+
 /* ---- 19.8 Info tips ----
    Context that used to sit permanently under titles and labels now lives
    behind a small (i). The bubble is a single fixed-position element on
