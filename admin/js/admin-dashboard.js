@@ -19,7 +19,7 @@
  *   7.  Student roster
  *   8.  Student drawer and per-student actions
  *   9.  Faculty
- *   10. Stage controls and targeted access
+ *   10. Stage controls (access by section)
  *   11. Settings and admin devices
  *   12. Scores encoding
  *   13. Realtime subscriptions
@@ -266,6 +266,7 @@
         deviceDiag: [],      // the last device-registration problems (see deviceProblem)
         overrides: undefined, // stage_overrides rows; undefined = loading, null = unavailable
         overridesMissing: false,
+        gateSelected: { ocean: [], char: [], dash: [] }, // ticked section names per stage card; kept here so a repaint keeps them
         cohortLoaded: false,
         sectionsLoaded: false,
         loading: { roster: false, cohort: false }
@@ -961,9 +962,7 @@
         return '<article class="gate" aria-hidden="true"><div class="gate-body">' +
             '<div class="gate-top">' + skeletonPill(64) + skeletonPill(56) + '</div>' +
             '<h3 class="gate-title">' + sk(gate.title) + '</h3>' +
-            '<div class="gate-control"><span class="gate-control-label">' + sk('Global access') + '</span>' +
-            '<span class="skeleton" style="width:44px;height:24px;border-radius:var(--r-pill)"></span></div>' +
-            '<div class="gate-access"><p class="gate-access-label">' + sk('Section overrides') + '</p>' +
+            '<div class="gate-access"><div class="gate-access-head"><p class="gate-access-label">' + sk('Sections') + '</p></div>' +
             '<span class="skeleton-text gate-access-skeleton"></span></div></div>' +
             '<div class="gate-foot"><span class="skeleton skeleton-btn"></span><span class="skeleton skeleton-btn"></span></div>' +
             '</article>';
@@ -1400,22 +1399,19 @@
     function renderGateSummary() {
         $('#gate-summary').innerHTML = GATES.map(function (gate) {
             var access = gateAccess(gate);
+            var status = gateStatus(gate);
             var meta = gate.stage;
             if (access && access.sections.length) {
-                meta += ' · Override: ' + access.sections.map(function (o) { return o.section; }).join(', ');
-            }
-            if (access && access.others.length) {
-                meta += ' · +' + access.others.length + ' student' + (access.others.length === 1 ? '' : 's');
+                meta += ' · ' + access.sections.map(function (o) { return o.section; }).join(', ');
             }
             return '' +
                 '<div class="device-row">' +
-                '<span class="dot ' + (gate.open ? 'dot-live' : 'dot-off') + '"></span>' +
+                '<span class="dot ' + (status.tone ? 'dot-live' : 'dot-off') + '"></span>' +
                 '<div class="device-text">' +
                 '<p class="device-name">' + esc(gate.title) + '</p>' +
                 '<p class="device-meta">' + esc(meta) + '</p>' +
                 '</div>' +
-                '<span class="badge ' + (gate.open ? 'badge-accent' : '') + '">' +
-                (gate.open ? 'Open' : 'Closed') + '</span>' +
+                '<span class="badge ' + status.tone + '">' + esc(status.text) + '</span>' +
                 '</div>';
         }).join('');
     }
@@ -2764,61 +2760,35 @@
 
     /* ============================= 10. STAGE CONTROLS AND TARGETING ===== */
 
-    function renderGates() {
-        $('#gates-grid').innerHTML = GATES.map(function (gate) {
-            return '' +
-                '<article class="gate">' +
-                '<div class="gate-body">' +
-                '<div class="gate-top">' +
-                '<span class="badge">' + esc(gate.stage) + '</span>' +
-                '<span class="badge ' + (gate.open ? 'badge-accent' : '') + '" data-gate-status="' + gate.key + '">' +
-                (gate.open ? 'Open' : 'Closed') + '</span>' +
-                '</div>' +
-                '<h3 class="gate-title">' + esc(gate.title) + '</h3>' +
-                '<div class="gate-control">' +
-                '<span class="gate-control-label">Global access</span>' +
-                '<label class="switch">' +
-                '<input type="checkbox" data-gate="' + gate.key + '"' + (gate.open ? ' checked' : '') + '>' +
-                '<span class="switch-track"></span>' +
-                '</label>' +
-                '</div>' +
-                '<div class="gate-access" data-gate-access="' + gate.key + '">' +
-                gateAccessHtml(gate) +
-                '</div>' +
-                '</div>' +
-                '<div class="gate-foot">' +
-                '<button class="btn btn-secondary btn-sm" data-target="' + gate.key + '" data-target-scope="section">Section override</button>' +
-                '<button class="btn btn-secondary btn-sm" data-target="' + gate.key + '" data-target-scope="student">Student override</button>' +
-                '</div>' +
-                '</article>';
-        }).join('');
+    /* Access is by section. A stage card lists the sections; ticking some and
+       pressing "Grant access" runs admin_grant_stage once per section, which
+       moves that section's eligible students into the stage now and records
+       the section in stage_overrides (0033). A section can be granted again
+       to let in students who became eligible later.
 
-        $$('[data-gate]').forEach(function (input) {
-            input.addEventListener('change', function () { updateStageControl(input); });
-        });
+       Taking access back is the one thing the database only does for a whole
+       stage: admin_set_stage_open(false) returns everyone inside to the
+       Waiting Room and clears every section's record. That is "Close stage".
+       There is no per-section close, and no switch that opens a stage for
+       everyone; a stage a previous version left globally open (gate.open)
+       shows as open for all sections until it is closed. */
 
-        $$('[data-target]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                openTargeted(btn.getAttribute('data-target'), btn.getAttribute('data-target-scope'));
-            });
-        });
-    }
+    var GATE_ACCESS_TIP = 'Granting moves a section’s eligible students in right away. Grant a section ' +
+        'again to let in students who finished the previous stage later. Close stage ends access for ' +
+        'every section.';
 
-    function paintGateStatus(key, open) {
-        var label = $('[data-gate-status="' + key + '"]');
-        if (!label) { return; }
-        label.textContent = open ? 'Open' : 'Closed';
-        label.className = 'badge ' + (open ? 'badge-accent' : '');
+    function gateByKey(key) {
+        return GATES.filter(function (g) { return g.key === key; })[0];
     }
 
     /* Who can enter a CLOSED stage, from two sources:
-         sections  the section overrides recorded by admin_grant_stage (0033),
+         sections  the section grants recorded by admin_grant_stage (0033),
                    each with how many of its students are in the stage now;
-         others    every other student in the stage — a student override, an
-                   admin reset, or a grant made before 0033 was applied.
-       A student inside a closed stage got there by a grant: closing a stage
-       returns everyone in it to the Waiting Room. Returns null while either
-       source is still loading, and for an open stage, where nobody needs one. */
+         others    every other student in the stage — an individual grant
+                   from before this page dropped them, an admin reset, or a
+                   grant made before 0033 was applied.
+       Returns null while either source is still loading, and for an open
+       stage, where nobody needs one. */
     function gateAccess(gate) {
         if (gate.open || state.overrides === undefined || !state.cohortLoaded) { return null; }
 
@@ -2840,271 +2810,220 @@
         return { sections: sections, others: others };
     }
 
-    var GATE_ACCESS_TIP = 'Sections let in while the stage is closed. Opening or closing the stage for ' +
-        'everyone clears them.';
+    function sectionOpen(gate, name) {
+        if (gate.open) { return true; }
+        return Array.isArray(state.overrides) && state.overrides.some(function (o) {
+            return o.stage === gate.key && o.section === name;
+        });
+    }
+
+    /* The badge on a card and on the Overview: closed, some sections, or (a
+       stage left globally open) all of them. */
+    function gateStatus(gate) {
+        if (gate.open) { return { text: 'Open · all sections', tone: 'badge-accent' }; }
+        var n = Array.isArray(state.overrides)
+            ? state.overrides.filter(function (o) { return o.stage === gate.key; }).length : 0;
+        if (n) { return { text: n + (n === 1 ? ' section open' : ' sections open'), tone: 'badge-accent' }; }
+        return { text: 'Closed', tone: '' };
+    }
+
+    function renderGates() {
+        $('#gates-grid').innerHTML = GATES.map(function (gate) {
+            return '' +
+                '<article class="gate">' +
+                '<div class="gate-body">' +
+                '<div class="gate-top">' +
+                '<span class="badge">' + esc(gate.stage) + '</span>' +
+                '<span class="badge" data-gate-status="' + gate.key + '"></span>' +
+                '</div>' +
+                '<h3 class="gate-title">' + esc(gate.title) + '</h3>' +
+                '<div class="gate-access" data-gate-access="' + gate.key + '"></div>' +
+                '</div>' +
+                '<div class="gate-foot">' +
+                '<button class="btn btn-primary btn-sm" type="button" data-gate-grant="' + gate.key + '">Grant access</button>' +
+                '<button class="btn btn-danger-soft btn-sm" type="button" data-gate-close="' + gate.key + '">Close stage</button>' +
+                '</div>' +
+                '</article>';
+        }).join('');
+
+        renderGateAccess();
+    }
+
+    function paintGateStatus(gate) {
+        var label = $('[data-gate-status="' + gate.key + '"]');
+        if (!label) { return; }
+        var status = gateStatus(gate);
+        label.textContent = status.text;
+        label.className = 'badge ' + status.tone;
+    }
 
     function gateAccessHtml(gate) {
-        var head = '<div class="with-tip"><p class="gate-access-label">Section overrides</p>' +
-            infoTip(GATE_ACCESS_TIP, 'section overrides') + '</div>';
+        var head = function (action) {
+            return '<div class="gate-access-head"><div class="with-tip">' +
+                '<p class="gate-access-label">Sections</p>' + infoTip(GATE_ACCESS_TIP, 'section access') +
+                '</div>' + (action || '') + '</div>';
+        };
 
-        if (gate.open) {
-            return head + '<p class="gate-access-note">—</p>';
+        if (!state.sectionsLoaded || state.overrides === undefined) {
+            return head() + '<span class="skeleton-text gate-access-skeleton" aria-hidden="true"></span>';
+        }
+        if (!state.sections.length) {
+            return head() + '<p class="gate-access-note">No sections yet. Create one under Sections.</p>';
         }
 
-        var access = gateAccess(gate);
-        if (!access) {
-            return head + '<span class="skeleton-text gate-access-skeleton" aria-hidden="true"></span>';
-        }
+        var selected = state.gateSelected[gate.key];
+        var allTicked = !gate.open && selected.length === state.sections.length;
+        var html = head(gate.open ? '' :
+            '<button type="button" class="btn btn-ghost btn-sm" data-gate-all="' + gate.key + '">' +
+            (allTicked ? 'Clear' : 'Select all') + '</button>');
 
-        var html = head;
+        html += '<div class="gate-sections" role="group" aria-label="Sections for ' + esc(gate.title) + '">' +
+            state.sections.map(function (section) {
+                var members = state.cohort.filter(function (s) { return s.section === section.name; });
+                var open = sectionOpen(gate, section.name);
+                var inside = members.filter(function (s) { return s.current_stage === gate.label; }).length;
+                var detail = state.cohortLoaded
+                    ? members.length + (members.length === 1 ? ' student' : ' students') +
+                      (open && !gate.open ? ' · ' + inside + ' in stage' : '')
+                    : '';
+                return '' +
+                    '<label class="check gate-section">' +
+                    '<input type="checkbox" data-gate-section="' + gate.key + '" value="' + esc(section.name) + '"' +
+                    (selected.indexOf(section.name) !== -1 ? ' checked' : '') + (gate.open ? ' disabled' : '') + '>' +
+                    '<span class="check-box">' + icon('check') + '</span>' +
+                    '<span class="check-text">' + esc(section.name) + '<small>' + esc(detail) + '</small></span>' +
+                    (open ? '<span class="badge badge-accent">Open</span>' : '') +
+                    '</label>';
+            }).join('') + '</div>';
 
         if (state.overrides === null) {
             html += '<p class="gate-access-note">' + (state.overridesMissing
-                ? 'Needs migration 0033'
-                : 'Couldn’t load. Refresh to retry.') + '</p>';
-        } else if (access.sections.length) {
-            html += '<ul class="gate-chips" aria-label="Sections opened into this stage">' +
-                access.sections.map(function (o) {
-                    var detail = 'Granted to ' + o.granted + ' student' + (o.granted === 1 ? '' : 's') +
-                        ' · ' + formatStamp(o.at) + (o.by ? ' · by ' + o.by : '');
-                    return '<li class="gate-chip" title="' + esc(detail) + '">' +
-                        '<span class="gate-chip-name">' + esc(o.section) + '</span>' +
-                        '<span class="gate-chip-count">' + o.inStage + ' in stage</span>' +
-                        '</li>';
-                }).join('') +
-                '</ul>';
-        } else if (!access.others.length) {
-            html += '<p class="gate-access-note">None</p>';
+                ? 'Which sections are open needs migration 0033.'
+                : 'Couldn’t load which sections are open. Refresh to retry.') + '</p>';
         }
 
-        if (access.others.length) {
+        var access = gateAccess(gate);
+        if (access && access.others.length) {
             var names = access.others.slice(0, 12).map(function (s) {
                 return (s.full_name || s.email) + (s.section ? ' (' + s.section + ')' : '');
             }).join('\n') + (access.others.length > 12 ? '\n…and ' + (access.others.length - 12) + ' more' : '');
-            html += '<p class="gate-access-note" title="' + esc(names) + '">' +
-                (access.sections.length ? '+ ' : '') +
-                access.others.length + ' student override' + (access.others.length === 1 ? '' : 's') + '</p>';
+            html += '<p class="gate-access-note" title="' + esc(names) + '">Also inside: ' +
+                access.others.length + ' student' + (access.others.length === 1 ? '' : 's') +
+                ' let in one by one</p>';
         }
 
         return html;
     }
 
-    /* Repaints only the override blocks, so a data refresh never rebuilds a
-       switch the admin may be about to press. */
+    /* The buttons follow what is ticked and what is open. */
+    function paintGateFoot(gate) {
+        var grant = $('[data-gate-grant="' + gate.key + '"]');
+        var close = $('[data-gate-close="' + gate.key + '"]');
+        if (!grant || !close) { return; }
+
+        var n = state.gateSelected[gate.key].length;
+        grant.textContent = n ? 'Grant access · ' + n : 'Grant access';
+        grant.disabled = gate.open || n === 0;
+
+        var access = gateAccess(gate);
+        var anyOpen = gate.open || (access && (access.sections.length || access.others.length)) ||
+            (Array.isArray(state.overrides) && state.overrides.some(function (o) { return o.stage === gate.key; }));
+        close.disabled = !anyOpen;
+    }
+
+    /* Repaints the section lists, badges and buttons, and the Overview's
+       summary, from current state. Called on every data refresh. */
     function renderGateAccess() {
         GATES.forEach(function (gate) {
+            /* A section that was deleted since it was ticked is dropped. */
+            state.gateSelected[gate.key] = state.gateSelected[gate.key].filter(function (name) {
+                return state.sections.some(function (s) { return s.name === name; });
+            });
             var box = $('[data-gate-access="' + gate.key + '"]');
             if (box) { box.innerHTML = gateAccessHtml(gate); }
+            paintGateStatus(gate);
+            paintGateFoot(gate);
         });
         if ($('#gate-summary')) { renderGateSummary(); }
     }
 
-    /* Closing a stage through the settings table alone does not evict the
-       students already inside — their own current_stage acts as a targeted
-       grant, so they keep re-entering by direct URL. admin_set_stage_open
-       returns them to the Waiting Room as part of closing. */
-    async function updateStageControl(input) {
-        var key = input.getAttribute('data-gate');
-        var gate = GATES.filter(function (g) { return g.key === key; })[0];
-        var wanted = input.checked;
+    function initGates() {
+        var grid = $('#gates-grid');
 
-        input.disabled = true;
-        paintGateStatus(key, wanted);
-
-        var res = await sb.rpc('admin_set_stage_open', { p_stage: key, p_open: wanted });
-        input.disabled = false;
-
-        if (res.error) {
-            /* Roll the control back to the server's actual state. */
-            input.checked = !wanted;
-            paintGateStatus(key, !wanted);
-            toastErr('Stage control failed', res.error.message);
-            return;
-        }
-
-        gate.open = wanted;
-        /* Opening or closing for everyone ends the stage's section overrides
-           on the server (0033); show that now rather than after the refresh. */
-        if (Array.isArray(state.overrides)) {
-            state.overrides = state.overrides.filter(function (o) { return o.stage !== key; });
-        }
-        if (!wanted) {
-            state.cohort.forEach(function (s) {
-                if (s.current_stage === gate.label) { s.current_stage = 'Waiting Room'; }
-            });
-        }
-        renderGateAccess();
-
-        var evicted = (res.data && res.data.evicted) || 0;
-        if (!wanted && evicted > 0) {
-            toastOk(gate.title + ' closed',
-                evicted + ' student' + (evicted === 1 ? '' : 's') + ' returned to the Waiting Room.');
-        } else {
-            toastOk(gate.title + (wanted ? ' opened' : ' closed'), 'Global access updated for every section.');
-        }
-
-        refreshAll();
-    }
-
-    /* ---- Targeted access ---- */
-
-    var targeted = { gate: null, mode: 'section', email: null, name: null };
-
-    function openTargeted(gateKey, mode) {
-        var gate = GATES.filter(function (g) { return g.key === gateKey; })[0];
-        targeted.gate = gateKey;
-        targeted.email = null;
-        targeted.name = null;
-
-        $('#targeted-sub').textContent = gate.title;
-        $('#tg-search').value = '';
-        $('#tg-list').innerHTML = '';
-        setTargetMode(mode || 'section');
-        openModal('modal-targeted');
-
-        if ((mode || 'section') === 'student') { runTargetSearch(''); }
-    }
-
-    function setTargetMode(mode) {
-        targeted.mode = mode;
-        $$('[data-target-mode]').forEach(function (btn) {
-            btn.classList.toggle('is-active', btn.getAttribute('data-target-mode') === mode);
-        });
-        $('#targeted-section-field').classList.toggle('is-hidden', mode !== 'section');
-        $('#targeted-student-field').classList.toggle('is-hidden', mode !== 'student');
-
-        if (mode === 'student' && !$('#tg-list').innerHTML) { runTargetSearch(''); }
-        updateTargetedFooter();
-    }
-
-    /* Queries the database directly rather than the roster cache: the cache
-       holds one page of 50 and reflects the active filters, so a student on
-       page 2 could never be targeted. */
-    async function runTargetSearch(rawTerm) {
-        var list = $('#tg-list');
-        list.innerHTML = '<div class="state-block" style="min-height:120px">' +
-            '<div class="spinner"></div><p class="state-desc">Searching…</p></div>';
-
-        var term = sanitizeFilterTerm(rawTerm);
-
-        var query = sb.from('profiles')
-            .select('full_name, email, section')
-            .neq('role', 'admin')
-            .order('full_name', { ascending: true })
-            .limit(50);
-
-        if (term) {
-            query = query.or('full_name.ilike.%' + term + '%,email.ilike.%' + term + '%');
-        }
-
-        var res = await query;
-
-        if (res.error) {
-            list.innerHTML = '<div class="state-block" style="min-height:120px">' +
-                '<p class="state-title">Search failed</p>' +
-                '<p class="state-desc">' + esc(res.error.message) + '</p></div>';
-            return;
-        }
-
-        var rows = res.data || [];
-
-        if (!rows.length) {
-            list.innerHTML = '<div class="state-block" style="min-height:120px">' +
-                '<p class="state-title">No participant found</p></div>';
-            return;
-        }
-
-        list.innerHTML = rows.map(function (s) {
-            return '' +
-                '<button type="button" class="pick-row' + (targeted.email === s.email ? ' is-picked' : '') +
-                '" data-pick="' + esc(s.email) + '" data-name="' + esc(s.full_name || s.email) + '">' +
-                '<span class="avatar">' + esc(initialsOf(s.full_name, s.email)) + '</span>' +
-                '<span class="pick-text">' +
-                '<span class="cell-name">' + esc(s.full_name || '(no name)') + '</span>' +
-                '<span class="cell-mail">' + esc(s.email) + ' · ' + esc(s.section || 'no section') + '</span>' +
-                '</span>' +
-                '<span class="pick-check">' + icon('check', 'icon-sm') + '</span>' +
-                '</button>';
-        }).join('');
-
-        $$('[data-pick]', list).forEach(function (row) {
-            row.addEventListener('click', function () {
-                targeted.email = row.getAttribute('data-pick');
-                targeted.name = row.getAttribute('data-name');
-                $$('[data-pick]', list).forEach(function (r) { r.classList.remove('is-picked'); });
-                row.classList.add('is-picked');
-                updateTargetedFooter();
-            });
-        });
-    }
-
-    function updateTargetedFooter() {
-        var note = $('#targeted-selection');
-        var confirmBtn = $('#targeted-confirm');
-
-        if (targeted.mode === 'section') {
-            var section = $('#tg-section').value;
-            note.textContent = section ? 'Section: ' + section : 'No section available';
-            confirmBtn.disabled = !section;
-            return;
-        }
-
-        note.textContent = targeted.name ? 'Selected: ' + targeted.name : 'Nothing selected';
-        confirmBtn.disabled = !targeted.email;
-    }
-
-    function initTargeted() {
-        $$('[data-target-mode]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                setTargetMode(btn.getAttribute('data-target-mode'));
-            });
+        grid.addEventListener('change', function (event) {
+            var box = event.target.closest('[data-gate-section]');
+            if (!box) { return; }
+            var gate = gateByKey(box.getAttribute('data-gate-section'));
+            var list = state.gateSelected[gate.key];
+            var at = list.indexOf(box.value);
+            if (box.checked && at === -1) { list.push(box.value); }
+            if (!box.checked && at !== -1) { list.splice(at, 1); }
+            /* Only the toggle's label and the buttons change; the list stays. */
+            var all = $('[data-gate-all="' + gate.key + '"]');
+            if (all) { all.textContent = list.length === state.sections.length ? 'Clear' : 'Select all'; }
+            paintGateFoot(gate);
         });
 
-        $('#tg-search').addEventListener('input', debounce(function (event) {
-            runTargetSearch(event.target.value);
-        }, 250));
+        grid.addEventListener('click', function (event) {
+            var all = event.target.closest('[data-gate-all]');
+            if (all) {
+                var gate = gateByKey(all.getAttribute('data-gate-all'));
+                var every = state.gateSelected[gate.key].length === state.sections.length;
+                state.gateSelected[gate.key] = every ? [] : state.sections.map(function (s) { return s.name; });
+                renderGateAccess();
+                return;
+            }
 
-        $('#tg-section').addEventListener('change', updateTargetedFooter);
+            var grant = event.target.closest('[data-gate-grant]');
+            if (grant) { grantSections(grant.getAttribute('data-gate-grant'), grant); return; }
 
-        $('#targeted-confirm').addEventListener('click', executeTargetedOpen);
+            var close = event.target.closest('[data-gate-close]');
+            if (close) { closeStage(close.getAttribute('data-gate-close'), close); }
+        });
     }
 
     /* admin_grant_stage resets the correct prerequisite flag per stage and
        reports who it could not grant (an unfinished OCEAN test, for example)
        instead of silently rewriting their data. Writing current_stage alone
        would be undone immediately: the route guard sends the student back to
-       the Waiting Room, which overwrites current_stage again. */
-    async function executeTargetedOpen() {
-        var args = { p_stage: targeted.gate, p_emails: null, p_section: null };
+       the Waiting Room, which overwrites current_stage again. One call per
+       section, one after another, so a failure names its section. */
+    async function grantSections(gateKey, sourceBtn) {
+        var gate = gateByKey(gateKey);
+        var names = state.gateSelected[gateKey].slice();
+        if (!names.length) { return; }
 
-        if (targeted.mode === 'section') {
-            var section = $('#tg-section').value;
-            if (!section) { toastErr('Select a section', 'Choose a section before granting access.'); return; }
-            args.p_section = section;
-        } else {
-            if (!targeted.email) { toastErr('Select a participant', 'Choose a student before granting access.'); return; }
-            args.p_emails = [targeted.email];
+        var release = setBusy(sourceBtn, 'Granting…');
+        var granted = [];
+        var skipped = [];
+        var failed = [];
+
+        for (var i = 0; i < names.length; i++) {
+            var res = await sb.rpc('admin_grant_stage', { p_stage: gateKey, p_emails: null, p_section: names[i] });
+            if (res.error) {
+                failed.push({ section: names[i], message: res.error.message });
+                continue;
+            }
+            granted = granted.concat((res.data && res.data.granted) || []);
+            skipped = skipped.concat((res.data && res.data.skipped) || []);
         }
-
-        var release = setBusy($('#targeted-confirm'), 'Granting…');
-        var res = await sb.rpc('admin_grant_stage', args);
         release();
 
-        if (res.error) {
-            toastErr('Grant failed', res.error.message);
-            return;
-        }
+        /* Sections that went through are unticked; a failed one stays ticked
+           so the same button retries it. */
+        state.gateSelected[gateKey] = names.filter(function (name) {
+            return failed.some(function (f) { return f.section === name; });
+        });
+        await refreshAll();
 
-        var granted = (res.data && res.data.granted) || [];
-        var skipped = (res.data && res.data.skipped) || [];
-
-        closeModal('modal-targeted');
-        refreshAll();
-
-        if (!skipped.length) {
-            toastOk('Access granted',
-                granted.length + ' student' + (granted.length === 1 ? '' : 's') +
-                ' moved to ' + targeted.gate.toUpperCase() + '.');
+        if (!skipped.length && !failed.length) {
+            if (granted.length) {
+                toastOk('Access granted',
+                    granted.length + ' student' + (granted.length === 1 ? '' : 's') + ' moved to ' + gate.title +
+                    ' from ' + names.join(', ') + '.');
+            } else {
+                toastOk('Nobody new to let in', 'Everyone eligible in ' + names.join(', ') + ' is already in ' + gate.title + '.');
+            }
             return;
         }
 
@@ -3112,12 +3031,63 @@
             return '• ' + item.email + ' — ' + item.reason;
         }).join('\n');
         var more = skipped.length > 8 ? '\n…and ' + (skipped.length - 8) + ' more.' : '';
+        var errors = failed.map(function (f) { return '• ' + f.section + ' — ' + f.message; }).join('\n');
 
         showNotice(
             granted.length ? 'Partially granted' : 'Nothing granted',
-            'Granted: ' + granted.length + '\nSkipped: ' + skipped.length + '\n\n' + lines + more,
+            'Granted: ' + granted.length + '\nSkipped: ' + skipped.length +
+            (skipped.length ? '\n\n' + lines + more : '') +
+            (failed.length ? '\n\nSections that failed:\n' + errors : ''),
             granted.length ? 'accent' : 'danger'
         );
+    }
+
+    /* Closing through the settings table alone would not evict the students
+       already inside — their own current_stage acts as a grant, so they keep
+       re-entering by direct URL. admin_set_stage_open returns them to the
+       Waiting Room as part of closing, and clears every section's record. */
+    async function closeStage(gateKey, sourceBtn) {
+        var gate = gateByKey(gateKey);
+        var inside = state.cohort.filter(function (s) { return s.current_stage === gate.label; }).length;
+
+        var ok = await confirmAction({
+            title: 'Close stage',
+            heading: 'Close ' + gate.title + ' for every section?',
+            message: (inside
+                ? inside + ' student' + (inside === 1 ? ' is' : 's are') + ' inside now and will return to the ' +
+                  'Waiting Room. '
+                : 'Nobody is inside right now. ') +
+                'Every section’s access ends; you can grant sections again afterwards.',
+            confirmLabel: 'Close stage'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Closing…');
+        var res = await sb.rpc('admin_set_stage_open', { p_stage: gateKey, p_open: false });
+        release();
+
+        if (res.error) {
+            toastErr('Stage control failed', res.error.message);
+            return;
+        }
+
+        gate.open = false;
+        /* The server cleared this stage's section records; show that now
+           rather than after the refresh. */
+        if (Array.isArray(state.overrides)) {
+            state.overrides = state.overrides.filter(function (o) { return o.stage !== gateKey; });
+        }
+        state.cohort.forEach(function (s) {
+            if (s.current_stage === gate.label) { s.current_stage = 'Waiting Room'; }
+        });
+        renderGateAccess();
+
+        var evicted = (res.data && res.data.evicted) || 0;
+        toastOk(gate.title + ' closed', evicted > 0
+            ? evicted + ' student' + (evicted === 1 ? '' : 's') + ' returned to the Waiting Room.'
+            : 'No section has access now.');
+
+        refreshAll();
     }
 
     /* ================================= 11. SETTINGS AND ADMIN DEVICES === */
@@ -5581,7 +5551,7 @@
         initRoster();
         initDrawerActions();
         initFaculty();
-        initTargeted();
+        initGates();
         initForms();
         initMathTask();
         initRetry();

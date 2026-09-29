@@ -249,23 +249,9 @@
 .gate-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .gate-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 
-.gate-control {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    min-height: 60px;
-    margin-top: var(--sp-4);
-    padding: 0 var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-}
-
-.gate-control-label { font-size: var(--fs-sm); font-weight: 600; }
-
 .gate-foot {
     display: grid;
-    /* Stacked on a phone: "Section override" is wider than half of 288px. */
+    /* Stacked on a phone: "Grant access · 5" is wider than half of 288px. */
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-2);
     padding: var(--sp-3) var(--sp-5);
@@ -277,7 +263,7 @@
    who was let in individually. The block keeps one line of height while it
    loads, so the card does not jump when the data arrives. */
 .gate-access {
-    min-height: 58px;
+    min-height: 96px;
     margin-top: var(--sp-4);
     padding-top: var(--sp-3);
     border-top: 1px solid var(--line-soft);
@@ -293,32 +279,24 @@
 
 .gate-access-skeleton { width: 60%; height: 14px; margin-top: var(--sp-2); }
 
-.gate-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin: var(--sp-2) 0 0;
-    padding: 0;
-    list-style: none;
+/* Access by section: one row per section, ticked to grant. The list is an
+   inset well like the rows elsewhere on the page, and scrolls past five so
+   a long roster never stretches the card. */
+.gate-access-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 36px; }
+
+.gate-sections {
+    max-height: 19rem;
+    margin-top: var(--sp-2);
+    padding: var(--sp-1);
+    overflow-y: auto;
+    border-radius: var(--r-md);
+    background: var(--bg-field);
 }
 
-.gate-chip {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    max-width: 100%;
-    min-height: 28px;
-    padding: 5px var(--sp-3);
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    line-height: 1.4;
-}
-
-.gate-chip-name { min-width: 0; overflow-wrap: anywhere; }
-.gate-chip-count { flex: 0 0 auto; font-weight: 500; opacity: 0.8; white-space: nowrap; }
+.gate-section { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); transition: background-color var(--t-base); }
+.gate-section:hover { background: var(--bg-surface-hover); }
+.gate-section .check-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.gate-section .badge { flex: 0 0 auto; }
 
 .gate-access-note {
     margin-top: var(--sp-2);
@@ -764,8 +742,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 }
 
 /* Keep the gap matching whatever sits behind the avatar. */
-.table tbody tr:hover .avatar-dot,
-.pick-row:hover .avatar-dot { box-shadow: 0 0 0 2.5px var(--bg-surface-hover); }
+.table tbody tr:hover .avatar-dot { box-shadow: 0 0 0 2.5px var(--bg-surface-hover); }
 .modal .avatar-dot,
 .drawer .avatar-dot { box-shadow: 0 0 0 2.5px var(--bg-surface); }
 

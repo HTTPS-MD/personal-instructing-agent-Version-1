@@ -1209,52 +1209,6 @@
         </div>
     </div>
 
-    <!-- ========================================= MODAL · TARGETED ACCESS -->
-    <div class="overlay" id="modal-targeted" role="dialog" aria-modal="true" aria-labelledby="targeted-title">
-        <div class="modal modal-md">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <h2 class="modal-title" id="targeted-title">Grant targeted access</h2>
-                    <p class="modal-sub" id="targeted-sub">Open one stage for a single section or participant.</p>
-                </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
-            </header>
-
-            <div class="modal-body stack">
-                <div class="segment" role="group" aria-label="Override scope">
-                    <button class="segment-btn is-active" data-target-mode="section">By section</button>
-                    <button class="segment-btn" data-target-mode="student">By student</button>
-                </div>
-
-                <div class="field" id="targeted-section-field">
-                    <label class="label" for="tg-section">Section</label>
-                    <select class="select" id="tg-section" data-section-select></select>
-                    <p class="field-msg"></p>
-                </div>
-
-                <div class="field is-hidden" id="targeted-student-field">
-                    <label class="label" for="tg-search">Find participant</label>
-                    <label class="search" style="flex:1 1 auto;min-width:0">
-                        <svg class="icon"><use href="#i-search"></use></svg>
-                        <input class="input" type="search" id="tg-search" placeholder="Name or email">
-                    </label>
-                    <div class="pick-list" id="tg-list"></div>
-                    <p class="field-msg" id="tg-msg"></p>
-                </div>
-            </div>
-
-            <footer class="modal-foot modal-foot-split">
-                <p class="modal-foot-note" id="targeted-selection">Nothing selected</p>
-                <div class="modal-foot-actions">
-                    <button class="btn btn-secondary" data-modal-close>Cancel</button>
-                    <button class="btn btn-primary" id="targeted-confirm">Grant access</button>
-                </div>
-            </footer>
-        </div>
-    </div>
-
     <!-- ======================================== MODAL · SECTION DETAILS -->
     <div class="overlay" id="modal-section-details" role="dialog" aria-modal="true" aria-labelledby="section-details-title">
         <div class="modal modal-xl">
