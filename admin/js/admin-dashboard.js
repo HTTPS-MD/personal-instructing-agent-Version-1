@@ -586,6 +586,294 @@
         return out;
     }
 
+    /* ---- 3.10 Loading state ----
+       The console always says when it is working, and saying so never moves
+       anything. Three layers (styles/pages/admin.css, section 19):
+
+         1. #load-bar     a strip under the top bar while any user-visible
+                          fetch is in flight, plus a spinning refresh icon;
+         2. data-region   each panel names the loaders that feed it. While one
+                          runs, the panel gets aria-busy, its own bar and a
+                          dimmed body;
+         3. skeletons     a panel with nothing to show holds the exact shape
+                          of its content, so data replaces it in place.
+
+       Nothing appears for the first 120ms, so a fast response shows nothing
+       at all. Loads the admin did not ask for (the realtime refresh) are
+       "quiet": no bar and no dimming, or the bar would never leave a live
+       class. A load that fails while its panel still shows placeholders turns
+       them into a message and a Try again button, so a placeholder can never
+       sit there looking like it is still loading. */
+
+    var Loading = (function () {
+        var perKey = {};
+        var visible = 0;
+        var quietNext = false;
+        var announceTimer = null;
+        var announced = false;
+
+        function paint() {
+            $$('[data-region]').forEach(function (el) {
+                var busy = el.getAttribute('data-region').split(/\s+/).some(function (key) {
+                    return perKey[key] > 0;
+                });
+                if (busy && el.getAttribute('aria-busy') !== 'true') { el.setAttribute('aria-busy', 'true'); }
+                else if (!busy && el.hasAttribute('aria-busy')) { el.removeAttribute('aria-busy'); }
+            });
+
+            if (visible > 0) { document.body.setAttribute('data-loading', 'true'); }
+            else { document.body.removeAttribute('data-loading'); }
+        }
+
+        /* Screen readers hear about a load only if it is slow enough to
+           notice, and hear when it is over. */
+        function announce() {
+            var status = $('#load-status');
+            if (!status) { return; }
+            clearTimeout(announceTimer);
+
+            if (visible > 0) {
+                announceTimer = setTimeout(function () {
+                    status.textContent = 'Loading data…';
+                    announced = true;
+                }, 600);
+            } else if (announced) {
+                announced = false;
+                status.textContent = 'Data updated.';
+                announceTimer = setTimeout(function () { status.textContent = ''; }, 2500);
+            }
+        }
+
+        function errorBlock(key, message) {
+            return '<div class="state-block region-error">' +
+                '<span class="state-glyph">' + icon('alert', 'icon-lg') + '</span>' +
+                '<p class="state-title">Couldn’t load this</p>' +
+                '<p class="state-desc">' + esc(message) + '</p>' +
+                '<button class="btn btn-secondary" type="button" data-retry="' + esc(key) + '">Try again</button>' +
+                '</div>';
+        }
+
+        /* Where a failed load leaves its placeholders. [selector, 'block'] or
+           [selector, 'rows', columns]. */
+        var FAILURE = {
+            cohort: [['#pipeline-strip', 'block'], ['#live-tbody', 'rows', 4],
+                     ['#section-health', 'block'], ['#sections-grid', 'block']],
+            sections: [['#sections-grid', 'block'], ['#section-health', 'block']],
+            roster: [['#student-tbody', 'rows', 7]],
+            faculty: [['#faculty-tbody', 'rows', 5]],
+            settings: [['#gates-grid', 'block'], ['#gate-summary', 'block']],
+            admins: [['#admin-tbody', 'rows', 4]],
+            admindevices: [['#admin-device-list', 'block']]
+        };
+
+        function fail(key, err) {
+            var message = friendlyDbError(err, 'The data could not be loaded.');
+
+            (FAILURE[key] || []).forEach(function (target) {
+                var el = $(target[0]);
+                /* Only placeholders are replaced: data already on screen
+                   stays, however stale. */
+                if (!el || !el.querySelector('.skeleton')) { return; }
+                el.innerHTML = target[1] === 'rows'
+                    ? '<tr><td colspan="' + target[2] + '">' + errorBlock(key, message) + '</td></tr>'
+                    : errorBlock(key, message);
+            });
+
+            /* A number that is still a placeholder becomes a dash. */
+            var dashed = key === 'cohort' ? '#view-overview .stat-value'
+                : (key === 'stages' ? '[data-stage-count]' : null);
+            if (dashed) {
+                $$(dashed).forEach(function (node) {
+                    if (node.querySelector('.skeleton')) { node.textContent = '—'; }
+                });
+            }
+        }
+
+        function track(key, promise) {
+            var quiet = quietNext;
+
+            if (!quiet) {
+                perKey[key] = (perKey[key] || 0) + 1;
+                visible += 1;
+                paint();
+                announce();
+            }
+
+            function settle() {
+                if (quiet) { return; }
+                perKey[key] -= 1;
+                visible -= 1;
+                paint();
+                announce();
+            }
+
+            return promise.then(function (value) {
+                settle();
+                return value;
+            }, function (err) {
+                settle();
+                fail(key, err);
+                throw err;
+            });
+        }
+
+        return {
+            track: track,
+            fail: fail,
+            /* Read synchronously by track(), so it covers exactly the loaders
+               started before it is cleared again. */
+            setQuiet: function (value) { quietNext = !!value; }
+        };
+    })();
+
+    /* Runs one loader as a background refresh: same work, no bar, no
+       dimming. For anything the admin did not just ask for. */
+    function quietly(load) {
+        Loading.setQuiet(true);
+        try { return load(); } finally { Loading.setQuiet(false); }
+    }
+
+    /* The "Try again" buttons. Each loader is registered here once it has
+       been wrapped for tracking (see "Loader tracking"). */
+    var RETRY = {};
+
+    function initRetry() {
+        document.addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-retry]');
+            if (!btn) { return; }
+            var load = RETRY[btn.getAttribute('data-retry')];
+            if (!load) { return; }
+
+            var release = setBusy(btn, 'Loading…');
+            Promise.resolve().then(load).catch(function (err) {
+                toastErr('Still couldn’t load it', friendlyDbError(err, 'Check the connection and try again.'));
+            }).then(release, release);
+        });
+    }
+
+    /* ---- 3.11 Placeholders that match what replaces them ----
+       Skeleton TEXT is real text with its colour removed and a shimmer behind
+       it (.skeleton-text), so a placeholder line is exactly as tall and as
+       wide as the words it stands in for. Every container below is built from
+       the same classes as the renderer that later replaces it, and the words
+       inside come from the same constants (GATES, STAGE_META), so a loaded
+       card is the size of its placeholder and nothing moves.
+
+       Only containers that are still empty are painted, and only once,
+       before the console is revealed. */
+
+    function sk(text) {
+        return '<span class="skeleton skeleton-text">' + esc(text) + '</span>';
+    }
+
+    function skeletonPill(width) {
+        return '<span class="skeleton skeleton-pill" style="width:' + width + 'px"></span>';
+    }
+
+    function skeletonStep(label) {
+        return '<div class="funnel-step" aria-hidden="true">' +
+            '<div><p class="funnel-num">' + sk('00') + '</p><p class="funnel-name">' + sk(label) + '</p></div>' +
+            '<div class="funnel-foot"><div class="bar"></div>' +
+            '<p class="funnel-meta">' + sk('00% of 00 participants') + '</p></div></div>';
+    }
+
+    function skeletonGateRow(gate) {
+        return '<div class="device-row" aria-hidden="true">' +
+            '<span class="skeleton" style="width:8px;height:8px;border-radius:50%;flex:0 0 8px"></span>' +
+            '<div class="device-text"><p class="device-name">' + sk(gate.title) + '</p>' +
+            '<p class="device-meta">' + sk(gate.stage) + '</p></div>' + skeletonPill(56) + '</div>';
+    }
+
+    function skeletonHealth() {
+        return '<div aria-hidden="true"><div class="trait-top">' +
+            '<span class="trait-name">' + sk('Section name') + '</span>' +
+            '<span class="trait-val tnum">' + sk('00%') + '</span></div><div class="bar"></div></div>';
+    }
+
+    function skeletonSectionCard() {
+        var metric = function (label) {
+            return '<div><p class="metric-label">' + sk(label) + '</p><p class="metric-value tnum">' + sk('00') + '</p></div>';
+        };
+        return '<article class="section-card" aria-hidden="true"><div class="section-card-body">' +
+            '<div class="section-card-top"><div><h3 class="section-name">' + sk('Section name') + '</h3>' +
+            '<p class="section-prof">' + sk('Professor name here') + '</p></div>' + skeletonPill(72) + '</div>' +
+            '<div class="section-metrics">' + metric('Students') + metric('OCEAN') + metric('Complete') + '</div>' +
+            '<div class="bar"></div></div>' +
+            '<div class="section-card-foot"><div class="avatar-stack">' +
+            '<span class="avatar skeleton"></span><span class="avatar skeleton"></span><span class="avatar skeleton"></span></div>' +
+            '<span class="skeleton skeleton-btn" style="width:120px"></span></div></article>';
+    }
+
+    function skeletonGate(gate) {
+        return '<article class="gate" aria-hidden="true"><div class="gate-body">' +
+            '<div class="gate-top">' + skeletonPill(64) + skeletonPill(56) + '</div>' +
+            '<h3 class="gate-title">' + sk(gate.title) + '</h3>' +
+            '<p class="gate-desc">' + sk(gate.desc) + '</p>' +
+            '<div class="gate-control"><span><span class="gate-control-label">' + sk('Global access') + '</span><br>' +
+            '<span class="gate-control-sub">' + sk('Applies to every section') + '</span></span>' +
+            '<span class="skeleton" style="width:44px;height:24px;border-radius:var(--r-pill)"></span></div></div>' +
+            '<div class="gate-foot"><span class="skeleton skeleton-btn"></span><span class="skeleton skeleton-btn"></span></div>' +
+            '</article>';
+    }
+
+    /* The same parts as a real device row: glyph, name, the device id
+       (which wraps), and the "This device" badge. */
+    function skeletonDevice() {
+        return '<div class="device-row" aria-hidden="true"><span class="stat-glyph skeleton"></span>' +
+            '<div class="device-text"><p class="device-name">' + sk('macOS computer') + '</p>' +
+            '<p class="device-meta cell-mail">' + sk('abc123 [macOS Computer]') + '</p></div>' +
+            skeletonPill(84) + '</div>';
+    }
+
+    function skeletonTraits() {
+        var one = '<div class="trait" aria-hidden="true"><div class="trait-top">' +
+            '<span class="trait-name">' + sk('Conscientiousness') + '</span>' +
+            '<span class="trait-val tnum">' + sk('00 / 40') + '</span></div><div class="bar"></div></div>';
+        return '<p class="sr-only">Loading results…</p>' + one + one + one + one + one;
+    }
+
+    function paintSkeletons() {
+        function fill(selector, markup) {
+            var el = $(selector);
+            if (el && !el.children.length) { el.innerHTML = markup; }
+        }
+        var times = function (n, make) {
+            var out = '';
+            for (var i = 0; i < n; i++) { out += make(i); }
+            return out;
+        };
+
+        fill('#pipeline-strip', ['OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game']
+            .map(function (key) { return skeletonStep(STAGE_META[key].label); }).join(''));
+        fill('#live-tbody', skeletonRows(4, 3));
+        fill('#gate-summary', GATES.map(skeletonGateRow).join(''));
+        fill('#section-health', times(3, skeletonHealth));
+        fill('#sections-grid', times(3, skeletonSectionCard));
+        fill('#gates-grid', GATES.map(skeletonGate).join(''));
+        fill('#student-tbody', skeletonRows(7, 6));
+        fill('#faculty-tbody', skeletonRows(5, 4));
+        fill('#admin-tbody', skeletonRows(4, 2));
+        fill('#admin-device-list', skeletonDevice());
+    }
+
+    /* A table that scrolls sideways must be reachable without a mouse, and
+       a screen reader has to be told it is there. */
+    function initScrollRegions() {
+        $$('.table-wrap').forEach(function (wrap) {
+            var host = wrap.closest('.card, .modal');
+            var title = host && $('.card-title, .modal-title', host);
+            wrap.setAttribute('role', 'region');
+            wrap.tabIndex = 0;
+
+            if (title && title.id && host.classList.contains('modal')) {
+                wrap.setAttribute('aria-labelledby', title.id);
+            } else {
+                wrap.setAttribute('aria-label',
+                    (title ? title.textContent.trim() : 'Table') + ' — scrolls sideways');
+            }
+        });
+    }
+
     /* ================================================ 4. DATA LAYER ===== */
 
     /* Columns the overview aggregates need. Selecting the exact set rather
@@ -691,7 +979,14 @@
         state.loading.roster = false;
 
         if (res.error) {
-            tbody.innerHTML = '';
+            /* Placeholders (or stale rows) become a message with a retry: an
+               empty table would read as "no students". */
+            tbody.innerHTML = '<tr><td colspan="7"><div class="state-block region-error">' +
+                '<span class="state-glyph">' + icon('alert', 'icon-lg') + '</span>' +
+                '<p class="state-title">Couldn’t load the roster</p>' +
+                '<p class="state-desc">' + esc(friendlyDbError(res.error, 'Unknown database error.')) + '</p>' +
+                '<button class="btn btn-secondary" type="button" data-retry="roster">Try again</button>' +
+                '</div></td></tr>';
             $('#pager-info').textContent = 'Could not load the roster.';
             toastErr('Roster failed to load', friendlyDbError(res.error, 'Unknown database error.'));
             return;
@@ -726,6 +1021,7 @@
             });
         } catch (err) {
             console.error('Stage counters failed:', err);
+            Loading.fail('stages', err);
         }
     }
 
@@ -849,8 +1145,9 @@
             '<div class="cell-user">' +
             avatarMarkup(profile) +
             '<span class="cell-user-text">' +
-            '<span class="cell-name">' + esc(profile.full_name || '(no name)') + '</span>' +
-            '<span class="cell-mail">' + esc(profile.email) + '</span>' +
+            '<span class="cell-name" title="' + esc(profile.full_name || '(no name)') + '">' +
+            esc(profile.full_name || '(no name)') + '</span>' +
+            '<span class="cell-mail" title="' + esc(profile.email) + '">' + esc(profile.email) + '</span>' +
             '</span>' +
             '</div>';
     }
@@ -1361,9 +1658,11 @@
 
     async function renderTraits(s) {
         var box = $('#drawer-traits');
-        box.innerHTML = '<p class="state-desc">Loading results…</p>';
+        box.innerHTML = skeletonTraits();
+        box.setAttribute('aria-busy', 'true');
 
         var res = await fetchResults(s.email);
+        box.removeAttribute('aria-busy');
 
         /* The admin may have opened another student while this was loading. */
         if (state.activeStudent !== s) { return; }
@@ -2502,6 +2801,8 @@
 
         if (res.error || !res.data) {
             console.error('Admin device settings failed:', res.error);
+            $('#admin-device-list').innerHTML = noticeHtml('alert', 'Could not load your devices',
+                friendlyDbError(res.error, 'No device record was found for this account.'));
             return;
         }
 
@@ -2516,6 +2817,7 @@
             if (claim.error) {
                 console.error('claim_device failed:', claim.error);
             } else if (claim.data && claim.data.allowed === false) {
+                renderAdminDevices(claim.data.devices || devices);
                 showDeviceLimitModal(claim.data.devices || devices);
                 return;
             } else if (claim.data && claim.data.devices) {
@@ -3098,7 +3400,7 @@
             }
 
             backoffMs = 1000;
-            refreshAll();
+            refreshAll({ quiet: true });
         }, backoffMs);
     }
 
@@ -3107,7 +3409,7 @@
         clearTimeout(refreshTimer);
         deferredRefresh = false;
         backoffMs = 1000;
-        refreshAll();
+        refreshAll({ quiet: true });
     }
 
     function setupRealtime() {
@@ -3146,7 +3448,7 @@
         registerChannel('admin-realtime-settings', function (channel) {
             return channel
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, function () {
-                    loadSettings().catch(function (err) { console.error('Settings reload failed:', err); });
+                    quietly(loadSettings).catch(function (err) { console.error('Settings reload failed:', err); });
                 })
                 .subscribe();
         });
@@ -4372,17 +4674,49 @@
     /* Every read the dashboard needs, in parallel. A failure here shows the
        error banner but never signs the admin out — their identity is already
        verified at this point. */
-    async function refreshAll() {
+    /* ---- Loader tracking ----
+       Each loader is wrapped ONCE, here, so every call to it -- boot, the
+       Refresh button, a filter change, Try again -- drives the loading state
+       without any call site remembering to. `key` is the data-region name. */
+    function tracked(key, load) {
+        return function () { return Loading.track(key, load.apply(this, arguments)); };
+    }
+
+    loadCohort = tracked('cohort', loadCohort);
+    loadSections = tracked('sections', loadSections);
+    loadRoster = tracked('roster', loadRoster);
+    loadStageCounters = tracked('stages', loadStageCounters);
+    loadFaculty = tracked('faculty', loadFaculty);
+    loadAdmins = tracked('admins', loadAdmins);
+    loadSettings = tracked('settings', loadSettings);
+    loadAdminDevices = tracked('admindevices', loadAdminDevices);
+    loadMathTask = tracked('mathtask', loadMathTask);
+
+    RETRY = {
+        cohort: loadCohort, sections: loadSections, roster: loadRoster, stages: loadStageCounters,
+        faculty: loadFaculty, admins: loadAdmins, settings: loadSettings,
+        admindevices: loadAdminDevices, mathtask: loadMathTask
+    };
+
+    async function refreshAll(opts) {
         try {
-            await Promise.all([
-                loadCohort(),
-                loadSections(),
-                loadRoster(),
-                loadStageCounters(),
-                loadFaculty(),
-                loadAdmins(),
-                loadSettings()
-            ]);
+            /* Started in this tick, so the flag covers exactly these. */
+            var jobs;
+            try {
+                Loading.setQuiet(opts && opts.quiet);
+                jobs = [
+                    loadCohort(),
+                    loadSections(),
+                    loadRoster(),
+                    loadStageCounters(),
+                    loadFaculty(),
+                    loadAdmins(),
+                    loadSettings()
+                ];
+            } finally {
+                Loading.setQuiet(false);
+            }
+            await Promise.all(jobs);
             hideGlobalError();
         } catch (err) {
             console.error('Dashboard data failed to load:', err);
@@ -4490,9 +4824,15 @@
         $('#export-roster').addEventListener('click', exportCohortCsv);
 
         $('#refresh-btn').addEventListener('click', async function () {
-            var release = setBusy(this, '…');
+            /* The icon keeps its place and turns; the button is inert until
+               everything has landed. */
+            var btn = this;
+            if (btn.classList.contains('is-busy')) { return; }
+            btn.classList.add('is-busy');
+            btn.setAttribute('aria-disabled', 'true');
             await Promise.all([refreshAll(), loadMathTask()]);
-            release();
+            btn.classList.remove('is-busy');
+            btn.removeAttribute('aria-disabled');
             toastOk('Refreshed', 'Every panel is showing current data.');
         });
     }
@@ -4544,6 +4884,9 @@
         initTargeted();
         initForms();
         initMathTask();
+        initRetry();
+        initScrollRegions();
+        paintSkeletons();
 
         setBootText('Loading dashboard…');
         await initAdminIdentity(email);

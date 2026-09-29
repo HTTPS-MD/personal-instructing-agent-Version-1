@@ -102,7 +102,14 @@
 
 /* -------------------------------------------------- 10. VIEW-LEVEL PATTERNS */
 /* Stage funnel strip */
-.funnel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+.funnel { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+
+/* Mobile first: one column, then two, then four. The desktop four used to be
+   this rule's base, which -- loading after shell.css -- overrode that file's
+   phone breakpoints, so a 320px screen got four 50px columns and each step
+   was 766px tall. */
+@media (min-width: 30.0625rem) { .funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 80rem) { .funnel { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .funnel-step {
     display: flex;
@@ -202,10 +209,13 @@
 
 .gate-foot {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Stacked on a phone: "Section override" is wider than half of 288px. */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-2);
     padding: var(--sp-3) var(--sp-5);
 }
+
+@media (min-width: 30rem) { .gate-foot { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* Notice / policy block */
 .notice {
@@ -463,13 +473,19 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 /* ---- 16.3 Skeleton rows ----
    A loading row is exactly as tall as a real row, so the table does not
    resize when live data replaces the placeholder. */
-.skeleton-line { height: 10px; border-radius: var(--r-pill); }
+/* Blocks, not inline spans. These are empty <span>s, and an empty inline
+   element has no width, no height and no vertical margin: every placeholder
+   built from them was measuring 0 x 0, i.e. invisible. */
+.skeleton-line { display: block; height: 10px; border-radius: var(--r-pill); }
 .skeleton-line + .skeleton-line { margin-top: 6px; }
-.skeleton-pill { height: 24px; width: 88px; border-radius: var(--r-pill); }
+.skeleton-pill { display: block; height: 24px; width: 88px; border-radius: var(--r-pill); }
 .skeleton-avatar { width: 32px; height: 32px; border-radius: var(--r-sm); flex: 0 0 32px; }
 
 /* Numeric placeholder keeps the tile height identical to a loaded value. */
-.stat-value .skeleton-line { width: 56px; height: 22px; margin: 7px 0; }
+/* An inline-block, centred in the value's own 36px line box. A block with
+   vertical margins would let those margins collapse through the parent and
+   leave the value 22px tall, not 36. */
+.stat-value .skeleton-line { display: inline-block; vertical-align: middle; width: 56px; height: 22px; margin: 0; }
 
 /* ---- 16.4 Action list (student drawer) ---- */
 .action-list {
@@ -958,4 +974,212 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) {
     .qb-topics .segment-btn,
     .qb-range::-webkit-slider-thumb { transition: none; }
+}
+
+/* ============================================================================
+   19. LOADING STATE, LONG STRINGS AND TOUCH TARGETS
+   ----------------------------------------------------------------------------
+   THE RULE: the console always says when it is working, and saying so never
+   moves anything.
+
+   Three layers, each with no layout impact:
+     1. .loadbar   a 3px strip fixed under the top bar while ANY user-visible
+                   fetch is in flight.
+     2. [data-region][aria-busy]
+                   the panel whose data is loading gets its own bar along its
+                   top edge and its body dims. aria-busy tells assistive tech.
+     3. skeletons  a panel with nothing to show yet holds the exact shape of
+                   its content (see "Loading state" in admin-dashboard.js).
+
+   Everything is transform / opacity, and each is delayed 120ms so a fast
+   response shows nothing at all -- no flash.
+   ========================================================================== */
+
+/* ---- 19.1 Global bar ---- */
+.loadbar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    right: 0;
+    z-index: calc(var(--z-sticky) + 1);
+    height: 3px;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--t-base);
+}
+
+.loadbar::before {
+    content: "";
+    display: block;
+    width: 40%;
+    height: 100%;
+    background: var(--accent);
+    border-radius: var(--r-pill);
+    transform: translateX(-100%);
+    animation: loadbar 1.15s var(--ease-flat) infinite;
+}
+
+body[data-loading] .loadbar { opacity: 1; transition-delay: 120ms; }
+
+@keyframes loadbar { to { transform: translateX(250%); } }
+
+@media (min-width: 1025px) {
+    /* The rail is fixed at this width and overlays the workspace's margin. */
+    .loadbar { left: var(--rail-w); }
+}
+
+/* The refresh button turns while anything loads. */
+body[data-loading] #refresh-btn .icon,
+#refresh-btn.is-busy .icon { animation: spin 800ms linear infinite; }
+.btn-icon.is-busy { pointer-events: none; }
+
+/* ---- 19.2 A panel that is loading ---- */
+[data-region] { position: relative; }
+
+[data-region][aria-busy="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--r-card);
+    right: var(--r-card);
+    height: 2px;
+    border-radius: var(--r-pill);
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: region-bar 1.15s var(--ease-flat) infinite;
+    pointer-events: none;
+}
+
+@keyframes region-bar {
+    from { background-position: -60% 0; }
+    to { background-position: 160% 0; }
+}
+
+/* Stale numbers stay readable but are clearly on their way out. */
+.card[data-region] > :not(.card-head),
+.stat[data-region] > *,
+[data-region].grid > * {
+    transition: opacity var(--t-base);
+}
+
+.card[data-region][aria-busy="true"] > :not(.card-head),
+.stat[data-region][aria-busy="true"] > :not(.stat-top),
+.grid[data-region][aria-busy="true"] > * {
+    opacity: 0.6;
+    transition-delay: 120ms;
+}
+
+[data-region][aria-busy="true"] { cursor: progress; }
+
+/* ---- 19.3 Skeleton text ----
+   Real text with its colour taken out and a shimmer put behind it. A
+   skeleton line is therefore exactly as tall and as wide as the words it
+   stands in for, in whatever size and line-height its container sets, which
+   a fixed-height bar can never promise. */
+.skeleton-text {
+    color: transparent !important;
+    user-select: none;
+    -webkit-user-select: none;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+/* A small button's placeholder. It follows .btn-sm exactly, including the
+   44px floor below, so the real button replaces it without a shift. */
+.skeleton-btn { display: block; height: 36px; border-radius: var(--r-pill); }
+
+/* ---- 19.4 A panel that failed to load, with the way out ---- */
+.region-error {
+    grid-column: 1 / -1;
+    min-height: 180px;
+}
+
+.region-error .btn { margin-top: var(--sp-1); }
+
+/* ---- 19.5 Long strings in the console ---- */
+.section-name, .section-prof, .gate-title, .gate-desc,
+.device-name, .device-meta, .trait-name, .funnel-name, .funnel-meta,
+.metric-label, .kv-label, .kv-value, .notice-title, .notice-text,
+.state-title, .state-desc, .qb-help, .qb-q {
+    overflow-wrap: anywhere;
+}
+
+/* Flex children that hold those strings must be allowed to shrink. */
+.section-card-top > div,
+.gate-top,
+.trait-top > .trait-name,
+.device-text { min-width: 0; }
+
+/* Result lists ("granted", "skipped", broadcast summaries) are lists of
+   emails. */
+.notice-pre { overflow-wrap: anywhere; }
+
+/* In a table a name or an address is one line with an ellipsis: rows keep
+   their height, and the full text is in the cell's title. The cap is what
+   makes the ellipsis fire -- an auto-layout column otherwise grows to fit. */
+.cell-user-text { max-width: min(20rem, 56vw); }
+
+/* Anywhere else (the drawer, a dialog) the same address wraps instead. */
+.drawer .cell-mail,
+.modal .cell-mail,
+.drawer .cell-name,
+.modal .cell-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+}
+
+/* ---- 19.6 Tables scroll, the page does not ----
+   The wrap is a keyboard-focusable region (admin-dashboard.js gives it a
+   role and a label), so someone without a mouse can scroll a wide table. */
+.table-wrap {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap:focus-visible { outline-offset: -3px; }
+
+/* A message inside a table ("No sessions running", "Couldn't load this")
+   spans every column, and a wide table is far wider than a phone: centred in
+   the table, it sat off-screen to the right, with its Try again button. The
+   wrap is a size container, so the message can be exactly as wide as the
+   VISIBLE part of the table (100cqw) and stay pinned to the left edge while
+   the table scrolls beneath it. */
+.table-wrap { container-type: inline-size; }
+
+.table td[colspan] > .state-block {
+    position: sticky;
+    left: 0;
+    width: 100cqw;
+    margin-inline: calc(-1 * var(--sp-5));   /* the cell's own padding would push it off the right edge */
+}
+
+/* ---- 19.7 Touch targets ----
+   Compact controls are fine under a mouse. On a phone, a tablet, or anything
+   with a coarse pointer, every one of them reaches the 44px floor. Where a
+   control's box would stretch a fixed-height row, the hit area is extended
+   instead (see .modal-close in global.css). */
+@media (max-width: 64rem), (pointer: coarse) {
+    .btn-sm,
+    .btn-signout,
+    .skeleton-btn,
+    .segment-btn,
+    .qb-topics .segment-btn { min-height: var(--icon-btn); }
+
+    .score-input { height: var(--control-h); }
+
+    .segment-btn { padding-inline: var(--sp-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* The global reduced-motion rule runs each animation once, which for
+       these leaves the bar parked off-screen. Show a still bar instead. */
+    .loadbar::before { animation: none; transform: none; width: 100%; opacity: 0.55; }
+    [data-region][aria-busy="true"]::after { animation: none; background-size: 100% 100%; opacity: 0.55; }
+    body[data-loading] #refresh-btn .icon,
+    #refresh-btn.is-busy .icon { animation: none; }
 }

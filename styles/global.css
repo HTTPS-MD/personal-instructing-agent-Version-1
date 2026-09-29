@@ -916,7 +916,8 @@ body {
 /* Checkbox — drawn from scratch to a fixed 18px box. */
 .check {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    min-height: var(--icon-btn);   /* the whole row is the tap target */
     gap: var(--sp-3);
     cursor: pointer;
     user-select: none;
@@ -946,10 +947,13 @@ body {
 .check-text small { display: block; color: var(--text-muted); font-size: var(--fs-xs); margin-top: 2px; }
 
 /* Toggle switch — 44×24 track, 18px knob, 13px travel. */
-.switch { position: relative; display: inline-flex; flex: 0 0 auto; cursor: pointer; }
+/* The label is the tap target, so it is 44px tall; the 24px track sits in the
+   middle of it, and the thumb is anchored to the TRACK, not the label. */
+.switch { position: relative; display: inline-flex; align-items: center; min-height: var(--icon-btn); flex: 0 0 auto; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 
 .switch-track {
+    position: relative;
     width: 44px;
     height: 24px;
     border-radius: var(--r-pill);
@@ -1194,6 +1198,7 @@ button.stat.is-active { background: var(--accent-soft); }
     width: 100%;
     max-width: 520px;
     max-height: calc(100vh - var(--sp-9));
+    max-height: calc(100dvh - var(--sp-9));   /* the visible height on a phone, URL bar and all */
     background: var(--bg-surface);
     border-radius: var(--r-xl);
     box-shadow: var(--shadow-dialog);
@@ -1232,6 +1237,7 @@ button.stat.is-active { background: var(--accent-soft); }
 .modal-head-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;               /* two buttons that do not fit stack, they do not overflow */
     gap: var(--sp-2);
     flex: 0 0 auto;
     order: 2;
@@ -1703,4 +1709,53 @@ body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
 
 @media (prefers-reduced-motion: reduce) {
     .spin { animation: none; }
+}
+
+/* ============================================================================
+   17. LONG STRINGS NEVER ESCAPE THEIR CONTAINER
+   ----------------------------------------------------------------------------
+   An email address has no space to break at, so
+   "francisco.markdanielbayona@ue.edu.ph" in a dialog title, a card subtitle
+   or a toast used to run straight past the edge of its box on a phone.
+
+   `overflow-wrap: anywhere`, not `break-word`: both break an unbreakable
+   string when nothing else fits, but only `anywhere` also lowers the
+   element's min-content size, which is what lets a flex or grid child
+   SHRINK to its container instead of holding it open. Ordinary text still
+   breaks at spaces first; a string is only cut when it has to be.
+
+   Text that is meant to stay on one line (table cells, the sidebar user)
+   keeps its own ellipsis rules; wrapping has no effect while
+   `white-space: nowrap` is set.
+   ========================================================================== */
+.modal-title, .modal-sub, .modal-hero-title, .modal-hero-text, .modal-foot-note,
+.card-title, .card-sub, .page-title, .page-desc,
+.label, .field-msg, .check-text,
+.choice-title, .choice-desc,
+.toast-title, .toast-desc,
+.pick-text, .pick-text > * {
+    overflow-wrap: anywhere;
+}
+
+/* A dialog is never wider than the screen and never lets a child hold it
+   open. `min-width: 0` on the direct children matters: a flex column
+   otherwise sizes to its widest unbreakable child. */
+.modal { max-width: min(520px, 100%); }
+.modal-sm { max-width: min(420px, 100%); }
+.modal-md { max-width: min(560px, 100%); }
+.modal-lg { max-width: min(720px, 100%); }
+.modal-xl { max-width: min(940px, 100%); }
+.modal > * { min-width: 0; }
+
+/* Footer buttons wrap onto a second row rather than overflow, and clear
+   the home indicator on a phone. */
+.modal-foot {
+    flex-wrap: wrap;
+    padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+}
+
+@media (max-width: 30rem) {
+    /* 320px: the 24px gutters left 272px for a form. */
+    .modal-body { padding-inline: var(--sp-5); }
+    .modal-foot { padding-inline: var(--sp-5); }
 }

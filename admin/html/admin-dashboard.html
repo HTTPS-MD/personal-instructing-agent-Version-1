@@ -97,6 +97,14 @@
         <span id="global-error-message"></span>
     </div>
 
+    <!-- Global loading state. The bar is a thin fixed strip under the top bar
+         (no layout impact) that shows whenever ANY fetch is in flight; each
+         panel also carries aria-busy while its own data loads (see
+         data-region below and "Loading state" in admin-dashboard.js). The
+         status line tells screen-reader users the same thing. -->
+    <div class="loadbar" id="load-bar" aria-hidden="true"></div>
+    <p class="sr-only" id="load-status" role="status" aria-live="polite"></p>
+
     <div class="scrim" id="nav-scrim" aria-hidden="true"></div>
 
     <!-- =====================================================================
@@ -242,7 +250,7 @@
 
                     <div class="stack-lg">
                         <div class="grid grid-4">
-                            <div class="stat">
+                            <div class="stat" data-region="cohort sections">
                                 <div class="stat-top">
                                     <span class="stat-label">Enrolled students</span>
                                     <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-users"></use></svg></span>
@@ -251,7 +259,7 @@
                                 <p class="stat-foot" id="kpi-enrolled-foot">Across all sections</p>
                             </div>
 
-                            <div class="stat">
+                            <div class="stat" data-region="cohort sections">
                                 <div class="stat-top">
                                     <span class="stat-label">Online now</span>
                                     <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-activity"></use></svg></span>
@@ -260,7 +268,7 @@
                                 <p class="stat-foot">Students with a registered device session</p>
                             </div>
 
-                            <div class="stat">
+                            <div class="stat" data-region="cohort sections">
                                 <div class="stat-top">
                                     <span class="stat-label">OCEAN completion</span>
                                     <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-brain"></use></svg></span>
@@ -269,7 +277,7 @@
                                 <div class="bar"><div class="bar-fill f-amber" id="kpi-ocean-bar" style="width:0%"></div></div>
                             </div>
 
-                            <div class="stat">
+                            <div class="stat" data-region="cohort sections">
                                 <div class="stat-top">
                                     <span class="stat-label">Awaiting activation</span>
                                     <span class="stat-glyph g-danger"><svg class="icon"><use href="#i-mail"></use></svg></span>
@@ -281,7 +289,7 @@
 
                         <div class="grid grid-main">
                             <div class="stack">
-                                <div class="card">
+                                <div class="card" data-region="cohort">
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Study pipeline</h2>
@@ -296,7 +304,7 @@
                                     </div>
                                 </div>
 
-                                <div class="card">
+                                <div class="card" data-region="cohort">
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Live sessions</h2>
@@ -323,7 +331,7 @@
                             </div>
 
                             <div class="stack">
-                                <div class="card">
+                                <div class="card" data-region="settings">
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Access gates</h2>
@@ -333,7 +341,7 @@
                                     <div class="card-body stack" id="gate-summary"></div>
                                 </div>
 
-                                <div class="card">
+                                <div class="card" data-region="cohort sections">
                                     <div class="card-head">
                                         <div class="card-head-text">
                                             <h2 class="card-title">Section health</h2>
@@ -362,7 +370,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-3" id="sections-grid"></div>
+                    <div class="grid grid-3" id="sections-grid" data-region="cohort sections"></div>
                 </section>
 
                 <!-- ============================== VIEW 3 · ROSTER ======== -->
@@ -389,7 +397,7 @@
                         <!-- Stage drill-down tiles. The data-stage value is the exact
                              profiles.current_stage string the database stores. -->
                         <div class="grid grid-4" id="stage-tiles">
-                            <button class="stat" data-stage-filter="OCEAN">
+                            <button class="stat" data-stage-filter="OCEAN" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">OCEAN test</span>
                                     <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-brain"></use></svg></span>
@@ -397,7 +405,7 @@
                                 <span class="stat-value" data-stage-count="OCEAN"><span class="skeleton skeleton-line"></span></span>
                                 <span class="stat-foot">Answering the inventory</span>
                             </button>
-                            <button class="stat" data-stage-filter="Character Selection">
+                            <button class="stat" data-stage-filter="Character Selection" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">Character select</span>
                                     <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-user"></use></svg></span>
@@ -405,7 +413,7 @@
                                 <span class="stat-value" data-stage-count="Character Selection"><span class="skeleton skeleton-line"></span></span>
                                 <span class="stat-foot">Choosing an agent persona</span>
                             </button>
-                            <button class="stat" data-stage-filter="Tutoring Dashboard">
+                            <button class="stat" data-stage-filter="Tutoring Dashboard" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">Tutoring dashboard</span>
                                     <span class="stat-glyph"><svg class="icon"><use href="#i-grid"></use></svg></span>
@@ -413,7 +421,7 @@
                                 <span class="stat-value" data-stage-count="Tutoring Dashboard"><span class="skeleton skeleton-line"></span></span>
                                 <span class="stat-foot">Browsing problem sets</span>
                             </button>
-                            <button class="stat" data-stage-filter="Active Game">
+                            <button class="stat" data-stage-filter="Active Game" data-region="stages">
                                 <span class="stat-top">
                                     <span class="stat-label">Active session</span>
                                     <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-gamepad"></use></svg></span>
@@ -423,7 +431,7 @@
                             </button>
                         </div>
 
-                        <div class="card">
+                        <div class="card" data-region="roster">
                             <div class="card-head">
                                 <div class="card-head-text">
                                     <h2 class="card-title" id="roster-title">All students</h2>
@@ -500,7 +508,7 @@
                         </div>
                     </div>
 
-                    <div class="card">
+                    <div class="card" data-region="faculty">
                         <div class="card-head">
                             <div class="card-head-text">
                                 <h2 class="card-title">Faculty roster</h2>
@@ -560,7 +568,7 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-3" id="gates-grid"></div>
+                        <div class="grid grid-3" id="gates-grid" data-region="settings"></div>
                     </div>
                 </section>
 
@@ -608,7 +616,7 @@
                             </div>
                         </div>
 
-                        <div class="card">
+                        <div class="card" data-region="admindevices">
                             <div class="card-head">
                                 <div class="card-head-text">
                                     <h2 class="card-title">Device policy</h2>
@@ -637,7 +645,7 @@
                          sign-in account and an admin profile, then emails a
                          one-time link where they choose their own password --
                          no password is ever known here. -->
-                    <div class="card">
+                    <div class="card" data-region="admins">
                         <div class="card-head">
                             <div class="card-head-text">
                                 <h2 class="card-title">Administrators</h2>
@@ -718,7 +726,7 @@
 
                         <div class="grid grid-main">
                             <!-- Question bank -->
-                            <div class="card">
+                            <div class="card" data-region="mathtask">
                                 <div class="card-head">
                                     <div class="card-head-text">
                                         <h2 class="card-title" id="qb-title">Topic 1 · Finding a percentage</h2>
@@ -764,7 +772,7 @@
                             </div>
 
                             <!-- Adaptive rules -->
-                            <form class="card qb-config" id="qb-config-form" novalidate>
+                            <form class="card qb-config" id="qb-config-form" data-region="mathtask" novalidate>
                                 <div class="card-head">
                                     <div class="card-head-text">
                                         <h2 class="card-title">Adaptive rules</h2>
