@@ -1090,6 +1090,13 @@ body[data-loading] #refresh-btn .icon,
    44px floor below, so the real button replaces it without a shift. */
 .skeleton-btn { display: block; height: 36px; border-radius: var(--r-pill); }
 
+/* Another administrator's row: a marker, not a control. It keeps the
+   icon-button box (so the column does not change width) and its focus ring
+   (so keyboard users can reach the explanation), but no hover or press. */
+.btn-icon.admin-protected { cursor: help; color: var(--text-faint); }
+.btn-icon.admin-protected:hover,
+.btn-icon.admin-protected:active { background: transparent; color: var(--text-muted); }
+
 /* A notice that reports a failure rather than a fact. */
 .notice-danger { background: var(--danger-soft); }
 .notice-danger .icon { color: var(--danger); }

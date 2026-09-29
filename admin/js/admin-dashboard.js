@@ -91,6 +91,9 @@
     function friendlyDbError(error, fallback) {
         if (!error) { return fallback; }
         var msg = error.message || '';
+        /* The database's own refusals ("PIA: an administrator cannot ...",
+           migration 0031) already say exactly why; pass them through. */
+        if (/^PIA:\s*/.test(msg)) { return msg.replace(/^PIA:\s*/, ''); }
         if (error.code === '23505' || /duplicate key|already exists/i.test(msg)) {
             return 'An account already uses this email. Only one account per email is allowed.';
         }
@@ -664,6 +667,7 @@
             faculty: [['#faculty-tbody', 'rows', 5]],
             settings: [['#gates-grid', 'block'], ['#gate-summary', 'block']],
             admins: [['#admin-tbody', 'rows', 4]],
+            audit: [['#audit-tbody', 'rows', 4]],
             admindevices: [['#admin-device-list', 'block']]
         };
 
@@ -854,6 +858,7 @@
         fill('#student-tbody', skeletonRows(7, 6));
         fill('#faculty-tbody', skeletonRows(5, 4));
         fill('#admin-tbody', skeletonRows(4, 2));
+        fill('#audit-tbody', skeletonRows(4, 4));
         fill('#admin-device-list', skeletonDevice());
     }
 
@@ -3044,8 +3049,10 @@
     async function saveAdminDeviceLimit() {
         var value = toInt($('#device-limit').value, 0);
 
-        if (!value || value < 1 || value > 10) {
-            setFieldError('device-limit', 'Choose a limit between 1 and 10.');
+        /* Never below 2 (migration 0031 enforces the same): with one slot, a
+           single lost or stolen device could leave no way to sign it out. */
+        if (!value || value < 2 || value > 10) {
+            setFieldError('device-limit', 'Choose a limit between 2 and 10.');
             return;
         }
         setFieldError('device-limit', '');
@@ -3158,6 +3165,77 @@
        would keep a "Remove faculty" button that deletes their whole account,
        admin access included, and a participant's row is research data. */
 
+    /* ---- Security log (migration 0031) ----
+       Written only by the database; this page reads the latest 50. */
+    var AUDIT_ACTIONS = {
+        'account.created': 'Account created',
+        'account.deleted': 'Account deleted',
+        'role.changed': 'Role changed',
+        'device_limit.changed': 'Device limit changed',
+        'email.changed': 'Email changed',
+        'devices.removed': 'Devices removed',
+        'sessions.revoked': 'Signed out everywhere'
+    };
+
+    function auditDetail(row) {
+        var d = row.detail || {};
+        if (row.action === 'role.changed' || row.action === 'device_limit.changed' || row.action === 'email.changed') {
+            return (d.from == null ? '—' : d.from) + ' → ' + (d.to == null ? '—' : d.to);
+        }
+        if (row.action === 'devices.removed') {
+            var n = Array.isArray(d.devices) ? d.devices.length : 0;
+            return n + (n === 1 ? ' device' : ' devices');
+        }
+        if (row.action === 'account.created' || row.action === 'account.deleted') { return d.role || ''; }
+        return '';
+    }
+
+    function auditMessage(title, text, glyph) {
+        return '<tr><td colspan="4"><div class="state-block" style="min-height:180px">' +
+            '<span class="state-glyph">' + icon(glyph || 'shield', 'icon-lg') + '</span>' +
+            '<p class="state-title">' + esc(title) + '</p><p class="state-desc">' + esc(text) + '</p></div></td></tr>';
+    }
+
+    async function loadAudit() {
+        var res = await sb.from('security_audit_log')
+            .select('at, actor_email, actor_role, action, target_email, detail')
+            .order('at', { ascending: false })
+            .limit(50);
+
+        if (res.error) {
+            /* Not a failure of this page: the log does not exist until 0031
+               is applied. Say so instead of showing an error. */
+            if (res.error.code === '42P01' || res.error.code === 'PGRST205' ||
+                /does not exist|could not find the table/i.test(res.error.message || '')) {
+                $('#audit-tbody').innerHTML = auditMessage('No security log yet',
+                    'Apply supabase/migrations/20260929_0031_admin_boundaries_and_audit.sql, then refresh.', 'info');
+                return;
+            }
+            throw res.error;
+        }
+
+        var rows = res.data || [];
+        if (!rows.length) {
+            $('#audit-tbody').innerHTML = auditMessage('Nothing recorded yet',
+                'Account changes appear here as they happen.');
+            return;
+        }
+
+        $('#audit-tbody').innerHTML = rows.map(function (r) {
+            var detail = auditDetail(r);
+            var by = r.actor_email
+                ? '<span class="cell-mail" title="' + esc(r.actor_email) + '">' + esc(r.actor_email) + '</span>'
+                : '<span class="badge">Project owner</span>';
+            return '<tr>' +
+                '<td class="muted tnum">' + esc(formatStamp(r.at)) + '</td>' +
+                '<td><span class="cell-name">' + esc(AUDIT_ACTIONS[r.action] || r.action) + '</span>' +
+                (detail ? '<span class="cell-mail" title="' + esc(detail) + '">' + esc(detail) + '</span>' : '') + '</td>' +
+                '<td><span class="cell-mail" title="' + esc(r.target_email || '') + '">' + esc(r.target_email || '—') + '</span></td>' +
+                '<td>' + by + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
     async function loadAdmins() {
         var res = await sb.from('profiles')
             .select('full_name, email, status, max_devices, active_devices')
@@ -3184,13 +3262,17 @@
                 (isYou ? ' <span class="badge">You</span>' : '') + '</td>' +
                 '<td class="tnum muted">' + (a.active_devices || []).length + ' of ' + toInt(a.max_devices, 1) + '</td>' +
                 '<td class="col-right"><span class="row-actions">' +
-                /* No actions on your own row: removing yourself would lock
-                   you out, and another administrator can do it for you. */
+                /* No remove, revoke or edit for another administrator: the
+                   database refuses them (migration 0031), so the console does
+                   not offer them. The one-time link only emails THEM. */
                 (isYou ? '' :
-                    '<button class="btn-icon" title="Email a one-time link to set their password" ' +
+                    '<button class="btn-icon" title="Email them a one-time link to set their password" ' +
+                    'aria-label="Email ' + esc(a.email) + ' a one-time sign-in link" ' +
                     'data-admin-act="link" data-email="' + esc(a.email) + '">' + icon('send', 'icon-sm') + '</button>' +
-                    '<button class="btn-icon" title="Remove administrator" ' +
-                    'data-admin-act="remove" data-email="' + esc(a.email) + '">' + icon('trash', 'icon-sm') + '</button>') +
+                    '<span class="btn-icon admin-protected" role="img" tabindex="0" ' +
+                    'title="Protected: only the project owner can remove or change another administrator" ' +
+                    'aria-label="Protected account: only the project owner can remove or change it">' +
+                    icon('shield', 'icon-sm') + '</span>') +
                 '</span></td>' +
                 '</tr>';
         }).join('');
@@ -3225,36 +3307,10 @@
         toastOk('Link sent', 'Delivered to ' + email + '.');
     }
 
-    /* Removal deletes the account (admin_delete_user), which also ends its
-       sessions: with the profile gone, pia_caller_role() no longer says
-       admin, so every admin check refuses them at once. It is not a demotion
-       -- the only other roles are participant (which would put them in the
-       research roster) and professor (which needs a faculty record). To give
-       someone access again, add them as a new administrator. */
-    async function removeAdmin(email, sourceBtn) {
-        if (email === state.adminEmail) { return; }
-
-        var ok = await confirmAction({
-            title: 'Remove administrator',
-            heading: 'Remove ' + email + '?',
-            message: 'Their account is deleted and their access to this console ends immediately. ' +
-                'This cannot be undone; to give them access again, add them as a new administrator.',
-            confirmLabel: 'Remove administrator'
-        });
-        if (!ok) { return; }
-
-        var release = setBusy(sourceBtn, '…');
-        var res = await sb.rpc('admin_delete_user', { target_email: email });
-        release();
-
-        if (res.error) {
-            toastErr('Not removed', friendlyDbError(res.error, 'The administrator was not removed.'));
-            return;
-        }
-
-        toastOk('Administrator removed', email + ' no longer has access.');
-        await loadAdmins();
-    }
+    /* There is no "remove administrator" here any more. Since migration 0031
+       the database refuses it for any signed-in user: one compromised
+       administrator must not be able to lock the others out. The project
+       owner removes an administrator from the Supabase dashboard. */
 
     async function handleAddAdmin(event) {
         event.preventDefault();
@@ -3267,7 +3323,7 @@
         var valid = true;
         valid = setFieldError('aa-name', name ? '' : 'Full name is required.') && valid;
         valid = setFieldError('aa-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
-        valid = setFieldError('aa-devices', (maxDevices >= 1 && maxDevices <= 10) ? '' : 'Choose between 1 and 10.') && valid;
+        valid = setFieldError('aa-devices', (maxDevices >= 2 && maxDevices <= 10) ? '' : 'Choose between 2 and 10.') && valid;
         if (!valid) { return; }
 
         /* Checked BEFORE the auth user exists: profiles carries UNIQUE(email),
@@ -3291,8 +3347,9 @@
             title: 'Add administrator',
             heading: 'Give ' + email + ' administrator access?',
             message: 'Administrators see every participant and result, open and close stages, and can ' +
-                'delete accounts, including other administrators. They will get a one-time link to ' +
-                'choose their own password.',
+                'delete participant and professor accounts. Once added, they can only be removed by the ' +
+                'project owner, from the Supabase dashboard. They will get a one-time link to choose ' +
+                'their own password.',
             confirmLabel: 'Create administrator',
             tone: 'accent'
         });
@@ -4842,13 +4899,14 @@
     loadStageCounters = tracked('stages', loadStageCounters);
     loadFaculty = tracked('faculty', loadFaculty);
     loadAdmins = tracked('admins', loadAdmins);
+    loadAudit = tracked('audit', loadAudit);
     loadSettings = tracked('settings', loadSettings);
     loadAdminDevices = tracked('admindevices', loadAdminDevices);
     loadMathTask = tracked('mathtask', loadMathTask);
 
     RETRY = {
         cohort: loadCohort, sections: loadSections, roster: loadRoster, stages: loadStageCounters,
-        faculty: loadFaculty, admins: loadAdmins, settings: loadSettings,
+        faculty: loadFaculty, admins: loadAdmins, audit: loadAudit, settings: loadSettings,
         admindevices: loadAdminDevices, mathtask: loadMathTask
     };
 
@@ -4865,6 +4923,7 @@
                     loadStageCounters(),
                     loadFaculty(),
                     loadAdmins(),
+                    loadAudit(),
                     loadSettings()
                 ];
             } finally {
@@ -4925,8 +4984,7 @@
             var btn = event.target.closest('[data-admin-act]');
             if (!btn) { return; }
             var email = btn.getAttribute('data-email');
-            if (btn.getAttribute('data-admin-act') === 'remove') { removeAdmin(email, btn); }
-            else { resendAdminLink(email, btn); }
+            if (btn.getAttribute('data-admin-act') === 'link') { resendAdminLink(email, btn); }
         });
         $('#password-form').addEventListener('submit', handlePasswordUpdate);
 

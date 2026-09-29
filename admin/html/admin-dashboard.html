@@ -626,8 +626,11 @@
                             <div class="card-body stack">
                                 <div class="field" style="max-width:220px">
                                     <label class="label" for="device-limit">Maximum devices</label>
-                                    <input class="input tnum" type="number" id="device-limit" min="1" max="10" value="1">
+                                    <input class="input tnum" type="number" id="device-limit" min="2" max="10" value="2"
+                                        aria-describedby="device-limit-help">
                                     <p class="field-msg" data-msg-for="device-limit"></p>
+                                    <p class="qb-help" id="device-limit-help">Between 2 and 10. Never below 2, so one
+                                        device can always be signed out from another.</p>
                                 </div>
 
                                 <div>
@@ -649,7 +652,9 @@
                         <div class="card-head">
                             <div class="card-head-text">
                                 <h2 class="card-title">Administrators</h2>
-                                <p class="card-sub">Full access to every participant, stage and result. Keep this list short.</p>
+                                <p class="card-sub">Full access to every participant, stage and result. Keep this list short.
+                                    Administrators cannot remove, change or sign out one another; the project owner does
+                                    that from the Supabase dashboard.</p>
                             </div>
                             <div class="card-tools">
                                 <button class="btn btn-primary" data-modal-open="modal-add-admin">
@@ -669,6 +674,33 @@
                                     </tr>
                                 </thead>
                                 <tbody id="admin-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Security log (migration 0031). Written by the database,
+                         never by this page; administrators can only read it.
+                         Refused attempts are in the Postgres logs, not here:
+                         a refusal rolls back its own transaction. -->
+                    <div class="card" data-region="audit">
+                        <div class="card-head">
+                            <div class="card-head-text">
+                                <h2 class="card-title">Security log</h2>
+                                <p class="card-sub">Account changes: staff accounts created, accounts deleted, roles,
+                                    device limits, emails, and devices or sessions ended. The latest 50.</p>
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>When</th>
+                                        <th>Action</th>
+                                        <th>Account</th>
+                                        <th>By</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-tbody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -1175,7 +1207,7 @@
                         </div>
                         <div class="field" style="max-width:220px">
                             <label class="label" for="aa-devices">Maximum devices</label>
-                            <input class="input tnum" type="number" id="aa-devices" min="1" max="10" value="2">
+                            <input class="input tnum" type="number" id="aa-devices" min="2" max="10" value="2">
                             <p class="field-msg" data-msg-for="aa-devices"></p>
                         </div>
                     </div>
