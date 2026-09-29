@@ -24,6 +24,7 @@
  *   12. Scores encoding
  *   13. Realtime subscriptions
  *   14. CSV export
+ *   16. Math task bank (question_bank + app_config, migration 0028)
  *   15. Boot sequence
  * ==========================================================================*/
 (function () {
@@ -257,7 +258,8 @@
         students: 'Student Roster',
         faculty: 'Faculty',
         controls: 'Stage Controls',
-        settings: 'Settings'
+        settings: 'Settings',
+        mathtask: 'Math Task'
     };
 
     function switchView(view) {
@@ -280,6 +282,9 @@
 
         /* Stage counters are the one thing that goes stale between visits. */
         if (view === 'students') { loadStageCounters(); }
+        /* The bank loads at boot; a failed load (or one run before 0028
+           existed) is retried when the view is opened. */
+        if (view === 'mathtask' && (qb.status === 'missing' || qb.status === 'error')) { loadMathTask(); }
 
         closeMobileNav();
         window.scrollTo({ top: 0, behavior: 'auto' });
@@ -323,12 +328,15 @@
         document.documentElement.style.setProperty('--scrollbar-w', '0px');
     }
 
-    function openModal(id) {
+    /* `trigger` is the control that opened the dialog, when the caller knows
+       it: Safari does not focus a button on click, so document.activeElement
+       would be the wrong place to send focus back to. */
+    function openModal(id, trigger) {
         var overlay = document.getElementById(id);
         if (!overlay || openLayers.indexOf(overlay) !== -1) { return; }
 
         if (!openLayers.length) {
-            lastFocused = document.activeElement;
+            lastFocused = trigger || document.activeElement;
             lockScroll();
         }
 
@@ -3229,6 +3237,1136 @@
             '.csv, with each student’s current assessment result.');
     }
 
+    /* ========================================= 16. MATH TASK BANK ====== */
+
+    /* The question bank and the adaptive rules per topic (view "mathtask").
+       Tables and access: migration 0028 -- admin only, reads included,
+       because every row carries its answers.
+
+       Ported from a team member's standalone page (list-equation.js). Kept:
+       the question_bank / app_config reads and writes with the same column
+       names, the hint JSON ({defaultHint, steps: [{prompt, answer, hint1,
+       hint2, hint3}]}), the sentence generator for all three topics, the
+       bulk points update with its mixed-points warning, and one max_points
+       for every topic. Changed on the way in:
+         * the mastery slider set ALL three topics to the value on screen,
+           and ran on every topic switch -- so switching topics silently
+           copied one threshold onto the others. Each topic now keeps its own,
+           as the three app_config columns intend.
+         * unsaved edits to one topic's rules survive switching topics; Save
+           writes all three.
+         * bulk points saved on 'change', so tabbing out of the field could
+           overwrite every question. It now takes an explicit Apply.
+         * rows are built with textContent and .value; no stored text reaches
+           innerHTML, and ids travel in data attributes, not inline onclick.
+
+       Loaded once at boot and by the Refresh button -- NOT by refreshAll(),
+       which the realtime roster feed calls on every profile change. */
+
+    var QB_TOPICS = {
+        EASY: { num: 1, short: 'Finding %', title: 'Finding a percentage' },
+        MEDIUM: { num: 2, short: '% Increase', title: 'Percentage increase' },
+        HARD: { num: 3, short: '% Decrease', title: 'Percentage decrease' }
+    };
+    var QB_ORDER = ['EASY', 'MEDIUM', 'HARD'];
+    var QB_POINTS_MAX = 500;
+    var QB_COLUMNS = 'id, difficulty, question, final_answer, hint, points';
+
+    function qbDefaultRules() { return { mastery: 80, minQuestions: 3, maxErrors: 3 }; }
+
+    var qb = {
+        topic: 'EASY',
+        status: 'idle',          /* idle | loading | ready | missing | error */
+        error: '',
+        bank: { EASY: [], MEDIUM: [], HARD: [] },
+        rules: { EASY: qbDefaultRules(), MEDIUM: qbDefaultRules(), HARD: qbDefaultRules() },
+        maxPoints: 10,
+        dirty: false,
+        editingId: null,
+        drafts: [],
+        stepSeq: 0,
+        busy: { edit: false, config: false, bulk: false, drafts: false },
+        renderPending: false
+    };
+
+    function qbTopicLabel(topic) {
+        var t = QB_TOPICS[topic];
+        return 'Topic ' + t.num + ' · ' + t.title;
+    }
+
+    /* ---- 16.1 Data shape ---- */
+
+    /* The hint column holds JSON; rows from before the step builder hold a
+       plain sentence, which becomes the default hint with no steps. */
+    function qbParseHint(hintStr) {
+        if (!hintStr) { return { defaultHint: '', steps: [] }; }
+        try {
+            var parsed = JSON.parse(hintStr);
+            if (parsed && typeof parsed === 'object') {
+                return {
+                    defaultHint: typeof parsed.defaultHint === 'string' ? parsed.defaultHint : '',
+                    steps: Array.isArray(parsed.steps) ? parsed.steps.map(qbCleanStep) : []
+                };
+            }
+        } catch (err) { /* legacy plain-text hint */ }
+        return { defaultHint: String(hintStr), steps: [] };
+    }
+
+    function qbCleanStep(step) {
+        var s = step || {};
+        return {
+            prompt: String(s.prompt || ''), answer: String(s.answer || ''),
+            hint1: String(s.hint1 || ''), hint2: String(s.hint2 || ''), hint3: String(s.hint3 || '')
+        };
+    }
+
+    /* The default hint is step 1's first hint. With no such hint, the row's
+       existing default is kept: an older question whose only hint is plain
+       text must not lose it just because it was edited. */
+    function qbSerializeHint(steps, keepDefault) {
+        var fromSteps = steps.length ? steps[0].hint1 : '';
+        return JSON.stringify({ defaultHint: fromSteps || keepDefault || '', steps: steps });
+    }
+
+    function qbFromRow(row) {
+        var hint = qbParseHint(row.hint);
+        return {
+            id: row.id,
+            topic: String(row.difficulty || 'EASY').toUpperCase(),
+            q: row.question || '',
+            final: row.final_answer || '',
+            hint: hint.defaultHint,
+            steps: hint.steps,
+            points: toInt(row.points, 10)
+        };
+    }
+
+    /* A whole number in 1..500, or null. */
+    function qbPoints(raw) {
+        var text = String(raw == null ? '' : raw).trim();
+        if (!/^\d+$/.test(text)) { return null; }
+        var n = parseInt(text, 10);
+        return (n >= 1 && n <= QB_POINTS_MAX) ? n : null;
+    }
+
+    function qbIntIn(raw, min, max) {
+        var text = String(raw == null ? '' : raw).trim();
+        if (!/^\d+$/.test(text)) { return null; }
+        var n = parseInt(text, 10);
+        return (n >= min && n <= max) ? n : null;
+    }
+
+    /* The one value every question in the list shares, or null if mixed. */
+    function qbUniformPoints(list) {
+        if (!list.length) { return null; }
+        var first = list[0].points;
+        return list.every(function (q) { return q.points === first; }) ? first : null;
+    }
+
+    function qbMissingTable(error) {
+        return !!error && (error.code === '42P01' || error.code === 'PGRST205' ||
+            /does not exist|could not find the table/i.test(error.message || ''));
+    }
+
+    function qbStepSummary(item) {
+        var steps = item.steps.length;
+        if (!steps) { return 'No steps yet'; }
+        var hints = item.steps.reduce(function (n, s) {
+            return n + (s.hint1 ? 1 : 0) + (s.hint2 ? 1 : 0) + (s.hint3 ? 1 : 0);
+        }, 0);
+        return steps + (steps === 1 ? ' step' : ' steps') + ' · ' + hints + (hints === 1 ? ' hint' : ' hints');
+    }
+
+    /* ---- 16.2 Load ---- */
+
+    async function loadMathTask() {
+        if (qb.status === 'loading') { return; }
+        var wasReady = qb.status === 'ready';
+        qb.status = 'loading';
+        if (!wasReady) { renderQbAll(); }
+
+        var questions, config;
+        try {
+            var results = await Promise.all([
+                sb.from('question_bank').select(QB_COLUMNS).order('id'),
+                sb.from('app_config').select('*').eq('id', 1).maybeSingle()
+            ]);
+            questions = results[0];
+            config = results[1];
+        } catch (err) {
+            questions = { error: { message: 'Could not reach the database.' } };
+        }
+
+        if (questions.error) {
+            qb.status = qbMissingTable(questions.error) ? 'missing' : 'error';
+            qb.error = friendlyDbError(questions.error, 'The question bank could not be loaded.');
+            renderQbAll();
+            return;
+        }
+
+        qb.bank = { EASY: [], MEDIUM: [], HARD: [] };
+        (questions.data || []).forEach(function (row) {
+            var item = qbFromRow(row);
+            if (qb.bank[item.topic]) { qb.bank[item.topic].push(item); }
+        });
+
+        /* A missing config row keeps the defaults; unsaved edits are never
+           overwritten by a refresh. */
+        if (config && !config.error && config.data && !qb.dirty) {
+            var c = config.data;
+            QB_ORDER.forEach(function (topic) {
+                var key = topic.toLowerCase();
+                qb.rules[topic] = {
+                    mastery: toInt(c[key + '_mastery'], 80),
+                    minQuestions: toInt(c[key + '_min_questions'], 3),
+                    maxErrors: toInt(c[key + '_max_errors'], 3)
+                };
+            });
+            qb.maxPoints = toInt(c.max_points, 10);
+        }
+
+        qb.status = 'ready';
+        qb.error = '';
+        renderQbAll();
+    }
+
+    /* ---- 16.3 Render ---- */
+
+    function renderQbAll() {
+        renderQbChrome();
+        renderQbTable();
+        renderQbRules();
+    }
+
+    function renderQbChrome() {
+        var topic = qb.topic;
+        var ready = qb.status === 'ready';
+
+        $$('[data-qb-topic]').forEach(function (btn) {
+            var on = btn.getAttribute('data-qb-topic') === topic;
+            btn.classList.toggle('is-active', on);
+            btn.setAttribute('aria-pressed', String(on));
+        });
+
+        $('#qb-title').textContent = qbTopicLabel(topic);
+        $('#qb-caption').textContent = 'Questions in ' + qbTopicLabel(topic);
+        $('#qb-config-sub').textContent = 'Topic ' + QB_TOPICS[topic].num + ' · ' + QB_TOPICS[topic].short;
+
+        $('#qb-add-btn').disabled = !ready;
+        $('#qb-generate-btn').disabled = !ready;
+
+        var total = QB_ORDER.reduce(function (n, t) { return n + qb.bank[t].length; }, 0);
+        $('#nav-count-mathtask').textContent = ready ? String(total) : '—';
+    }
+
+    /* Never re-render under a field the admin is typing in; catch up as soon
+       as focus leaves the table. */
+    function renderQbTable() {
+        var tbody = $('#qb-tbody');
+        if (tbody.contains(document.activeElement) && qb.status === 'ready') {
+            qb.renderPending = true;
+            return;
+        }
+        qb.renderPending = false;
+
+        var list = qb.bank[qb.topic];
+        var ready = qb.status === 'ready';
+        var loading = qb.status === 'idle' || qb.status === 'loading';
+        var empty = $('#qb-empty');
+
+        tbody.textContent = '';
+        empty.classList.add('is-hidden');
+
+        if (loading) {
+            for (var i = 0; i < 3; i++) { tbody.appendChild(qbSkeletonRow()); }
+            $('#qb-sub').textContent = 'Loading questions…';
+        } else if (!ready) {
+            empty.classList.remove('is-hidden');
+            $('#qb-empty-title').textContent = qb.status === 'missing'
+                ? 'The question bank is not set up yet'
+                : 'The question bank could not be loaded';
+            $('#qb-empty-desc').textContent = qb.status === 'missing'
+                ? 'Run supabase/migrations/20260929_0028_math_task_bank.sql in the Supabase SQL Editor, then press Refresh.'
+                : qb.error + ' Press Refresh to try again.';
+            $('#qb-sub').textContent = 'Unavailable';
+        } else if (!list.length) {
+            empty.classList.remove('is-hidden');
+            $('#qb-empty-title').textContent = 'No questions in this topic yet';
+            $('#qb-empty-desc').textContent = 'Add one by hand, or let Auto-generate draft a set you can review first.';
+            $('#qb-sub').textContent = 'No questions';
+        } else {
+            var frag = document.createDocumentFragment();
+            list.forEach(function (item, index) { frag.appendChild(qbRow(item, index)); });
+            tbody.appendChild(frag);
+            var withSteps = list.filter(function (q) { return q.steps.length > 0; }).length;
+            $('#qb-sub').textContent = list.length + (list.length === 1 ? ' question' : ' questions') +
+                ' · ' + withSteps + ' with steps';
+        }
+
+        renderQbToolbar();
+    }
+
+    function renderQbToolbar() {
+        var list = qb.bank[qb.topic];
+        var usable = qb.status === 'ready' && list.length > 0;
+        var input = $('#qb-bulk-points');
+        var uniform = qbUniformPoints(list);
+
+        $('#qb-delete-all').disabled = !usable || qb.busy.bulk;
+        $('#qb-bulk-apply').disabled = !usable || qb.busy.bulk;
+        input.disabled = !usable;
+        if (document.activeElement !== input) {
+            input.value = uniform === null ? '' : String(uniform);
+        }
+        input.placeholder = usable && uniform === null ? 'Mixed' : '';
+    }
+
+    function qbCell(className) {
+        var td = document.createElement('td');
+        td.className = className;
+        return td;
+    }
+
+    function qbRow(item, index) {
+        var n = index + 1;
+        var tr = document.createElement('tr');
+        tr.className = 'qb-row';
+        tr.setAttribute('data-id', String(item.id));
+
+        var tdQ = qbCell('qb-cell-q');
+        var q = document.createElement('p');
+        q.className = 'qb-q';
+        q.id = 'qb-q-' + item.id;
+        q.textContent = item.q || 'Untitled question';
+        q.title = item.q || '';
+        var meta = document.createElement('p');
+        meta.className = 'qb-meta';
+        meta.textContent = qbStepSummary(item);
+        tdQ.append(q, meta);
+
+        tr.append(
+            tdQ,
+            qbInlineField(item, 'final', 'Final answer', 'qb-cell-answer'),
+            qbInlineField(item, 'points', 'Points', 'qb-cell-points'),
+            qbActions(item, n)
+        );
+        return tr;
+    }
+
+    function qbInlineField(item, field, labelText, cellClass) {
+        var td = qbCell(cellClass);
+        var id = 'qb-' + field + '-' + item.id;
+
+        var label = document.createElement('label');
+        label.className = 'qb-cell-label';
+        label.htmlFor = id;
+        label.textContent = labelText;
+
+        var input = document.createElement('input');
+        input.className = 'input qb-inline' + (field === 'points' ? ' tnum' : '');
+        input.id = id;
+        input.setAttribute('data-qb-field', field);
+        input.setAttribute('aria-describedby', 'qb-q-' + item.id);
+        input.autocomplete = 'off';
+
+        if (field === 'points') {
+            input.type = 'number';
+            input.min = '1';
+            input.max = String(QB_POINTS_MAX);
+            input.step = '1';
+            input.inputMode = 'numeric';
+            input.value = String(item.points);
+        } else {
+            input.type = 'text';
+            input.maxLength = 200;
+            input.placeholder = '—';
+            input.value = item.final;
+        }
+
+        td.append(label, input);
+        return td;
+    }
+
+    function qbActions(item, n) {
+        var td = qbCell('qb-cell-actions');
+        var wrap = document.createElement('div');
+        wrap.className = 'row-actions';
+
+        [['edit', 'pencil', 'Edit question ' + n, 'Edit question, steps and hints'],
+         ['delete', 'trash', 'Delete question ' + n, 'Delete question']].forEach(function (spec) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-icon';
+            btn.setAttribute('data-qb-act', spec[0]);
+            btn.setAttribute('aria-label', spec[2]);
+            btn.title = spec[3];
+            btn.innerHTML = icon(spec[1]);
+            wrap.appendChild(btn);
+        });
+
+        td.appendChild(wrap);
+        return td;
+    }
+
+    /* Same markup, same boxes as a real row: nothing moves when data lands. */
+    function qbSkeletonRow() {
+        var tr = document.createElement('tr');
+        tr.className = 'qb-row';
+        tr.setAttribute('aria-hidden', 'true');
+        tr.innerHTML =
+            '<td class="qb-cell-q">' +
+                '<div class="qb-q qb-skel-q"><span class="skeleton skeleton-line" style="width:92%"></span>' +
+                '<span class="skeleton skeleton-line" style="width:64%"></span></div>' +
+                '<div class="qb-meta"><span class="skeleton qb-skel-meta"></span></div>' +
+            '</td>' +
+            '<td class="qb-cell-answer"><span class="qb-cell-label">&nbsp;</span><span class="skeleton qb-skel-field"></span></td>' +
+            '<td class="qb-cell-points"><span class="qb-cell-label">&nbsp;</span><span class="skeleton qb-skel-field"></span></td>' +
+            '<td class="qb-cell-actions"><div class="row-actions"><span class="skeleton qb-skel-btn"></span>' +
+                '<span class="skeleton qb-skel-btn"></span></div></td>';
+        return tr;
+    }
+
+    function renderQbRules() {
+        var ready = qb.status === 'ready';
+        var rules = qb.rules[qb.topic];
+        var range = $('#qb-mastery');
+
+        range.value = String(rules.mastery);
+        qbPaintRange();
+        $('#qb-min-questions').value = rules.minQuestions == null ? '' : String(rules.minQuestions);
+        $('#qb-max-errors').value = rules.maxErrors == null ? '' : String(rules.maxErrors);
+        if (document.activeElement !== $('#qb-max-points')) {
+            $('#qb-max-points').value = qb.maxPoints == null ? '' : String(qb.maxPoints);
+        }
+
+        ['#qb-mastery', '#qb-min-questions', '#qb-max-errors', '#qb-max-points'].forEach(function (sel) {
+            $(sel).disabled = !ready;
+        });
+        $('#qb-config-save').disabled = !ready || qb.busy.config;
+        $('#qb-dirty').classList.toggle('is-on', qb.dirty);
+    }
+
+    function qbPaintRange() {
+        var range = $('#qb-mastery');
+        var min = toInt(range.min, 50), max = toInt(range.max, 100), val = toInt(range.value, 80);
+        range.style.setProperty('--qb-fill', (((val - min) / (max - min)) * 100) + '%');
+        $('#qb-mastery-out').textContent = val + '%';
+        range.setAttribute('aria-valuetext', val + ' percent');
+    }
+
+    function qbSwitchTopic(topic) {
+        if (!QB_TOPICS[topic] || topic === qb.topic) { return; }
+        qb.topic = topic;
+        clearFormErrors('qb-config-form');
+        setFieldError('qb-bulk-points', '');
+        renderQbAll();
+    }
+
+    /* ---- 16.4 Inline edits: final answer and points ---- */
+
+    /* Saves on one row run one after another. Editing the points while the
+       answer is still saving used to be dropped without a word; now it waits
+       its turn and compares against what the first save left behind. */
+    var qbRowQueue = {};
+
+    function qbSaveInline(input) {
+        var tr = input.closest('.qb-row');
+        var id = toInt(tr && tr.getAttribute('data-id'), null);
+        if (id === null) { return; }
+        var run = (qbRowQueue[id] || Promise.resolve()).then(function () { return qbSaveInlineNow(input, id); });
+        qbRowQueue[id] = run.catch(function () { /* reported inside */ });
+    }
+
+    function qbRowEl(id) { return $('#qb-tbody .qb-row[data-id="' + id + '"]'); }
+
+    async function qbSaveInlineNow(input, id) {
+        var item = null;
+        QB_ORDER.some(function (t) {
+            item = qb.bank[t].find(function (q) { return q.id === id; }) || null;
+            return !!item;
+        });
+        if (!item) { return; }
+
+        var field = input.getAttribute('data-qb-field');
+        var patch, next;
+
+        if (field === 'points') {
+            next = qbPoints(input.value);
+            if (next === null) {
+                input.value = String(item.points);
+                toastErr('Points not saved', 'Use a whole number from 1 to ' + QB_POINTS_MAX + '.');
+                return;
+            }
+            if (next === item.points) { return; }
+            patch = { points: next };
+        } else {
+            next = input.value.trim();
+            input.value = next;
+            if (next === item.final) { return; }
+            patch = { final_answer: next };
+        }
+
+        var row = qbRowEl(id);
+        if (row) { row.setAttribute('aria-busy', 'true'); }
+        var res = await sb.from('question_bank').update(patch).eq('id', id).select('id');
+        row = qbRowEl(id);
+        if (row) { row.removeAttribute('aria-busy'); }
+
+        if (res.error || !res.data || !res.data.length) {
+            input.value = field === 'points' ? String(item.points) : item.final;
+            toastErr('Not saved', friendlyDbError(res.error,
+                'This question may have been deleted elsewhere. Press Refresh to check.'));
+            return;
+        }
+
+        if (field === 'points') { item.points = next; renderQbToolbar(); }
+        else { item.final = next; }
+    }
+
+    /* ---- 16.5 Delete one, delete all, bulk points ---- */
+
+    function qbShort(text) {
+        var t = String(text || '').trim();
+        return t.length > 90 ? t.slice(0, 87) + '…' : t;
+    }
+
+    /* After a row disappears, focus goes somewhere that still exists. The
+       dialog restores focus on a 160ms timer; this runs after it. */
+    function qbRefocus(index) {
+        setTimeout(function () {
+            var rows = $$('#qb-tbody .qb-row');
+            var row = rows[Math.min(index, rows.length - 1)];
+            var target = row ? $('[data-qb-act="edit"]', row) : $('#qb-add-btn');
+            if (target) { target.focus({ preventScroll: true }); }
+        }, 220);
+    }
+
+    async function qbDeleteOne(id, btn) {
+        var list = qb.bank[qb.topic];
+        var index = list.findIndex(function (q) { return q.id === id; });
+        if (index === -1) { return; }
+        var item = list[index];
+
+        var ok = await confirmAction({
+            title: 'Delete question',
+            subtitle: qbTopicLabel(qb.topic),
+            heading: 'Delete question ' + (index + 1) + '?',
+            message: '“' + qbShort(item.q) + '” and its steps and hints will be removed. This cannot be undone.',
+            confirmLabel: 'Delete question'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(btn, '…');
+        var res = await sb.from('question_bank').delete().eq('id', id);
+        release();
+
+        if (res.error) {
+            toastErr('Question not deleted', friendlyDbError(res.error, 'Delete rejected.'));
+            return;
+        }
+
+        qb.bank[qb.topic] = qb.bank[qb.topic].filter(function (q) { return q.id !== id; });
+        renderQbTable();
+        renderQbChrome();
+        toastOk('Question deleted', qbTopicLabel(qb.topic) + ' now has ' + qb.bank[qb.topic].length + '.');
+        qbRefocus(index);
+    }
+
+    async function qbDeleteAll() {
+        var topic = qb.topic;
+        var count = qb.bank[topic].length;
+        if (!count || qb.busy.bulk) { return; }
+
+        var ok = await confirmAction({
+            title: 'Delete all questions',
+            subtitle: qbTopicLabel(topic),
+            heading: 'Delete every question in topic ' + QB_TOPICS[topic].num + '?',
+            message: 'All ' + count + ' questions in “' + QB_TOPICS[topic].title +
+                '”, with their steps and hints, will be removed. The other topics are not touched. This cannot be undone.',
+            confirmLabel: 'Delete ' + count
+        });
+        if (!ok) { return; }
+
+        qb.busy.bulk = true;
+        var release = setBusy($('#qb-delete-all'), 'Deleting…');
+        var res = await sb.from('question_bank').delete().eq('difficulty', topic);
+        release();
+        qb.busy.bulk = false;
+
+        if (res.error) {
+            renderQbToolbar();
+            toastErr('Questions not deleted', friendlyDbError(res.error, 'Delete rejected.'));
+            return;
+        }
+
+        qb.bank[topic] = [];
+        renderQbAll();
+        toastOk('Topic cleared', count + ' questions removed from ' + qbTopicLabel(topic) + '.');
+        setTimeout(function () { $('#qb-add-btn').focus({ preventScroll: true }); }, 220);
+    }
+
+    async function qbApplyBulk(event) {
+        event.preventDefault();
+        if (qb.busy.bulk) { return; }
+
+        var topic = qb.topic;
+        var list = qb.bank[topic];
+        if (!list.length) { return; }
+
+        var value = qbPoints($('#qb-bulk-points').value);
+        if (!setFieldError('qb-bulk-points', value === null
+            ? 'Use a whole number from 1 to ' + QB_POINTS_MAX + '.' : '')) {
+            $('#qb-bulk-points').focus();
+            return;
+        }
+
+        var uniform = qbUniformPoints(list);
+        if (uniform === value) {
+            toastOk('Nothing to change', 'Every question here is already worth ' + value + '.');
+            return;
+        }
+
+        /* Some questions carry their own value: say so before replacing it. */
+        if (uniform === null) {
+            var ok = await confirmAction({
+                title: 'Replace custom points',
+                subtitle: qbTopicLabel(topic),
+                heading: 'Set all ' + list.length + ' questions to ' + value + ' points?',
+                message: 'Some questions in this topic have their own point value. Applying this replaces every one of them with ' +
+                    value + '.',
+                confirmLabel: 'Replace all'
+            });
+            if (!ok) { return; }
+        }
+
+        var ids = list.map(function (q) { return q.id; });
+        qb.busy.bulk = true;
+        var release = setBusy($('#qb-bulk-apply'), 'Applying…');
+        var res = await sb.from('question_bank').update({ points: value }).in('id', ids);
+        release();
+        qb.busy.bulk = false;
+
+        if (res.error) {
+            renderQbToolbar();
+            toastErr('Points not updated', friendlyDbError(res.error, 'Update rejected.'));
+            return;
+        }
+
+        list.forEach(function (q) { q.points = value; });
+        renderQbTable();
+        toastOk('Points updated', 'Every question in ' + qbTopicLabel(topic) + ' is now worth ' + value + '.');
+    }
+
+    /* ---- 16.6 Add / edit dialog ---- */
+
+    function qbStepList() { return $('#qb-steps'); }
+
+    function qbAddStep(data, focus) {
+        var node = $('#tpl-qb-step').content.firstElementChild.cloneNode(true);
+        var seq = ++qb.stepSeq;
+        var step = qbCleanStep(data);
+
+        $$('[data-step]', node).forEach(function (input) {
+            var key = input.getAttribute('data-step');
+            input.id = 'qb-step-' + seq + '-' + key;
+            input.value = step[key] || '';
+        });
+        $$('label[data-for]', node).forEach(function (label) {
+            label.htmlFor = 'qb-step-' + seq + '-' + label.getAttribute('data-for');
+        });
+
+        qbStepList().appendChild(node);
+        qbRenumberSteps();
+        if (focus) { $('[data-step="prompt"]', node).focus(); }
+    }
+
+    function qbRenumberSteps() {
+        var steps = $$('.qb-step', qbStepList());
+        steps.forEach(function (li, i) {
+            $('.qb-step-num', li).textContent = String(i + 1);
+            var remove = $('[data-qb-remove-step]', li);
+            remove.setAttribute('aria-label', 'Remove step ' + (i + 1));
+            /* At least one step stays, as in the original builder. */
+            remove.disabled = steps.length <= 1;
+        });
+    }
+
+    function qbReadSteps() {
+        return $$('.qb-step', qbStepList()).map(function (li) {
+            var s = {};
+            ['prompt', 'answer', 'hint1', 'hint2', 'hint3'].forEach(function (key) {
+                s[key] = $('[data-step="' + key + '"]', li).value.trim();
+            });
+            return s;
+        }).filter(function (s) {
+            /* A step left completely blank is not saved. */
+            return s.prompt || s.answer || s.hint1 || s.hint2 || s.hint3;
+        });
+    }
+
+    function qbOpenEditor(id, trigger) {
+        var item = id == null ? null : qb.bank[qb.topic].find(function (q) { return q.id === id; });
+        if (id != null && !item) { return; }
+
+        qb.editingId = item ? item.id : null;
+        clearFormErrors('qb-edit-form');
+
+        var index = item ? qb.bank[qb.topic].indexOf(item) + 1 : 0;
+        $('#qb-edit-title').textContent = item ? 'Edit question ' + index : 'Add question';
+        $('#qb-edit-sub').textContent = qbTopicLabel(qb.topic);
+        $('#qb-edit-save').textContent = item ? 'Save changes' : 'Add question';
+
+        var uniform = qbUniformPoints(qb.bank[qb.topic]);
+        $('#qb-question').value = item ? item.q : '';
+        $('#qb-final').value = item ? item.final : '';
+        $('#qb-points').value = String(item ? item.points : (uniform || 10));
+
+        qbStepList().textContent = '';
+        var steps = item && item.steps.length ? item.steps : [null];
+        steps.forEach(function (s) { qbAddStep(s, false); });
+
+        openModal('modal-qb-edit', trigger);
+        /* openModal lands on the first control, the close button; the
+           problem text is where this dialog starts. */
+        $('#qb-question').focus({ preventScroll: true });
+    }
+
+    async function qbSaveEditor(event) {
+        event.preventDefault();
+        if (qb.busy.edit) { return; }
+        clearFormErrors('qb-edit-form');
+
+        var question = $('#qb-question').value.trim();
+        var finalAnswer = $('#qb-final').value.trim();
+        var points = qbPoints($('#qb-points').value);
+
+        var valid = true;
+        valid = setFieldError('qb-question', question ? '' : 'Write the sentence problem.') && valid;
+        valid = setFieldError('qb-points', points === null
+            ? 'Use a whole number from 1 to ' + QB_POINTS_MAX + '.' : '') && valid;
+        if (!valid) {
+            var bad = $('#qb-edit-form .is-invalid');
+            if (bad) { bad.focus(); }
+            return;
+        }
+
+        var steps = qbReadSteps();
+        var current = qb.editingId == null ? null
+            : qb.bank[qb.topic].find(function (q) { return q.id === qb.editingId; });
+        var payload = {
+            question: question,
+            final_answer: finalAnswer,
+            hint: qbSerializeHint(steps, current ? current.hint : ''),
+            points: points
+        };
+
+        qb.busy.edit = true;
+        var release = setBusy($('#qb-edit-save'), 'Saving…');
+        var editing = qb.editingId;
+        var topic = qb.topic;
+        var res = editing != null
+            ? await sb.from('question_bank').update(payload).eq('id', editing).select(QB_COLUMNS).maybeSingle()
+            : await sb.from('question_bank').insert([Object.assign({ difficulty: topic }, payload)])
+                .select(QB_COLUMNS).single();
+        release();
+        qb.busy.edit = false;
+
+        if (res.error || !res.data) {
+            toastErr(editing != null ? 'Changes not saved' : 'Question not added',
+                friendlyDbError(res.error, 'This question may have been deleted elsewhere. Press Refresh to check.'));
+            return;
+        }
+
+        var saved = qbFromRow(res.data);
+        var list = qb.bank[topic];
+        if (editing != null) {
+            var at = list.findIndex(function (q) { return q.id === editing; });
+            if (at !== -1) { list[at] = saved; } else { list.push(saved); }
+        } else {
+            list.push(saved);
+        }
+
+        closeModal('modal-qb-edit');
+        renderQbTable();
+        renderQbChrome();
+        /* The row was rebuilt, so the Edit button that opened the dialog is
+           gone; its replacement takes focus instead. */
+        if (editing != null) {
+            setTimeout(function () {
+                var row = qbRowEl(editing);
+                var btn = row && $('[data-qb-act="edit"]', row);
+                if (btn) { btn.focus({ preventScroll: true }); }
+            }, 220);
+        }
+        toastOk(editing != null ? 'Question updated' : 'Question added',
+            qbTopicLabel(topic) + ' · ' + (steps.length ? qbStepSummary(saved) : 'no steps'));
+    }
+
+    /* ---- 16.7 Auto-generate ----
+       The generator is the original, unchanged in what it produces: two
+       templates for topic 1, one each for topics 2 and 3, every problem with
+       its worked steps and three tiers of hints. `pts` is passed in rather
+       than read from the page. */
+    function generateRandomSentenceQuestion(diff, pts) {
+        var pick = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+
+        if (diff === 'EASY') {
+            var templates = [
+                function () {
+                    var total = Math.floor(Math.random() * 8 + 2) * 50;
+                    var pct = pick([10, 20, 25, 30, 40, 50, 60, 75]);
+                    var result = (total * pct) / 100;
+                    var act = pick(['sports club', 'art workshop', 'math olympiad', 'science fair']);
+                    return {
+                        q: 'In a school of ' + total + ' students, ' + pct + '% joined the ' + act + '. How many students joined?',
+                        final: String(result),
+                        points: pts,
+                        steps: [
+                            { prompt: 'Step 1: Convert ' + pct + '% into a decimal.', answer: String(pct / 100),
+                              hint1: 'Divide percentage by 100 to convert to decimal.',
+                              hint2: pct + ' / 100', hint3: pct + ' / 100 = ' + (pct / 100) },
+                            { prompt: 'Step 2: Multiply decimal (' + (pct / 100) + ') by total students (' + total + ').',
+                              answer: String(result),
+                              hint1: 'Multiply decimal value by total number of students.',
+                              hint2: (pct / 100) + ' * ' + total, hint3: (pct / 100) + ' * ' + total + ' = ' + result }
+                        ]
+                    };
+                },
+                function () {
+                    var price = pick([500, 800, 1000, 1200, 1500, 2000]);
+                    var pct = pick([10, 15, 20, 25, 30, 50]);
+                    var discount = (price * pct) / 100;
+                    var item = pick(['jacket', 'pair of shoes', 'backpack', 'watch']);
+                    return {
+                        q: 'A ' + item + ' originally priced at PHP ' + price.toLocaleString() + ' is on sale with a ' + pct +
+                            '% discount. What is the discount amount in PHP?',
+                        final: String(discount),
+                        points: pts,
+                        steps: [
+                            { prompt: 'Step 1: Convert ' + pct + '% into decimal form.', answer: String(pct / 100),
+                              hint1: 'Divide the rate by 100.', hint2: pct + ' / 100', hint3: pct + ' / 100 = ' + (pct / 100) },
+                            { prompt: 'Step 2: Calculate discount amount by multiplying ' + price + ' by ' + (pct / 100) + '.',
+                              answer: String(discount),
+                              hint1: 'Multiply original price by percentage in decimal.',
+                              hint2: price + ' * ' + (pct / 100), hint3: price + ' * ' + (pct / 100) + ' = ' + discount }
+                        ]
+                    };
+                }
+            ];
+            return pick(templates)();
+        }
+
+        if (diff === 'MEDIUM') {
+            var orig = Math.floor(Math.random() * 10 + 5) * 100;
+            var pctUp = pick([10, 20, 25, 30, 50]);
+            var inc = (orig * pctUp) / 100;
+            var newPrice = orig + inc;
+            var thing = pick(['smartphone', 'bicycle', 'monitor', 'guitar']);
+            return {
+                q: 'A ' + thing + ' originally priced at PHP ' + orig.toLocaleString() + ' increased in price to PHP ' +
+                    newPrice.toLocaleString() + '. What is the percentage increase?',
+                final: pctUp + '%',
+                points: pts,
+                steps: [
+                    { prompt: 'Step 1: Calculate the amount of price increase (' + newPrice + ' - ' + orig + ').',
+                      answer: String(inc), hint1: 'Subtract original price from new price.',
+                      hint2: newPrice + ' - ' + orig, hint3: newPrice + ' - ' + orig + ' = ' + inc },
+                    { prompt: 'Step 2: Divide increase (' + inc + ') by original price (' + orig + ').',
+                      answer: String(inc / orig), hint1: 'Divide increase amount by original price.',
+                      hint2: inc + ' / ' + orig, hint3: inc + ' / ' + orig + ' = ' + (inc / orig) },
+                    { prompt: 'Step 3: Convert decimal (' + (inc / orig) + ') to percentage by multiplying by 100.',
+                      answer: pctUp + '%', hint1: 'Multiply decimal by 100 and add % sign.',
+                      hint2: (inc / orig) + ' * 100', hint3: (inc / orig) + ' * 100 = ' + pctUp + '%' }
+                ]
+            };
+        }
+
+        /* HARD: percentage decrease */
+        var base = Math.floor(Math.random() * 10 + 10) * 100;
+        var pctDown = pick([10, 20, 25, 30, 40, 50]);
+        var dec = (base * pctDown) / 100;
+        var sale = base - dec;
+        var goods = pick(['television', 'tablet', 'pair of sneakers', 'camera']);
+        return {
+            q: 'An item (' + goods + ') originally priced at PHP ' + base.toLocaleString() + ' is marked down to PHP ' +
+                sale.toLocaleString() + '. What is the percentage decrease?',
+            final: pctDown + '%',
+            points: pts,
+            steps: [
+                { prompt: 'Step 1: Calculate the amount of price decrease (' + base + ' - ' + sale + ').',
+                  answer: String(dec), hint1: 'Subtract new sale price from original price.',
+                  hint2: base + ' - ' + sale, hint3: base + ' - ' + sale + ' = ' + dec },
+                { prompt: 'Step 2: Divide decrease (' + dec + ') by original price (' + base + ').',
+                  answer: String(dec / base), hint1: 'Divide decrease amount by original price.',
+                  hint2: dec + ' / ' + base, hint3: dec + ' / ' + base + ' = ' + (dec / base) },
+                { prompt: 'Step 3: Convert decimal (' + (dec / base) + ') to percentage by multiplying by 100.',
+                  answer: pctDown + '%', hint1: 'Multiply decimal by 100.',
+                  hint2: (dec / base) + ' * 100', hint3: (dec / base) + ' * 100 = ' + pctDown + '%' }
+            ]
+        };
+    }
+
+    function qbOpenGenerator(trigger) {
+        qb.drafts = [];
+        $('#qb-gen-sub').textContent = qbTopicLabel(qb.topic);
+        $('#qb-gen-status').textContent = '';
+        renderQbDrafts();
+        openModal('modal-qb-generate', trigger);
+        $('#qb-gen-count').focus({ preventScroll: true });
+    }
+
+    function renderQbDrafts() {
+        var list = $('#qb-previews');
+        list.textContent = '';
+
+        qb.drafts.forEach(function (draft, i) {
+            var node = $('#tpl-qb-preview').content.firstElementChild.cloneNode(true);
+            node.setAttribute('data-index', String(i));
+            $('.qb-preview-num', node).textContent = String(i + 1);
+            $('[data-qb-remove-preview]', node).setAttribute('aria-label', 'Remove draft ' + (i + 1));
+
+            $$('[data-preview]', node).forEach(function (input) {
+                var key = input.getAttribute('data-preview');
+                input.id = 'qb-draft-' + i + '-' + key;
+                input.value = String(draft[key] == null ? '' : draft[key]);
+            });
+            $$('label[data-for]', node).forEach(function (label) {
+                label.htmlFor = 'qb-draft-' + i + '-' + label.getAttribute('data-for');
+            });
+            $('.qb-preview-meta', node).textContent = qbStepSummary(draft) + ' included — edit them after saving.';
+            list.appendChild(node);
+        });
+
+        var n = qb.drafts.length;
+        $('#qb-gen-empty').classList.toggle('is-hidden', n > 0);
+        var save = $('#qb-gen-save');
+        save.disabled = n === 0 || qb.busy.drafts;
+        save.textContent = n ? 'Save ' + n + ' to bank' : 'Save to bank';
+    }
+
+    function qbGenerateDrafts(event) {
+        event.preventDefault();
+        var count = toInt($('#qb-gen-count').value, 5);
+        var pts = qbUniformPoints(qb.bank[qb.topic]) || 10;
+        qb.drafts = [];
+        for (var i = 0; i < count; i++) { qb.drafts.push(generateRandomSentenceQuestion(qb.topic, pts)); }
+        renderQbDrafts();
+        $('#qb-gen-status').textContent = count + (count === 1 ? ' draft' : ' drafts') + ' ready to review.';
+    }
+
+    async function qbSaveDrafts() {
+        if (qb.busy.drafts || !qb.drafts.length) { return; }
+
+        for (var i = 0; i < qb.drafts.length; i++) {
+            var d = qb.drafts[i];
+            var pts = qbPoints(d.points);
+            if (!String(d.q || '').trim() || pts === null) {
+                var field = !String(d.q || '').trim() ? 'q' : 'points';
+                var input = document.getElementById('qb-draft-' + i + '-' + field);
+                if (input) { input.focus(); }
+                toastErr('Draft ' + (i + 1) + ' needs a fix', field === 'q'
+                    ? 'The problem statement is empty.'
+                    : 'Points must be a whole number from 1 to ' + QB_POINTS_MAX + '.');
+                return;
+            }
+        }
+
+        var topic = qb.topic;
+        var rows = qb.drafts.map(function (d) {
+            return {
+                difficulty: topic,
+                question: String(d.q).trim(),
+                final_answer: String(d.final || '').trim(),
+                hint: qbSerializeHint(d.steps.map(qbCleanStep)),
+                points: qbPoints(d.points)
+            };
+        });
+
+        qb.busy.drafts = true;
+        var release = setBusy($('#qb-gen-save'), 'Saving…');
+        var res = await sb.from('question_bank').insert(rows).select(QB_COLUMNS);
+        release();
+        qb.busy.drafts = false;
+
+        if (res.error || !res.data) {
+            renderQbDrafts();
+            toastErr('Drafts not saved', friendlyDbError(res.error, 'Insert rejected.'));
+            return;
+        }
+
+        res.data.forEach(function (row) { qb.bank[topic].push(qbFromRow(row)); });
+        qb.drafts = [];
+        closeModal('modal-qb-generate');
+        renderQbTable();
+        renderQbChrome();
+        toastOk(res.data.length + (res.data.length === 1 ? ' question saved' : ' questions saved'), qbTopicLabel(topic));
+    }
+
+    /* ---- 16.8 Adaptive rules ---- */
+
+    function qbMarkDirty() {
+        qb.dirty = true;
+        $('#qb-dirty').classList.add('is-on');
+    }
+
+    async function qbSaveRules(event) {
+        event.preventDefault();
+        if (qb.busy.config || qb.status !== 'ready') { return; }
+        clearFormErrors('qb-config-form');
+
+        /* Every topic is checked, not only the one on screen: an invalid
+           value typed into another topic takes the admin back there. */
+        var fields = [['minQuestions', 'qb-min-questions', 'Solved to level up'],
+                      ['maxErrors', 'qb-max-errors', 'Wrong to level down']];
+        var order = [qb.topic].concat(QB_ORDER.filter(function (t) { return t !== qb.topic; }));
+
+        for (var i = 0; i < order.length; i++) {
+            for (var j = 0; j < fields.length; j++) {
+                var value = qb.rules[order[i]][fields[j][0]];
+                if (qbIntIn(value, 1, 10) === null) {
+                    if (order[i] !== qb.topic) { qbSwitchTopic(order[i]); }
+                    setFieldError(fields[j][1], 'Use a whole number from 1 to 10.');
+                    $('#' + fields[j][1]).focus();
+                    return;
+                }
+            }
+        }
+
+        var maxPoints = qbPoints(qb.maxPoints);
+        if (maxPoints === null) {
+            setFieldError('qb-max-points', 'Use a whole number from 1 to ' + QB_POINTS_MAX + '.');
+            $('#qb-max-points').focus();
+            return;
+        }
+
+        var row = { id: 1, max_points: maxPoints };
+        QB_ORDER.forEach(function (topic) {
+            var key = topic.toLowerCase();
+            row[key + '_mastery'] = toInt(qb.rules[topic].mastery, 80);
+            row[key + '_min_questions'] = toInt(qb.rules[topic].minQuestions, 3);
+            row[key + '_max_errors'] = toInt(qb.rules[topic].maxErrors, 3);
+        });
+
+        qb.busy.config = true;
+        var release = setBusy($('#qb-config-save'), 'Saving…');
+        var res = await sb.from('app_config').upsert(row);
+        release();
+        qb.busy.config = false;
+
+        if (res.error) {
+            renderQbRules();
+            toastErr('Rules not saved', friendlyDbError(res.error, 'Save rejected.'));
+            return;
+        }
+
+        qb.dirty = false;
+        qb.maxPoints = maxPoints;
+        renderQbRules();
+        toastOk('Rules saved', 'All three topics · max points ' + maxPoints + '.');
+    }
+
+    /* ---- 16.9 Wiring ---- */
+
+    function initMathTask() {
+        $$('[data-qb-topic]').forEach(function (btn) {
+            btn.addEventListener('click', function () { qbSwitchTopic(btn.getAttribute('data-qb-topic')); });
+        });
+
+        var tbody = $('#qb-tbody');
+        tbody.addEventListener('change', function (event) {
+            var input = event.target.closest('[data-qb-field]');
+            if (input) { qbSaveInline(input); }
+        });
+        /* Enter in an inline field saves it, like leaving the field does. */
+        tbody.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && event.target.matches('[data-qb-field]')) {
+                event.preventDefault();
+                event.target.blur();
+            }
+        });
+        tbody.addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-qb-act]');
+            if (!btn) { return; }
+            var row = btn.closest('.qb-row');
+            var id = toInt(row && row.getAttribute('data-id'), null);
+            if (id === null) { return; }
+            if (btn.getAttribute('data-qb-act') === 'edit') { qbOpenEditor(id, btn); }
+            else { qbDeleteOne(id, btn); }
+        });
+        tbody.addEventListener('focusout', function () {
+            setTimeout(function () {
+                if (qb.renderPending && !tbody.contains(document.activeElement)) { renderQbTable(); }
+            }, 0);
+        });
+
+        $('#qb-add-btn').addEventListener('click', function () { qbOpenEditor(null, this); });
+        $('#qb-generate-btn').addEventListener('click', function () { qbOpenGenerator(this); });
+        $('#qb-delete-all').addEventListener('click', qbDeleteAll);
+        $('#qb-bulk-form').addEventListener('submit', qbApplyBulk);
+        $('#qb-bulk-points').addEventListener('input', function () { setFieldError('qb-bulk-points', ''); });
+
+        /* Rules: every edit lands in the topic's own state at once, so
+           switching topics never loses it. */
+        $('#qb-mastery').addEventListener('input', function () {
+            qb.rules[qb.topic].mastery = toInt(this.value, 80);
+            qbPaintRange();
+            qbMarkDirty();
+        });
+        [['#qb-min-questions', 'minQuestions'], ['#qb-max-errors', 'maxErrors']].forEach(function (spec) {
+            $(spec[0]).addEventListener('input', function () {
+                qb.rules[qb.topic][spec[1]] = this.value;
+                setFieldError(this.id, '');
+                qbMarkDirty();
+            });
+        });
+        $('#qb-max-points').addEventListener('input', function () {
+            qb.maxPoints = this.value;
+            setFieldError(this.id, '');
+            qbMarkDirty();
+        });
+        $('#qb-config-form').addEventListener('submit', qbSaveRules);
+
+        $('#qb-edit-form').addEventListener('submit', qbSaveEditor);
+        $('#qb-add-step').addEventListener('click', function () { qbAddStep(null, true); });
+        qbStepList().addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-qb-remove-step]');
+            if (!btn || btn.disabled) { return; }
+            var li = btn.closest('.qb-step');
+            var prev = li.previousElementSibling || li.nextElementSibling;
+            li.remove();
+            qbRenumberSteps();
+            var target = prev ? $('[data-qb-remove-step]', prev) : $('#qb-add-step');
+            (target && !target.disabled ? target : $('#qb-add-step')).focus();
+        });
+        ['qb-question', 'qb-points'].forEach(function (id) {
+            $('#' + id).addEventListener('input', function () { setFieldError(id, ''); });
+        });
+
+        $('#qb-gen-form').addEventListener('submit', qbGenerateDrafts);
+        $('#qb-gen-save').addEventListener('click', qbSaveDrafts);
+        var previews = $('#qb-previews');
+        previews.addEventListener('input', function (event) {
+            var input = event.target.closest('[data-preview]');
+            var li = input && input.closest('.qb-preview');
+            if (!li) { return; }
+            var draft = qb.drafts[toInt(li.getAttribute('data-index'), -1)];
+            if (draft) { draft[input.getAttribute('data-preview')] = input.value; }
+        });
+        previews.addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-qb-remove-preview]');
+            if (!btn) { return; }
+            var index = toInt(btn.closest('.qb-preview').getAttribute('data-index'), -1);
+            if (index < 0) { return; }
+            qb.drafts.splice(index, 1);
+            renderQbDrafts();
+            var rest = $$('[data-qb-remove-preview]', previews);
+            (rest[Math.min(index, rest.length - 1)] || $('#qb-gen-run')).focus();
+            $('#qb-gen-status').textContent = 'Draft removed. ' + qb.drafts.length + ' left.';
+        });
+
+        renderQbAll();
+    }
+
     /* ============================================ 15. BOOT SEQUENCE ===== */
 
     /* Every read the dashboard needs, in parallel. A failure here shows the
@@ -3353,7 +4491,7 @@
 
         $('#refresh-btn').addEventListener('click', async function () {
             var release = setBusy(this, '…');
-            await refreshAll();
+            await Promise.all([refreshAll(), loadMathTask()]);
             release();
             toastOk('Refreshed', 'Every panel is showing current data.');
         });
@@ -3405,6 +4543,7 @@
         initFaculty();
         initTargeted();
         initForms();
+        initMathTask();
 
         setBootText('Loading dashboard…');
         await initAdminIdentity(email);
@@ -3415,6 +4554,7 @@
            verified admin on the page. --- */
         await refreshAll();
         applyDrilldownChrome();
+        loadMathTask();
 
         setupRealtime();
         await loadAdminDevices();
