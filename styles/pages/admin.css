@@ -1097,6 +1097,12 @@ body[data-loading] #refresh-btn .icon,
 .btn-icon.admin-protected:hover,
 .btn-icon.admin-protected:active { background: transparent; color: var(--text-muted); }
 
+/* A field that is shown but cannot be changed (Edit participant's email):
+   text stays fully readable and selectable, only the fill and the pointer
+   say it is not editable. Focus keeps the normal ring so a keyboard user can
+   still land on it and hear its explanation. */
+.input.input-locked { background: var(--bg-chip); color: var(--text-muted); cursor: not-allowed; }
+
 /* A notice that reports a failure rather than a fact. */
 .notice-danger { background: var(--danger-soft); }
 .notice-danger .icon { color: var(--danger); }

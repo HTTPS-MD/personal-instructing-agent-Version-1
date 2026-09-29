@@ -2135,7 +2135,6 @@
         var first = $('#es-first').value.trim();
         var middle = $('#es-middle').value.trim();
         var last = $('#es-last').value.trim();
-        var email = normalizeEmail($('#es-email').value);
         var section = $('#es-section').value;
         var groupType = ($('input[name="es-condition"]:checked') || {}).value;
         var maxDevices = toInt($('#es-device').value, 1);
@@ -2144,39 +2143,20 @@
         var valid = true;
         valid = setFieldError('es-first', first ? '' : 'First name is required.') && valid;
         valid = setFieldError('es-last', last ? '' : 'Last name is required.') && valid;
-        valid = setFieldError('es-email', isEmail(email) ? '' : 'Enter a valid email address.') && valid;
         valid = setFieldError('es-pretest', score.ok ? '' : 'Pre-test score must be between 0 and 100.') && valid;
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
-        var emailChanged = (email !== normalizeEmail(originalEmail));
         var release = setBusy($('#es-submit'), 'Saving…');
 
         try {
-            /* Check for a clash BEFORE touching auth. If the auth email is
-               changed first and the profiles update then fails, auth holds the
-               new address while profiles holds the old one — the student's
-               session no longer matches any profile and they cannot log in. */
-            if (emailChanged) {
-                var clash = await sb.from('profiles').select('email').eq('email', email).maybeSingle();
-
-                if (clash.data) {
-                    setFieldError('es-email', 'Another account already uses this email.');
-                    toastErr('Duplicate email', email + ' is already taken.');
-                    return;
-                }
-
-                var rpcRes = await sb.rpc('admin_update_user_email', {
-                    target_email: originalEmail,
-                    new_email: email
-                });
-
-                if (rpcRes.error) {
-                    toastErr('Auth email not updated', friendlyDbError(rpcRes.error, 'Could not update the auth email.'));
-                    return;
-                }
-            }
-
+            /* The email is never sent. It is read-only in the form, and this
+               save does not read the field at all, so editing it in the
+               browser's tools changes nothing. A participant's answers are
+               keyed by email, with no foreign key: moving the address would
+               strand everything they had already produced. (The function
+               that used to change it, admin_update_user_email, does not
+               exist in the database, so that path never worked either.) */
             var payload = {
                 full_name: fullName,
                 section: section,
@@ -2184,21 +2164,10 @@
                 group_type: groupType,
                 max_devices: maxDevices
             };
-            if (emailChanged) { payload.email = email; }
-
             var updateRes = await sb.from('profiles').update(payload).eq('email', originalEmail);
 
             if (updateRes.error) {
-                if (emailChanged) {
-                    showNotice('Profile not updated',
-                        friendlyDbError(updateRes.error, 'Could not update the profile.') +
-                        '\n\nWARNING: the auth email was already changed to ' + email +
-                        ' but the profile still holds ' + originalEmail +
-                        '. These must be reconciled before this student signs in again.',
-                        'danger');
-                } else {
-                    toastErr('Update failed', friendlyDbError(updateRes.error, 'Could not update the profile.'));
-                }
+                toastErr('Update failed', friendlyDbError(updateRes.error, 'Could not update the profile.'));
                 return;
             }
 

@@ -1032,8 +1032,12 @@
 
                         <div class="form-grid" style="margin-top:16px">
                             <div class="field">
-                                <label class="label" for="es-email">School email <span class="req">*</span></label>
-                                <input class="input" type="email" id="es-email" autocomplete="off">
+                                <label class="label" for="es-email">School email</label>
+                                <input class="input input-locked" type="email" id="es-email" autocomplete="off" readonly
+                                    aria-describedby="es-email-help">
+                                <p class="qb-help" id="es-email-help">Email changes are disabled to keep this
+                                    participant's research data linked to their account. If an address was entered
+                                    wrongly before they activated, delete the account and register it again.</p>
                                 <p class="field-msg" data-msg-for="es-email"></p>
                             </div>
                         </div>
