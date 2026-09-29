@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <meta name="description"
-        content="PIA pairs a Grade 7 maths student with one of six tutor agents, matched to how they actually think.">
+        content="PIA pairs a Grade 7 maths student with one of six tutor agents for percentages: finding a percentage, percentage increase and percentage decrease.">
 
     <!-- CONTENT SECURITY POLICY
          Only the directives a <meta> element can carry are here. frame-ancestors,
@@ -367,7 +367,7 @@
                 <!-- ------------------------------------ 1. THE DROP ------
                      The hero. Its own looping video sits UNDER the copy and
                      OVER the pinned scrub stage, so scrolling lifts the hero
-                     away like a curtain and reveals the equations behind it.
+                     away like a curtain and reveals the maths footage behind it.
                      The reel's geometry is untouched: the hero is still the
                      first act of .reel-flow, so the scrub range is unchanged. -->
                 <section class="act act-drop" id="hero" aria-labelledby="drop-title">
@@ -409,7 +409,7 @@
                         <div class="hero-copy">
                             <!-- The kicker. data-nav-edge: the navbar turns solid the
                                  moment this line would slide under it (nav.js). -->
-                            <p class="hero-kicker" data-reveal data-nav-edge>Level up your Grade 7 maths</p>
+                            <p class="hero-kicker" data-reveal data-nav-edge>Grade 7 maths &middot; Percentages</p>
 
                             <!-- The name is the headline. Three words, three lines,
                                  the last one printed in the volt box.
@@ -901,24 +901,27 @@
 
         <!-- ============================================== MATHS TAPE ---- -->
         <!-- Decorative, so hidden from assistive tech: the list is printed
-             twice for a seamless loop and must never be announced twice.
-             Every line is Grade 7 maths. -->
+             twice for a seamless loop and must never be announced twice --
+             the two halves must stay identical, or the loop jumps. Every
+             line is from the study's three topics: finding a percentage,
+             percentage increase, percentage decrease. -->
         <div class="marquee" aria-hidden="true">
             <div class="marquee-track">
-                <span>2x + 3 = 11</span><span>&minus;3 + 8 = 5</span><span>|&minus;7| = 7</span>
-                <span>&frac34; = 0.75</span><span>3(x &minus; 2) = 3x &minus; 6</span><span>A = l &times; w</span>
-                <span>&ang;A + &ang;B = 180&deg;</span><span>mean = sum &divide; n</span>
-                <span>2x + 3 = 11</span><span>&minus;3 + 8 = 5</span><span>|&minus;7| = 7</span>
-                <span>&frac34; = 0.75</span><span>3(x &minus; 2) = 3x &minus; 6</span><span>A = l &times; w</span>
-                <span>&ang;A + &ang;B = 180&deg;</span><span>mean = sum &divide; n</span>
+                <span>20% of 150 = 30</span><span>25% = 0.25</span><span>&#8369;100 &rarr; &#8369;120 = +20%</span>
+                <span>50% = &frac12;</span><span>&#8369;800 &rarr; &#8369;600 = &minus;25%</span><span>10% of 90 = 9</span>
+                <span>change &divide; original &times; 100</span><span>75% = &frac34;</span>
+                <span>20% of 150 = 30</span><span>25% = 0.25</span><span>&#8369;100 &rarr; &#8369;120 = +20%</span>
+                <span>50% = &frac12;</span><span>&#8369;800 &rarr; &#8369;600 = &minus;25%</span><span>10% of 90 = 9</span>
+                <span>change &divide; original &times; 100</span><span>75% = &frac34;</span>
             </div>
         </div>
 
         <!-- ========================================= 3. HOW A LESSON WORKS -->
-        <!-- Chunking, shown rather than described: one equation, one move per
-             panel. An ordered list, so a screen reader hears four numbered
-             steps; each bubble says who is talking. Plain text throughout —
-             "2x + 3 = 11" reads correctly aloud as written. -->
+        <!-- Chunking, shown rather than described: one percentage-increase
+             problem, one move per panel -- the same three steps the tutoring
+             session's hints walk through. An ordered list, so a screen reader
+             hears four numbered steps; each bubble says who is talking. The
+             arrow is hidden from screen readers and spoken as "to". -->
         <section class="band band-strip" id="lesson" aria-labelledby="strip-title">
             <div class="shell">
                 <header class="band-head">
@@ -929,39 +932,42 @@
                     </h2>
                     <p class="band-lede" data-reveal>
                         PIA never dumps a whole solution on you. It breaks every problem into small
-                        moves, one per panel, so nothing piles up in your head at once. Here&rsquo;s
-                        <span class="math">2x + 3 = 11</span>, the PIA way.
+                        moves, one per panel, so nothing piles up in your head at once. A &#8369;100
+                        bag now costs &#8369;120. What is the percentage increase? Here it is, the PIA way.
                     </p>
                 </header>
 
                 <ol class="strip">
                     <li class="panel panel-a" data-reveal>
                         <p class="caption panel-cap">The problem</p>
-                        <p class="panel-eq">2x + 3 = 11</p>
-                        <p class="bubble"><span class="sr-only">PIA: </span>One unknown. Let&rsquo;s corner it.</p>
+                        <p class="panel-eq">&#8369;100 <span aria-hidden="true">&rarr;</span><span class="sr-only">to</span> &#8369;120</p>
+                        <p class="bubble"><span class="sr-only">PIA: </span>The price went up. By what percent?
+                            Let&rsquo;s find out.</p>
                     </li>
                     <li class="panel panel-b" data-reveal>
-                        <p class="caption panel-cap">Undo the +3</p>
+                        <p class="caption panel-cap">Find the change</p>
                         <p class="panel-eq">
-                            <span class="panel-work">2x <del>+ 3 &minus; 3</del> = 11 &minus; 3</span>
-                            2x = 8
+                            <span class="panel-work">&#8369;120 &minus; &#8369;100</span>
+                            &#8369;20 more
                         </p>
-                        <p class="bubble"><span class="sr-only">PIA: </span>Whatever you do to one side, do to
-                            the other. That&rsquo;s the whole trick.</p>
+                        <p class="bubble"><span class="sr-only">PIA: </span>First, how much did it go up? New
+                            price minus old price.</p>
                     </li>
                     <li class="panel panel-c" data-reveal>
-                        <p class="caption panel-cap">Split it in two</p>
+                        <p class="caption panel-cap">Compare to the start</p>
                         <p class="panel-eq">
-                            <span class="panel-work">2x &divide; 2 = 8 &divide; 2</span>
-                            x = 8 &divide; 2
+                            <!-- The common slip, struck out: dividing by the NEW price. Hidden
+                                 from screen readers, which hear "20 divided by 100". -->
+                            <span class="panel-work">20 &divide; <del aria-hidden="true">120</del> 100</span>
+                            = 0.20
                         </p>
-                        <p class="bubble"><span class="sr-only">PIA: </span>Two x&rsquo;s share 8. How much does
-                            each one get?</p>
+                        <p class="bubble"><span class="sr-only">PIA: </span>Divide by the ORIGINAL price, where
+                            it started. That&rsquo;s the whole trick.</p>
                     </li>
                     <li class="panel panel-d panel-splash" data-reveal>
                         <p class="caption panel-cap">Done</p>
-                        <p class="panel-eq panel-eq-big">x = 4</p>
-                        <p class="panel-check">Check: 2(4) + 3 = 11 &check;</p>
+                        <p class="panel-eq panel-eq-big">20%</p>
+                        <p class="panel-check">Check: 20% of &#8369;100 = &#8369;20 &check;</p>
                         <span class="sfx" aria-hidden="true">Click!</span>
                     </li>
                 </ol>
@@ -1040,7 +1046,8 @@
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
                         <h3 class="cap-name">Moves at your speed</h3>
-                        <p class="cap-text">Difficulty tracks what you just did, so nobody waits and nobody drowns.</p>
+                        <p class="cap-text">Master finding a percentage and you move on to increase, then decrease.
+                            Get stuck and it steps back with you.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
                         <h3 class="cap-name">Never runs a clock</h3>
@@ -1120,7 +1127,7 @@
                 <span class="foot-staff-label">Staff</span>
                 <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
             </p>
-            <p class="foot-line foot-line-mono">University of the East &middot; Grade 7 mathematics &middot; 2026</p>
+            <p class="foot-line foot-line-mono">University of the East &middot; Grade 7 mathematics &middot; Percentages &middot; 2026</p>
         </div>
     </footer>
 

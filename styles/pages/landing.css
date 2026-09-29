@@ -16,7 +16,7 @@
      3. PRESSING moves the thing: a control travels into its own shadow, and
         quiet controls invert. No opacity fades as feedback.
      4. TYPE: Space Grotesk, huge and tight, for display; Inter at 16px for
-        reading (C1); JetBrains Mono for numbers, equations and labels only.
+        reading (C1); JetBrains Mono for numbers, working and labels only.
 
    COLOUR SCOPE
    ------------
@@ -1984,8 +1984,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 
 /* ═══════════════════════════════════════════ 11. THE LESSON STRIP ═════ */
-/* Chunking, shown rather than claimed: one equation cut into four panels,
-   one move per panel. The explanation sits INSIDE the panel with the step
+/* Chunking, shown rather than claimed: one percentage problem cut into
+   four panels, one move per panel. The explanation sits INSIDE the panel with the step
    it explains (C3, integrated format), never in a legend beside it.
 
    The grid is deliberately off: panels alternate widths and drop to
