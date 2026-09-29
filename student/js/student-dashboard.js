@@ -13,11 +13,16 @@
  *      learns they scored low on Conscientiousness may behave differently for
  *      the rest of the study, contaminating the measure the thesis depends on.
  *
- *   2. The browser never asserts performance. Answers are checked by
- *      check_math_answer(), hints are metered by consume_hint(), and the
- *      smooth/struggling verdict comes from record_problem_result_v2(). This
- *      file sends what the student typed and renders what the server replies.
- *      It never sends "correct: true" and never computes a classification.
+ *   2. The browser never asserts performance, and never holds an answer.
+ *      The questions are the Percentages bank (question_bank, migration
+ *      0029): serve_next_question() picks one and sends only its statement;
+ *      check_question_answer() says right or wrong; consume_question_hint()
+ *      gives and counts each hint; record_question_result() decides smooth /
+ *      struggling and the topic; reveal_question_solution() shows the answer
+ *      only once the question is closed. This file sends what the student
+ *      typed and renders what the server replies. It never sends
+ *      "correct: true", never computes a classification, and never picks a
+ *      question.
  * ==========================================================================*/
 (function () {
     'use strict';
@@ -55,17 +60,23 @@
         profile: null,
         email: null,
         sessionId: null,
-        level: 1,
-        problem: null,
+        topic: 1,
+        problem: null,       /* { id, number, question, questionTopic, locked } */
         problemNumber: 1,
         answered: 0,
         correct: 0,
         streak: 0,
-        hintsAvailable: 0,
+        hintsTotal: 0,
+        hintsUsed: 0,
+        hintsLeft: 0,
         hintsUsedTotal: 0,
+        lastHintStep: null,
         attemptsUsed: 0,
-        servedIds: [],
         submitting: false,
+        recording: false,
+        hinting: false,
+        awaitingNext: false,
+        bankEmpty: false,
         finished: false,
         ended: false        /* another device took the account (function.js 1C-6) */
     };
@@ -316,43 +327,152 @@
 
     function clearFeedback() { setFeedback('', null); }
 
+    /* The three study topics. The server numbers them 1-3 (question_bank's
+       EASY / MEDIUM / HARD); these are only the words on screen. */
+    var TOPICS = {
+        1: { short: 'Finding %', title: 'finding a percentage' },
+        2: { short: '% Increase', title: 'percentage increase' },
+        3: { short: '% Decrease', title: 'percentage decrease' }
+    };
+
+    function topicOf(n) { return TOPICS[n] || TOPICS[1]; }
+
     function paintProgress() {
         var done = Math.min(state.answered, SESSION_TARGET);
         $('#progress-count').textContent = done + ' / ' + SESSION_TARGET;
         $('#progress-fill').style.width = Math.round((done / SESSION_TARGET) * 100) + '%';
         $('#stat-correct').textContent = state.correct;
         $('#stat-streak').textContent = state.streak;
-        $('#stat-level').textContent = state.level;
+        $('#stat-level').textContent = state.topic;
     }
 
     function paintAttempts() {
         var left = Math.max(0, MAX_ATTEMPTS - state.attemptsUsed);
         $('#attempts-note').textContent = left === MAX_ATTEMPTS
             ? 'You have ' + MAX_ATTEMPTS + ' tries'
-            : (left === 1 ? '1 try left' : left + ' tries left');
+            : (left === 1 ? '1 try left' : (left === 0 ? 'No tries left' : left + ' tries left'));
     }
+
+    function problemOpen() { return !!state.problem && !state.problem.locked; }
 
     function paintHintButton() {
         var btn = $('#hint-btn');
         var label = $('#hint-btn-label');
         var note = $('#hints-note');
 
-        if (state.hintsAvailable > 0) {
+        if (problemOpen() && state.hintsLeft > 0) {
             btn.disabled = false;
-            label.textContent = 'Give me a hint';
-            note.textContent = state.hintsAvailable + ' hint' + (state.hintsAvailable === 1 ? '' : 's') + ' available';
+            label.textContent = state.hintsUsed > 0 ? 'Next hint' : 'Give me a hint';
+            note.textContent = state.hintsLeft + (state.hintsLeft === 1 ? ' hint' : ' hints') + ' left';
         } else {
             btn.disabled = true;
-            label.textContent = 'No more hints';
+            label.textContent = state.hintsTotal > 0 ? 'No more hints' : 'No hints for this one';
             note.textContent = '';
+            suggestHint(false);
         }
+    }
+
+    /* ---- 4.1 Hint offers ----
+       When the student struggles -- a wrong first try, or a minute with no
+       progress -- the tutor OFFERS the next hint and the button lights up.
+       The hint itself is only taken when the student taps it: hints_used is
+       a measure in the study, and a hint pushed onto a student who did not
+       ask would inflate it. */
+    var HINT_OFFER_IDLE_MS = 60 * 1000;
+    var hintOfferTimer = null;
+
+    function suggestHint(on) { $('#hint-btn').classList.toggle('is-suggested', !!on); }
+
+    function offerHint(reason) {
+        if (!problemOpen() || state.hintsLeft <= 0) { return; }
+        var first = state.hintsUsed === 0;
+        if (reason === 'wrong') {
+            setSpeech(first
+                ? 'Not quite. Want a nudge? Tap “Give me a hint” — the first one explains the idea.'
+                : 'Close. The next hint builds on the last one — tap “Next hint” if you want it.');
+        } else {
+            setSpeech(first
+                ? 'Take your time. If you are not sure where to start, a hint can show you.'
+                : 'Still thinking? The next hint takes you one step further.');
+        }
+        suggestHint(true);
+    }
+
+    function armHintOffer() {
+        clearTimeout(hintOfferTimer);
+        if (!problemOpen() || state.hintsLeft <= 0) { return; }
+        hintOfferTimer = setTimeout(function () { offerHint('idle'); }, HINT_OFFER_IDLE_MS);
+    }
+
+    /* ---- 4.2 Hints and the worked solution on screen ----
+       Built with textContent: hint text is authored in the admin console and
+       is never treated as markup. */
+    function stripStepPrefix(text) {
+        return String(text || '').replace(/^\s*step\s*\d+\s*[:.\-–—]\s*/i, '');
+    }
+
+    function appendHint(h) {
+        if (!h || !h.text) { return; }
+        var zone = $('#hint-zone');
+        var step = h.step == null ? null : Number(h.step);
+
+        /* Each step's prompt appears once, with its first hint. */
+        if (step !== null && step !== state.lastHintStep) {
+            var head = document.createElement('p');
+            head.className = 'hint-step';
+            var label = document.createElement('span');
+            label.className = 'hint-step-label';
+            label.textContent = 'Step ' + step + (Number(h.steps_total) > 1 ? ' of ' + h.steps_total : '');
+            head.appendChild(label);
+            if (h.step_prompt) {
+                var prompt = document.createElement('span');
+                prompt.className = 'hint-step-prompt';
+                prompt.textContent = stripStepPrefix(h.step_prompt);
+                head.appendChild(prompt);
+            }
+            zone.appendChild(head);
+            state.lastHintStep = step;
+        }
+
+        var line = document.createElement('p');
+        line.className = 'hint-line hint-tier-' + (Number(h.tier) || 1);
+        var tag = document.createElement('b');
+        tag.textContent = (h.tier_label || 'Hint') + ':';
+        line.appendChild(tag);
+        line.appendChild(document.createTextNode(' ' + h.text));
+        zone.appendChild(line);
+    }
+
+    function showWorkedSolution(steps) {
+        var rows = (steps || []).filter(function (s) { return s && (s.prompt || s.answer || s.worked); });
+        if (!rows.length) { return; }
+
+        var box = document.createElement('div');
+        box.className = 'worked';
+        var title = document.createElement('p');
+        title.className = 'worked-title';
+        title.textContent = 'How to solve it';
+        box.appendChild(title);
+
+        var list = document.createElement('ol');
+        list.className = 'worked-steps';
+        rows.forEach(function (s) {
+            var li = document.createElement('li');
+            li.appendChild(document.createTextNode(stripStepPrefix(s.prompt) + (s.prompt ? ' ' : '')));
+            var result = document.createElement('b');
+            result.textContent = s.worked || s.answer || '';
+            li.appendChild(result);
+            list.appendChild(li);
+        });
+        box.appendChild(list);
+        $('#hint-zone').appendChild(box);
     }
 
     /* ============================================ 5. SESSION =========== */
 
     /* resume_or_start_game_session() decides on the server: an unfinished
-       session comes back with its progress, otherwise a new one is issued.
-       The browser does not get to pick. */
+       percentages session comes back with its progress, otherwise a new one
+       is issued. The student's topic comes with it. */
     async function startOrResume() {
         var res = await sb.rpc('resume_or_start_game_session');
 
@@ -362,102 +482,117 @@
             return false;
         }
 
-        var d = res.data;
-        state.sessionId = d.session_id;
-        state.answered = Number(d.problems_answered) || 0;
-        state.correct = Number(d.correct_count) || 0;
-        state.level = Number(d.level) || 1;
-        state.streak = Number(d.consecutive_correct) || 0;
+        applySession(res.data);
         return true;
     }
 
-    /* Picks the next unseen problem at the server-reported level, then asks
-       the server to serve it. serve_problem() stamps the start time — the
-       browser's clock is never the source of time_taken_ms. */
-    function pickProblem() {
-        var bank = (typeof MATH_PROBLEMS !== 'undefined' && MATH_PROBLEMS[state.level]) || [];
-        var unseen = bank.filter(function (p) { return state.servedIds.indexOf(p.id) === -1; });
-
-        if (unseen.length) { return unseen[Math.floor(Math.random() * unseen.length)]; }
-
-        /* Bank for this level is exhausted — fall back to the nearest level
-           that still has something, rather than repeating a problem. */
-        var levels = Object.keys(MATH_PROBLEMS || {}).map(Number).sort(function (a, b) {
-            return Math.abs(a - state.level) - Math.abs(b - state.level);
-        });
-
-        for (var i = 0; i < levels.length; i++) {
-            var alt = (MATH_PROBLEMS[levels[i]] || []).filter(function (p) {
-                return state.servedIds.indexOf(p.id) === -1;
-            });
-            if (alt.length) { return alt[Math.floor(Math.random() * alt.length)]; }
-        }
-        return null;
+    function applySession(d) {
+        state.sessionId = d.session_id;
+        state.answered = Number(d.problems_answered) || 0;
+        state.correct = Number(d.correct_count) || 0;
+        state.topic = Number(d.topic) || 1;
+        state.streak = Number(d.consecutive_correct) || 0;
     }
 
+    /* The SERVER picks the question (serve_next_question): the student's
+       topic, questions they have seen least, then at random. Only the problem
+       statement and hints already taken come back -- never an answer. A
+       question still open comes back unchanged, so reloading cannot swap it. */
     async function nextProblem() {
-        if (state.ended) { return; }
-        if (state.answered >= SESSION_TARGET) { return endSession(); }
+        if (state.ended || state.finished) { return; }
+        clearTimeout(hintOfferTimer);
 
-        var problem = pickProblem();
-        if (!problem) { return endSession(); }
+        var res = await sb.rpc('serve_next_question', { p_session_id: state.sessionId });
 
-        state.problemNumber = state.answered + 1;
-        state.attemptsUsed = 0;
-
-        var served = await sb.rpc('serve_problem', {
-            p_session_id: state.sessionId,
-            p_problem_id: problem.id,
-            p_problem_number: state.problemNumber
-        });
-
-        if (served.error) {
-            setFeedback('Could not reach the server. Try again in a moment.', 'wrong');
+        if (res.error || !res.data) {
+            console.error('Could not load the next question:', res.error && res.error.message);
+            setFeedback('Could not reach the server. Trying again…', 'wrong');
+            setTimeout(nextProblem, 4000);
             return;
         }
 
-        state.servedIds.push(problem.id);
-        state.problem = problem;
-        state.level = Number(served.data && served.data.level) || state.level;
-        state.hintsAvailable = Number(served.data && served.data.hints_available) || 0;
-        state.streak = Number(served.data && served.data.consecutive_correct) || 0;
+        var d = res.data;
+        if (d.done) {
+            state.bankEmpty = d.reason === 'bank_empty';
+            return endSession();
+        }
 
-        renderProblem();
+        state.problem = {
+            id: d.problem_id,
+            number: Number(d.problem_number) || (state.answered + 1),
+            question: String(d.question || ''),
+            questionTopic: Number(d.question_topic) || Number(d.topic) || 1,
+            locked: d.locked === true
+        };
+        state.problemNumber = state.problem.number;
+        state.topic = Number(d.topic) || state.topic;
+        state.attemptsUsed = Number(d.attempts_used) || 0;
+        state.hintsTotal = Number(d.hints_total) || 0;
+        state.hintsUsed = Number(d.hints_used) || 0;
+        state.hintsLeft = Number(d.hints_left) || 0;
+        state.lastHintStep = null;
+
+        renderProblem(Array.isArray(d.hints) ? d.hints : []);
         syncProgress();
+
+        /* Answered on an earlier visit but never recorded: finish it now. */
+        if (state.problem.locked) { finishProblem(); }
     }
 
-    function renderProblem() {
-        $('#problem-kicker').textContent = 'Problem ' + state.problemNumber;
-        $('#problem-expression').textContent = state.problem.expression;
-        $('#problem-instruction').textContent = 'Solve for x.';
+    function renderProblem(hintsTaken) {
+        $('#problem-kicker').textContent = 'Problem ' + state.problemNumber + ' · ' +
+            topicOf(state.problem.questionTopic).short;
+        $('#problem-expression').textContent = state.problem.question;
+        $('#problem-instruction').textContent = 'Type your answer as a number. The % sign is optional.';
 
         var input = $('#answer-input');
         input.value = '';
-        input.disabled = false;
-        $('#submit-btn').disabled = false;
-        $('#hint-zone').innerHTML = '';
+        input.disabled = state.problem.locked;
+        setAnswerButton('check');
+
+        $('#hint-zone').textContent = '';
+        hintsTaken.forEach(appendHint);
 
         clearFeedback();
+        suggestHint(false);
         paintAttempts();
         paintHintButton();
         paintProgress();
 
-        input.focus({ preventScroll: true });
+        if (!state.problem.locked) {
+            input.focus({ preventScroll: true });
+            armHintOffer();
+        }
     }
 
     /* ============================================ 6. ANSWERING ========= */
 
+    /* The answer button doubles as "Next problem" after a missed question,
+       so the worked solution can be read at the student's own pace. Its
+       min-width fits both labels, so the swap moves nothing. */
+    function setAnswerButton(mode) {
+        var btn = $('#submit-btn');
+        state.awaitingNext = mode === 'next';
+        btn.textContent = mode === 'next' ? 'Next problem' : 'Check';
+        btn.disabled = mode === 'check' ? !problemOpen() : false;
+    }
+
     async function handleSubmit(event) {
         event.preventDefault();
-        if (state.submitting || !state.problem) { return; }
+
+        if (state.awaitingNext) {
+            setAnswerButton('check');
+            $('#submit-btn').disabled = true;
+            advance();
+            return;
+        }
+        if (state.submitting || !problemOpen()) { return; }
 
         var input = $('#answer-input');
-        var parsed = (typeof parseAnswerInput === 'function')
-            ? parseAnswerInput(input.value)
-            : parseFallback(input.value);
+        var raw = input.value.trim();
 
-        if (parsed === null) {
-            setFeedback('Type a number, like "x = 5" or just "5".', 'neutral');
+        if (!/\d/.test(raw)) {
+            setFeedback('Type your answer as a number, like 25 or 25%.', 'neutral');
             input.select();
             return;
         }
@@ -466,45 +601,64 @@
            keydown, which is what actually stops Enter-spam. */
         state.submitting = true;
         input.disabled = true;
+        clearTimeout(hintOfferTimer);
         var release = setBusy($('#submit-btn'), 'Checking…');
 
         var result;
         try {
-            result = await validateAnswer(parsed, state.problem, state.sessionId);
+            result = await checkAnswer(raw);
         } catch (err) {
             console.error('Answer submission failed:', err);
-            result = { correct: false, attemptsUsed: 0, attemptsLeft: null, locked: false, error: true };
+            result = { error: true };
         } finally {
             state.submitting = false;
             release();
         }
 
-        /* Network trouble fails closed — not counted correct, but the
-           student's attempt is not spent either. */
+        /* Network trouble fails closed: not counted correct, and the attempt
+           is not spent either. */
         if (result.error) {
             input.disabled = false;
-            setFeedback(result.message || 'Could not reach the server. Please try again.', 'wrong');
+            setFeedback('Could not reach the server. Please try again.', 'wrong');
             input.select();
+            armHintOffer();
             return;
         }
 
-        state.attemptsUsed = result.attemptsUsed || (state.attemptsUsed + 1);
+        state.attemptsUsed = result.attemptsUsed;
         paintAttempts();
 
-        if (result.correct) { return handleCorrect(); }
-        if (result.locked || result.attemptsLeft <= 0) { return handleOutOfTries(); }
+        if (result.correct || result.locked) {
+            state.problem.locked = true;
+            return finishProblem();
+        }
 
         input.disabled = false;
         setFeedback('Not quite yet — have another go.', 'wrong');
-        setSpeech("You're close. Check each step again — I'll wait.");
+        offerHint('wrong');
         input.select();
+        armHintOffer();
     }
 
-    /* Only used if math-problems.js is unavailable; the real parser lives
-       there alongside the answer-checking call. */
-    function parseFallback(raw) {
-        var m = String(raw || '').replace(/\s+/g, '').match(/^x?=?(-?\d+(?:\.\d+)?)$/i);
-        return m ? parseFloat(m[1]) : null;
+    /* check_question_answer() compares on the server and says right or
+       wrong. The key never leaves the database. */
+    async function checkAnswer(raw) {
+        var res = await sb.rpc('check_question_answer', {
+            p_session_id: state.sessionId,
+            p_problem_id: state.problem.id,
+            p_submitted: raw
+        });
+        if (res.error || !res.data) {
+            console.error('Answer check failed:', res.error && res.error.message);
+            return { error: true };
+        }
+        return {
+            correct: res.data.correct === true,
+            attemptsUsed: Number(res.data.attempts_used) || 0,
+            attemptsLeft: Number(res.data.attempts_left) || 0,
+            locked: res.data.locked === true,
+            error: false
+        };
     }
 
     function lockInput() {
@@ -513,60 +667,80 @@
         $('#hint-btn').disabled = true;
     }
 
-    async function handleCorrect() {
-        state.answered++;
-        state.correct++;
-        lockInput();
-
-        /* The server decides smooth vs struggling from its own logs. The
-           browser only renders the verdict. */
-        var recorded = await sb.rpc('record_problem_result_v2', {
-            p_session_id: state.sessionId,
-            p_problem_id: state.problem.id
-        });
-
-        if (recorded.error) { console.error('Failed to record result:', recorded.error.message); }
-
-        var smooth = recorded.data && recorded.data.classification === 'smooth';
-        state.streak = state.streak + 1;   /* re-synced from serve_problem next round */
-
-        setFeedback(smooth ? 'Correct — and quickly too!' : 'Correct. Nice work.', 'correct');
-        setSpeech(smooth
-            ? "That was sharp. The next one steps up a little."
-            : "Well done. Let's keep going.");
-
-        paintProgress();
-        syncProgress();
-        setTimeout(advance, 1400);
+    function topicSpeech(change, from, to) {
+        if (change === 'up') {
+            return 'You have mastered ' + topicOf(from).title + '! Next up: ' + topicOf(to).title + '.';
+        }
+        if (change === 'down') {
+            return 'Let’s go back to ' + topicOf(to).title + ' for a little while — it will make the next part easier.';
+        }
+        return null;
     }
 
-    async function handleOutOfTries() {
-        state.answered++;
-        state.streak = 0;
+    /* The question is closed (solved, or both tries used). The server
+       records it -- time, hints, tries, smooth/struggling, and the topic
+       rules -- and the page only shows what it says. */
+    async function finishProblem() {
+        if (state.recording || state.ended) { return; }
+        state.recording = true;
+        clearTimeout(hintOfferTimer);
+        suggestHint(false);
         lockInput();
 
-        var recorded = await sb.rpc('record_problem_result_v2', {
+        var recorded = await sb.rpc('record_question_result', {
             p_session_id: state.sessionId,
             p_problem_id: state.problem.id
         });
+        state.recording = false;
 
-        if (recorded.error) { console.error('Failed to record result:', recorded.error.message); }
+        if (recorded.error || !recorded.data) {
+            console.error('Failed to record result:', recorded.error && recorded.error.message);
+            setFeedback('Saving your answer… one moment.', 'neutral');
+            setTimeout(finishProblem, 3000);
+            return;
+        }
 
-        /* reveal_solution() only answers once the problem is locked. Without
-           that gate this call would become the new answer leak. */
-        var sol = await sb.rpc('reveal_solution', {
-            p_session_id: state.sessionId,
-            p_problem_id: state.problem.id
-        });
+        var r = recorded.data;
+        var correct = r.is_correct === true;
+        var from = Number(r.topic_before) || state.topic;
+        var to = Number(r.topic) || state.topic;
 
-        setFeedback(sol.data && sol.data.solution
-            ? 'The answer was ' + sol.data.solution
-            : "That's alright — let's move on.", 'neutral');
-        setSpeech("No problem at all. We'll see this type again.");
-
+        state.answered = Number(r.problems_answered) || (state.answered + 1);
+        if (correct) { state.correct++; }
+        state.streak = Number(r.streak) || 0;
+        state.topic = to;
         paintProgress();
+        paintHintButton();
         syncProgress();
-        setTimeout(advance, 2600);
+
+        if (r.topic_change === 'up') {
+            toast('Topic ' + to + ' unlocked', 'Next: ' + topicOf(to).title + '.', 'accent');
+        } else if (r.topic_change === 'down') {
+            toast('Back to topic ' + to, 'A little more practice on ' + topicOf(to).title + '.', 'accent');
+        }
+
+        if (correct) {
+            var smooth = r.classification === 'smooth';
+            setFeedback(smooth ? 'Correct — and quickly too!' : 'Correct. Nice work.', 'correct');
+            setSpeech(topicSpeech(r.topic_change, from, to) ||
+                (smooth ? 'That was sharp. Let’s keep going.' : 'Well done. Let’s keep going.'));
+            setTimeout(advance, r.topic_change ? 2400 : 1400);
+            return;
+        }
+
+        /* Only now, with the question closed, may the answer be shown. */
+        var sol = await sb.rpc('reveal_question_solution', {
+            p_session_id: state.sessionId,
+            p_problem_id: state.problem.id
+        });
+        var answer = sol.data && sol.data.final_answer;
+        setFeedback(answer ? 'The answer was ' + answer : 'That’s alright — let’s move on.', 'neutral');
+        if (sol.data) { showWorkedSolution(sol.data.steps); }
+        setSpeech(topicSpeech(r.topic_change, from, to) ||
+            'No problem at all. Read how it works, then carry on when you are ready.');
+
+        setAnswerButton('next');
+        $('#submit-btn').focus({ preventScroll: true });
     }
 
     function advance() {
@@ -577,45 +751,46 @@
 
     /* ============================================ 7. HINTS ============= */
 
-    /* consume_hint() both returns the text and counts it. A hint read any
+    /* consume_question_hint() returns the next hint -- Concept, Setup, then
+       Worked calculation, step by step -- and counts it. A hint read any
        other way would not raise hints_used, which would quietly inflate the
-       'smooth' rate — the exact number the study measures. */
+       'smooth' rate, the number the study measures. */
     async function handleHint() {
         var btn = $('#hint-btn');
-        if (btn.disabled || !state.problem) { return; }
+        if (btn.disabled || !problemOpen() || state.hinting) { return; }
+        state.hinting = true;
         btn.disabled = true;
+        suggestHint(false);
 
-        var res = await sb.rpc('consume_hint', {
+        var res = await sb.rpc('consume_question_hint', {
             p_session_id: state.sessionId,
             p_problem_id: state.problem.id
         });
+        state.hinting = false;
 
-        if (res.error) {
-            btn.disabled = false;
+        if (res.error || !res.data) {
+            paintHintButton();
             setFeedback('Could not load a hint. Please try again.', 'wrong');
             return;
         }
 
-        if (res.data && res.data.hint_text) {
+        var d = res.data;
+        if (d.hint) {
+            appendHint(d.hint);
             state.hintsUsedTotal++;
-            var line = document.createElement('p');
-            line.className = 'hint-line';
-            line.innerHTML = '<b>Hint ' + esc(res.data.hints_used) + ':</b> ' + esc(res.data.hint_text);
-            $('#hint-zone').appendChild(line);
         }
+        state.hintsUsed = Number(d.hints_used) || state.hintsUsed;
+        state.hintsLeft = Number(d.hints_left) || 0;
+        if (d.locked) { state.problem.locked = true; }
+        paintHintButton();
 
-        var left = Number(res.data && res.data.hints_left) || 0;
-        state.hintsAvailable = left;
+        var tier = d.hint ? Number(d.hint.tier) : 0;
+        setSpeech(tier === 1 ? 'Here’s the idea behind this step. Try it from there.'
+            : tier === 2 ? 'Here’s how to set it up. Can you finish the calculation?'
+            : tier === 3 ? 'Here’s the worked calculation. Use it for the next part.'
+            : 'That was the last hint for this one. You can do it!');
 
-        if ((res.data && res.data.exhausted) || left === 0) {
-            $('#hint-btn-label').textContent = 'No more hints';
-            $('#hints-note').textContent = '';
-        } else {
-            btn.disabled = false;
-            $('#hints-note').textContent = left + ' hint' + (left === 1 ? '' : 's') + ' left';
-        }
-
-        setSpeech("Here's a nudge. Try the next step from there.");
+        armHintOffer();
         syncProgress();
     }
 
@@ -627,7 +802,7 @@
         if (!state.email || state.ended) { return; }
         await sb.from('profiles').update({
             current_problem: state.problemNumber,
-            current_difficulty: 'Level ' + state.level,
+            current_difficulty: 'Topic ' + state.topic + ' · ' + topicOf(state.topic).short,
             hints_used: state.hintsUsedTotal,
             consecutive_correct: state.streak
         }).eq('email', state.email);
@@ -649,21 +824,26 @@
             summary = res.data;
         }
 
-        var answered = summary ? summary.problems_answered : state.answered;
-        var correct = summary ? summary.correct_count : state.correct;
-        var level = summary ? summary.final_level : state.level;
+        var answered = summary ? Number(summary.problems_answered) || 0 : state.answered;
+        var correct = summary ? Number(summary.correct_count) || 0 : state.correct;
+        /* The topic is the one record_question_result() last returned. The
+           view's final_level is not used: it was defined outside this repo
+           and may still replay the algebra rules. */
+        var topic = state.topic;
         var accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
 
         $('#summary-correct').textContent = correct + ' / ' + answered;
         $('#summary-accuracy').textContent = accuracy + '%';
-        $('#summary-level').textContent = 'Level ' + level;
-        $('#summary-lede').textContent = accuracy >= 70
-            ? 'Strong session — you worked through the harder ones too.'
-            : 'Good effort. Every one of these gets easier with practice.';
+        $('#summary-level').textContent = 'Topic ' + topic;
+        $('#summary-lede').textContent = state.bankEmpty && answered < SESSION_TARGET
+            ? 'That’s every question available for now. Your teacher will add more.'
+            : (accuracy >= 70
+                ? 'Strong session — you worked through the harder ones too.'
+                : 'Good effort. Every one of these gets easier with practice.');
 
         await sb.from('profiles').update({
             is_in_game: false,
-            current_difficulty: 'Level ' + level
+            current_difficulty: 'Topic ' + topic + ' · ' + topicOf(topic).short
         }).eq('email', state.email);
 
         if (state.sessionId) {
@@ -741,25 +921,28 @@
         $('#signout-btn').addEventListener('click', signOut);
         $('#summary-signout').addEventListener('click', signOut);
         $('#start-btn').addEventListener('click', handleStart);
+        /* Typing is progress: the "stuck?" offer waits while they work. */
+        $('#answer-input').addEventListener('input', armHintOffer);
 
         /* Show any progress already recorded, so a resumed session is obvious
-           before the student presses anything. */
+           before the student presses anything. The session this returns is
+           the one Start uses -- asking twice used to open a second one. */
         var peek = await sb.rpc('resume_or_start_game_session');
-        if (peek.data) {
-            state.sessionId = peek.data.session_id;
-            state.answered = Number(peek.data.problems_answered) || 0;
-            state.correct = Number(peek.data.correct_count) || 0;
-            state.level = Number(peek.data.level) || 1;
-            state.streak = Number(peek.data.consecutive_correct) || 0;
+        if (peek.data && peek.data.session_id) {
+            applySession(peek.data);
 
             $('#fact-progress').textContent = state.answered;
             $('#fact-target').textContent = SESSION_TARGET;
 
-            if (state.answered > 0) {
+            var where = 'You are on topic ' + state.topic + ': ' + topicOf(state.topic).title + '.';
+            if (peek.data.resumed) {
                 $('#start-btn-label').textContent = 'Continue my session';
-                $('#start-lede').textContent =
-                    'You already answered ' + state.answered + ' of ' + SESSION_TARGET +
-                    '. Pick up right where you left off.';
+                $('#start-lede').textContent = (state.answered > 0
+                    ? 'You already answered ' + state.answered + ' of ' + SESSION_TARGET + '. '
+                    : '') + where + ' Pick up right where you left off.';
+            } else if (state.topic > 1) {
+                $('#start-lede').textContent = where + ' Take your time — there’s no timer, and you can ask ' +
+                    'for a hint whenever you’re stuck.';
             }
         }
 
@@ -780,19 +963,21 @@
     }
 
     async function handleStart() {
+        if (state.starting) { return; }
+        state.starting = true;
         var release = setBusy($('#start-btn'), 'Starting…');
 
-        var ok = await startOrResume();
-        if (!ok) { release(); return; }
+        var ok = state.sessionId ? true : await startOrResume();
+        if (!ok) { release(); state.starting = false; return; }
 
         await sb.from('profiles').update({
             is_in_game: true,
-            current_difficulty: 'Level ' + state.level
+            current_difficulty: 'Topic ' + state.topic + ' · ' + topicOf(state.topic).short
         }).eq('email', state.email);
 
         release();
         showScreen('session');
-        setSpeech("Let's begin. Read it once, then try the first step.");
+        setSpeech('Let’s begin. Read the problem carefully, then work it out step by step.');
         await nextProblem();
     }
 

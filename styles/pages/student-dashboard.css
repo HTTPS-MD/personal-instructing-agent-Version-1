@@ -416,6 +416,76 @@
 
 .btn-hint { height: 48px; padding: 0 var(--sp-5); }
 
+/* ---- 5.4b Percentages: word problems, tiered hints, worked solution ----
+   A word problem reads as a sentence, not as an equation. Its box keeps
+   four lines' height, so moving from a short problem to a long one does not
+   move the answer row (the move happens after a timer, where it would count
+   as layout shift). Two classes, so the equation-era phone rule further
+   down (.problem-expression { min-height: 76px }) cannot shrink it. */
+.problem-expression.problem-statement {
+    display: block;
+    max-width: 40rem;
+    min-height: calc(4 * 1.5em);
+    margin: var(--sp-4) auto var(--sp-2);
+    font-family: var(--font-body);
+    font-size: clamp(18px, 2.2vw, 21px);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.5;
+    text-wrap: pretty;
+    word-break: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Fits "Next problem" as well as "Check", so swapping the label moves
+   nothing in the answer row. */
+.btn-answer { min-width: 8.75rem; }
+
+/* Each step's prompt heads its hints. */
+.hint-step {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-2);
+    margin: var(--sp-4) 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+}
+
+.hint-step:first-child { margin-top: 0; }
+.hint-step-label { font-weight: 700; color: var(--text); }
+.hint-step-prompt { color: var(--text-muted); }
+
+/* The tutor is offering a hint: the button lifts twice and keeps a ring.
+   transform and box-shadow only -- nothing around it moves. */
+.btn-hint.is-suggested {
+    box-shadow: 0 0 0 3px var(--warning-soft), inset 0 0 0 1px var(--warning);
+    animation: hint-offer 900ms var(--ease-flat) 2;
+}
+
+@keyframes hint-offer {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+.worked {
+    margin-top: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-md);
+    background: var(--bg-field);
+    font-size: 13.5px;
+    line-height: 1.6;
+}
+
+.worked-title { font-weight: 700; color: var(--text); margin-bottom: var(--sp-1); }
+.worked-steps { margin: 0; padding-left: 1.25rem; color: var(--text-muted); }
+.worked-steps li + li { margin-top: var(--sp-1); }
+.worked-steps b { color: var(--text); font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-hint.is-suggested { animation: none; }
+}
+
 /* ---- 5.5 Agent panel ---- */
 .agent-panel {
     padding: var(--sp-5);

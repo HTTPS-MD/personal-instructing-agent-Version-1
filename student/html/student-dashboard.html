@@ -90,8 +90,8 @@
                     <div class="start-card">
                         <h1 class="start-hello" id="start-hello">Welcome back!</h1>
                         <p class="start-lede" id="start-lede">
-                            Today you'll solve algebra problems with your tutor. Take your time — there's no
-                            timer, and you can ask for a hint whenever you're stuck.
+                            Today you'll solve percentage word problems with your tutor. Take your time — there's
+                            no timer, and you can ask for a hint whenever you're stuck.
                         </p>
 
                         <div class="start-facts">
@@ -140,21 +140,24 @@
                             <div class="progress-stats">
                                 <span class="pstat"><b id="stat-correct">0</b> correct</span>
                                 <span class="pstat"><b id="stat-streak">0</b> in a row</span>
-                                <span class="pstat"><b id="stat-level">1</b> level</span>
+                                <span class="pstat"><b id="stat-level">1</b> topic</span>
                             </div>
                         </div>
 
                         <!-- The work -->
                         <div class="problem-card">
                             <p class="problem-kicker" id="problem-kicker">Problem 1</p>
-                            <p class="problem-expression" id="problem-expression">—</p>
-                            <p class="problem-instruction" id="problem-instruction">Solve for x.</p>
+                            <!-- A word problem, set as a sentence. Its box holds four lines, so a
+                                 short problem and a long one leave the answer row in place. -->
+                            <p class="problem-expression problem-statement" id="problem-expression">—</p>
+                            <p class="problem-instruction" id="problem-instruction">Type your answer as a number. The % sign is optional.</p>
 
                             <form id="answer-form" novalidate>
                                 <div class="answer-row">
                                     <input class="answer-input" type="text" id="answer-input"
-                                        inputmode="decimal" autocomplete="off" autocapitalize="off"
-                                        spellcheck="false" placeholder="x = ?" aria-label="Your answer">
+                                        inputmode="decimal" autocomplete="off" autocapitalize="off" maxlength="60"
+                                        spellcheck="false" placeholder="Your answer" aria-label="Your answer"
+                                        aria-describedby="problem-expression problem-instruction">
                                     <button class="btn btn-primary btn-answer" type="submit" id="submit-btn">Check</button>
                                 </div>
                             </form>
@@ -181,7 +184,9 @@
                                 </button>
                             </div>
 
-                            <div class="hint-zone" id="hint-zone"></div>
+                            <!-- Hints arrive here, step by step: Concept, Setup, Worked calculation.
+                                 Announced as they appear. -->
+                            <div class="hint-zone" id="hint-zone" aria-live="polite"></div>
                         </div>
                     </div>
 
@@ -264,7 +269,6 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script src="../../assets/js/function.js"></script>
-    <script src="../js/math-problems.js"></script>
     <script src="../js/student-dashboard.js"></script>
 </body>
 
