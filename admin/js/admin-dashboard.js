@@ -209,6 +209,7 @@
         managingEmail: null,
         resetEmail: null,    // the student the Reset password dialog is acting on
         activeSection: null,
+        deviceDiag: [],      // the last device-registration problems (see deviceProblem)
         loading: { roster: false, cohort: false }
     };
 
@@ -2790,9 +2791,56 @@
         toastOk('Password updated', 'Use the new password the next time you sign in.');
     }
 
+    /* ---- Device registration diagnostics ----
+       A failure here used to end in one console.error and a list that said
+       "No registered devices", which reads as "nothing is wrong". Now every
+       way this can go wrong is logged with the details needed to tell them
+       apart, kept in window.PIA_DEVICE_DIAG (paste it into a bug report), and
+       shown in the Device policy card with a retry. */
+
+    function errorFields(err) {
+        if (!err) { return {}; }
+        return {
+            code: err.code || null,
+            message: err.message || String(err),
+            details: err.details || null,
+            hint: err.hint || null,
+            status: err.status || null
+        };
+    }
+
+    function deviceProblem(stage, fields) {
+        var record = Object.assign({
+            stage: stage,
+            at: new Date().toISOString(),
+            adminEmail: state.adminEmail,
+            online: navigator.onLine,
+            page: window.location.pathname
+        }, fields);
+
+        console.error('[PIA device] ' + stage + ' failed', record);
+        state.deviceDiag.push(record);
+        if (state.deviceDiag.length > 20) { state.deviceDiag.shift(); }
+        window.PIA_DEVICE_DIAG = state.deviceDiag;
+        return record;
+    }
+
+    function claimFailureText(fields) {
+        var code = fields.code ? ' (' + fields.code + ')' : '';
+        if (fields.code === '42501') {
+            return 'The server refused the request' + code + ': ' + fields.message;
+        }
+        if (fields.code === 'PGRST202' || fields.code === '42883') {
+            return 'The claim_device function was not found' + code + '. Apply the latest database migrations.';
+        }
+        return 'claim_device failed' + code + ': ' + (fields.message || 'no reason given') +
+            ' Details are in the browser console; search for “[PIA device]”.';
+    }
+
     /* Reads the limit, then registers this browser through claim_device.
        claim_device uses SELECT … FOR UPDATE and enforces the limit server-side,
-       so the rule lives in one place instead of two copies that can disagree. */
+       so the rule lives in one place instead of two copies that can disagree
+       -- and two racing sign-ins cannot both take the last slot. */
     async function loadAdminDevices() {
         var res = await sb.from('profiles')
             .select('max_devices, active_devices')
@@ -2800,47 +2848,118 @@
             .maybeSingle();
 
         if (res.error || !res.data) {
-            console.error('Admin device settings failed:', res.error);
-            $('#admin-device-list').innerHTML = noticeHtml('alert', 'Could not load your devices',
-                friendlyDbError(res.error, 'No device record was found for this account.'));
+            deviceProblem('read-profile', Object.assign({ rowFound: !!res.data }, errorFields(res.error)));
+            renderAdminDevices([], {
+                title: 'Could not load your devices',
+                message: friendlyDbError(res.error, 'No profile row was found for this account.')
+            });
             return;
         }
 
         $('#device-limit').value = toInt(res.data.max_devices, 1);
-
         var devices = res.data.active_devices || [];
-        var deviceId = (typeof getOrCreateDeviceId === 'function') ? getOrCreateDeviceId() : null;
 
-        if (deviceId && devices.indexOf(deviceId) === -1) {
-            var claim = await sb.rpc('claim_device', { p_device_id: deviceId });
-
-            if (claim.error) {
-                console.error('claim_device failed:', claim.error);
-            } else if (claim.data && claim.data.allowed === false) {
-                renderAdminDevices(claim.data.devices || devices);
-                showDeviceLimitModal(claim.data.devices || devices);
-                return;
-            } else if (claim.data && claim.data.devices) {
-                devices = claim.data.devices;
-            }
+        /* Storage can be blocked (a private window, a strict browser setting);
+           without it there is no device ID to register. */
+        var deviceId = null;
+        try { deviceId = getOrCreateDeviceId(); }
+        catch (err) {
+            deviceProblem('device-id', { message: err && err.message });
+            renderAdminDevices(devices, {
+                title: 'This browser can’t be registered',
+                message: 'It is blocking local storage (a private window, or storage switched off), ' +
+                    'so it has no device ID to register.'
+            });
+            return;
         }
 
-        renderAdminDevices(devices);
+        if (devices.indexOf(deviceId) !== -1) {
+            renderAdminDevices(devices);
+            return;
+        }
+
+        var claim;
+        try { claim = await sb.rpc('claim_device', { p_device_id: deviceId }); }
+        catch (err) { claim = { error: { message: (err && err.message) || 'The request did not complete.' } }; }
+
+        if (claim.error) {
+            var fields = errorFields(claim.error);
+            deviceProblem('claim_device', Object.assign({ deviceId: deviceId, listedBefore: devices }, fields));
+            renderAdminDevices(devices, { title: 'This browser was not registered', message: claimFailureText(fields) });
+            toastErr('This browser was not registered', 'claim_device failed' +
+                (fields.code ? ' (' + fields.code + ')' : '') + '. Details are in the Device policy card.');
+            return;
+        }
+
+        if (claim.data && claim.data.allowed === false) {
+            renderAdminDevices(claim.data.devices || devices);
+            showDeviceLimitModal(claim.data.devices || devices);
+            return;
+        }
+
+        if (!claim.data || !Array.isArray(claim.data.devices)) {
+            deviceProblem('claim_device-response', { deviceId: deviceId, response: claim.data });
+            toastErr('This browser was not registered', 'claim_device gave no usable answer. Details are in the Device policy card.');
+            renderAdminDevices(devices, {
+                title: 'This browser was not registered',
+                message: 'claim_device answered without a device list, so the registration cannot be confirmed. ' +
+                    'Details are in the browser console.'
+            });
+            return;
+        }
+
+        /* The server says this browser is registered. Read the list back
+           before believing it: "accepted, but not in the list" is exactly the
+           silent failure this page used to show as an empty list. */
+        var verify = await sb.from('profiles').select('active_devices').eq('email', state.adminEmail).maybeSingle();
+        var stored = verify.data && verify.data.active_devices;
+
+        if (!verify.error && Array.isArray(stored) && stored.indexOf(deviceId) === -1) {
+            deviceProblem('registration-lost', {
+                deviceId: deviceId, claimReturned: claim.data.devices, storedNow: stored
+            });
+            toastErr('The registration did not stick', 'The server accepted this browser but it is not in the saved list. Details are in the Device policy card.');
+            renderAdminDevices(stored, {
+                title: 'The registration did not stick',
+                message: 'The server accepted this browser, but it is not in the saved list. ' +
+                    'Something removed it straight away. Details are in the browser console.'
+            });
+            return;
+        }
+
+        renderAdminDevices(!verify.error && Array.isArray(stored) ? stored : claim.data.devices);
+
+        /* The Administrators table counted this account's devices before the
+           browser registered; refresh it now rather than waiting for a
+           realtime event to arrive. */
+        quietly(loadAdmins).catch(function () { /* the next refresh will catch up */ });
     }
 
-    function renderAdminDevices(devices) {
+    /* `problem` ({ title, message }) is shown above the list when this
+       browser could not be registered. It replaces the "registers itself the
+       next time" reassurance, which would be false: something is wrong, and
+       the console says what. */
+    function renderAdminDevices(devices, problem) {
         var container = $('#admin-device-list');
         var currentId = null;
         try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
 
+        var banner = problem
+            ? '<div class="notice notice-danger" role="alert">' + icon('alert') +
+              '<div><p class="notice-title">' + esc(problem.title) + '</p>' +
+              '<p class="notice-text">' + esc(problem.message) + '</p></div></div>' +
+              '<div class="device-problem-actions"><button class="btn btn-secondary btn-sm" type="button" ' +
+              'data-retry="admindevices">Try registering again</button></div>'
+            : '';
+
         if (!devices || !devices.length) {
-            container.innerHTML = '<div class="notice">' + icon('info') +
+            container.innerHTML = banner || ('<div class="notice">' + icon('info') +
                 '<div><p class="notice-title">No registered devices</p>' +
-                '<p class="notice-text">This browser registers itself the next time the console loads.</p></div></div>';
+                '<p class="notice-text">This browser registers itself the next time the console loads.</p></div></div>');
             return;
         }
 
-        container.innerHTML = devices.map(function (deviceId) {
+        container.innerHTML = banner + devices.map(function (deviceId) {
             var info = describeDevice(deviceId);
             var isCurrent = (deviceId === currentId);
             return '' +
@@ -2863,13 +2982,40 @@
         });
     }
 
+    /* What a revoke actually did, from what the server reports. The server
+       ends the login it recorded for the device (its session and refresh
+       tokens are deleted, and the token is refused straight away). A device
+       that registered before sessions were recorded can only be taken off the
+       list, and the console says so rather than claiming a sign-out. */
+    function announceRevoke(data, extra) {
+        var ended = toInt(data && data.sessions_ended, 0);
+        var unbound = toInt(data && data.unbound, 0);
+        var removed = toInt(data && data.removed, 0);
+        var tail = extra ? ' ' + extra : '';
+
+        if (unbound > 0) {
+            showNotice('Removed from the list — its login was not ended',
+                (unbound === 1 ? 'That device' : unbound + ' of those devices') +
+                ' signed in before the server started recording which login belongs to which device, ' +
+                'so there is no session to end. It is off the list, but it can keep working until it ' +
+                'signs out or its login expires. Signing out of this console ends every login of this ' +
+                'account, including that one.' + tail, 'danger');
+        } else if (ended > 0) {
+            toastOk('Device revoked', 'That login was ended on the server; the browser can no longer use it.' + tail);
+        } else if (removed === 0) {
+            toastOk('Already removed', 'That device was no longer in the list.' + tail);
+        } else {
+            toastOk('Device revoked', 'Its login had already ended.' + tail);
+        }
+    }
+
     async function revokeAdminDevice(deviceId, sourceBtn) {
         var ok = await confirmAction({
             title: 'Revoke device',
-            heading: 'Sign this device out?',
-            message: 'That session ends immediately. If it is the browser you are using right ' +
-                'now, you will be signed out too.',
-            confirmLabel: 'Revoke session'
+            heading: 'End this device’s login?',
+            message: 'The login on that device is ended on the server, so it is refused straight away and ' +
+                'cannot renew itself. If it is the browser you are using right now, you will be signed out too.',
+            confirmLabel: 'End this login'
         });
         if (!ok) { return; }
 
@@ -2886,7 +3032,7 @@
         }
 
         renderAdminDevices((res.data && res.data.devices) || []);
-        toastOk('Device revoked', 'That session has been signed out.');
+        announceRevoke(res.data);
 
         var currentId = null;
         try { currentId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
@@ -2980,7 +3126,7 @@
         release();
         closeModal('modal-device-limit');
         renderAdminDevices(updated);
-        toastOk('Device revoked', 'This browser is now registered.');
+        announceRevoke(revoke.data, 'This browser is now registered.');
 
         var storedId = null;
         try { storedId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
@@ -3431,12 +3577,17 @@
 
                     /* Keep an open device manager in sync with the same row. */
                     if (state.managingEmail && payload.new && payload.new.email === state.managingEmail) {
-                        renderStudentDevices(payload.new.active_devices || []);
+                        if (Array.isArray(payload.new.active_devices)) { renderStudentDevices(payload.new.active_devices); }
+                        else { console.warn('[PIA device] realtime update had no active_devices; list left as is', payload.new.email); }
                     }
 
                     /* And the admin's own device list. */
                     if (state.adminEmail && payload.new && payload.new.email === state.adminEmail) {
-                        renderAdminDevices(payload.new.active_devices || []);
+                        /* A payload that lacks the column is not an empty list:
+                           rendering it as one is how a working registration
+                           could be painted as "No registered devices". */
+                        if (Array.isArray(payload.new.active_devices)) { renderAdminDevices(payload.new.active_devices); }
+                        else { console.warn('[PIA device] realtime update had no active_devices; list left as is'); }
                     }
                 })
                 .subscribe(function (status) { paintConnection(status); });

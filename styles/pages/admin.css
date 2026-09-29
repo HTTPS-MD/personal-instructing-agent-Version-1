@@ -1090,6 +1090,11 @@ body[data-loading] #refresh-btn .icon,
    44px floor below, so the real button replaces it without a shift. */
 .skeleton-btn { display: block; height: 36px; border-radius: var(--r-pill); }
 
+/* A notice that reports a failure rather than a fact. */
+.notice-danger { background: var(--danger-soft); }
+.notice-danger .icon { color: var(--danger); }
+.device-problem-actions { margin: var(--sp-3) 0 var(--sp-4); }
+
 /* ---- 19.4 A panel that failed to load, with the way out ---- */
 .region-error {
     grid-column: 1 / -1;

@@ -405,7 +405,15 @@
                 leave("Couldn't confirm your access. Taking you back to sign in…");
                 return 'denied';
             }
-            if (!res.data || res.data.role !== 'teacher') {
+            /* A valid session can always read its own profile row, so no row at
+               all means this login is no longer accepted -- signed out on the
+               server (an admin ended it, or "Sign out everywhere") -- not that
+               the person is the wrong kind of user. */
+            if (!res.data) {
+                leave('Your session ended. Taking you to sign in…');
+                return 'denied';
+            }
+            if (res.data.role !== 'teacher') {
                 leave('This page is for teachers. Taking you back to sign in…');
                 return 'denied';
             }
