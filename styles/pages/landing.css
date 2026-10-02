@@ -2432,7 +2432,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 /* "Forgot password?" where every sign-in form has trained people to look.
    Its hit area is held to 32px so it cannot reach the field below. */
-.label-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.label-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-1) var(--sp-3); }
+.label-row > label { overflow-wrap: normal; word-break: keep-all; }
 .label-row .link-btn { font-size: var(--fs-xs); }
 .label-row .link-btn::after { height: max(100%, 32px); }
 

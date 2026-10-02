@@ -17,6 +17,20 @@ Status values distinguish implementation from verification. Browser checks use i
 | 12.2 Password setup outcomes | Implemented | Implemented and verified in isolated browser checks | Confirmed password failure preserves fields; uncertain password save blocks retry; cleanup can retry without resubmitting password. |
 | 13.1 Dialog dismissal and focus | Implemented | Implemented and verified in isolated browser checks | One visible X, inert background, return-to-origin context, Escape and focus restoration. |
 | 14–15 Homepage structure/accessibility | Implemented | Implemented but partially unverified | Both themes, reduced motion, responsive overflow, 200% text zoom, touch targets and contrast checked in isolated browser run. Real-device and live integration checks remain unavailable. |
+| 14.1 Label wrapping at 200% text zoom | Fixed in this verification pass | Rendered check (`text-zoom-200.png`) | "PASSWORD" label broke mid-word beside "Forgot password?"; `.label-row` in `styles/pages/landing.css` now wraps and keeps words intact. Suite rerun 33/33. |
+| 11.2 Repository-managed recovery/activation email templates | Blocked | Source inspection | No template files, `config.toml` or `[auth.email]` settings exist in the repo (only `supabase/functions/admin-set-temp-password` and migrations). Templates are therefore live-managed and were not changed. Migration `20260927_0019` comment says `resetPasswordForEmail()` sends "a link and a code"; if the live template still shows a code or lacks a Reset password button, it must be edited in the Supabase dashboard (needs user approval). |
+| 11.3 Device-recovery code flow preserved | Already satisfied | Source inspection (`index.html` device-reset dialog) | Separate from password recovery; untouched. No manual reset-code UI remains in the recovery dialog (grep for reset-code/verify-code strings: none). |
+| 14.2 Scroll scrub and marquee removal | Decision recorded, not reverted | Source inspection | Marquee is absent. `data-scrub-words` headings remain; the hero background-video scrub was removed in the earlier implementation. Neither is required by Sections 5-15, and Section 14 lists marquees/parallax as items to avoid. |
 | Shared live email/template configuration | Blocked | Unverified | No live emails, templates, migrations, configuration changes or deployment performed. |
 
 Future-module requirements (student screens, admin dashboard, teacher roster and final cross-module verification) remain pending for their scheduled batches.
+
+
+## Verification run (this session)
+
+- Command: `node tests/batch-1-browser.cjs` (Playwright 1.56.1, bundled Chromium via `PIA_CHROME`), isolated: loopback only, Supabase SDK replaced by a fixture, all other requests blocked.
+- Result: 33/33 passed, before and after the label fix. Covered: navbar visibility/focus, activation and recovery dialogs, cooldowns, late responses, Escape and focus return, setup page outcomes, 200% text size on a short viewport, long email wrapping, contrast and touch targets in both themes, overflow at 320/343/345/375/768/1280/1440px.
+- Screenshots inspected by eye: homepage 1280 dark, 375 light, recovery dialog 320 light and 1440 dark, and 200% zoom. No overflow or overlap seen apart from the fixed label wrap.
+- Reduced motion: the suite runs under `reducedMotion: 'reduce'`; the non-reduced motion path was not separately tested.
+- Limits: desktop Chromium only (no real device, mobile keyboard, Firefox or Safari); no live Supabase, email delivery, token verification or role routing; mocks are not integration evidence.
+- Not run: lint/type/build (the repo has no package.json or configured checks, so not applicable).
