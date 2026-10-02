@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-surface="comic">
 
 <head>
     <meta charset="UTF-8">
@@ -33,6 +33,7 @@
             <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 17.5h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3Z"/></symbol>
+            <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
             <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5L7 4.5Z"/></symbol>
             <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5.5H4.5A2.5 2.5 0 0 0 7 10.5"/><path d="M17 5.5h2.5A2.5 2.5 0 0 1 17 10.5"/><path d="M10 20h4M12 14.2V20"/></symbol>
@@ -74,6 +75,10 @@
                         </span>
                         <span class="avatar" id="who-initials" aria-hidden="true">··</span>
                     </div>
+                    <button class="btn btn-secondary btn-tutorial" id="tutorial-btn" type="button" aria-haspopup="dialog" aria-label="Open the tutorial">
+                        <svg class="icon"><use href="#i-help"></use></svg>
+                        <span class="hide-sm-inline">Tutorial</span>
+                    </button>
                     <button class="btn btn-signout" id="signout-btn">
                         <svg class="icon"><use href="#i-logout"></use></svg>
                         <span class="hide-sm-inline">Sign out</span>
@@ -266,10 +271,34 @@
         </div>
     </div>
 
+    <!-- ============================================== MODAL · TUTORIAL ----
+         Opens by itself once per account (student-tutorial.js) and on demand
+         from the Tutorial button. Skip is always visible; Escape also skips. -->
+    <div class="overlay" id="modal-tutorial" role="dialog" aria-modal="true"
+        aria-labelledby="tutorial-title" aria-describedby="tutorial-text">
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <p class="tutorial-step" id="tutorial-step" aria-live="polite">Step 1 of 4</p>
+                    <h2 class="modal-title" id="tutorial-title">Tutorial</h2>
+                </div>
+            </header>
+            <div class="modal-body">
+                <p class="tutorial-text" id="tutorial-text"></p>
+            </div>
+            <footer class="modal-foot tutorial-foot">
+                <button class="btn btn-skip" id="tutorial-skip" type="button">Skip tutorial</button>
+                <button class="btn btn-secondary" id="tutorial-back" type="button">Back</button>
+                <button class="btn btn-primary" id="tutorial-next" type="button">Next</button>
+            </footer>
+        </div>
+    </div>
+
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/student-dashboard.js"></script>
+    <script src="../js/student-tutorial.js"></script>
 </body>
 
 </html>

@@ -957,6 +957,10 @@
 
         reveal();
 
+        /* First visit only, per account (student-tutorial.js). Never blocks
+           the dashboard: a failure there leaves the page fully usable. */
+        if (window.PIATutorial) { window.PIATutorial.init(sb).catch(function () {}); }
+
         /* If the admin closes this stage mid-session, leave for the waiting
            room rather than sitting on a page that is no longer open. */
         if (typeof registerChannel === 'function') {

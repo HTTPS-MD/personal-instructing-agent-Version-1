@@ -265,27 +265,6 @@ function initTestUI() {
     if (testUIReady) return;
     testUIReady = true;
 
-    const grid = document.getElementById('question-grid');
-    if (grid) {
-        grid.innerHTML = '';
-        for (let i = 0; i < questions.length; i++) {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'qgrid-btn';
-            b.textContent = String(i + 1);
-            b.setAttribute('aria-label', `Question ${i + 1}`);
-            b.addEventListener('click', () => {
-                goToQuestion(i);
-                // Sa sheet mode, ang pagpili ng numero ang tapos na ng trabaho
-                // ng map: isara ito para makita agad ang tanong.
-                if (isMapOpen()) closeMap();
-            });
-            grid.appendChild(b);
-        }
-    }
-
-    initQuestionMap();
-
     // Ang mga answer button ay may data-score na (dating inline onclick), kaya
     // isang delegated listener na lang ang kailangan.
     const list = document.getElementById('ocean-answer-list');
@@ -315,7 +294,6 @@ function initTestUI() {
     document.addEventListener('keydown', (e) => {
         if (!isTestAllowed || hasSubmitted) return;
         if (document.getElementById('quit-modal')?.classList.contains('modal-active')) return;
-        if (isMapOpen()) return;
         if (e.key === 'ArrowLeft') goToQuestion(currentQuestionIndex - 1);
         if (e.key === 'ArrowRight') goToQuestion(currentQuestionIndex + 1);
     });
@@ -327,84 +305,6 @@ function goToQuestion(index) {
     currentQuestionIndex = index;
     saveOceanProgress();
     loadQuestion();
-}
-
-// ==========================================
-// QUESTION MAP -- SIDEBAR O BOTTOM SHEET
-// Mula 1025px pataas, sidebar ang map sa tabi ng tanong (student-journey.css).
-// Sa mas makitid, wala itong puwang doon at dati ay napupunta sa pinakailalim
-// ng page -- hindi alam ng bagong estudyante na nandoon pala. Ngayon may bar na
-// nakapako sa ibaba ng screen ("Question map · 12 of 50 answered"), at ang
-// pagpindot dito ay nagbubukas ng parehong map bilang bottom sheet.
-//
-// Habang bukas, dialog ang sheet: naka-trap ang Tab sa loob, Escape o ang
-// backdrop ang nagsasara, at bumabalik ang focus sa bar.
-// ==========================================
-const MAP_SHEET_QUERY = window.matchMedia('(max-width: 1024px)');
-
-function isMapOpen() {
-    return !!document.getElementById('qnav')?.classList.contains('is-open');
-}
-
-function mapFocusables() {
-    const sheet = document.getElementById('qnav');
-    return sheet ? Array.from(sheet.querySelectorAll('button:not([disabled])')) : [];
-}
-
-function onMapKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); closeMap(); return; }
-    if (e.key !== 'Tab') return;
-    const items = mapFocusables();
-    if (!items.length) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-}
-
-function openMap() {
-    const sheet = document.getElementById('qnav');
-    if (!sheet || !MAP_SHEET_QUERY.matches || isMapOpen()) return;
-
-    sheet.classList.add('is-open');
-    sheet.setAttribute('role', 'dialog');
-    sheet.setAttribute('aria-modal', 'true');
-    document.getElementById('qmap-scrim').hidden = false;
-    document.getElementById('qmap-open').setAttribute('aria-expanded', 'true');
-    document.body.style.overflow = 'hidden';
-    document.addEventListener('keydown', onMapKey);
-
-    // Diretso sa numerong kinaroroonan nila, para isang pindot lang ang lipat.
-    const here = sheet.querySelector('.qgrid-btn.is-current') || mapFocusables()[0];
-    if (here) here.focus({ preventScroll: true });
-}
-
-function closeMap(options) {
-    const sheet = document.getElementById('qnav');
-    if (!sheet || !isMapOpen()) return;
-
-    sheet.classList.remove('is-open');
-    sheet.removeAttribute('role');
-    sheet.removeAttribute('aria-modal');
-    document.getElementById('qmap-scrim').hidden = true;
-    const opener = document.getElementById('qmap-open');
-    opener.setAttribute('aria-expanded', 'false');
-    document.body.style.overflow = 'auto';
-    document.removeEventListener('keydown', onMapKey);
-
-    if (!(options && options.keepFocus)) opener.focus({ preventScroll: true });
-}
-
-function initQuestionMap() {
-    document.getElementById('qmap-open')?.addEventListener('click', openMap);
-    document.getElementById('qmap-close')?.addEventListener('click', () => closeMap());
-    document.getElementById('qmap-scrim')?.addEventListener('click', () => closeMap());
-
-    // Lumaki ang window habang bukas ang sheet (naging sidebar ang map): isara
-    // ang dialog mode para hindi maiwang naka-lock ang scroll.
-    MAP_SHEET_QUERY.addEventListener('change', (e) => {
-        if (!e.matches) closeMap({ keepFocus: true });
-    });
 }
 
 function loadQuestion() {
@@ -429,9 +329,6 @@ function loadQuestion() {
     const tally = document.getElementById('answered-tally');
     if (tally) tally.textContent = `${done} of ${total} answered`;
 
-    const navCount = document.getElementById('qnav-count');
-    if (navCount) navCount.textContent = `${done}/${total}`;
-
     // I-highlight ang naunang sagot kapag binalikan nila ang tanong.
     // aria-pressed: sinasabi rin sa screen reader kung alin ang napili.
     document.querySelectorAll('#ocean-answer-list .ocean-answer-btn').forEach(btn => {
@@ -443,8 +340,12 @@ function loadQuestion() {
     const prevBtn = document.getElementById('btn-prev');
     const nextBtn = document.getElementById('btn-next');
     if (prevBtn) prevBtn.disabled = (i === 0);
+    const isLast = (i === total - 1);
     if (nextBtn) {
-        nextBtn.disabled = (i === total - 1);
+        // Back and Next are the only navigation. Next gives way to Submit on
+        // the final question.
+        nextBtn.hidden = isLast;
+        nextBtn.disabled = isLast;
         // Walang auto-advance, kaya ang Next ang nagiging pangunahing button
         // sa sandaling may sagot na: doon napupunta ang mata pagkatapos pumili.
         const ready = userResponses[i] !== null && !nextBtn.disabled;
@@ -452,19 +353,14 @@ function loadQuestion() {
         nextBtn.classList.toggle('btn-secondary', !ready);
     }
 
-    const barMeta = document.getElementById('qmap-bar-meta');
-    if (barMeta) barMeta.textContent = `${done} of ${total} answered`;
-    const barFill = document.getElementById('qmap-bar-fill');
-    if (barFill) barFill.style.width = `${pctDone}%`;
-
-    document.querySelectorAll('#question-grid .qgrid-btn').forEach((btn, idx) => {
-        btn.classList.toggle('is-answered', userResponses[idx] !== null);
-        btn.classList.toggle('is-current', idx === i);
-    });
-
     const submitBtn = document.getElementById('btn-submit-ocean');
     const hint = document.getElementById('submit-hint');
-    if (submitBtn) submitBtn.disabled = !isComplete();
+    if (submitBtn) {
+        // Submit does not exist until the final question; once there, the
+        // existing rule (every question answered) still decides if it works.
+        submitBtn.hidden = !isLast;
+        submitBtn.disabled = !isComplete();
+    }
     if (hint) {
         hint.textContent = isComplete()
             ? 'All questions answered -- ready to submit.'
