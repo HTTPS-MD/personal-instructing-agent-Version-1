@@ -130,10 +130,7 @@
 }
 
 .start-card {
-    padding: var(--sp-8);
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
+    padding: var(--sp-6) 0;
 }
 
 .start-hello {
@@ -153,19 +150,19 @@
     margin-bottom: var(--sp-7);
 }
 
-.start-facts {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-7);
-}
 
-.fact {
-    min-height: 88px;
-    padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); margin: 0 0 var(--sp-7); }
+/* Labelled facts, not cards: a rule above each, value over label. */
+.fact,
+.summary-tile {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    margin: 0;
+    padding-top: var(--sp-3);
+    border-top: var(--edge-w, 2px) solid var(--line);
 }
+.fact dd, .summary-tile dd { margin: 0; }
 
 .fact-value {
     font-family: var(--font-mono);
@@ -544,22 +541,8 @@
 .summary-card {
     max-width: 640px;
     margin: 0 auto;
-    padding: var(--sp-8);
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
+    padding: var(--sp-6) 0;
     text-align: center;
-}
-
-.summary-glyph {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto var(--sp-5);
-    border-radius: var(--r-lg);
-    display: grid;
-    place-items: center;
-    background: var(--accent-soft);
-    color: var(--accent);
 }
 
 .summary-title {
@@ -571,19 +554,6 @@
 
 .summary-lede { font-size: 15px; color: var(--text-muted); line-height: 1.65; margin-bottom: var(--sp-7); }
 
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-7);
-}
-
-.summary-tile {
-    min-height: 96px;
-    padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-}
 
 .summary-value {
     font-size: 26px;
@@ -627,11 +597,10 @@ body:not([data-boot="pending"]) .learn-veil[hidden] { display: none; }
 @media (max-width: 720px) {
     .learn-shell { padding: 0 var(--sp-4); }
     .learn-main { padding: var(--sp-5) 0 var(--sp-8); }
-    .start-card { padding: var(--sp-6) var(--sp-5); }
+    .start-card { padding: var(--sp-5) 0; }
     .problem-card { padding: var(--sp-6) var(--sp-4); }
-    .summary-card { padding: var(--sp-6) var(--sp-5); }
-    .start-facts { grid-template-columns: minmax(0, 1fr); }
-    .fact { min-height: 0; }
+    .summary-card { padding: var(--sp-5) 0; }
+    .start-facts { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
     .who-text { display: none; }
     .stage-chip.hide-sm { display: none; }
     .btn-start { width: 100%; }

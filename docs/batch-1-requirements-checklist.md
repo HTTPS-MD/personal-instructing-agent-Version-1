@@ -40,7 +40,7 @@ Future-module requirements (admin dashboard, teacher roster and final cross-modu
 
 # Batch 2 — Student screens + tutorial (Sections 16–18)
 
-Branch `codex/batch-2-student-screens`, created from `codex/batch-1-homepage-access` @ `e0bc425`. Harness: `tests/batch-2-browser.cjs` (isolated: loopback only, Supabase SDK replaced by a fixture; the "account" lives in the Node process so two browser contexts act as two devices). Result: 30/30; Batch 1 suite re-run 33/33.
+Branch `codex/batch-2-student-screens`, created from `codex/batch-1-homepage-access` @ `e0bc425`. Harness: `tests/batch-2-browser.cjs` (isolated: loopback only, Supabase SDK replaced by a fixture; the "account" lives in the Node process so two browser contexts act as two devices). Result after the icon/card audit: 41/41; Batch 1 suite re-run 33/33.
 
 | Req | Implementation | Verification | Evidence / limitation |
 |---|---|---|---|
@@ -71,3 +71,23 @@ Branch `codex/batch-2-student-screens`, created from `codex/batch-1-homepage-acc
 - `tests/batch-1-browser.cjs`: 33/33 re-run (no regression).
 - Lint/type/build: not applicable (no package.json or configured tooling).
 - Not verified: live integration, real devices/mobile keyboard, other browsers, Character Selection selection logic (only rendered), waiting room / assessment-complete (out of scope), 200% text zoom on student screens, WCAG contrast measurement on student screens (visual inspection only).
+
+
+## Batch 2 icon and card audit (follow-up)
+
+Rule applied (spec 13/14, extended to the student screens): a card stays only if it groups a function (an interactive unit or a comparable record); an icon stays only if it carries meaning the text does not, or is the accessible label of an icon-only control. Large icons above text and nested boxes are removed.
+
+**Kept (with reason):** OCEAN question card (the answer unit); Back/Next chevrons (direction); persona cards and preview card (selectable tutors / their detail); dashboard progress card, problem card, tutor card and session tutor panel (functional groups); modal X on the lock-in and sign-out dialogs (the single dismissal); feedback status icon and error-banner icon (non-colour status cue); Tutorial help icon (the only visible content of the button under 480px); stage rail pips on OCEAN/Character Selection (progress state).
+
+**Removed:** Sign out icon (all three screens, text label already present); Submit check, Start play, Hint bulb, Lock-in check icons (redundant with labels); brain and lock glyphs above the OCEAN consent/locked titles; shield icon and the shaded box around the OCEAN privacy disclosure (text unchanged, now an open section with a left rule); the large glyph + centred "hero" in the OCEAN quit, Character lock-in and dashboard sign-out dialogs (now left-aligned plain text; the redundant second heading was dropped); trophy glyph on the summary; the decorative "live" dot in the dashboard stage chip (it implied live status that nothing measures); the gate card around OCEAN consent, the OCEAN progress card, the saving/error state card, the dashboard start card and summary card (now open sections); the stat boxes on the start and summary screens (now `<dl>` with a top rule). Unused icon symbols removed.
+
+**Unchanged on purpose:** research/assessment/selection/navigation logic. The sign-out dialog keeps its title, Go back/Sign out buttons and Escape/backdrop behaviour. `.modal-hero*` stays in `styles/global.css` (still used by Admin pages); a small `.modal-text` rule was added there.
+
+**Verification:** 11 added isolated browser checks (icons present per screen and state, card/hero absence, flat computed styles, description lists, dialogs plain, no overflow) at 375 and 1280px in both themes, plus screenshots inspected. The first run of these checks passed while the layout was actually broken (a stray `</div>` I introduced closed the start card early and emptied the summary); the screenshots caught it, it was fixed, and layout assertions were added.
+
+**Remaining violations / limits (not fixed):**
+1. Waiting room, assessment-complete and set-new-password still use the old gate card and glyph (`.gate-glyph`, `.gate-wrap` card). They are outside the three screens named in section 16; they were deliberately left intact. Until they are reworked, the journey is visually uneven.
+2. Character Selection still shows the `.stage-rail` pips plus the tutor preview card and six persona cards; these are judged functional, but that is a judgement call.
+3. The post-Skip tutorial note briefly overlays the heading on phones (transient, covers no control).
+4. The dashboard tutorial-eligible "Section Earth" identity block and avatar initials are unchanged (identity, functional).
+5. Only desktop Chromium; no real device, other browsers, 200% zoom or contrast measurement on these screens.

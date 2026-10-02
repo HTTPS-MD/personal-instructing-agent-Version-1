@@ -25,9 +25,6 @@
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
             <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
-            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
-            <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5v-1a5 5 0 0 1 5-5h5a5 5 0 0 1 5 5v1"/></symbol>
-            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
         </defs>
     </svg>
 
@@ -52,7 +49,6 @@
                 <div class="journey-bar-right">
                     <span class="pick-status" id="status-text">CHOOSING</span>
                     <button class="btn btn-signout" id="signout-btn" data-signout>
-                        <svg class="icon"><use href="#i-logout"></use></svg>
                         Sign out
                     </button>
                 </div>
@@ -209,7 +205,6 @@
                         <div class="preview-actions">
                             <button class="btn btn-primary btn-block" id="lock-in-btn"
                                 data-action="confirm" disabled>
-                                <svg class="icon"><use href="#i-check"></use></svg>
                                 Lock in this tutor
                             </button>
                             <button class="btn btn-primary btn-block" id="continue-btn"
@@ -241,16 +236,10 @@
             </header>
 
             <div class="modal-body">
-                <div class="modal-hero">
-                    <span class="modal-hero-glyph g-accent">
-                        <svg class="icon icon-lg"><use href="#i-user"></use></svg>
-                    </span>
-                    <p class="modal-hero-title">This choice is final</p>
-                    <p class="modal-hero-text">
-                        You won't be able to swap tutors later, so pick the one whose style
-                        sounds best for how you like to learn.
-                    </p>
-                </div>
+                <p class="modal-text">
+                    This choice is final. You won't be able to swap tutors later, so pick the one
+                    whose style sounds best for how you like to learn.
+                </p>
             </div>
 
             <footer class="modal-foot">

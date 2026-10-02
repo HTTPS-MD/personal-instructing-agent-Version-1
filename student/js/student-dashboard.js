@@ -208,7 +208,6 @@
 
             $('#confirm-title').textContent = options.title || 'Are you sure?';
             $('#confirm-subtitle').textContent = options.subtitle || 'Check before you continue.';
-            $('#confirm-heading').textContent = options.heading || options.title || '';
             $('#confirm-text').textContent = options.message || '';
             accept.textContent = options.confirmLabel || 'Continue';
 

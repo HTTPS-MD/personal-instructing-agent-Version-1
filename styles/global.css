@@ -1325,6 +1325,10 @@ button.stat.is-active { background: var(--accent-soft); }
 .modal-hero-title { font-size: var(--fs-h4); font-weight: 700; }
 .modal-hero-text { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.6; max-width: 44ch; }
 
+/* Plain, left-aligned confirmation copy (no icon, no centred hero). */
+.modal-text { font-size: var(--fs-body); color: var(--text); line-height: 1.6; max-width: 52ch; }
+.quit-progress { margin-top: var(--sp-5); }
+
 /* Form grid inside modals */
 .form-grid { display: grid; gap: var(--sp-4); }
 .form-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

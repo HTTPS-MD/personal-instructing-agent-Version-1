@@ -32,13 +32,7 @@
             <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
             <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.2 2.8 20h18.4L12 4.2Z"/><path d="M12 10.5v3.8"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
-            <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9.2 17.5h5.6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3Z"/></symbol>
             <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></symbol>
-            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
-            <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5L7 4.5Z"/></symbol>
-            <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5.5H4.5A2.5 2.5 0 0 0 7 10.5"/><path d="M17 5.5h2.5A2.5 2.5 0 0 1 17 10.5"/><path d="M10 20h4M12 14.2V20"/></symbol>
-            <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3s5.5 4.2 5.5 9a5.5 5.5 0 0 1-11 0c0-1.6.7-3 1.5-4 0 1.6 1 2.5 2 2.5 1.4 0 2-1.4 2-3.5 0-2-.5-3.4-.5-4Z"/></symbol>
-            <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
         </defs>
     </svg>
 
@@ -62,7 +56,6 @@
                 <div class="learn-brand">
                     <a class="brand-link" href="../../index.html"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA home" width="48" height="48"></a>
                     <span class="stage-chip hide-sm">
-                        <span class="dot dot-live"></span>
                         Stage 3 · Tutoring
                     </span>
                 </div>
@@ -80,7 +73,6 @@
                         <span class="hide-sm-inline">Tutorial</span>
                     </button>
                     <button class="btn btn-signout" id="signout-btn">
-                        <svg class="icon"><use href="#i-logout"></use></svg>
                         <span class="hide-sm-inline">Sign out</span>
                     </button>
                 </div>
@@ -99,23 +91,22 @@
                             no timer, and you can ask for a hint whenever you're stuck.
                         </p>
 
-                        <div class="start-facts">
+                        <dl class="facts start-facts">
                             <div class="fact">
-                                <p class="fact-value" id="fact-target">10</p>
-                                <p class="fact-label">Problems this session</p>
+                                <dt class="fact-label">Problems this session</dt>
+                                <dd class="fact-value" id="fact-target">10</dd>
                             </div>
                             <div class="fact">
-                                <p class="fact-value">2</p>
-                                <p class="fact-label">Tries per problem</p>
+                                <dt class="fact-label">Tries per problem</dt>
+                                <dd class="fact-value">2</dd>
                             </div>
                             <div class="fact">
-                                <p class="fact-value" id="fact-progress">0</p>
-                                <p class="fact-label">Already answered</p>
+                                <dt class="fact-label">Already answered</dt>
+                                <dd class="fact-value" id="fact-progress">0</dd>
                             </div>
-                        </div>
+                        </dl>
 
                         <button class="btn btn-primary btn-start" id="start-btn">
-                            <svg class="icon"><use href="#i-play"></use></svg>
                             <span id="start-btn-label">Start my session</span>
                         </button>
                     </div>
@@ -184,7 +175,6 @@
                                  nothing moves; the card simply grows at the bottom. -->
                             <div class="hint-actions">
                                 <button class="btn btn-secondary btn-hint" id="hint-btn">
-                                    <svg class="icon"><use href="#i-bulb"></use></svg>
                                     <span id="hint-btn-label">Give me a hint</span>
                                 </button>
                             </div>
@@ -210,29 +200,25 @@
             <!-- ========================================== SUMMARY SCREEN -->
             <section class="learn-shell screen" id="screen-summary">
                 <div class="summary-card">
-                    <div class="summary-glyph">
-                        <svg class="icon icon-lg"><use href="#i-trophy"></use></svg>
-                    </div>
                     <h2 class="summary-title">Session complete</h2>
                     <p class="summary-lede" id="summary-lede">Nice work getting all the way through.</p>
 
-                    <div class="summary-grid">
+                    <dl class="facts summary-grid">
                         <div class="summary-tile">
-                            <p class="summary-value" id="summary-correct">0 / 0</p>
-                            <p class="summary-label">Correct</p>
+                            <dt class="summary-label">Correct</dt>
+                            <dd class="summary-value" id="summary-correct">0 / 0</dd>
                         </div>
                         <div class="summary-tile">
-                            <p class="summary-value" id="summary-accuracy">0%</p>
-                            <p class="summary-label">Accuracy</p>
+                            <dt class="summary-label">Accuracy</dt>
+                            <dd class="summary-value" id="summary-accuracy">0%</dd>
                         </div>
                         <div class="summary-tile">
-                            <p class="summary-value" id="summary-level">Level 1</p>
-                            <p class="summary-label">Reached</p>
+                            <dt class="summary-label">Reached</dt>
+                            <dd class="summary-value" id="summary-level">Level 1</dd>
                         </div>
-                    </div>
+                    </dl>
 
                     <button class="btn btn-secondary" id="summary-signout">
-                        <svg class="icon"><use href="#i-logout"></use></svg>
                         Sign out
                     </button>
                 </div>
@@ -244,7 +230,7 @@
          Same mechanics as every other dialog in the system: 18px radius, the
          36×36 close button in flow 21px from the edge, scroll lock that
          substitutes the scrollbar width. -->
-    <div class="overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
+    <div class="overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
@@ -256,13 +242,7 @@
                 </button>
             </header>
             <div class="modal-body">
-                <div class="modal-hero">
-                    <span class="modal-hero-glyph" id="confirm-glyph">
-                        <svg class="icon icon-lg"><use href="#i-alert"></use></svg>
-                    </span>
-                    <p class="modal-hero-title" id="confirm-heading">Sign out?</p>
-                    <p class="modal-hero-text" id="confirm-text"></p>
-                </div>
+                <p class="modal-text" id="confirm-text"></p>
             </div>
             <footer class="modal-foot">
                 <button class="btn btn-secondary" data-modal-close id="confirm-cancel">Go back</button>

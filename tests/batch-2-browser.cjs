@@ -323,6 +323,108 @@ function fixture() {
     assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
     await p.context().close();
   });
+  /* ---------------- ICON / CARD AUDIT ---------------- */
+  const iconsOf = p => p.evaluate(() => [...document.querySelectorAll('svg.icon')].filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden').map(e => (e.querySelector('use') || {getAttribute: () => '?'}).getAttribute('href')).sort());
+  const flat = (p, sel) => p.locator(sel).evaluate(el => { const c = getComputedStyle(el); return { bg: c.backgroundColor, shadow: c.boxShadow }; });
+  const isFlat = o => (o.bg === 'rgba(0, 0, 0, 0)' || o.bg === 'transparent') && o.shadow === 'none';
+
+  for (const [w, t] of [[375, 'dark'], [1280, 'light']]) {
+    await check(`audit: OCEAN consent screen has no glyph, icon, or card (${w}px ${t})`, async () => {
+      const p = await pageFor(ocean, { width: w, theme: t, initial: { profile: { is_ocean_done: false } } });
+      await p.waitForSelector('.gate-wrap');
+      assert.equal(await p.locator('.gate-glyph, .privacy-box, .modal-hero, svg.icon-lg').count(), 0);
+      assert.deepEqual(await iconsOf(p), ['#i-logout'].filter(() => false));
+      assert.ok(isFlat(await flat(p, '.gate-wrap')));
+      assert.match(await p.locator('.privacy-note').innerText(), /Your answers are private[\s\S]*not graded/);
+      await p.screenshot({ path: path.join(out, `audit-ocean-consent-${w}-${t}.png`) });
+      await p.context().close();
+    });
+    await check(`audit: OCEAN question screen keeps only direction chevrons (${w}px ${t})`, async () => {
+      const p = await startOcean({ width: w, theme: t });
+      await p.locator('#ocean-answer-list button[data-score="3"]').click();
+      await p.locator('#btn-next').click();
+      assert.deepEqual(await iconsOf(p), ['#i-chev-left', '#i-chev-right']);
+      assert.ok(isFlat(await flat(p, '.test-progress')));
+      await p.screenshot({ path: path.join(out, `audit-ocean-question-${w}-${t}.png`) });
+      await p.context().close();
+    });
+  }
+  await check('audit: OCEAN quit dialog is plain text, no glyph/hero; behaviour unchanged', async () => {
+    const p = await startOcean({ width: 375 });
+    await p.locator('#ocean-answer-list button[data-score="3"]').click();
+    await p.locator('.brand-link').click();
+    await p.waitForSelector('#quit-modal.modal-active');
+    assert.equal(await p.locator('#quit-modal .modal-hero, #quit-modal svg').count(), 0);
+    assert.match(await p.locator('#quit-modal .modal-text').innerText(), /come back and carry on/);
+    await p.screenshot({ path: path.join(out, 'audit-ocean-quit-375.png') });
+    await p.locator('#quit-modal-stay').click();
+    await p.waitForFunction(() => !document.querySelector('#quit-modal.modal-active'));
+    assert.equal(new URL(p.url()).pathname, ocean);        // still on the test: no navigation change
+    await p.context().close();
+  });
+  for (const [w, t] of [[375, 'dark'], [1280, 'light']]) {
+    await check(`audit: Character Selection icons/cards (${w}px ${t}); lock-in dialog plain`, async () => {
+      const p = await pageFor('/student/html/character-selection.html', { width: w, theme: t, account: 'char2', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+      await p.waitForSelector('.persona-card');
+      assert.deepEqual(await iconsOf(p), []);
+      assert.equal(await p.locator('.persona-card').count() > 1, true);   // functional cards kept
+      await p.locator('.persona-card').first().click();
+      assert.equal(await p.locator('#lock-in-btn').isEnabled(), true);
+      assert.equal(await p.locator('#lock-in-btn svg').count(), 0);
+      await p.screenshot({ path: path.join(out, `audit-char-preview-${w}-${t}.png`) });
+      await p.locator('#lock-in-btn').click();
+      await p.waitForSelector('.overlay.modal-active, .overlay.is-open, .overlay[aria-hidden="false"]');
+      assert.equal(await p.locator('#modal-content .modal-hero, #modal-content .modal-hero-glyph').count(), 0);
+      assert.match(await p.locator('#modal-content .modal-text').innerText(), /This choice is final/);
+      await p.screenshot({ path: path.join(out, `audit-char-lock-${w}-${t}.png`) });
+      await p.context().close();
+    });
+    await check(`audit: dashboard start screen icons/cards (${w}px ${t}); facts are a description list`, async () => {
+      const p = await pageFor(dash, { width: w, theme: t, account: 'dash-audit', initial: {} });
+      await p.waitForSelector('#start-btn');
+      await p.keyboard.press('Escape');
+      assert.equal(await p.locator('.start-card svg, .agent-card svg, #start-btn svg, #signout-btn svg').count(), 0);
+      assert.equal(await p.locator('.dot-live').count(), 0);
+      assert.deepEqual(await iconsOf(p), ['#i-help']);
+      assert.equal(await p.locator('dl.facts > .fact > dt').count(), 3);
+      assert.equal(await p.locator('.start-card #start-btn').count(), 1, 'Start sits inside the start section');
+      assert.equal(await p.evaluate(() => { const a = document.querySelector('.start-card').getBoundingClientRect(), b = document.querySelector('.agent-card').getBoundingClientRect(); return b.top >= a.top - 1 && (innerWidth < 720 || b.left >= a.right - 1 || b.top >= a.bottom - 1); }), true);
+      assert.ok(isFlat(await flat(p, '.start-card')));
+      assert.equal(await p.locator('.agent-card').count(), 1);          // functional tutor card kept
+      await p.screenshot({ path: path.join(out, `audit-dash-start-${w}-${t}.png`) });
+      await p.context().close();
+    });
+  }
+  await check('audit: dashboard session + summary + sign-out dialog (no trophy/bulb/hero; status icon kept)', async () => {
+    const p = await pageFor(dash, { width: 375, account: 'dash-audit2' });
+    await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape');
+    await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
+    assert.equal(await p.locator('#hint-btn svg, #submit-btn svg').count(), 0);
+    assert.deepEqual(await iconsOf(p), ['#i-help', '#i-info']);      // tutorial control + feedback status icon
+    assert.equal(await p.locator('.progress-card').count() + await p.locator('.problem-card').count(), 2);
+    await p.screenshot({ path: path.join(out, 'audit-dash-session-375.png') });
+    await p.evaluate(() => { document.querySelector('#screen-session').classList.remove('is-active'); document.querySelector('#screen-summary').classList.add('is-active'); });
+    assert.equal(await p.locator('.summary-glyph, #screen-summary svg.icon-lg, #summary-signout svg').count(), 0);
+    assert.equal(await p.locator('dl.summary-grid dt').count(), 3);
+    assert.equal(await p.locator('#screen-summary .summary-title').isVisible(), true);
+    assert.equal(await p.locator('#summary-signout').isVisible(), true);
+    assert.ok(isFlat(await flat(p, '.summary-card')));
+    await p.screenshot({ path: path.join(out, 'audit-dash-summary-375.png') });
+    await p.locator('#signout-btn').click();
+    await p.waitForSelector('#modal-confirm.is-open');
+    assert.equal(await p.locator('#modal-confirm .modal-hero, #modal-confirm .modal-hero-glyph').count(), 0);
+    assert.ok((await p.locator('#confirm-text').innerText()).length >= 0);
+    assert.equal(await p.locator('#modal-confirm').getAttribute('aria-labelledby'), 'confirm-title');
+    await p.screenshot({ path: path.join(out, 'audit-dash-signout-dialog-375.png') });
+    await p.keyboard.press('Escape');
+    await p.context().close();
+  });
+  await check('audit: tutorial dialog has no icon, X, or nested card', async () => {
+    const p = await pageFor(dash, { width: 375, account: 'tut-audit' });
+    await p.locator('#modal-tutorial.is-open').waitFor();
+    assert.equal(await p.locator('#modal-tutorial svg, #modal-tutorial .modal-close, #modal-tutorial .modal-hero').count(), 0);
+    await p.context().close();
+  });
   /* ---------------- CHARACTER SELECTION (visual + surface only) ---------------- */
   for (const [w, t] of [[320, 'light'], [375, 'dark'], [1280, 'dark'], [1440, 'light']]) {
     await check(`character selection renders on the comic surface at ${w}px ${t} without overflow`, async () => {

@@ -142,17 +142,14 @@ async function checkAccessAndInit() {
 function renderGatekeeper() {
     if (isTestAllowed) {
         gatekeeperScreen.innerHTML = `
-            <div class="gate-wrap">
+            <div class="gate-wrap gate-open">
                 <div id="step-container"></div>
             </div>
         `;
         showPrivacyStep();
     } else {
         gatekeeperScreen.innerHTML = `
-            <div class="gate-wrap">
-                <div class="gate-glyph is-locked">
-                    <svg class="icon icon-lg"><use href="#i-lock"></use></svg>
-                </div>
+            <div class="gate-wrap gate-open">
                 <h1 class="gate-title">Not open yet</h1>
                 <p class="gate-lede">
                     Your teacher hasn't started the questionnaire. Head back to the waiting
@@ -208,9 +205,6 @@ function showPrivacyStep() {
     const container = document.getElementById('step-container');
     if (!container) return;
     container.innerHTML = `
-        <div class="gate-glyph">
-            <svg class="icon icon-lg"><use href="#i-brain"></use></svg>
-        </div>
         <h1 class="gate-title">A few questions about you</h1>
         <p class="gate-lede">
             There are 50 short statements, and there are no right or wrong answers —
@@ -219,16 +213,13 @@ function showPrivacyStep() {
             answer before you submit.
         </p>
 
-        <div class="privacy-box">
-            <svg class="icon"><use href="#i-shield"></use></svg>
-            <div>
-                <p class="privacy-title">Your answers are private</p>
-                <p class="privacy-text">
-                    They are used only to set up your tutor. Your classmates never see them,
-                    and this is not graded — it does not affect your marks in any way.
-                </p>
-            </div>
-        </div>
+        <section class="privacy-note" aria-labelledby="privacy-title">
+            <h2 class="privacy-title" id="privacy-title">Your answers are private</h2>
+            <p class="privacy-text">
+                They are used only to set up your tutor. Your classmates never see them,
+                and this is not graded — it does not affect your marks in any way.
+            </p>
+        </section>
 
         <div class="gate-actions">
             <button type="button" data-action="start" class="btn btn-primary btn-block">

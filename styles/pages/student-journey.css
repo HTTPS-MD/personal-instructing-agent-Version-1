@@ -220,6 +220,7 @@ body.opacity-0 { opacity: 0; }
     box-shadow: var(--shadow-card);
 }
 
+/* Used by waiting/complete/password screens (not yet reworked). */
 .gate-glyph {
     width: 64px;
     height: 64px;
@@ -233,6 +234,14 @@ body.opacity-0 { opacity: 0; }
 
 .gate-glyph.is-locked { background: var(--warning-soft); color: var(--warning); }
 
+/* OCEAN consent / locked screen: an open section, no card, no glyph. */
+.gate-wrap.gate-open {
+    padding: var(--sp-6) 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+}
+
 .gate-title {
     font-size: clamp(23px, 3.2vw, 30px);
     font-weight: 800;
@@ -242,16 +251,12 @@ body.opacity-0 { opacity: 0; }
 
 .gate-lede { font-size: 14.5px; line-height: 1.7; color: var(--text-muted); margin-bottom: var(--sp-6); }
 
-.privacy-box {
-    display: flex;
-    gap: var(--sp-3);
-    padding: var(--sp-5);
+/* The disclosure stays prominent as an open section with a rule, not a box. */
+.privacy-note {
+    padding-left: var(--sp-4);
     margin-bottom: var(--sp-6);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
+    border-left: var(--edge-w, 2px) solid var(--accent);
 }
-
-.privacy-box .icon { flex: 0 0 20px; color: var(--accent); margin-top: 1px; }
 .privacy-title { font-size: 14px; font-weight: 700; margin-bottom: var(--sp-2); }
 .privacy-text { font-size: var(--fs-sm); line-height: 1.65; color: var(--text-muted); }
 
@@ -327,11 +332,8 @@ body.opacity-0 { opacity: 0; }
 }
 
 .test-progress {
-    padding: var(--sp-4) var(--sp-5);
     margin-bottom: var(--sp-4);
-    border-radius: var(--r-lg);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
+    color: var(--text-muted);
 }
 
 .test-progress-top {
@@ -452,10 +454,7 @@ body.opacity-0 { opacity: 0; }
 .state-card {
     max-width: 520px;
     margin: 0 auto;
-    padding: var(--sp-8);
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
+    padding: var(--sp-8) 0;
     text-align: center;
 }
 
@@ -640,6 +639,7 @@ body.opacity-0 { opacity: 0; }
     .journey-main { padding: var(--sp-5) 0 var(--sp-8); }
     .wait-card { padding: var(--sp-7) var(--sp-5); }
     .gate-wrap { padding: var(--sp-6) var(--sp-5); }
+    .gate-wrap.gate-open { padding: var(--sp-5) 0; }
     .question-card { padding: var(--sp-6) var(--sp-4); }
     .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stage-rail.hide-sm { display: none; }
