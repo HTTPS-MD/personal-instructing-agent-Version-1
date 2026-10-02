@@ -181,3 +181,16 @@
     .auth-card { padding: var(--sp-6) var(--sp-5); }
     .auth-title { font-size: 21px; }
 }
+
+/* Shared setup: one grouping, visible policy and wrapping verified identity. */
+[hidden] { display: none !important; }
+.auth-card { text-align: left; border: 1px solid var(--line); }
+.auth-identity { padding: 0; background: none; }
+.auth-identity-value { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
+.auth-hint { text-align: left; display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.auth-hint a { min-height: 44px; display: inline-flex; align-items: center; }
+.auth-show-row { min-height: 44px; }
+.field-hint { font-size: var(--fs-sm); color: var(--text-muted); }
+.field-msg { color: var(--danger); }
+.auth-status { overflow-wrap: anywhere; }
+.auth-form .input { border: 1px solid var(--line); }

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <meta name="description"
-        content="PIA pairs a Grade 7 maths student with one of six tutor agents for percentages: finding a percentage, percentage increase and percentage decrease.">
+        content="Practise Grade 7 percentages with PIA. Sign in to your admin-created account to continue the activities available to you.">
 
     <!-- CONTENT SECURITY POLICY
          Only the directives a <meta> element can carry are here. frame-ancestors,
@@ -266,16 +266,17 @@
                 <!-- Sheet-only. Never shown in the desktop bar, where the
                      sign-in dialog already carries the staff entry points. -->
                 <div class="nav-menu-extra">
-                    <!-- Only below 21.5rem, where the bar drops its own Sign in. -->
+                    <!-- Both account actions stay discoverable in the mobile menu. -->
                     <div class="nav-menu-group nav-menu-student">
-                        <button type="button" class="tap btn-pop-ghost" data-auth-open="signin">Sign in</button>
+                        <button type="button" class="tap btn-pop" data-auth-open="signin">Sign in</button>
+                        <button type="button" class="tap btn-pop-ghost" data-auth-open="activate">Activate account</button>
                     </div>
 
                     <!-- One staff door for teachers and admins alike, as the
                          same quiet text link the sign-in dialog uses. -->
                     <p class="nav-menu-note">
                         Teacher or admin?
-                        <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                        <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
                     </p>
 
                     <!-- Only below 30rem, where the bar drops its own toggle.
@@ -296,13 +297,13 @@
                      scroll away (nav.js). data-resume-label: auth.js swaps this
                      label for a returning session, and "Continue to dashboard"
                      does not fit a phone bar. -->
-                <button type="button" class="tap btn-pop-ghost nav-signin nav-auth" data-auth-open="signin"
+                <button type="button" class="tap btn-pop nav-signin nav-auth" data-auth-open="signin"
                     data-resume-label="Dashboard">Sign in</button>
                 <!-- The tail is visually hidden on small phones but stays in the
                      accessible name, so the name still contains the visible
                      label (WCAG 2.5.3). Wrapped in one span so the button's
                      flex gap is not inserted between "Activate" and the tail. -->
-                <button type="button" class="tap btn-pop nav-activate nav-auth" data-auth-open="activate">
+                <button type="button" class="tap btn-pop-ghost nav-activate nav-auth" data-auth-open="activate">
                     <span>Activate<span class="nav-activate-tail"> account</span></span>
                 </button>
                 <!-- Last before the hamburger: while the two buttons above are
@@ -338,30 +339,8 @@
     <main id="main" tabindex="-1">
         <span id="top" class="anchor" aria-hidden="true"></span>
 
-        <!-- ================================================== THE REEL ====
-             Master wrapper for the scrubbed act. Its height IS the scrub
-             range: the video is pinned inside it with position: sticky and
-             .reel-flow is pulled back over the pinned frame, so seven full
-             viewports of scroll play six seconds of footage.
-
-             Everything inside is presentation. Remove the whole element and
-             the page still signs people in. -->
+        <!-- Hero and tutor previews retain the existing artwork. -->
         <div class="reel" id="reel">
-
-            <div class="reel-stage" aria-hidden="true">
-                <!-- Locked to the viewport box and object-fit: cover, so the
-                     frame has its final size before a single byte of video
-                     arrives. The poster paints immediately; the video fades
-                     over it once it can render a frame. -->
-                <video class="reel-video" id="reel-video" poster="assets/images/scrub-poster.jpg" preload="auto" muted
-                    playsinline disablepictureinpicture aria-hidden="true" tabindex="-1">
-                    <source src="assets/videos/pia-equations-scrub.mp4" type="video/mp4">
-                </video>
-                <span class="reel-wash"></span>
-                <span class="reel-scrim"></span>
-                <span class="reel-vignette"></span>
-            </div>
-
             <div class="reel-flow">
 
                 <!-- ------------------------------------ 1. THE DROP ------
@@ -424,15 +403,23 @@
                             </h1>
 
                             <p class="drop-sub" data-reveal>
-                                Six tutor agents. One of them already teaches the way you think.
-                                Ten minutes to find out which.
+                                Practise Grade 7 percentages step by step. Explore teaching styles,
+                                then sign in to continue the activities available to your account.
                             </p>
 
                             <!-- The page's two account actions. While these are on
                                  screen the navbar hides its own copies; nav.js brings
                                  those back once #hero-cta scrolls away. -->
                             <div class="hero-cta" id="hero-cta" data-reveal>
-                                <button type="button" class="tap cta cta-primary" data-auth-open="activate">
+                                <button type="button" class="tap cta cta-primary" data-auth-open="signin">
+                                    <span class="cta-label">Sign in</span>
+                                    <span class="cta-orb" aria-hidden="true">
+                                        <svg class="icon">
+                                            <use href="#i-login"></use>
+                                        </svg>
+                                    </span>
+                                </button>
+                                <button type="button" class="tap cta cta-quiet" data-auth-open="activate">
                                     <span class="cta-label">Activate account</span>
                                     <span class="cta-orb" aria-hidden="true">
                                         <svg class="icon cta-arrow">
@@ -443,15 +430,8 @@
                                         </svg>
                                     </span>
                                 </button>
-                                <button type="button" class="tap cta cta-quiet" data-auth-open="signin">
-                                    <span class="cta-label">Sign in</span>
-                                    <span class="cta-orb" aria-hidden="true">
-                                        <svg class="icon">
-                                            <use href="#i-login"></use>
-                                        </svg>
-                                    </span>
-                                </button>
                             </div>
+                            <p class="account-guidance signed-out-copy">Use your school email to sign in.<br>First time here? Activate the account created by your admin.</p>
                         </div>
 
                         <!-- THE CAST. Six comic cutouts, dealt onto the cover.
@@ -524,20 +504,17 @@
                                 </a>
                             </li>
                             <li class="cast-slot" data-reveal>
-                                <!-- The sixth tutor has no art yet, so it is shown the way a
-                                     game shows a character you have not unlocked. -->
-                                <a class="cast-card is-locked" href="#agent-select" data-pick="pia-neutral">
+                                <!-- Neutral uses a labelled placeholder, without implying a lock. -->
+                                <a class="cast-card neutral-preview" href="#agent-select" data-pick="pia-neutral">
                                     <span class="cast-art locked-art" aria-hidden="true">
                                         <svg class="locked-silhouette" viewBox="0 0 120 160" focusable="false">
                                             <use href="#i-silhouette"></use>
                                         </svg>
-                                        <span class="locked-mark">?</span>
-                                        <span class="locked-tag"><svg class="icon">
-                                                <use href="#i-key"></use>
-                                            </svg>Locked</span>
+                                        <span class="locked-mark">N</span>
+                                        <span class="locked-tag">Neutral</span>
                                     </span>
                                     <span class="cast-name">Neutral</span>
-                                    <span class="cast-tag">Unlocks soon</span>
+                                    <span class="cast-tag">Straightforward guidance</span>
                                 </a>
                             </li>
                         </ul>
@@ -582,12 +559,10 @@
                     <div class="shell select-shell">
 
                         <header class="select-head">
-                            <p class="mono-tag" data-reveal>Character select</p>
-                            <h2 class="select-title" id="select-title" data-reveal>Six tutors. Zero wrong
-                                picks.</h2>
-                            <p class="select-lede" data-reveal>Each one explains maths in its own style. Tap
-                                through all six &mdash; you don&rsquo;t pick here. A few questions after you
-                                sign in do that for you.</p>
+                            <p class="mono-tag" data-reveal>Meet the tutors</p>
+                            <h2 class="select-title" id="select-title" data-reveal>Explore the teaching styles.</h2>
+                            <p class="select-lede" data-reveal>Tap a tutor to preview its teaching style. This preview does not save a choice.
+                                Your study group determines whether a tutor is assigned or you can choose after the questionnaire.</p>
                         </header>
 
                         <div class="roster" role="tablist" aria-label="Tutors" data-reveal>
@@ -702,16 +677,14 @@
                                     </div>
                                 </div>
                                 <div class="stage-figure" data-figure="pia-neutral" hidden>
-                                    <div class="model-canvas-wrapper is-locked" data-model="pia-neutral" role="img"
-                                        aria-label="PIA Neutral, locked: character art coming soon">
+                                    <div class="model-canvas-wrapper neutral-preview" data-model="pia-neutral" role="img"
+                                        aria-label="PIA Neutral, teaching-style placeholder">
                                         <span class="locked-art" aria-hidden="true">
                                             <svg class="locked-silhouette" viewBox="0 0 120 160" focusable="false">
                                                 <use href="#i-silhouette"></use>
                                             </svg>
-                                            <span class="locked-mark">?</span>
-                                            <span class="locked-tag"><svg class="icon">
-                                                    <use href="#i-key"></use>
-                                                </svg>Locked</span>
+                                            <span class="locked-mark">N</span>
+                                            <span class="locked-tag">Neutral</span>
                                         </span>
                                     </div>
                                 </div>
@@ -834,9 +807,8 @@
                                         <span class="detail-name-a">PIA</span>
                                         <span class="detail-name-b">Anchor</span>
                                     </h3>
-                                    <p class="detail-line">No timers. No streaks. No rush.</p>
-                                    <p class="detail-desc">Slow and repetitive on purpose. Nothing on screen counts down
-                                        and nothing compares you to the person sitting next to you.</p>
+                                    <p class="detail-line">A calm approach to each step.</p>
+                                    <p class="detail-desc">A calm teaching style with reassuring explanations as you work through percentage problems.</p>
                                     <dl class="detail-spec">
                                         <div class="detail-spec-row">
                                             <dt>Pace</dt>
@@ -860,9 +832,9 @@
                                         <span class="detail-name-a">PIA</span>
                                         <span class="detail-name-b">Neutral</span>
                                     </h3>
-                                    <p class="detail-line">The baseline. On purpose.</p>
-                                    <p class="detail-desc">No personality applied at all. This is what the other five
-                                        are measured against, which is the only reason it exists.</p>
+                                    <p class="detail-line">Clear, straightforward guidance.</p>
+                                    <p class="detail-desc">A neutral presentation of the maths, without a personality-specific style.
+                                        Tutor access follows your study assignment; previewing this style does not select it.</p>
                                     <dl class="detail-spec">
                                         <div class="detail-spec-row">
                                             <dt>Pace</dt>
@@ -870,7 +842,7 @@
                                         </div>
                                         <div class="detail-spec-row">
                                             <dt>Best for</dt>
-                                            <dd>The control group</dd>
+                                            <dd>Study-assigned access</dd>
                                         </div>
                                     </dl>
                                 </div>
@@ -881,7 +853,7 @@
                              the student, not by name. -->
                         <div class="select-foot" data-reveal>
                             <button type="button" class="tap cta cta-primary" data-auth-open="signin">
-                                <span class="cta-label">Find my tutor</span>
+                                <span class="cta-label">Sign in to get started</span>
                                 <span class="cta-orb" aria-hidden="true">
                                     <svg class="icon cta-arrow">
                                         <use href="#i-arrow-right"></use>
@@ -891,30 +863,12 @@
                                     </svg>
                                 </span>
                             </button>
-                            <p class="select-note">No need to pick. A few quick questions about how you like to
-                                learn will match you with yours.</p>
+                            <p class="select-note">After signing in, continue from your saved stage. Activities and tutor choices depend on your study group and the stages opened by your admin.</p>
                         </div>
                     </div>
                 </section>
             </div><!-- /.reel-flow -->
         </div><!-- /.reel -->
-
-        <!-- ============================================== MATHS TAPE ---- -->
-        <!-- Decorative, so hidden from assistive tech: the list is printed
-             twice for a seamless loop and must never be announced twice --
-             the two halves must stay identical, or the loop jumps. Every
-             line is from the study's three topics: finding a percentage,
-             percentage increase, percentage decrease. -->
-        <div class="marquee" aria-hidden="true">
-            <div class="marquee-track">
-                <span>20% of 150 = 30</span><span>25% = 0.25</span><span>&#8369;100 &rarr; &#8369;120 = +20%</span>
-                <span>50% = &frac12;</span><span>&#8369;800 &rarr; &#8369;600 = &minus;25%</span><span>10% of 90 = 9</span>
-                <span>change &divide; original &times; 100</span><span>75% = &frac34;</span>
-                <span>20% of 150 = 30</span><span>25% = 0.25</span><span>&#8369;100 &rarr; &#8369;120 = +20%</span>
-                <span>50% = &frac12;</span><span>&#8369;800 &rarr; &#8369;600 = &minus;25%</span><span>10% of 90 = 9</span>
-                <span>change &divide; original &times; 100</span><span>75% = &frac34;</span>
-            </div>
-        </div>
 
         <!-- ========================================= 3. HOW A LESSON WORKS -->
         <!-- Chunking, shown rather than described: one percentage-increase
@@ -931,9 +885,7 @@
                         <span class="band-title-quiet">Cut it into panels.</span>
                     </h2>
                     <p class="band-lede" data-reveal>
-                        PIA never dumps a whole solution on you. It breaks every problem into small
-                        moves, one per panel, so nothing piles up in your head at once. A &#8369;100
-                        bag now costs &#8369;120. What is the percentage increase? Here it is, the PIA way.
+                        Percentage problems can be broken into smaller steps. A &#8369;100 bag now costs &#8369;120. What is the percentage increase? This example shows the calculation.
                     </p>
                 </header>
 
@@ -985,43 +937,36 @@
                         Self-determination theory
                     </p>
                     <h2 class="band-title" id="sdt-title" data-reveal>
-                        Three things have to be true<br>
-                        <span class="band-title-quiet">or nobody keeps going.</span>
+                        Support for your learning
                     </h2>
                     <p class="band-lede" data-reveal>
-                        Deci and Ryan's model says motivation needs autonomy, competence and
-                        relatedness. Miss one and a student stops — not because the maths is
-                        hard, but because the loop stopped being worth it. PIA is built around
-                        all three.
+                        PIA’s design draws on autonomy, competence and relatedness from self-determination theory: opportunities to act, practise and receive support.
                     </p>
                 </header>
 
                 <ol class="sdt-list">
                     <li class="sdt-card" data-reveal data-hover-intent>
-                        <h3 class="sdt-name">Autonomy</h3>
+                        <h3 class="sdt-name">Take an active role</h3>
                         <p class="sdt-body">
-                            You pick the tutor. You ask for the hint, or you don't. Nothing
-                            starts a topic on your behalf and nothing decides you're finished.
+                            Ask for a hint when you need one. Some study groups choose a tutor; others receive an assignment.
                         </p>
-                        <p class="sdt-note">In PIA: the agent is your choice, and it stays your choice.</p>
+                        <p class="sdt-note">Autonomy: choices follow the study rules for your account.</p>
                     </li>
 
                     <li class="sdt-card" data-reveal data-hover-intent>
-                        <h3 class="sdt-name">Competence</h3>
+                        <h3 class="sdt-name">Practise step by step</h3>
                         <p class="sdt-body">
-                            Problems land just past what you can already do. Far enough to be
-                            worth solving, close enough that you get there.
+                            Work on finding percentages, percentage increases and percentage decreases, with feedback on your answers.
                         </p>
-                        <p class="sdt-note">In PIA: difficulty follows your streak, not the class timetable.</p>
+                        <p class="sdt-note">Competence: practise with hints and answer feedback.</p>
                     </li>
 
                     <li class="sdt-card" data-reveal data-hover-intent>
-                        <h3 class="sdt-name">Relatedness</h3>
+                        <h3 class="sdt-name">Learn with guidance</h3>
                         <p class="sdt-body">
-                            Someone on the other side is paying attention. Not scoring you —
-                            remembering you.
+                            Explore different ways of presenting guidance while you practise. Your tutor is part of the learning application.
                         </p>
-                        <p class="sdt-note">In PIA: your agent knows what tripped you up last session, and says so.</p>
+                        <p class="sdt-note">Relatedness: a consistent tutor presence during your activities.</p>
                     </li>
                 </ol>
             </div>
@@ -1040,33 +985,28 @@
 
                 <ul class="caps">
                     <li class="cap" data-reveal data-hover-intent>
-                        <h3 class="cap-name">Explains it again, differently</h3>
-                        <p class="cap-text">If the first route doesn't land there's a second and a third. Same answer,
-                            different way in.</p>
+                        <h3 class="cap-name">Hints when you need them</h3>
+                        <p class="cap-text">Request step-by-step hints while working on a problem.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <h3 class="cap-name">Moves at your speed</h3>
-                        <p class="cap-text">Master finding a percentage and you move on to increase, then decrease.
-                            Get stuck and it steps back with you.</p>
+                        <h3 class="cap-name">Practise percentages</h3>
+                        <p class="cap-text">Work through problems on percentages, increases and decreases.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <h3 class="cap-name">Never runs a clock</h3>
-                        <p class="cap-text">No timers, no streak you can break, no leaderboard. Nothing on screen is
-                            counting down.</p>
+                        <h3 class="cap-name">Focus on the next step</h3>
+                        <p class="cap-text">Read the question, try an answer and use the available feedback.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <h3 class="cap-name">Keeps your working private</h3>
-                        <p class="cap-text">Your teacher sees that you're progressing. They don't see every wrong turn
-                            you took.</p>
+                        <h3 class="cap-name">Part of a research study</h3>
+                        <p class="cap-text">Authorized teachers and administrators can view learning records according to their roles.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <h3 class="cap-name">Runs on the school laptops</h3>
-                        <p class="cap-text">A browser and a login. Nothing to install and nothing to carry home.</p>
+                        <h3 class="cap-name">Use your browser</h3>
+                        <p class="cap-text">Sign in with your admin-created account and an internet connection.</p>
                     </li>
                     <li class="cap" data-reveal data-hover-intent>
-                        <h3 class="cap-name">Picks up where you stopped</h3>
-                        <p class="cap-text">Close the tab mid-problem. It's still there, mid-problem, when you come
-                            back.</p>
+                        <h3 class="cap-name">Continue your activities</h3>
+                        <p class="cap-text">Sign in again to continue from the stage available to your account.</p>
                     </li>
                 </ul>
             </div>
@@ -1076,7 +1016,7 @@
         <section class="band band-finale" id="get-started" aria-labelledby="cta-title">
             <div class="shell finale-inner">
                 <p class="mono-tag" data-reveal>
-                    Enrolment
+                    Account access
                 </p>
 
                 <h2 class="finale-title" id="cta-title" data-scrub-words>
@@ -1084,14 +1024,23 @@
                 </h2>
 
                 <p class="finale-sub" data-reveal>
-                    Accounts are created for you in advance, so there is no public sign-up.
-                    Use your school email — if it isn't recognised yet, ask your teacher.
+                    Your admin creates your account. Sign in with your school email, or activate your account if this is your first visit.
                 </p>
+
+                <p class="account-guidance signed-out-copy">If your account has not been created yet, contact your admin.</p>
 
                 <!-- The same pair as the hero, in the same style: one design for
                      one pair of actions, wherever it appears. -->
                 <div class="finale-actions" data-reveal>
-                    <button type="button" class="tap cta cta-primary" data-auth-open="activate">
+                    <button type="button" class="tap cta cta-primary" data-auth-open="signin">
+                        <span class="cta-label">Sign in</span>
+                        <span class="cta-orb" aria-hidden="true">
+                            <svg class="icon">
+                                <use href="#i-login"></use>
+                            </svg>
+                        </span>
+                    </button>
+                    <button type="button" class="tap cta cta-quiet" data-auth-open="activate">
                         <span class="cta-label">Activate account</span>
                         <span class="cta-orb" aria-hidden="true">
                             <svg class="icon cta-arrow">
@@ -1102,19 +1051,11 @@
                             </svg>
                         </span>
                     </button>
-                    <button type="button" class="tap cta cta-quiet" data-auth-open="signin">
-                        <span class="cta-label">Sign in</span>
-                        <span class="cta-orb" aria-hidden="true">
-                            <svg class="icon">
-                                <use href="#i-login"></use>
-                            </svg>
-                        </span>
-                    </button>
                 </div>
 
                 <p class="finale-staff" data-reveal>
                     Teacher or admin?
-                    <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                    <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
                 </p>
             </div>
         </section>
@@ -1125,7 +1066,7 @@
             <p class="foot-line">PIA System &middot; Personal Instructing Agent</p>
             <p class="foot-line foot-staff">
                 <span class="foot-staff-label">Staff</span>
-                <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
             </p>
             <p class="foot-line foot-line-mono">University of the East &middot; Grade 7 mathematics &middot; Percentages &middot; 2026</p>
         </div>
@@ -1145,7 +1086,7 @@
          exactly like "Activate your account", into their own dialog below.
 
          The student form still accepts student accounts only: a teacher or
-         admin who signs in here is pointed to "Admin sign in" and signed
+         admin who signs in here is pointed to "Teacher / Admin sign in" and signed
          back out, never silently redirected (auth.js). That is a routing
          guarantee, not the security boundary — row-level security is. -->
     <div class="overlay" id="modal-signin" role="dialog" aria-modal="true" aria-labelledby="signin-title"
@@ -1224,7 +1165,7 @@
                         </p>
                         <p class="portal-note">
                             Teacher or admin?
-                            <button type="button" class="link-btn" data-auth-open="staff">Admin sign in</button>
+                            <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
                         </p>
                     </div>
                 </form>
@@ -1237,7 +1178,7 @@
          One door for every staff account. Teachers and admins both sign in
          here and auth.js sends each to their own dashboard by the role on
          their profile — there is no role to pick, so nothing to get wrong.
-         Titled "Admin sign in" to match the link that opens it; the subtitle
+         Titled "Teacher / Admin sign in" to match the link that opens it; the subtitle
          tells teachers it is theirs too.
          ===================================================================== -->
     <div class="overlay" id="modal-staff" role="dialog" aria-modal="true" aria-labelledby="staff-title"
@@ -1245,7 +1186,7 @@
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
-                    <h2 class="modal-title" id="staff-title">Admin sign in</h2>
+                    <h2 class="modal-title" id="staff-title">Teacher / Admin sign in</h2>
                     <p class="modal-sub" id="staff-sub">For teachers and administrators.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
@@ -1259,7 +1200,7 @@
                 <form id="staff-form" class="portal-form" novalidate>
                     <div class="form-grid">
                         <div class="field">
-                            <label class="label" for="st-email">Staff email</label>
+                            <label class="label" for="st-email">School email</label>
                             <input class="input" type="email" id="st-email" name="email" autocomplete="username"
                                 inputmode="email" autocapitalize="off" spellcheck="false" placeholder="name@ue.edu.ph"
                                 aria-describedby="st-email-msg" data-autofocus>
@@ -1319,135 +1260,70 @@
         </div>
     </div>
 
-    <!-- ============================================= MODAL · ACTIVATION -->
-    <div class="overlay" id="modal-activate" role="dialog" aria-modal="true" aria-labelledby="activate-title">
+    <div class="overlay" id="modal-activate" role="dialog" aria-modal="true" aria-labelledby="activate-title" aria-describedby="activate-description">
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="activate-title">Activate your account</h2>
-                    <p class="modal-sub">We'll email you a one-time link to set your password.</p>
+                    <p class="modal-sub" id="activate-description">Your account must be created by an admin before you can activate it. If your account has not been created yet, contact your admin.</p>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon">
-                        <use href="#i-x"></use>
-                    </svg>
-                </button>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close dialog"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></button>
             </header>
-
             <div class="modal-body">
-                <div class="auth-intro">
-                    <svg class="icon">
-                        <use href="#i-info"></use>
-                    </svg>
-                    <p class="auth-intro-text">
-                        Your account is set up for you in advance, so there's no public sign-up. If your
-                        email isn't recognised yet, check with your teacher.
-                    </p>
-                </div>
-
-
                 <form id="activate-form" novalidate>
                     <div class="field">
                         <label class="label" for="ac-email">School email</label>
-                        <input class="input" type="email" id="ac-email" autocomplete="username"
-                            placeholder="maria.santos@student.ue.edu.ph">
-                        <p class="field-msg" data-msg-for="ac-email"></p>
+                        <input class="input" type="email" id="ac-email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" aria-describedby="ac-email-msg" data-autofocus>
+                        <p class="field-msg" id="ac-email-msg" data-msg-for="ac-email"></p>
                     </div>
                 </form>
-                <p class="auth-status" id="activate-status" role="status">
-                    <svg class="icon">
-                        <use href="#i-alert"></use>
-                    </svg>
-                    <span data-status-text></span>
-                </p>
+                <section id="ac-accepted" class="email-accepted" aria-label="Email request accepted" hidden>
+                    <p>If this email belongs to an account that can be activated, you’ll receive an activation email. Use the activation button or link in the email to set your password. Check Spam or Junk if you don’t see it.</p>
+                    <p class="email-destination">Request destination: <strong id="ac-sent-to"></strong></p>
+                    <div class="auth-alt">
+                        <button type="button" class="link-btn" id="ac-resend">Resend email</button>
+                        <button type="button" class="link-btn" id="ac-change-email">Use a different email</button>
+                    </div>
+                </section>
+                <p class="email-cooldown" id="ac-cooldown"></p>
+                <p class="auth-status" id="activate-status" role="status"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg><span data-status-text></span></p>
             </div>
-
-            <footer class="modal-foot modal-foot-split">
-                <button type="button" class="link-btn" data-auth-open="back">Back to sign in</button>
-                <div class="modal-foot-actions">
-                    <button class="btn btn-primary" type="submit" form="activate-form" id="ac-submit">
-                        <svg class="icon">
-                            <use href="#i-mail"></use>
-                        </svg>
-                        Send link
-                    </button>
-                </div>
+            <footer class="modal-foot" id="ac-footer">
+                <button class="btn btn-primary" type="submit" form="activate-form" id="ac-submit">Send activation link</button>
             </footer>
         </div>
     </div>
 
-    <!-- ============================================ MODAL · RESET PASSWORD -->
-    <div class="overlay" id="modal-forgot" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+    <div class="overlay" id="modal-forgot" role="dialog" aria-modal="true" aria-labelledby="forgot-title" aria-describedby="forgot-description">
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="forgot-title">Reset your password</h2>
-                    <p class="modal-sub">We'll email you a link and a code. Use whichever is easier.</p>
+                    <p class="modal-sub" id="forgot-description">Enter your school email. We’ll send instructions to reset your password.</p>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon">
-                        <use href="#i-x"></use>
-                    </svg>
-                </button>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close dialog"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></button>
             </header>
-
             <div class="modal-body">
-
-                <!-- STEP 1 — the email. -->
                 <form id="forgot-form" novalidate>
                     <div class="field">
                         <label class="label" for="fp-email">School email</label>
-                        <input class="input" type="email" id="fp-email" autocomplete="username"
-                            placeholder="maria.santos@student.ue.edu.ph">
-                        <p class="field-msg" data-msg-for="fp-email"></p>
+                        <input class="input" type="email" id="fp-email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" aria-describedby="fp-email-msg" data-autofocus>
+                        <p class="field-msg" id="fp-email-msg" data-msg-for="fp-email"></p>
                     </div>
                 </form>
-
-                <!-- STEP 2 — the code, as an alternative to the link. The same
-                     email carries both; verifyOtp(type: 'recovery') turns the
-                     code into the same session the link would, and both end on
-                     the set-password page. auth.js swaps the footer button
-                     between the two forms. -->
-                <form id="forgot-code-form" novalidate hidden>
-                    <div class="auth-intro">
-                        <svg class="icon">
-                            <use href="#i-mail"></use>
-                        </svg>
-                        <p class="auth-intro-text">
-                            If <b id="fp-sent-to">that address</b> is on the roster, an email is on its way
-                            with a reset link and a code. Open the link, or type the code here.
-                        </p>
-                    </div>
-                    <div class="field">
-                        <label class="label" for="fp-code">Reset code</label>
-                        <input class="input" type="text" id="fp-code" inputmode="numeric" autocomplete="one-time-code"
-                            maxlength="10" spellcheck="false" placeholder="Code from the email"
-                            aria-describedby="fp-code-msg">
-                        <p class="field-msg" id="fp-code-msg" data-msg-for="fp-code"></p>
-                    </div>
+                <section id="fp-accepted" class="email-accepted" aria-label="Email request accepted" hidden>
+                    <p>If this email is registered, you’ll receive instructions to reset your password. Click the Reset password button in the email. Check Spam or Junk if you don’t see it.</p>
+                    <p class="email-destination">Request destination: <strong id="fp-sent-to"></strong></p>
                     <div class="auth-alt">
-                        <button type="button" class="link-btn" id="fp-resend" disabled>Send a new code</button>
+                        <button type="button" class="link-btn" id="fp-resend">Resend email</button>
                         <button type="button" class="link-btn" id="fp-change-email">Use a different email</button>
                     </div>
-                </form>
-                <p class="auth-status" id="forgot-status" role="status">
-                    <svg class="icon">
-                        <use href="#i-alert"></use>
-                    </svg>
-                    <span data-status-text></span>
-                </p>
+                </section>
+                <p class="email-cooldown" id="fp-cooldown"></p>
+                <p class="auth-status" id="forgot-status" role="status"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg><span data-status-text></span></p>
             </div>
-
-            <footer class="modal-foot modal-foot-split">
-                <button type="button" class="link-btn" data-auth-open="back">Back to sign in</button>
-                <div class="modal-foot-actions">
-                    <button class="btn btn-primary" type="submit" form="forgot-form" id="fp-submit">
-                        <svg class="icon">
-                            <use href="#i-key"></use>
-                        </svg>
-                        Send reset link
-                    </button>
-                </div>
+            <footer class="modal-foot" id="fp-footer">
+                <button class="btn btn-primary" type="submit" form="forgot-form" id="fp-submit">Send reset email</button>
             </footer>
         </div>
     </div>
@@ -1505,7 +1381,6 @@
             </div>
 
             <footer class="modal-foot modal-foot-split">
-                <button type="button" class="link-btn" data-auth-open="back">Back to sign in</button>
                 <div class="modal-foot-actions">
                     <button class="btn btn-primary" type="submit" form="device-reset-form" id="dr-submit">
                         <svg class="icon">

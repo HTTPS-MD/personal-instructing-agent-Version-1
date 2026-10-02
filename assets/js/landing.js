@@ -100,114 +100,6 @@
      * Nothing here writes a layout-affecting property. currentTime is a media
      * property, not a style, so the scrub cannot shift the page.             */
 
-    function initScrub() {
-        var reel = $('#reel');
-        var video = $('#reel-video');
-        if (!reel || !video) { return; }
-
-        var target = 0;      /* where the scroll says we should be, 0..1 */
-        var eased = 0;       /* where we actually are                    */
-        var duration = 0;
-        var visible = true;
-        var ready = false;
-
-        /* A seek costs a decode. Below a quarter-frame of difference it is
-           not visible, so we skip it and let the loop park. */
-        var EPSILON = 1 / 96;
-
-        function onMeta() {
-            duration = video.duration;
-            if (!isFinite(duration) || duration <= 0) { return; }
-            ready = true;
-            video.classList.add('is-live');
-            wake();
-        }
-
-        if (video.readyState >= 1) { onMeta(); }
-        video.addEventListener('loadedmetadata', onMeta);
-
-        /* If the file 404s, is an unsupported codec, or the network dies
-           mid-buffer, the poster is already painted underneath — so the
-           failure state is "a still frame", not a black box. */
-        function onDead() {
-            ready = false;
-            video.classList.remove('is-live');
-        }
-        video.addEventListener('error', onDead);
-        video.addEventListener('emptied', onDead);
-
-        /* Stop doing any of this when the reel is off screen. */
-        if ('IntersectionObserver' in window) {
-            new IntersectionObserver(function (entries) {
-                visible = entries[0].isIntersecting;
-                if (visible) { wake(); }
-            }, { rootMargin: '10% 0px' }).observe(reel);
-        }
-
-        /* Honour a preference change made after load, not just at boot. */
-        function onMotionChange() {
-            reduceMotion = motionQuery.matches;
-            if (reduceMotion && ready) {
-                try { video.currentTime = 0; } catch (e) { /* not seekable yet */ }
-            }
-            wake();
-        }
-        if (motionQuery.addEventListener) { motionQuery.addEventListener('change', onMotionChange); }
-
-        addReader(function () {
-            if (!ready || !visible) { return false; }
-
-            /* Reduced motion: the video is a still. No seeking, no loop. */
-            if (reduceMotion) { return false; }
-
-            var rect = reel.getBoundingClientRect();
-            var span = reel.offsetHeight - window.innerHeight;
-            if (span <= 0) { return false; }
-
-            target = clamp(-rect.top / span, 0, 1);
-
-            var delta = target - eased;
-            if (Math.abs(delta) < 0.0005) {
-                eased = target;
-            } else {
-                /* 0.18 is the whole feel of the thing: lower drags behind the
-                   scroll, higher reintroduces the stutter we are smoothing. */
-                eased += delta * 0.18;
-            }
-
-            var want = eased * duration;
-            if (Math.abs(want - video.currentTime) > EPSILON) {
-                try { video.currentTime = want; } catch (e) { /* seek raced a reload */ }
-            }
-
-            /* Keep the loop alive only while we are still catching up. */
-            return Math.abs(target - eased) > 0.0005;
-        });
-    }
-
-
-    /* ==================================================================== *
-     * 2B. HERO BACKGROUND VIDEO                                            *
-     * ==================================================================== *
-     * A plain loop, not a scrub — nothing here reads scroll position, so it
-     * adds no work to the frame loop above.
-     *
-     * The <video> ships with preload="none" and no autoplay attribute, so
-     * NOTHING is downloaded until this function decides to play. It plays
-     * only when all of these hold:
-     *   * the visitor has not paused it (a choice remembered per browser),
-     *   * they have not asked for reduced motion — unless they explicitly
-     *     pressed Play, which outranks the OS default,
-     *   * the connection is not in Save-Data or 2G mode,
-     *   * the hero is on screen and the tab is visible.
-     * The last two are resource rules, not preferences: a paused video
-     * costs no decode, no GPU and no battery while the visitor reads the
-     * rest of the page.
-     *
-     * Every failure path — autoplay refused (iOS Low Power Mode), every
-     * source unplayable, JS absent — leaves the poster in place. The poster
-     * is frame 0 of the loop, so success and failure look the same at rest. */
-
     function initHeroVideo() {
         var hero = $('#hero');
         var video = $('#hero-video');
@@ -534,7 +426,10 @@
 
         function sync() {
             var dark = String(current() === 'dark');
-            toggles.forEach(function (t) { t.setAttribute('aria-pressed', dark); });
+            toggles.forEach(function (t) {
+                t.setAttribute('aria-pressed', dark);
+                if (t.classList.contains('theme-toggle')) { t.setAttribute('aria-label', current() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'); }
+            });
         }
 
         toggles.forEach(function (toggle) {
@@ -613,7 +508,7 @@
             wire.hidden = false;
             wire.classList.add('is-error');
             if (text) {
-                text.textContent = 'Part of this page tripped over itself. Reload, or carry on — sign-in still works.';
+                text.textContent = 'Part of this page could not load. Reload the page to try again.';
             }
 
             /* Fail visible, not blank. */
@@ -637,7 +532,6 @@
         initReveals();
         initWordEntrance();
         initWordScrub();
-        initScrub();
         initHeroVideo();
         initHoverIntent();
         wake();

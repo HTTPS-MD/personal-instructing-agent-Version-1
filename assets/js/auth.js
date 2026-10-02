@@ -5,7 +5,7 @@
  * Vanilla JavaScript. Uses the shared `sb` client from assets/js/function.js.
  *
  * Three flows, all against the real backend:
- *   1. Sign in            — two doors: the student form, and "Admin sign in"
+ *   1. Sign in            — two doors: the student form, and "Teacher / Admin sign in"
  *                           for every staff account (teachers AND admins).
  *                           Each accepts only its own kind of account; the
  *                           redirect then routes by role
@@ -45,7 +45,7 @@
     /* Matches --z-overlay in global.css; see the stacking ladder there. */
     var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
-    var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
+    var FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
     function lockScroll() {
@@ -59,106 +59,94 @@
         document.documentElement.style.setProperty('--scrollbar-w', '0px');
     }
 
+    var authReturn = null;
+    var backgroundNodes = [];
+
+    function setBackgroundInert(on) {
+        if (on && !backgroundNodes.length) {
+            backgroundNodes = Array.from(document.body.children).filter(function (el) {
+                return !el.classList.contains('overlay') && !['SCRIPT', 'SVG'].includes(el.tagName) && !el.inert;
+            });
+            backgroundNodes.forEach(function (el) { el.inert = true; });
+        } else if (!on) {
+            backgroundNodes.forEach(function (el) { el.inert = false; });
+            backgroundNodes = [];
+        }
+    }
+
     function openModal(id) {
         var overlay = document.getElementById(id);
-        if (!overlay || openLayers.indexOf(overlay) !== -1) { return; }
-
+        if (!overlay || openLayers.includes(overlay)) { return; }
         if (!openLayers.length) {
-            lastFocused = document.activeElement;
+            if (!lastFocused) { lastFocused = document.activeElement; }
             lockScroll();
+            setBackgroundInert(true);
         }
-
-        overlay.classList.add('is-mounted');
+        overlay.inert = false;
+        overlay.classList.add('is-mounted', 'is-open');
         openLayers.push(overlay);
-        
-        /* Raise this layer above every layer already open. All overlays share
-           one base z-index in CSS, so without this the winner is decided by DOM
-           source order — which is how an open drawer ended up covering a
-           confirmation dialog it had itself triggered. z-index does not affect
-           layout, so this costs nothing in CLS. */
-        overlay.style.zIndex = String(Z_OVERLAY_BASE + openLayers.length);
-        void overlay.offsetWidth;
-        overlay.classList.add('is-open');
-
-        /* [data-autofocus] first, so the email field wins over anything that
-           precedes it in source order. When the email is already filled in
-           (carried over from another dialog) the password is the next thing
-           to type, so focus goes there instead. */
         var first = overlay.querySelector('[data-autofocus]');
+        if (first && first.closest('[hidden]')) { first = null; }
         if (first && first.type === 'email' && first.value) {
             first = overlay.querySelector('input[type="password"]') || first;
         }
-        first = first || overlay.querySelector('input:not([type="hidden"]), select, textarea, button');
+        first = first || overlay.querySelector('button:not([disabled])');
         if (first) { first.focus({ preventScroll: true }); }
     }
 
-    function closeModal(target) {
-        var overlay = (typeof target === 'string') ? document.getElementById(target) : target;
+    function closeModal(target, switching) {
+        var overlay = typeof target === 'string' ? document.getElementById(target) : target;
         overlay = overlay || openLayers[openLayers.length - 1];
         if (!overlay) { return; }
-
-        overlay.classList.remove('is-open');
-        overlay.style.zIndex = '';
+        invalidateEmailView(overlay.id);
+        overlay.dataset.authVersion = String(Number(overlay.dataset.authVersion || 0) + 1);
+        overlay.classList.remove('is-open', 'is-mounted');
+        overlay.inert = true;
         openLayers = openLayers.filter(function (layer) { return layer !== overlay; });
-
-        /* These are shared school laptops. A password left in a closed dialog
-           is one "show password" click away from the next person to sit down,
-           so it is wiped and re-masked the moment the dialog goes. The email
-           is kept — retyping it is friction, and it is not a secret. */
-        $$('input[type="password"], input[data-pw-shown]', overlay).forEach(function (input) {
-            input.value = '';
-        });
+        $$('input[type="password"], input[data-pw-shown]', overlay).forEach(function (input) { input.value = ''; });
         maskPasswords(overlay);
-
-        setTimeout(function () {
-            overlay.classList.remove('is-mounted');
-            if (!openLayers.length) {
-                unlockScroll();
-                if (lastFocused && lastFocused.focus) { lastFocused.focus({ preventScroll: true }); }
-            }
-        }, 160);
+        if (switching) { return; }
+        if (authReturn && ['modal-forgot', 'modal-activate', 'modal-device-reset'].includes(overlay.id)) {
+            var context = authReturn;
+            authReturn = null;
+            openModal(context.id);
+            if (context.focus && context.focus.isConnected) { context.focus.focus(); }
+            return;
+        }
+        authReturn = null;
+        if (!openLayers.length) {
+            unlockScroll();
+            setBackgroundInert(false);
+            var focus = lastFocused;
+            lastFocused = null;
+            if (focus && focus.isConnected) { focus.focus({ preventScroll: true }); }
+        }
     }
 
-    /* Switching between the auth dialogs closes the current one first, so
-       the scroll lock and focus restore stay balanced.
-
-       "student" is an alias of "signin" for links INSIDE the dialogs:
-       offerResume() relabels every data-auth-open="signin" trigger for a
-       returning session, which is right for the page's entry points and
-       wrong for "Student sign in" inside the staff dialog. */
     var AUTH_MODALS = {
-        signin: 'modal-signin',
-        student: 'modal-signin',
-        staff: 'modal-staff',
-        activate: 'modal-activate',
-        forgot: 'modal-forgot',
-        'device-reset': 'modal-device-reset'
+        signin: 'modal-signin', student: 'modal-signin', staff: 'modal-staff',
+        activate: 'modal-activate', forgot: 'modal-forgot', 'device-reset': 'modal-device-reset'
     };
-
-    /* "Back to sign in" (data-auth-open="back") returns to whichever sign-in
-       the visitor actually came from. A teacher who clicked "Forgot
-       password?" in the staff dialog expects to land back in the staff
-       dialog, not on the student form. */
     var lastSignin = 'signin';
 
     function openAuth(key) {
         if (key === 'back') { key = lastSignin; }
-
         var id = AUTH_MODALS[key];
         if (!id) { return; }
-
+        var current = openLayers[openLayers.length - 1];
+        if (current && current.id === id) { return; }
+        if (current && ['modal-signin', 'modal-staff'].includes(current.id) &&
+            ['modal-forgot', 'modal-activate', 'modal-device-reset'].includes(id)) {
+            authReturn = { id: current.id, focus: document.activeElement };
+        } else if (!current || ['modal-signin', 'modal-staff'].includes(id)) {
+            authReturn = null;
+        }
         if (id === 'modal-signin') { lastSignin = 'signin'; }
         if (id === 'modal-staff') { lastSignin = 'staff'; }
-        if (id === 'modal-forgot' && typeof resetForgotDialog === 'function') { resetForgotDialog(); }
-
-        var current = openLayers[openLayers.length - 1];
-        if (current && current.id !== id) {
-            closeModal(current);
-            setTimeout(function () { carryEmail(id); openModal(id); }, 170);
-            return;
-        }
+        if (current) { closeModal(current, true); }
         carryEmail(id);
         openModal(id);
+        renderEmailRequests();
     }
 
     /* The last address typed into ANY auth dialog is offered to the next
@@ -412,7 +400,7 @@
             return 'This is a student account. Use Student sign in instead.';
         }
         if (area === 'student' && isStaff) {
-            return 'This is a staff account. Use Admin sign in, below.';
+            return 'This is a staff account. Use Teacher / Admin sign in, below.';
         }
         return '';
     }
@@ -424,18 +412,21 @@
     function friendlyAuthError(error) {
         var raw = String((error && error.message) || '');
         if (/invalid login credentials/i.test(raw)) {
-            return 'Nope — that email and password don\u2019t match. Check both (and Caps Lock) and try again.';
+            return 'The email or password is incorrect. Check both and try again.';
         }
         if (/email not confirmed/i.test(raw)) {
-            return 'This account isn\u2019t switched on yet. Hit Activate account first.';
+            return 'Activate your account before signing in.';
         }
         if (/rate limit|too many/i.test(raw)) {
-            return 'Whoa, too many tries. Take a one-minute breather, then go again.';
+            return 'Too many sign-in attempts. Please wait before trying again.';
         }
-        return raw || 'Well, that didn\u2019t work. Let\u2019s try again.';
+        return 'Sign in could not be completed. Check your connection or try again later.';
     }
 
+    var signInPending = false;
     async function signIn(opts) {
+        if (signInPending) { return; }
+        if ($('#' + opts.submitId).disabled) { return; }
         clearFormErrors(opts.formId);
         clearStatus(opts.statusId);
 
@@ -448,8 +439,8 @@
         var password = $('#' + opts.passwordId).value;
 
         var valid = true;
-        valid = setFieldError(opts.emailId, isEmail(email) ? '' : 'That doesn\u2019t look like an email address.') && valid;
-        valid = setFieldError(opts.passwordId, password ? '' : 'You\u2019ll need your password for this one.') && valid;
+        valid = setFieldError(opts.emailId, isEmail(email) ? '' : 'Enter a valid school email address.') && valid;
+        valid = setFieldError(opts.passwordId, password ? '' : 'Enter your password.') && valid;
         if (!valid) {
             focusFirstInvalid(opts.formId);
             return;
@@ -459,11 +450,19 @@
            that was submitted from a type="password" field. */
         maskPasswords($('#' + opts.formId));
 
+        var overlay = $('#' + opts.formId).closest('.overlay');
+        var version = overlay.dataset.authVersion || '0';
+        var current = function () { return overlay.classList.contains('is-open') && (overlay.dataset.authVersion || '0') === version; };
+        signInPending = true;
         var release = setBusy($('#' + opts.submitId), 'Signing in…');
 
         try {
             var auth = await sb.auth.signInWithPassword({ email: email, password: password });
 
+            if (!current()) {
+                if (!auth.error) { await sb.auth.signOut({ scope: 'local' }); }
+                return;
+            }
             if (auth.error) {
                 setStatus(opts.statusId, friendlyAuthError(auth.error), 'error');
                 return;
@@ -471,6 +470,8 @@
 
             var profileRes = await sb.from('profiles').select('*')
                 .eq('email', auth.data.user.email).maybeSingle();
+
+            if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
 
             /* Every refusal below undoes the session signInWithPassword just
                created ON THIS DEVICE, and nothing more. scope 'local' matters:
@@ -509,6 +510,7 @@
             } catch (err) { /* private mode */ }
 
             var check = await claimSeat(auth.data.user.email, profile, role);
+            if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
             if (!check.allowed) {
                 /* Only this refused attempt is undone; any other device
                    keeps its session. */
@@ -534,9 +536,9 @@
                 setStatus(opts.statusId, message, tone);
             });
         } catch (err) {
-            console.error('Sign-in failed:', err);
-            setStatus(opts.statusId, 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
+            if (current()) { setStatus(opts.statusId, 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error'); }
         } finally {
+            signInPending = false;
             release();
         }
     }
@@ -800,220 +802,125 @@
         return true;
     }
 
-    /* ============================================ 4. ACTIVATION ======== */
+    /* Shared email-link requests. The existing 60-second UI cooldown is a
+       convenience only; the service remains responsible for rate limits.
+       Timestamps (not tick counts) survive backgrounding. State survives
+       closing and changing the destination; no emails/tokens are persisted. */
+    var emailRequests = {
+        activate: { prefix: 'ac', title: 'Activate your account', pending: false, until: 0, version: 0, accepted: false },
+        forgot: { prefix: 'fp', title: 'Reset your password', pending: false, until: 0, version: 0, accepted: false }
+    };
+    var emailTimer = null;
 
-    /* shouldCreateUser:false is the important argument. Without it a typo
-       would silently create an auth user with no profile row — exactly the
-       orphan state the admin console has to clean up by hand. */
-    async function handleActivate(event) {
-        event.preventDefault();
-        clearFormErrors('activate-form');
-        clearStatus('activate-status');
+    function invalidateEmailView(id) {
+        Object.keys(emailRequests).forEach(function (kind) {
+            if (id === 'modal-' + kind) { emailRequests[kind].version++; }
+        });
+    }
 
-        var email = normalizeEmail($('#ac-email').value);
-        if (!setFieldError('ac-email', isEmail(email) ? '' : 'That doesn\u2019t look like an email address.')) { return; }
+    function renderEmailRequests() {
+        clearTimeout(emailTimer);
+        var ticking = false;
+        Object.keys(emailRequests).forEach(function (kind) {
+            var state = emailRequests[kind], p = state.prefix;
+            var remaining = Math.max(0, Math.ceil((state.until - Date.now()) / 1000));
+            var open = $('#modal-' + kind).classList.contains('is-open');
+            $('#' + kind + '-form').hidden = state.accepted;
+            $('#' + p + '-accepted').hidden = !state.accepted;
+            $('#' + p + '-footer').hidden = state.accepted;
+            $('#' + kind + '-title').textContent = state.accepted ? 'Check your email' : state.title;
+            $('#' + kind + '-description').hidden = state.accepted;
+            $('#' + p + '-submit').disabled = state.pending || remaining > 0;
+            $('#' + p + '-submit').textContent = state.pending ? 'Sending…' :
+                (kind === 'activate' ? 'Send activation link' : 'Send reset email');
+            $('#' + p + '-resend').disabled = state.pending || remaining > 0;
+            $('#' + p + '-change-email').disabled = state.pending;
+            $('#' + p + '-resend').textContent = state.pending ? 'Sending…' : 'Resend email';
+            $('#' + p + '-email').disabled = state.pending;
+            // Deliberately outside the live region: do not announce every second.
+            $('#' + p + '-cooldown').textContent = remaining ? 'You can request another email in ' + remaining + ' seconds.' : '';
+            if (remaining && open) { ticking = true; }
+        });
+        if (ticking) { emailTimer = setTimeout(renderEmailRequests, 1000); }
+    }
 
-        var release = setBusy($('#ac-submit'), 'Sending…');
+    function retryDelay(error) {
+        var raw = error && (error.retry_after || error.retryAfter ||
+            (error.headers && error.headers.get && error.headers.get('Retry-After')));
+        if (raw && Number.isFinite(Number(raw))) { return Math.max(0, Number(raw) * 1000); }
+        if (raw && Number.isFinite(Date.parse(raw))) { return Math.max(0, Date.parse(raw) - Date.now()); }
+        var match = String(error && error.message || '').match(/after\s+(\d+)\s+seconds?/i);
+        return match ? Number(match[1]) * 1000 : 60000;
+    }
 
+    function emailRequestError(error) {
+        var message = String(error && error.message || '');
+        if (Number(error && error.status) === 429 || /rate.limit|too many|after.*seconds/i.test(message)) {
+            return 'Too many email requests. Wait for the cooldown, then try again.';
+        }
+        if (navigator.onLine === false || /fetch|network|connection/i.test(message)) {
+            return 'The request could not be confirmed. Check your connection and your inbox before trying again.';
+        }
+        return 'The email request was not accepted. Try again later or contact your admin.';
+    }
+
+    async function requestEmail(kind, resend) {
+        var state = emailRequests[kind], p = state.prefix;
+        if (state.pending || Date.now() < state.until) { return; }
+        clearFormErrors(kind + '-form');
+        clearStatus(kind + '-status');
+        var email = resend ? state.email : normalizeEmail($('#' + p + '-email').value);
+        if (!setFieldError(p + '-email', isEmail(email) ? '' : 'Enter a valid school email address.')) {
+            focusFirstInvalid(kind + '-form'); return;
+        }
+        var version = ++state.version;
+        state.pending = true;
+        renderEmailRequests();
         try {
-            var res = await sb.auth.signInWithOtp({
-                email: email,
-                options: { shouldCreateUser: false, emailRedirectTo: activationRedirect() }
+            var res = kind === 'activate'
+                ? await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: false, emailRedirectTo: activationRedirect() } })
+                : await sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() });
+            if (res.error) {
+                if (Number(res.error.status) === 429 || /rate.limit|too many|after.*seconds/i.test(res.error.message || '')) {
+                    state.until = Date.now() + retryDelay(res.error);
+                }
+                if (version === state.version) { setStatus(kind + '-status', emailRequestError(res.error), 'error'); }
+                return;
+            }
+            // Acceptance still starts the cooldown if the dialog was closed.
+            state.until = Date.now() + 60000;
+            if (version !== state.version) { return; }
+            state.email = email;
+            state.accepted = true;
+            $('#' + p + '-sent-to').textContent = email;
+            setStatus(kind + '-status', 'Email request accepted. Check your email.', 'ok');
+            renderEmailRequests();
+            $('#' + p + '-change-email').focus();
+        } catch (error) {
+            if (version === state.version) { setStatus(kind + '-status', emailRequestError(error), 'error'); }
+        } finally {
+            state.pending = false;
+            renderEmailRequests();
+        }
+    }
+
+    function initEmailRequests() {
+        Object.keys(emailRequests).forEach(function (kind) {
+            var state = emailRequests[kind], p = state.prefix;
+            $('#' + kind + '-form').addEventListener('submit', function (event) {
+                event.preventDefault(); requestEmail(kind, false);
             });
-
-            if (res.error) {
-                setStatus('activate-status', res.error.message, 'error');
-                return;
-            }
-
-            setStatus('activate-status',
-                'Link sent. Check your inbox — it expires shortly, so use it soon.', 'ok');
-            toast('Activation link sent', 'Sent to ' + email + '.');
-            $('#activate-form').reset();
-        } catch (err) {
-            console.error('Activation failed:', err);
-            setStatus('activate-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
-        } finally {
-            release();
-        }
-    }
-
-    /* ============================================ 5. PASSWORD RESET ==== */
-
-    /* Self-service recovery, in two steps inside one dialog.
-
-         1. The email. resetPasswordForEmail() sends ONE email carrying both a
-            reset link and a one-time code (the Supabase "Reset Password"
-            template must include {{ .ConfirmationURL }} and {{ .Token }}).
-         2. The code, for whoever finds typing it easier than opening the link
-            — a student on a lab PC whose email is on their phone, say.
-            verifyOtp(type: 'recovery') turns it into the same recovery
-            session the link would, and both routes end on the set-password
-            page, which saves the new password and signs them out to sign in
-            again normally.
-
-       Neither step ever says whether an address is enrolled: the wording is
-       identical either way, so the form cannot be used to test the roster. */
-    var forgotEmail = null;
-    var resendTimerId = null;
-    var RESEND_COOLDOWN = 60;
-
-    function passwordPageAfterCode() {
-        return new URL('assets/html/sign-up.html?mode=reset', window.location.href).href;
-    }
-
-    /* The footer's one primary button serves whichever step is showing. */
-    function showForgotStep(step) {
-        var onCode = step === 'code';
-        $('#forgot-form').hidden = onCode;
-        $('#forgot-code-form').hidden = !onCode;
-
-        var submit = $('#fp-submit');
-        submit.setAttribute('form', onCode ? 'forgot-code-form' : 'forgot-form');
-        submit.innerHTML = onCode
-            ? '<svg class="icon"><use href="#i-check"></use></svg> Verify code'
-            : '<svg class="icon"><use href="#i-key"></use></svg> Send reset link';
-
-        var field = onCode ? $('#fp-code') : $('#fp-email');
-        if (field) { field.focus({ preventScroll: true }); }
-    }
-
-    function resetForgotDialog() {
-        clearInterval(resendTimerId);
-        forgotEmail = null;
-        clearFormErrors('forgot-form');
-        clearFormErrors('forgot-code-form');
-        clearStatus('forgot-status');
-        $('#forgot-code-form').reset();
-        showForgotStep('email');
-    }
-
-    /* Supabase rate-limits reset emails; the cooldown keeps a student from
-       hitting that limit and being told to wait with no explanation. */
-    function startResendCooldown() {
-        var btn = $('#fp-resend');
-        var left = RESEND_COOLDOWN;
-        clearInterval(resendTimerId);
-        btn.disabled = true;
-        btn.textContent = 'Send a new code (' + left + 's)';
-        resendTimerId = setInterval(function () {
-            left -= 1;
-            if (left <= 0) {
-                clearInterval(resendTimerId);
-                btn.disabled = false;
-                btn.textContent = 'Send a new code';
-                return;
-            }
-            btn.textContent = 'Send a new code (' + left + 's)';
-        }, 1000);
-    }
-
-    async function sendResetEmail(email) {
-        return sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() });
-    }
-
-    async function handleForgot(event) {
-        event.preventDefault();
-        clearFormErrors('forgot-form');
-        clearStatus('forgot-status');
-
-        var email = normalizeEmail($('#fp-email').value);
-        if (!setFieldError('fp-email', isEmail(email) ? '' : 'That doesn\u2019t look like an email address.')) {
-            focusFirstInvalid('forgot-form');
-            return;
-        }
-
-        var release = setBusy($('#fp-submit'), 'Sending…');
-        var sent = false;
-
-        try {
-            var res = await sendResetEmail(email);
-            if (res.error) {
-                setStatus('forgot-status', friendlyAuthError(res.error), 'error');
-                return;
-            }
-            sent = true;
-        } catch (err) {
-            console.error('Reset failed:', err);
-            setStatus('forgot-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
-        } finally {
-            release();
-        }
-
-        /* After release(): it restores the button's step-1 label, which the
-           step switch then replaces. */
-        if (sent) {
-            forgotEmail = email;
-            $('#fp-sent-to').textContent = email;
-            showForgotStep('code');
-            startResendCooldown();
-            toast('Check your email', 'A reset link and code are on their way.');
-        }
-    }
-
-    async function handleForgotCode(event) {
-        event.preventDefault();
-        clearFormErrors('forgot-code-form');
-        clearStatus('forgot-status');
-
-        var token = ($('#fp-code').value || '').replace(/\s+/g, '');
-        if (!setFieldError('fp-code', /^\d{6,10}$/.test(token)
-            ? '' : 'Enter the code from the email — numbers only.')) {
-            focusFirstInvalid('forgot-code-form');
-            return;
-        }
-
-        var release = setBusy($('#fp-submit'), 'Checking…');
-        var verified = false;
-
-        try {
-            var res = await sb.auth.verifyOtp({ email: forgotEmail, token: token, type: 'recovery' });
-            if (res.error) {
-                /* One message for wrong, used and expired alike: telling them
-                   apart helps a guesser, not a student. */
-                setFieldError('fp-code', 'That code is wrong or has expired. Check the newest email, or send a new code.');
-                focusFirstInvalid('forgot-code-form');
-                return;
-            }
-            verified = true;
-        } catch (err) {
-            console.error('Code check failed:', err);
-            setStatus('forgot-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
-        } finally {
-            release();
-        }
-
-        if (verified) {
-            clearInterval(resendTimerId);
-            setStatus('forgot-status', 'Code accepted. Opening the page to choose your new password…', 'ok');
-            window.location.assign(passwordPageAfterCode());
-        }
-    }
-
-    async function handleForgotResend() {
-        if (!forgotEmail) { return; }
-        clearStatus('forgot-status');
-        var btn = $('#fp-resend');
-        btn.disabled = true;
-        btn.textContent = 'Sending…';
-
-        try {
-            var res = await sendResetEmail(forgotEmail);
-            if (res.error) {
-                setStatus('forgot-status', friendlyAuthError(res.error), 'error');
-                btn.disabled = false;
-                btn.textContent = 'Send a new code';
-                return;
-            }
-            setStatus('forgot-status', 'A new email is on its way. Use the newest code.', 'ok');
-            $('#fp-code').value = '';
-            startResendCooldown();
-        } catch (err) {
-            console.error('Resend failed:', err);
-            setStatus('forgot-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error');
-            btn.disabled = false;
-            btn.textContent = 'Send a new code';
-        }
+            $('#' + p + '-resend').addEventListener('click', function () { requestEmail(kind, true); });
+            $('#' + p + '-change-email').addEventListener('click', function () {
+                state.version++;
+                state.accepted = false;
+                clearStatus(kind + '-status');
+                renderEmailRequests();
+                $('#' + p + '-email').focus();
+            });
+        });
+        document.addEventListener('visibilitychange', renderEmailRequests);
+        renderEmailRequests();
     }
 
     /* ============================================ 6. BOOT ============== */
@@ -1022,7 +929,7 @@
        Student, teacher or admin, the page stops pitching and greets them:
          - every Sign in becomes "Continue to dashboard", routed by role, and
            in the hero and finale it is promoted to the primary button;
-         - "Activate account" and every "Admin sign in" disappear (landing.css
+         - "Activate account" and every "Teacher / Admin sign in" disappear (landing.css
            7.1b, keyed on data-session);
          - the kicker reads "Personal Instructing Agent" and the headline
            becomes "Good / Morning, / <first name>".
@@ -1220,8 +1127,15 @@
         root.setAttribute('data-session', 'in');
 
         var email = (session.user && session.user.email) || '';
-        var role = 'student';
-        try { role = localStorage.getItem('pia_user_role') || 'student'; } catch (err) { /* ignore */ }
+        var role = null;
+        try {
+            var roleRes = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
+            if (!roleRes.error && roleRes.data) { role = normalizeRole(roleRes.data.role); }
+        } catch (err) { /* continuation stays unavailable until verified */ }
+        var finale = $('.finale-sub');
+        if (finale) { finale.textContent = 'You are signed in. Continue to the activities available to your account.'; }
+        var heroCopy = $('.drop-sub');
+        if (heroCopy) { heroCopy.textContent = 'Continue to your dashboard and the activities available to your account.'; }
 
         $$('[data-auth-open="signin"]').forEach(function (btn) {
             /* data-resume-label lets a tight spot (the phone navbar) ask
@@ -1231,6 +1145,7 @@
             label.textContent = btn.getAttribute('data-resume-label') || 'Continue to dashboard';
             btn.addEventListener('click', function (event) {
                 event.stopImmediatePropagation();
+                if (!role) { toast('Dashboard unavailable', 'Your account role could not be verified. Check your connection and reload.', 'danger'); return; }
                 /* page-guard.js admits only with this set. Written from the
                    session just verified, so the dashboard can never bounce
                    this click back here. */
@@ -1283,9 +1198,11 @@
             /* Without the SDK the session cannot be confirmed: show the
                ordinary signed-out page rather than a half-greeting. */
             document.documentElement.removeAttribute('data-session');
-            $$('[data-auth-open]').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    toast('Server\u2019s not answering', 'The database didn\u2019t pick up. Refresh and try again.', 'danger');
+            $$('.overlay form').forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    var row = form.closest('.overlay').querySelector('.auth-status');
+                    if (row) { setStatus(row.id, 'The sign-in service is unavailable. Check your connection and reload.', 'error'); }
                 });
             });
             return;
@@ -1293,16 +1210,12 @@
 
         $('#signin-form').addEventListener('submit', handleStudentSignIn);
         $('#staff-form').addEventListener('submit', handleStaffSignIn);
-        $('#activate-form').addEventListener('submit', handleActivate);
-        $('#forgot-form').addEventListener('submit', handleForgot);
-        $('#forgot-code-form').addEventListener('submit', handleForgotCode);
-        $('#fp-resend').addEventListener('click', handleForgotResend);
+        initEmailRequests();
         $('#device-reset-form').addEventListener('submit', handleDeviceResetCode);
         $('#dr-resend').addEventListener('click', sendDeviceResetCode);
         $$('[data-device-reset]').forEach(function (btn) {
             btn.addEventListener('click', openDeviceReset);
         });
-        $('#fp-change-email').addEventListener('click', function () { resetForgotDialog(); });
 
         /* Smooth in-page anchors, without hijacking anything else. */
         $$('a[href^="#"]').forEach(function (link) {
@@ -1310,7 +1223,7 @@
                 var target = document.querySelector(link.getAttribute('href'));
                 if (!target) { return; }
                 event.preventDefault();
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
             });
         });
 
@@ -1349,7 +1262,7 @@
            offers "Continue to dashboard". */
         if (document.documentElement.getAttribute('data-session') === 'in') { return; }
 
-        var key = target === 'staff' ? 'staff' : 'signin';
+        var key = ['staff', 'activate', 'forgot'].includes(target) ? target : 'signin';
         var statusId = key === 'staff' ? 'staff-status' : 'signin-status';
         openAuth(key);
         if (ENTRY_REASONS[reason]) {

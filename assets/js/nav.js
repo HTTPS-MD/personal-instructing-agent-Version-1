@@ -1,34 +1,7 @@
-/**
- * ============================================================================
- * PIA SYSTEM — NAVBAR
- * ============================================================================
- * Owns #nav and nothing else. Delete this file and the page still works: the
- * bar stays transparent, the desktop links still jump to their sections, and
- * Sign in / Activate remain beside the hero headline and in the closing
- * section — the bar's own copies simply never reappear. That trade is
- * deliberate: hiding them by default is what stops them flashing on at load
- * and vanishing a frame later.
- *
- *   1. SURFACE    transparent while only the hero video is under the bar,
- *                 solid the moment the hero's copy would pass beneath it.
- *   1B. AUTH      the bar's Sign in / Activate stand down while the hero's
- *                 own pair is on screen, and return once it scrolls away.
- *   2. SHEET      the hamburger menu below 64rem. It closes itself on a
- *                 section link, on any sign-in button inside it, on Escape,
- *                 on a tap outside, when focus tabs out, and when the window
- *                 grows past the breakpoint.
- *   3. SCROLLSPY  aria-current on the link for the section in view.
- *
- * PERFORMANCE CONTRACT
- *   landing.js promises exactly one scroll listener for the whole page, and
- *   this file keeps that promise: all three jobs are IntersectionObserver
- *   callbacks, which cost nothing per frame.
- *
- * SECURITY
- *   No innerHTML. State lives in classes and ARIA attributes. The one style
- *   write — the scrollbar-gutter custom property, identical to auth.js's —
- *   goes through the CSSOM, which CSP's style-src-attr does not govern.
- * ==========================================================================*/
+/** Landing navigation. Account actions use full button geometry, the sticky
+ * header, visual viewport and hit testing. Updates are coalesced per frame.
+ * Hidden copies retain their space and are inert; focused actions stay visible.
+ */
 (function () {
     'use strict';
 
@@ -60,18 +33,56 @@
      * two actions are always exactly one click away and never shown twice.  */
 
     function initAuthSwap(nav) {
-        var heroButtons = $('#hero-cta');
-
-        if (!heroButtons || !('IntersectionObserver' in window)) {
-            nav.classList.add('has-auth');
-            return;
+        var hero = $('#hero-cta');
+        var controls = $$('.nav-auth', nav);
+        var queued = false;
+        function update() {
+            queued = false;
+            var top = nav.getBoundingClientRect().bottom;
+            var viewport = window.visualViewport;
+            var bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+            var right = viewport ? viewport.offsetLeft + viewport.width : window.innerWidth;
+            var buttons = hero ? $$('button', hero).filter(function (button) {
+                return getComputedStyle(button).display !== 'none';
+            }) : [];
+            var signedIn = document.documentElement.hasAttribute('data-session');
+            var visible = buttons.length === (signedIn ? 1 : 2) && buttons.every(function (button) {
+                var rect = button.getBoundingClientRect();
+                if (!rect.width || !rect.height || rect.top < top || rect.bottom > bottom || rect.left < 0 || rect.right > right) { return false; }
+                if (getComputedStyle(button).visibility !== 'visible') { return false; }
+                return [[rect.left + 2, rect.top + 2], [rect.right - 2, rect.bottom - 2],
+                    [rect.left + rect.width / 2, rect.top + rect.height / 2]].every(function (point) {
+                    var hit = document.elementFromPoint(point[0], point[1]);
+                    return hit && button.contains(hit);
+                });
+            });
+            var show = !visible || nav.classList.contains('is-open') || controls.some(function (button) {
+                return button.contains(document.activeElement);
+            });
+            if (nav.classList.contains('has-auth') !== show) { nav.classList.toggle('has-auth', show); }
+            controls.forEach(function (button) {
+                button.inert = !show;
+                button.setAttribute('aria-hidden', String(!show));
+            });
         }
-
-        var barHeight = Math.round(nav.getBoundingClientRect().height) || 68;
-
-        new IntersectionObserver(function (entries) {
-            nav.classList.toggle('has-auth', !entries[0].isIntersecting);
-        }, { rootMargin: '-' + barHeight + 'px 0px 0px 0px' }).observe(heroButtons);
+        function schedule() {
+            if (!queued) { queued = true; requestAnimationFrame(update); }
+        }
+        window.addEventListener('scroll', schedule, { passive: true });
+        window.addEventListener('resize', schedule, { passive: true });
+        nav.addEventListener('focusout', schedule);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', schedule);
+            window.visualViewport.addEventListener('scroll', schedule);
+        }
+        if ('ResizeObserver' in window) {
+            var size = new ResizeObserver(schedule);
+            size.observe(nav);
+            if (hero) { size.observe(hero); }
+        }
+        new MutationObserver(schedule).observe(nav, { attributes: true, attributeFilter: ['class'] });
+        new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: ['data-session'] });
+        update();
     }
 
 

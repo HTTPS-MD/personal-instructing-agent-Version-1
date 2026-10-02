@@ -1,207 +1,223 @@
-// ==========================================
-// ACCOUNT ACTIVATION / PASSWORD SETUP
-// (sign-up.html lang ang gumagamit nito -- ito ang landing page ng
-//  "Send Activation Email" at "Reset Password" magic-link mula sa admin.
-//  Ang normal na sign-in + forgot-password (OTP) flow ay nasa auth.js na
-//  modal -- hindi na dinuplicate dito.)
-// ==========================================
-
-const setupForm = document.getElementById('setup-password-form');
-const setupStatus = document.getElementById('setup-status-box');
-const setupSubmitBtn = document.getElementById('setup-submit-btn');
-
-// WHAT OPENED THIS PAGE. Supabase writes the result of an email link into the
-// URL it redirects to:
-//   #access_token=…&type=invite|magiclink|signup|recovery   a working link
-//   #error=…&error_code=otp_expired&error_description=…      a spent/expired link
-//   ?token_hash=…&type=…                                     a customised template
-// and auth.js adds ?mode=reset after a correct reset CODE. Read from
-// PIA_ENTRY_URL (function.js), captured before supabase-js wipes the hash.
-// Links that first landed on the home page arrive here the same way, forwarded
-// by auth-callback.js with the hash intact.
-const entryUrl = new URL(window.PIA_ENTRY_URL || window.location.href);
-const linkHash = new URLSearchParams(entryUrl.hash.replace(/^#/, ''));
-const linkQuery = entryUrl.searchParams;
-const linkType = linkHash.get('type') || linkQuery.get('type') || '';
-const linkErrorCode = linkHash.get('error_code') || linkQuery.get('error_code') || '';
-const linkError = linkErrorCode || linkHash.get('error') || linkQuery.get('error') || '';
-const linkTokenHash = linkQuery.get('token_hash');
-const linkHasTokens = linkHash.has('access_token') || !!linkTokenHash;
-const pageMode = linkQuery.get('mode');   // 'reset' | 'activate' | null
-
-// RESET vs ACTIVATION. Iisang page ito para sa dalawa. ?mode=reset ang galing
-// sa reset CODE (auth.js); ang reset LINK ay type=recovery sa hash, o ang
-// PASSWORD_RECOVERY event ng Supabase. Ang invite / magiclink / signup ay
-// activation. Salita lang ang nagbabago -- pareho ang updateUser() at ang
-// pag-sign out pagkatapos.
-let isResetMode = pageMode === 'reset' || linkType === 'recovery';
-let submitLabel = 'Activate my account';
-
-function applyResetCopy() {
-    isResetMode = true;
-    submitLabel = 'Save new password';
-    const label = document.querySelector('.auth-identity-label');
-    if (label) label.textContent = 'Resetting the password for';
-    const title = document.querySelector('.auth-title');
-    if (title) title.textContent = 'Choose a new password';
-    const lede = document.querySelector('.auth-lede');
-    if (lede) lede.textContent = 'Your old password stops working as soon as you save this one. Then sign in again with your school email and the new password.';
-    document.title = 'Reset Your Password — PIA';
-    if (setupSubmitBtn && !setupSubmitBtn.disabled) {
-        setupSubmitBtn.innerHTML = '<svg class="icon"><use href="#i-key"></use></svg> ' + submitLabel;
-    }
-}
-
-if (isResetMode) applyResetCopy();
-if (window.supabaseClient) {
-    window.supabaseClient.auth.onAuthStateChange((event) => {
-        if (event === 'PASSWORD_RECOVERY') applyResetCopy();
-    });
-}
-
-function showSetupStatus(message, type) {
-    if (!setupStatus) return;
-
-    // Write into the inner <span>, not the row itself: the row also holds an
-    // icon, and textContent on the parent would delete it.
-    const textEl = setupStatus.querySelector('span') || setupStatus;
-    textEl.textContent = message;
-
-    const glyph = setupStatus.querySelector('use');
-    if (glyph) glyph.setAttribute('href', type === 'error' ? '#i-alert' : '#i-check');
-
-    setupStatus.classList.remove('hidden', 'auth-status-error', 'auth-status-success');
-    setupStatus.classList.add(type === 'error' ? 'auth-status-error' : 'auth-status-success');
-}
-
-const EXPIRED_LINK_MESSAGE = "This link has expired or was already used. Each link works once, for a short time — ask for a new one from the sign-in page.";
-
-// Ends the page without a form. Used for every link that cannot be trusted.
-function refuseLink(message) {
-    showSetupStatus(message, "error");
-    if (setupForm) setupForm.classList.add('hidden');
+/* Shared activation/recovery setup. A URL mode or a cached session alone
+   never authorizes this form. Tokens stay in the existing Supabase client;
+   this controller adds no token/password persistence. */
+(function () {
+    'use strict';
+    const form = document.getElementById('setup-password-form');
+    const submit = document.getElementById('setup-submit-btn');
+    const status = document.querySelector('#setup-status-box span');
     const identity = document.querySelector('.auth-identity');
-    if (identity) identity.hidden = true;
-}
+    const retry = document.getElementById('setup-retry');
+    const actions = document.getElementById('setup-link-actions');
+    const continuation = document.getElementById('setup-signin');
+    const entry = new URL(window.PIA_ENTRY_URL || location.href);
+    const hash = new URLSearchParams(entry.hash.slice(1));
+    const type = hash.get('type') || entry.searchParams.get('type');
+    const tokenHash = entry.searchParams.get('token_hash');
+    const accessToken = hash.get('access_token');
+    const errorCode = hash.get('error_code') || entry.searchParams.get('error_code');
+    const linkError = errorCode || hash.get('error') || entry.searchParams.get('error');
+    let verifiedUser = null;
+    let verifiedSession = null;
+    let mode = null;
+    let busy = false;
+    let passwordSaved = false;
+    let profileSaved = false;
+    let uncertain = false;
+    let verifiedExchange = null;
+    let label = 'Save password';
+    let accountRole = 'student';
 
-window.addEventListener('DOMContentLoaded', async () => {
-    if (!window.supabaseClient) {
-        showSetupStatus("Connection error. Please refresh the page.", "error");
-        return;
+    function message(text, error = false) {
+        status.textContent = text;
+        const row = status.parentElement;
+        row.classList.remove('hidden', 'auth-status-error', 'auth-status-success');
+        row.classList.add(error ? 'auth-status-error' : 'auth-status-success');
+        row.querySelector('use').setAttribute('href', error ? '#i-alert' : '#i-check');
+    }
+    function fieldError(id, text) {
+        document.getElementById(id).setAttribute('aria-invalid', String(!!text));
+        document.getElementById(id + '-error').textContent = text;
+    }
+    function temporary(error) {
+        return !error || !error.status || error.status >= 500 || error.status === 429 ||
+            /fetch|network|connection/i.test(error.message || '');
+    }
+    function refuse(text, canRetry = false) {
+        verifiedUser = null;
+        submit.disabled = true;
+        form.hidden = true;
+        identity.hidden = true;
+        actions.hidden = false;
+        retry.hidden = !canRetry;
+        message(text, true);
+    }
+    function unusable(error) {
+        if (error && error.code === 'otp_expired') {
+            refuse('This link has expired or was already used. Request a new activation or reset email.');
+        } else if (temporary(error)) {
+            refuse('We could not verify this link right now. Check your connection and retry.', true);
+        } else {
+            refuse('This link could not be verified. Request a new activation or reset email.');
+        }
+    }
+    async function verifyLink() {
+        if (busy) return;
+        busy = true;
+        retry.disabled = true;
+        submit.disabled = true;
+        message('Verifying your email link…');
+        try {
+            if (!window.supabaseClient) {
+                return refuse('The sign-in service is unavailable. Reload this page when your connection is restored.');
+            }
+            if (linkError) {
+                return refuse(errorCode === 'otp_expired'
+                    ? 'This link has expired or was already used. Request a new email below.'
+                    : 'The email link reported an error and could not be verified. Request a new email below.');
+            }
+            if ((!accessToken && !tokenHash) || !['recovery', 'invite', 'magiclink', 'signup', 'email'].includes(type)) {
+                return refuse('Open this page using the activation or reset link in your email. An existing sign-in alone cannot verify this request.');
+            }
+            // A token hash must pass the provider's exchange for the requested
+            // purpose. A hash-token callback must match the SDK's new session.
+            if (tokenHash && !verifiedExchange) {
+                const result = await supabaseClient.auth.verifyOtp({ token_hash: tokenHash, type });
+                if (result.error) return unusable(result.error);
+                verifiedExchange = result.data.session;
+            }
+            const result = await supabaseClient.auth.getSession();
+            if (result.error) return unusable(result.error);
+            const session = result.data.session;
+            const linkToken = tokenHash ? verifiedExchange?.access_token : accessToken;
+            if (!session || !linkToken || session.access_token !== linkToken) {
+                return refuse('No verified session matches this email link. Open a new activation or reset link.');
+            }
+            const identityResult = await supabaseClient.auth.getUser(linkToken);
+            if (identityResult.error) return unusable(identityResult.error);
+            if (!identityResult.data.user || identityResult.data.user.id !== session.user.id) {
+                return refuse('The account for this link could not be verified. Request a new email.');
+            }
+            verifiedUser = identityResult.data.user;
+            verifiedSession = session.access_token;
+            // Only interpret the link's purpose AFTER its provider verification;
+            // ?mode and entered addresses are deliberately ignored.
+            mode = type === 'recovery' ? 'reset' : type === 'email' ? null : 'activate';
+            if (!mode) return refuse('This link does not identify an activation or password reset. Request the email you need below.');
+            label = mode === 'reset' ? 'Save new password' : 'Activate account';
+            document.querySelector('.auth-title').textContent = mode === 'reset' ? 'Choose a new password' : 'Set up your account';
+            document.title = document.querySelector('.auth-title').textContent + ' — PIA';
+            document.querySelector('.auth-lede').textContent = 'Use your school email and this password to sign in after saving.';
+            document.getElementById('setup-email').textContent = verifiedUser.email;
+            identity.hidden = false;
+            actions.hidden = true;
+            retry.hidden = true;
+            form.hidden = false;
+            submit.disabled = false;
+            submit.textContent = label;
+            message('Email link verified. Choose your password.');
+            // No secret or untrusted mode is put in a recovery URL. Refreshing
+            // requires reopening the original link; cached sessions cannot bypass verification.
+            history.replaceState(null, '', entry.pathname);
+            document.getElementById('setup-password').focus();
+        } catch (error) {
+            refuse('We could not verify the link. Check your connection and retry.', true);
+        } finally {
+            busy = false;
+            retry.disabled = false;
+        }
     }
 
-    // Every refusal below comes BEFORE getSession() on purpose. This browser
-    // may still hold an older session -- another student's on a shared lab
-    // PC, or the admin's while testing -- and a bad or missing link must never
-    // turn this page into a password change for THAT account.
-
-    // 1. A spent or expired link (most often: opened twice, or opened by a
-    //    mail scanner before the student tapped it).
-    if (linkError) {
-        return refuseLink(linkErrorCode === 'otp_expired'
-            ? EXPIRED_LINK_MESSAGE
-            : "This link didn't work. Please ask for a new one from the sign-in page.");
-    }
-
-    // 2. A customised email template sends a token hash instead of tokens:
-    //    exchange it for the session the plain link would have given.
-    if (linkTokenHash) {
-        const { error } = await window.supabaseClient.auth.verifyOtp({
-            token_hash: linkTokenHash,
-            type: linkType || 'email'
+    document.getElementById('setup-show-password').addEventListener('change', function () {
+        ['setup-password', 'setup-confirm-password'].forEach(id => {
+            document.getElementById(id).type = this.checked ? 'text' : 'password';
         });
-        if (error) return refuseLink(EXPIRED_LINK_MESSAGE);
-    }
-
-    // 3. No link at all: the address was typed, bookmarked or shared.
-    if (!linkHasTokens && !pageMode) {
-        return refuseLink("Open this page from the link in your email.");
-    }
-
-    // For a normal link, supabase-js has turned the #access_token into a
-    // session by the time this resolves (and replaced any older one).
-    const { data: { session } } = await window.supabaseClient.auth.getSession();
-    const user = session?.user;
-
-    if (!user) {
-        return refuseLink("This link is invalid or has expired. Please request a new one.");
-    }
-
-    // The tokens are spent and gone from the address bar; ?mode= records that
-    // this session came from a link, so a refresh keeps the form instead of
-    // refusing at step 3.
-    history.replaceState(null, '', entryUrl.pathname + '?mode=' + (isResetMode ? 'reset' : 'activate'));
-
-    const passwordField = document.getElementById('setup-password');
-    if (passwordField) passwordField.focus();
-
-    // Dynamic greeting gamit ang full_name mula sa profiles table
-    const { data: profile } = await window.supabaseClient
-        .from('profiles')
-        .select('full_name')
-        .eq('email', user.email)
-        .maybeSingle();
-
-    const fullName = profile?.full_name || 'there';
-    const greetingEl = document.getElementById('setup-greeting');
-    if (greetingEl) greetingEl.textContent = `${getTimeGreeting()}, ${fullName}!`;
-
-    const emailEl = document.getElementById('setup-email');
-    if (emailEl) emailEl.textContent = user.email;
-});
-
-// Show/Hide password toggle
-const showPasswordCheckbox = document.getElementById('setup-show-password');
-if (showPasswordCheckbox) {
-    showPasswordCheckbox.addEventListener('change', function () {
-        const type = this.checked ? 'text' : 'password';
-        const p1 = document.getElementById('setup-password');
-        const p2 = document.getElementById('setup-confirm-password');
-        if (p1) p1.type = type;
-        if (p2) p2.type = type;
     });
-}
-
-if (setupForm) {
-    setupForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
+    retry.addEventListener('click', verifyLink);
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (busy || uncertain || !verifiedUser || submit.disabled) return;
         const password = document.getElementById('setup-password').value;
-        const confirmPassword = document.getElementById('setup-confirm-password').value;
-
-        // Kapareho ng patakaran sa set-new-password page at sa temporary password
-        // ng admin: 8+ character, may letra at may numero.
-        if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-            return showSetupStatus("Use at least 8 characters, with at least one letter and one number.", "error");
+        const confirm = document.getElementById('setup-confirm-password').value;
+        fieldError('setup-password', '');
+        fieldError('setup-confirm-password', '');
+        if (!passwordSaved) {
+            if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+                fieldError('setup-password', 'Use at least 8 characters, including a letter and a number.');
+                document.getElementById('setup-password').focus(); return;
+            }
+            if (password !== confirm) {
+                fieldError('setup-confirm-password', 'Passwords do not match.');
+                document.getElementById('setup-confirm-password').focus(); return;
+            }
         }
-        if (password !== confirmPassword) return showSetupStatus("Passwords do not match.", "error");
-
-        setupSubmitBtn.disabled = true;
-        setupSubmitBtn.textContent = 'Saving…';
-
-        const { error: updateError } = await window.supabaseClient.auth.updateUser({ password });
-
-        if (updateError) {
-            const sameAsOld = updateError.code === 'same_password' ||
-                /different from the old password/i.test(updateError.message || '');
-            showSetupStatus(sameAsOld ? "Choose a password different from your old one." : updateError.message, "error");
-            setupSubmitBtn.disabled = false;
-            setupSubmitBtn.textContent = submitLabel;
-            return;
+        busy = true;
+        submit.disabled = true;
+        submit.textContent = passwordSaved ? 'Finishing…' : 'Saving…';
+        let operation = 'identity';
+        try {
+            // Once both writes are confirmed, only session cleanup remains.
+            // Retrying cleanup is safe even if a prior sign-out cleared the local session.
+            if (!passwordSaved || !profileSaved) {
+            const current = await supabaseClient.auth.getSession();
+            if (current.error) throw current.error;
+            if (current.data.session?.access_token !== verifiedSession) {
+                return refuse('Your session changed. Reopen your email link before setting a password.');
+            }
+            const checked = await supabaseClient.auth.getUser();
+            if (checked.error) throw checked.error;
+            if (checked.data.user?.id !== verifiedUser.id) {
+                return refuse('Your account could not be verified. Request a new email link.');
+            }
+            }
+            if (!passwordSaved) {
+                operation = 'password';
+                const updated = await supabaseClient.auth.updateUser({ password });
+                if (updated.error) {
+                    if (temporary(updated.error)) throw updated.error;
+                    const same = updated.error.code === 'same_password';
+                    fieldError('setup-password', same ? 'Choose a password different from your old one.' : 'The password was not accepted. Check the requirements and try again.');
+                    document.getElementById('setup-password').focus();
+                    message('Your password was not saved.', true);
+                    return;
+                }
+                passwordSaved = true;
+                document.getElementById('setup-password').value = '';
+                document.getElementById('setup-confirm-password').value = '';
+                form.querySelectorAll('input').forEach(input => { input.disabled = true; });
+            }
+            if (!profileSaved) {
+                operation = 'profile';
+                const profile = await supabaseClient.from('profiles').update({ status: 'active' }).eq('email', verifiedUser.email).select('email, role').maybeSingle();
+                if (profile.error) throw profile.error;
+                if (!profile.data) throw new Error('Profile confirmation unavailable');
+                accountRole = profile.data.role || 'student';
+                profileSaved = true;
+            }
+            operation = 'signout';
+            const signedOut = await supabaseClient.auth.signOut();
+            if (signedOut.error) throw signedOut.error;
+            form.hidden = true;
+            identity.hidden = true;
+            continuation.href = '../../index.html?signin=' + (['admin', 'teacher'].includes(accountRole) ? 'staff' : 'student');
+            continuation.hidden = false;
+            message(mode === 'reset' ? 'Your password has been updated. Sign in with your new password.' : 'Your account is activated. Sign in with your new password.');
+            verifiedUser = null;
+        } catch (error) {
+            if (operation === 'password') {
+                uncertain = true;
+                message('The save result could not be confirmed. Do not submit again. Check your connection, then request a fresh reset email if needed.', true);
+                actions.hidden = false;
+            } else {
+                message(passwordSaved
+                    ? 'Your password was saved, but setup could not finish. Check your connection, then choose Finish setup. This will not resubmit your password.'
+                    : 'Your account could not be checked. Check your connection and try again.', true);
+            }
+        } finally {
+            busy = false;
+            submit.disabled = uncertain || !verifiedUser;
+            submit.textContent = passwordSaved ? 'Finish setup' : label;
         }
-
-        const { data: { user } } = await window.supabaseClient.auth.getUser();
-        if (user) {
-            await window.supabaseClient.from('profiles').update({ status: 'active' }).eq('email', user.email);
-        }
-
-        // Palabas na sa session na ito (galing sa magic-link) para pumunta sila
-        // sa normal sign-in gamit ang bago nilang password.
-        await window.supabaseClient.auth.signOut();
-
-        showSetupStatus(isResetMode
-            ? "Password updated! Redirecting to sign in..."
-            : "Account activated! Redirecting to sign in...", "success");
-        setTimeout(() => { window.location.replace('../../index.html'); }, 2000);
     });
-}
+    verifyLink();
+})();
