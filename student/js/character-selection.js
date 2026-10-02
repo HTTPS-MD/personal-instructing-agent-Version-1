@@ -60,13 +60,34 @@ function previewCharacter(element) {
     lockBtn.disabled = false;
 }
 
+// Keyboard handling for the irreversible lock-in dialog: focus starts on the
+// safe "Let me look again" button, Tab stays inside, Escape = look again, and
+// focus returns to the control that opened it. Selection logic is untouched.
+let confirmReturnFocus = null;
+
+function confirmModalKeys(e) {
+    const modal = document.getElementById('confirm-modal');
+    if (!modal || !modal.classList.contains('modal-active')) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeConfirmModal(); return; }
+    if (e.key !== 'Tab') return;
+    const nodes = Array.from(modal.querySelectorAll('button:not([disabled])'));
+    if (!nodes.length) return;
+    const first = nodes[0], last = nodes[nodes.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
 function openConfirmModal() {
     if (!selectedChar || isLockedIn) return;
     const modal = document.getElementById('confirm-modal');
     const content = document.getElementById('modal-content');
 
+    confirmReturnFocus = document.activeElement;
     modal.classList.add('modal-active');
     content.classList.add('modal-content-active');
+    document.addEventListener('keydown', confirmModalKeys);
+    const safe = modal.querySelector('.modal-foot [data-action="close"]');
+    if (safe) safe.focus({ preventScroll: true });
 }
 
 function closeConfirmModal() {
@@ -75,6 +96,11 @@ function closeConfirmModal() {
 
     modal.classList.remove('modal-active');
     content.classList.remove('modal-content-active');
+    document.removeEventListener('keydown', confirmModalKeys);
+    if (confirmReturnFocus && confirmReturnFocus.focus && !confirmReturnFocus.disabled) {
+        confirmReturnFocus.focus({ preventScroll: true });
+    }
+    confirmReturnFocus = null;
 }
 
 async function finalLockIn() {

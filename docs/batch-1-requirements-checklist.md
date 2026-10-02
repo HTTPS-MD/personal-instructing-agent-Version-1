@@ -40,7 +40,7 @@ Future-module requirements (admin dashboard, teacher roster and final cross-modu
 
 # Batch 2 — Student screens + tutorial (Sections 16–18)
 
-Branch `codex/batch-2-student-screens`, created from `codex/batch-1-homepage-access` @ `e0bc425`. Harness: `tests/batch-2-browser.cjs` (isolated: loopback only, Supabase SDK replaced by a fixture; the "account" lives in the Node process so two browser contexts act as two devices). Result after the icon/card audit: 41/41; Batch 1 suite re-run 33/33.
+Branch `codex/batch-2-student-screens`, created from `codex/batch-1-homepage-access` @ `e0bc425`. Harness: `tests/batch-2-browser.cjs` (isolated: loopback only, Supabase SDK replaced by a fixture; the "account" lives in the Node process so two browser contexts act as two devices). Final result: see "Batch 2 final polish" below.
 
 | Req | Implementation | Verification | Evidence / limitation |
 |---|---|---|---|
@@ -91,3 +91,32 @@ Rule applied (spec 13/14, extended to the student screens): a card stays only if
 3. The post-Skip tutorial note briefly overlays the heading on phones (transient, covers no control).
 4. The dashboard tutorial-eligible "Section Earth" identity block and avatar initials are unchanged (identity, functional).
 5. Only desktop Chromium; no real device, other browsers, 200% zoom or contrast measurement on these screens.
+
+
+## Batch 2 final polish
+
+**Files changed in this polish pass:** `student/js/student-tutorial.js`, `student/js/character-selection.js`, `styles/pages/student-dashboard.css`, `tests/batch-2-browser.cjs`, `docs/batch-1-requirements-checklist.md`.
+
+1. **Post-Skip note (phones).** The floating note could sit over the page heading. It is now an in-flow status row inserted directly under the top bar (`.tutorial-callout`, `role="status"`, text filled a tick after insertion so it is announced), so it cannot overlap the heading or any control at any width. Reduced-motion fallback kept: ring on the Tutorial button plus this note, no cursor. Normal motion still shows the mock cursor. Asserted at 320 and 375 (reduced and normal), 768 and 1440: the note sits below the top bar, inside the viewport, overlaps none of heading / Start / Tutorial / Sign out / tutor card / facts, causes no overflow, then disappears and clears the highlight.
+2. **Long names.** A 90-character first name clipped past the right edge of the dashboard heading at 320px (the first geometry assertion missed it; the screenshot showed it). `.start-hello` now wraps with `overflow-wrap: anywhere`; the test now also fails on text overflowing its own box.
+3. **Character Selection lock-in dialog keyboard gap (found while testing).** The irreversible-choice dialog had no Escape, no initial focus, no Tab containment and no focus return. Added, without touching selection logic: focus starts on the safe "Let me look again" button, Tab stays inside, Escape = look again, focus returns to the Lock in button. This is a keyboard/a11y fix, not a navigation or research change.
+
+**The three remaining screens: decision = intentionally OUT OF SCOPE for Batch 2 (limitation recorded, not silently changed).**
+
+| Screen | What it looks like now (inspected in rendered screenshots, 375 and 1280, both themes) | Why not changed |
+|---|---|---|
+| Waiting Room (`waiting-room.html`) | Rounded card, large clock glyph in a circle, shaded info box, Sign out icon | Not named in section 16; no Batch 2 acceptance behaviour depends on it. Its logic redirects students by stage and was not touched. |
+| Assessment Complete (`assessment-complete.html`) | Rounded card, large check glyph, pill Continue button with arrow icon | Same. It is the screen right after OCEAN, so the visual seam is real and visible. |
+| Set New Password (`set-new-password.html`) | Rounded card, large key glyph, rounded fields and button | Same, and it is part of the forced temporary-password security flow; restyling it risks authentication behaviour, so it should be its own reviewed change. |
+
+All three render without horizontal overflow (checked). Recommended follow-up (needs your go-ahead): apply `data-surface="comic"` and the same icon/card rules to these three, preserving their scripts.
+
+**Final icon/card decisions** are as listed in the audit section above; nothing was added back. Icons kept: Back/Next chevrons (direction), modal X (dismissal), feedback/error status icons (state), Tutorial help icon (the only content of the button on phones). No decorative icons added. Cards kept only for functional units (question card, tutor/persona/preview cards, progress/problem/tutor panels).
+
+**Verification (isolated, `tests/batch-2-browser.cjs`; Batch 1 regression `tests/batch-1-browser.cjs`):** see the results line appended below after the final run. Added in this pass: note geometry at 5 viewports/themes, the three out-of-scope screens (render + overflow, 6 checks), 200% text zoom on OCEAN and the dashboard/tutorial at 375x667, computed text contrast >= 4.5 in dark and light for OCEAN, tutorial and dashboard text and buttons, long-name overflow, quit-dialog and lock-in-dialog keyboard/Escape/focus. Screenshots were inspected after the runs, which is what caught the two layout defects above.
+
+**Limitations (unchanged):** real devices and mobile keyboards, Firefox/Safari, assistive-technology testing and live integration are not tested. Contrast uses a computed-colour check on selected text, not a full audit, and does not cover disabled controls or text over images. Tutorial persistence remains **unverified against live Supabase** (Auth `user_metadata`, see Batch 2 dependencies above); only the isolated fixture was exercised. No migrations, templates, emails or deployments were touched.
+
+**Final results (this session, isolated Chromium, loopback only):** Batch 2 suite 59/59; Batch 1 regression 33/33 (run after the last source change; the only edit since was a wait added to one Batch 2 test). `node --check` on all `student/js/*.js`: pass. Lint/type/build: not applicable (no tooling in the repo). Widths covered: 320, 375, 768, 1280, 1440 (OCEAN, dashboard, tutorial, Character Selection), both themes; reduced motion on and off.
+
+**Batch 2 status: partially complete.** The three named screens (OCEAN, Character Selection, Tutoring Dashboard) and the tutorial are implemented and pass the isolated checks with screenshots inspected. Not complete: the three journey screens above remain on the old design (recorded as out of scope), tutorial persistence is unverified against live Supabase, and there is no real-device, other-browser or assistive-technology testing.

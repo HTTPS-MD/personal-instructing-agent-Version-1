@@ -143,14 +143,22 @@
         clearSpotlight();
         var rect = helpBtn.getBoundingClientRect();
 
-        var note = document.createElement('p');
+        /* The note lives IN the page flow, directly under the top bar, so it
+           can never sit on top of the heading or a control (at any width).
+           The empty status region is inserted first and filled a tick later
+           so assistive technology announces the text. */
+        var bar = document.querySelector('.learn-bar');
+        var note = document.createElement('div');
         note.className = 'tutorial-callout';
         note.setAttribute('role', 'status');
-        note.textContent = 'You can replay the tutorial any time with this button.';
-        document.body.appendChild(note);
-        var left = Math.max(8, Math.min(window.innerWidth - 8 - note.offsetWidth, rect.right - note.offsetWidth));
-        note.style.left = left + 'px';
-        note.style.top = (rect.bottom + 10) + 'px';
+        var inner = document.createElement('p');
+        inner.className = 'learn-shell tutorial-callout-text';
+        note.appendChild(inner);
+        if (bar && bar.parentNode) { bar.parentNode.insertBefore(note, bar.nextSibling); }
+        else { document.body.insertBefore(note, document.body.firstChild); }
+        setTimeout(function () {
+            inner.textContent = 'You can replay the tutorial any time with the Tutorial button at the top of the page.';
+        }, 50);
 
         helpBtn.classList.add('is-spotlight');
         var done = function () { clearSpotlight(); };

@@ -29,7 +29,7 @@ function fixture() {
   const profile = () => Object.assign({ email: user.email, full_name: 'Fixture Learner', role: 'student', group_type: 'Control', is_ocean_done: true, selected_character: 'pia-open', current_stage: '', section: 'Earth', must_change_password: false }, f.profile || {});
   const chain = (table) => {
     const c = { select() { return c; }, eq() { return c; }, update() { f.calls.push({ method: 'profile-update' }); return c; },
-      maybeSingle: async () => table === 'settings' ? { data: { value: true }, error: null } : { data: profile(), error: null },
+      maybeSingle: async () => table === 'settings' ? { data: { value: f.stageOpen !== false }, error: null } : { data: profile(), error: null },
       then(res) { res({ data: null, error: null }); } };
     return c;
   };
@@ -264,6 +264,7 @@ function fixture() {
     await p.locator('#tutorial-skip').click();
     await p.waitForSelector('#tutorial-btn.is-spotlight');
     assert.equal(await p.locator('.tutorial-cursor').count(), 0);
+    await p.waitForFunction(() => (document.querySelector('.tutorial-callout-text') || {}).textContent);
     assert.match(await p.locator('.tutorial-callout').innerText(), /replay the tutorial/i);
     const ring = await p.locator('#tutorial-btn').evaluate(el => getComputedStyle(el).outlineStyle);
     assert.equal(ring, 'solid');
@@ -423,6 +424,134 @@ function fixture() {
     const p = await pageFor(dash, { width: 375, account: 'tut-audit' });
     await p.locator('#modal-tutorial.is-open').waitFor();
     assert.equal(await p.locator('#modal-tutorial svg, #modal-tutorial .modal-close, #modal-tutorial .modal-hero').count(), 0);
+    await p.context().close();
+  });
+  /* ---------------- POLISH: callout, out-of-scope screens, zoom, contrast, long text, keyboard ---------------- */
+  const overlap = (a, b) => !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+  for (const [w, t, reduced] of [[320, 'light', true], [375, 'dark', true], [375, 'light', false], [768, 'dark', false], [1440, 'light', true]]) {
+    await check(`polish: post-Skip note overlaps nothing at ${w}px ${t} reduced=${reduced}`, async () => {
+      const p = await pageFor(dash, { width: w, theme: t, reduced, account: `note-${w}${t}${reduced}` });
+      await dlg(p).waitFor();
+      await p.locator('#tutorial-skip').click();
+      await p.waitForFunction(() => (document.querySelector('.tutorial-callout-text') || {}).textContent);
+      const r = await p.evaluate(() => {
+        const box = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, w: b.width }; };
+        return { note: box('.tutorial-callout'), text: box('.tutorial-callout-text'), bar: box('.learn-bar'),
+                 others: ['.start-hello', '#start-btn', '#tutorial-btn', '#signout-btn', '.agent-card', '.start-facts'].map(s => [s, box(s)]),
+                 role: document.querySelector('.tutorial-callout').getAttribute('role'), vw: innerWidth, sw: document.documentElement.scrollWidth };
+      });
+      assert.equal(r.role, 'status');
+      assert.ok(r.note.top >= r.bar.bottom - 1, 'sits below the top bar');
+      assert.ok(r.note.left >= 0 && r.note.right <= r.vw + 1, 'inside the viewport');
+      assert.ok(r.sw <= r.vw + 1, 'no horizontal overflow');
+      for (const [sel, b] of r.others) if (b) assert.equal(overlap(r.note, b), false, 'note overlaps ' + sel);
+      if (reduced) assert.equal(await p.locator('.tutorial-cursor').count(), 0, 'reduced motion: no cursor');
+      assert.equal(await p.locator('#tutorial-btn.is-spotlight').count(), 1, 'button is highlighted');
+      await p.screenshot({ path: path.join(out, `polish-note-${w}-${t}${reduced ? '-rm' : ''}.png`) });
+      await p.waitForSelector('.tutorial-callout', { state: 'detached', timeout: 9000 });
+      assert.equal(await p.locator('#tutorial-btn.is-spotlight').count(), 0);
+      await p.context().close();
+    });
+  }
+  for (const [name, url, initial, ready] of [
+    ['waiting room', '/student/html/waiting-room.html', { stageOpen: false, profile: { is_ocean_done: false } }, '.wait-card'],
+    ['assessment complete', '/student/html/assessment-complete.html', { profile: { is_ocean_done: true } }, '.gate-wrap'],
+    ['set new password', '/student/html/set-new-password.html', { profile: { must_change_password: true } }, '.gate-wrap']]) {
+    for (const [w, t] of [[375, 'dark'], [1280, 'light']]) {
+      await check(`out-of-scope screen renders: ${name} ${w}px ${t} (no overflow, keeps old surface)`, async () => {
+        const p = await pageFor(url, { width: w, theme: t, account: 'oos', initial });
+        await p.waitForSelector(ready); await p.waitForTimeout(300);
+        assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+        assert.equal(await p.evaluate(() => document.documentElement.dataset.surface || ''), '');
+        await p.screenshot({ path: path.join(out, `oos-${name.replace(/ /g, '-')}-${w}-${t}.png`) });
+        await p.context().close();
+      });
+    }
+  }
+  const zoomCss = 'html { font-size: 200% !important; }';
+  await check('zoom 200%: OCEAN question reachable, no overflow (375x667)', async () => {
+    const p = await startOcean({ width: 375, height: 667 });
+    await p.addStyleTag({ content: zoomCss });
+    await p.locator('#ocean-answer-list button[data-score="3"]').scrollIntoViewIfNeeded();
+    assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    for (const id of ['#btn-next', '#btn-prev']) { await p.locator(id).scrollIntoViewIfNeeded(); assert.equal(await p.locator(id).isVisible(), true); }
+    await p.screenshot({ path: path.join(out, 'zoom200-ocean-375.png') });
+    await p.context().close();
+  });
+  await check('zoom 200%: dashboard + tutorial dialog reachable, Skip/Next usable, no overflow (375x667)', async () => {
+    const p = await pageFor(dash, { width: 375, height: 667, account: 'zoom-dash' });
+    await p.addStyleTag({ content: zoomCss });
+    await dlg(p).waitFor();
+    for (const id of ['#tutorial-skip', '#tutorial-next']) { await p.locator(id).scrollIntoViewIfNeeded(); const b = await p.locator(id).boundingBox(); assert.ok(b && b.x >= 0 && b.x + b.width <= 376, id + JSON.stringify(b)); }
+    assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await p.screenshot({ path: path.join(out, 'zoom200-tutorial-375.png') });
+    await p.locator('#tutorial-skip').click();
+    await p.waitForFunction(() => !document.querySelector('#modal-tutorial.is-open'));
+    assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await p.screenshot({ path: path.join(out, 'zoom200-dashboard-375.png') });
+    await p.context().close();
+  });
+  const contrast = (p, sels) => p.evaluate(sels => {
+    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'); canvas.width = canvas.height = 1;
+    const rgb = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+    const lum = c => { const a = c.slice(0, 3).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * a[0] + .7152 * a[1] + .0722 * a[2]; };
+    return sels.map(sel => {
+      const el = [...document.querySelectorAll(sel)].find(e => e.getClientRects().length); if (!el) return { sel, missing: true };
+      let n = el, bg = [0, 0, 0, 0];
+      while (n) { bg = rgb(getComputedStyle(n).backgroundColor); if (bg[3] === 255) break; n = n.parentElement; }
+      if (bg[3] !== 255) bg = rgb(getComputedStyle(document.documentElement).getPropertyValue('--bg-body') || '#fff');
+      const a = lum(rgb(getComputedStyle(el).color)), b = lum(bg);
+      return { sel, ratio: Math.round(((Math.max(a, b) + .05) / (Math.min(a, b) + .05)) * 100) / 100 };
+    });
+  }, sels);
+  for (const t of ['dark', 'light']) {
+    await check(`contrast >= 4.5 (${t}): OCEAN, dashboard, tutorial`, async () => {
+      const bad = [];
+      let p = await startOcean({ theme: t });
+      await p.locator('#ocean-answer-list button[data-score="3"]').click();
+      for (const c of await contrast(p, ['#question-counter', '#question-text', '.answer-label', '#btn-prev', '#btn-next', '#submit-hint', '#progress-lbl', '#answered-tally'])) if (c.missing || c.ratio < 4.5) bad.push('ocean ' + JSON.stringify(c));
+      await p.context().close();
+      p = await pageFor(dash, { theme: t, account: 'contrast-' + t });
+      await dlg(p).waitFor();
+      for (const c of await contrast(p, ['#tutorial-step', '#tutorial-title', '#tutorial-text', '#tutorial-skip', '#tutorial-next', '#tutorial-back'])) if (c.missing || c.ratio < 4.5) bad.push('tutorial ' + JSON.stringify(c));
+      await p.locator('#tutorial-skip').click();
+      await p.waitForSelector('.tutorial-callout-text');
+      for (const c of await contrast(p, ['.start-hello', '.start-lede', '.fact-label', '.fact-value', '#start-btn', '#tutorial-btn', '#signout-btn', '.tutorial-callout-text', '.agent-name'])) if (c.missing || c.ratio < 4.5) bad.push('dash ' + JSON.stringify(c));
+      await p.context().close();
+      assert.deepEqual(bad, []);
+    });
+  }
+  await check('long text: very long name/first name does not overflow at 320px', async () => {
+    const long = 'Bartholomew-Maximilian-Alexandrovich-Fitzgerald-Montgomery-Wolfeschlegelsteinhausenbergerdorff';
+    const p = await pageFor(dash, { width: 320, account: 'long', initial: { profile: { full_name: long + ' Smith' } } });
+    await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const over = await p.evaluate(() => [...document.querySelectorAll('body *')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1).slice(0, 4).map(e => e.tagName + '.' + e.className));
+    const clipped = await p.evaluate(() => [...document.querySelectorAll('h1, h2, p, dd, dt, .who-name, #pia-signout-who')].filter(e => e.getClientRects().length && e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis').map(e => e.tagName + '.' + e.className));
+    await p.screenshot({ path: path.join(out, 'polish-long-name-320.png') });
+    assert.deepEqual(over, []);
+    assert.deepEqual(clipped, [], 'text clipped inside its box');
+    await p.context().close();
+  });
+  await check('keyboard: quit dialog traps focus, Escape keeps the test, focus returns to the link', async () => {
+    const p = await startOcean({ width: 1280 });
+    await p.locator('#ocean-answer-list button[data-score="3"]').click();
+    await p.locator('.brand-link').focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#quit-modal.modal-active');
+    for (let i = 0; i < 4; i++) { await p.keyboard.press('Tab'); assert.equal(await p.evaluate(() => !!document.activeElement.closest('#quit-modal')), true); }
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('#quit-modal.modal-active'));
+    assert.equal(new URL(p.url()).pathname, ocean);
+    await p.context().close();
+  });
+  await check('keyboard: Character Selection lock-in dialog closes with Escape and focus is restored', async () => {
+    const p = await pageFor('/student/html/character-selection.html', { account: 'kbd-char', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+    await p.waitForSelector('.persona-card');
+    await p.locator('.persona-card').first().click();
+    await p.locator('#lock-in-btn').focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('.overlay.modal-active, .overlay.is-open');
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('.overlay.modal-active, .overlay.is-open'));
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'lock-in-btn');
     await p.context().close();
   });
   /* ---------------- CHARACTER SELECTION (visual + surface only) ---------------- */
