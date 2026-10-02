@@ -77,6 +77,10 @@ body.opacity-0 { opacity: 0; }
     padding: var(--sp-8) 0 var(--sp-9);
 }
 
+/* The questionnaire's hint can take one or two lines. Anchor the work at the
+   top so a taller footer never recentres the whole question and answer list. */
+.journey-main:has(#test-container:not(.hidden)) { align-items: flex-start; }
+
 /* ---- 2.1 Top bar: identical geometry to the tutoring dashboard, so the
         header does not jump as the student moves between stages. ---- */
 .journey-bar {
@@ -87,8 +91,9 @@ body.opacity-0 { opacity: 0; }
     flex: 0 0 68px;
     display: flex;
     align-items: center;
-    background: var(--glass);
-    box-shadow: var(--shadow-under);
+    background: var(--bg);
+    border-bottom: 1px solid var(--rule);
+    box-shadow: none;
 }
 
 .journey-bar-inner {
@@ -111,8 +116,9 @@ body.opacity-0 { opacity: 0; }
     gap: var(--sp-2);
     height: 32px;
     padding: 0 var(--sp-3);
-    border-radius: var(--r-pill);
-    background: var(--bg-chip);
+    border: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
 }
 
 .stage-node {
@@ -142,55 +148,113 @@ body.opacity-0 { opacity: 0; }
 
 /* ================================================== 3. WAITING ROOM ==== */
 
-/* Waiting room: an open section, no card and no glyph. The student may sit
-   here for minutes, so nothing animates. */
+/* Waiting room: the shared homepage type, caption and hard rules stay quiet
+   while the student waits; there is no fake action or decorative animation. */
 .wait-section {
-    max-width: 620px;
-    margin: 0 auto;
-    padding: var(--sp-7) 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(19rem, .9fr);
+    align-items: center;
+    gap: clamp(2rem, 7vw, 7rem);
+    padding: clamp(2.5rem, 7vh, 6rem) 0;
 }
 
-/* The controller swaps this text between three stage variants. Reserving two
-   lines means the button below never moves when it does. */
+.wait-intro,
+.wait-details { min-width: 0; }
+
+.wait-kicker,
+.wait-details-kicker {
+    width: fit-content;
+    margin: 0 0 var(--sp-6);
+    padding: .5rem .75rem;
+    background: var(--volt);
+    color: var(--on-volt);
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    line-height: 1.3;
+}
+
+.wait-kicker span { padding-inline: .25rem; }
+
 .wait-title {
-    min-height: 40px;
-    font-size: clamp(22px, 3.2vw, 28px);
-    font-weight: 800;
-    letter-spacing: -0.025em;
-    line-height: 1.2;
-    margin-bottom: var(--sp-3);
+    max-width: 11ch;
+    margin: 0 0 var(--sp-5);
+    font-family: var(--font-display);
+    font-size: clamp(3.25rem, 6vw, 5.75rem);
+    font-weight: 700;
+    letter-spacing: -.065em;
+    line-height: .99;
     text-wrap: balance;
+    overflow-wrap: anywhere;
 }
 
 .wait-desc {
-    min-height: 48px;
-    font-size: 14.5px;
-    line-height: 1.65;
-    color: var(--text-muted);
-    max-width: 46ch;
-    margin: 0 0 var(--sp-6);
-}
-
-.wait-note {
-    margin-top: var(--sp-6);
-    font-size: var(--fs-sm);
+    font-size: clamp(1rem, 1.35vw, 1.125rem);
     line-height: 1.6;
     color: var(--text-muted);
-    max-width: 52ch;
+    max-width: 39ch;
+    margin: 0;
 }
 
-/* Labelled facts: rows separated by thin rules, label left, value right. */
+.wait-details {
+    border-top: .375rem solid var(--volt);
+    padding-top: var(--sp-6);
+}
+
+.wait-details-kicker {
+    margin-bottom: var(--sp-4);
+    padding: 0;
+    background: transparent;
+    color: var(--accent-strong);
+}
+
+.wait-promise {
+    max-width: 22ch;
+    margin: 0 0 var(--sp-6);
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 2.2vw, 2.25rem);
+    font-weight: 700;
+    letter-spacing: -.04em;
+    line-height: 1.15;
+}
+
 .facts-list { margin: 0; }
 .facts-list > div {
     display: grid;
-    grid-template-columns: minmax(7.5rem, 11rem) minmax(0, 1fr);
-    gap: var(--sp-4);
-    padding: var(--sp-3) 0;
+    grid-template-columns: minmax(6.5rem, .6fr) minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: .85rem 0;
     border-top: 1px solid var(--line);
 }
 .facts-list > div:last-child { border-bottom: 1px solid var(--line); }
-.facts-list dt { color: var(--text-muted); font-size: var(--fs-sm); }
-.facts-list dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; min-height: 1.5em; }
+.facts-list dt {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    line-height: 1.5;
+    letter-spacing: .025em;
+}
+.facts-list dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; min-height: 1.5em; }
+
+.wait-note {
+    margin: var(--sp-5) 0 0;
+    max-width: 42ch;
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+@media (max-width: 760px) {
+    .wait-section { grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); }
+    .wait-title { max-width: 13ch; font-size: clamp(3rem, 10vw, 4.75rem); }
+    .wait-details { max-width: 38rem; }
+}
+
+@media (max-width: 380px) {
+    .journey #pia-signout-who { display: none; }
+}
 
 
 /* =================================================== 4. OCEAN TEST ===== */
@@ -213,14 +277,34 @@ body.opacity-0 { opacity: 0; }
     box-shadow: none;
 }
 
-.gate-title {
-    font-size: clamp(23px, 3.2vw, 30px);
-    font-weight: 800;
-    letter-spacing: -0.025em;
-    margin-bottom: var(--sp-3);
+.journey-kicker {
+    width: fit-content;
+    margin: 0 0 var(--sp-5);
+    padding: .5rem .75rem;
+    background: var(--volt);
+    color: var(--on-volt);
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    line-height: 1.3;
 }
 
-.gate-lede { font-size: 14.5px; line-height: 1.7; color: var(--text-muted); margin-bottom: var(--sp-6); }
+.gate-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 5vw, 4.25rem);
+    font-weight: 700;
+    letter-spacing: -.055em;
+    line-height: 1.06;
+    margin-bottom: var(--sp-5);
+    text-wrap: balance;
+}
+
+.gate-lede { font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.65; color: var(--text-muted); margin-bottom: var(--sp-6); }
+
+.assessment-finish { border-top: .375rem solid var(--volt); }
+.assessment-finish .journey-kicker { margin-top: var(--sp-6); }
+.assessment-finish .gate-actions { max-width: 16rem; }
 
 /* The disclosure stays prominent as an open section with a rule, not a box. */
 .privacy-note {
@@ -267,6 +351,9 @@ body.opacity-0 { opacity: 0; }
 
 @media (max-width: 420px) {
     .pw-rules { grid-template-columns: minmax(0, 1fr); }
+    /* The longest validation sentence wraps to three lines at 320px. Keep
+       those lines available before an error appears. */
+    .pw-form .field-msg { min-height: 3.375rem; }
 }
 
 .pw-show {
@@ -327,11 +414,12 @@ body.opacity-0 { opacity: 0; }
 }
 
 .question-counter {
+    font-family: var(--font-mono);
     font-size: var(--fs-sm);
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-faint);
+    color: var(--text);
     text-align: center;
 }
 
@@ -460,13 +548,16 @@ body.opacity-0 { opacity: 0; }
 .pick-head { margin-bottom: var(--sp-5); }
 
 .pick-title {
-    font-size: clamp(24px, 3.4vw, 32px);
-    font-weight: 800;
-    letter-spacing: -0.028em;
-    margin-bottom: var(--sp-2);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 5vw, 4.25rem);
+    font-weight: 700;
+    letter-spacing: -.055em;
+    line-height: 1.06;
+    margin-bottom: var(--sp-4);
 }
 
-.pick-lede { font-size: 14.5px; line-height: 1.65; color: var(--text-muted); max-width: 54ch; }
+.pick-lede { font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.65; color: var(--text-muted); max-width: 54ch; }
+.pick-mobile-note { display: none; }
 
 .persona-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
 
@@ -558,7 +649,7 @@ body.opacity-0 { opacity: 0; }
 }
 
 .preview-desc {
-    min-height: 88px;
+    min-height: 8rem;
     margin-top: var(--sp-3);
     font-size: var(--fs-sm);
     line-height: 1.65;
@@ -603,7 +694,9 @@ body.opacity-0 { opacity: 0; }
 /* ------------------------------------------------------- 6. RESPONSIVE */
 @media (max-width: 1024px) {
     .pick-wrap { grid-template-columns: minmax(0, 1fr); }
-    .preview-card { position: static; order: -1; }
+    .preview-card { position: static; }
+    .pick-mobile-note { display: block; margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--accent); }
+    .preview-desc { min-height: 10rem; }
 }
 
 @media (max-width: 720px) {
@@ -623,15 +716,13 @@ body.opacity-0 { opacity: 0; }
     .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
     .persona-card { min-height: 168px; padding: var(--sp-3); }
     .persona-thumb { width: 64px; height: 64px; flex-basis: 64px; }
-    .question-text { min-height: 84px; }
+    .question-text { min-height: 144px; }
 }
 
 /* ---------------------------------------------- 7. PERSONA ART FALLBACK --
-   Five of the six persona illustrations are not in the repository yet. Rather
-   than showing a 12-year-old six broken-image boxes on the one screen where
-   they are asked to tell the tutors apart, a missing file falls back to a
-   tinted monogram. Each persona keeps a distinct colour, so the screen still
-   does its job; drop the artwork in and the monograms disappear on their own. */
+   The five illustrated tutors reuse the landing-page cast. Neutral has no
+   illustration yet; its monogram also covers a failed image request without
+   changing the thumbnail or preview dimensions. */
 .persona-thumb[data-mono]::after,
 .preview-portrait[data-mono]::after {
     content: attr(data-mono);

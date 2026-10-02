@@ -141,3 +141,13 @@ Icons left on these screens: Continue arrow (direction), the four rule dots (sta
 **Verification:** 17 new isolated checks plus updated old ones. Final runs: **Batch 2 suite 76/76, Batch 1 regression 33/33.** Widths 320/375/768/1280/1440 and both themes on all three screens (overflow, surface, glyph/card absence, icon list, single action). Screenshots inspected for each screen after the runs. 
 
 **Status:** Waiting Room, Assessment Complete and Set New Password are implemented and verified in the isolated harness. Remaining limits: no real device or other browsers; live token verification, real password change and the live DB trigger are untested (no live access); Waiting Room facts reflect existing page logic only; contrast on these three screens was inspected visually, not computed (the computed 4.5:1 check covers OCEAN, tutorial and dashboard). **Batch 2 overall: implemented and isolated-verified for all six student screens; still limited by unverified live tutorial persistence and no real-device testing.**
+
+## Student visual consistency and steady-layout follow-up
+
+The student stages now share the landing page's comic surface, typography, strong labels and hard rules. Waiting Room uses a two-column introduction and stage explanation on wide screens, stacking them on phones. Assessment Complete has one clear Continue action; Set New Password uses the same heading hierarchy. Character Selection and the dashboard reuse the landing page's five tracked tutor illustrations. Neutral has an intentional fixed-size text monogram because no sixth illustration exists.
+
+The lock-in and sign-out confirmation dialogs each retain one visible safe dismiss action, with Escape also supported; their redundant X controls were removed. The dashboard summary uses the single header Sign out control. On phones the tutor choices appear before their preview, and the maths task appears before its tutor panel.
+
+Steady-layout checks cover all 50 OCEAN prompts at 320px, all six tutor previews, and password validation errors. Question text, preview copy and field-error slots reserve space; the OCEAN work area stays top-aligned as footer hints change. OCEAN now routes unanswered questions back for review before Submit appears. The original answer storage and submit RPC remain in use.
+
+**Latest isolated checks:** Batch 2 browser suite 82/82; Batch 1 regression 33/33. Both use local Chrome and mocked service responses. JavaScript syntax checks and `git diff --check` passed. These checks do not establish live Supabase behaviour, real-device rendering, or complete accessibility coverage.

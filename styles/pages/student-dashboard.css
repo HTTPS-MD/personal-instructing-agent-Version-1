@@ -57,8 +57,9 @@
     height: 68px;
     display: flex;
     align-items: center;
-    background: var(--glass);
-    box-shadow: var(--shadow-under);
+    background: var(--bg);
+    border-bottom: 1px solid var(--rule);
+    box-shadow: none;
 }
 
 .learn-bar-inner {
@@ -83,9 +84,9 @@
     gap: var(--sp-2);
     height: 32px;
     padding: 0 var(--sp-4);
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
+    border-radius: 0;
+    background: var(--volt);
+    color: var(--on-volt);
     font-size: var(--fs-sm);
     font-weight: 700;
     white-space: nowrap;
@@ -133,12 +134,26 @@
     padding: var(--sp-6) 0;
 }
 
+.learn-kicker {
+    width: fit-content;
+    margin: 0 0 var(--sp-5);
+    padding: .5rem .75rem;
+    background: var(--volt);
+    color: var(--on-volt);
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    line-height: 1.3;
+}
+
 .start-hello {
-    font-size: clamp(26px, 3.6vw, 36px);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1.15;
-    margin-bottom: var(--sp-3);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 5vw, 4.25rem);
+    font-weight: 700;
+    letter-spacing: -.055em;
+    line-height: 1.06;
+    margin-bottom: var(--sp-5);
     text-wrap: balance;
     overflow-wrap: anywhere;   /* a very long first name must wrap, not clip */
 }
@@ -211,6 +226,15 @@
     height: 100%;
     object-fit: contain;
 }
+
+.agent-portrait[data-mono]::after {
+    content: attr(data-mono);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+    font-weight: 700;
+}
+.agent-portrait[data-mono] img { display: none; }
 
 .agent-name { font-size: 16px; font-weight: 700; }
 .agent-role { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-muted); }
@@ -547,11 +571,16 @@
 }
 
 .summary-title {
-    font-size: clamp(24px, 3.4vw, 32px);
-    font-weight: 800;
-    letter-spacing: -0.025em;
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 5vw, 4.25rem);
+    font-weight: 700;
+    letter-spacing: -.055em;
+    line-height: 1.06;
     margin-bottom: var(--sp-3);
 }
+
+.summary-card .learn-kicker { margin-inline: auto; }
+.summary-note { margin-top: var(--sp-7); font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted); }
 
 .summary-lede { font-size: 15px; color: var(--text-muted); line-height: 1.65; margin-bottom: var(--sp-7); }
 
@@ -590,9 +619,8 @@ body:not([data-boot="pending"]) .learn-veil[hidden] { display: none; }
     .start-wrap { grid-template-columns: minmax(0, 1fr); }
     .session-wrap { grid-template-columns: minmax(0, 1fr); }
 
-    /* Agent above the work on narrow screens, so the answer input stays near
-       the bottom of the screen where the thumbs are. */
-    .agent-panel { order: -1; }
+    /* Keep the problem and answer first on phones; the tutor remains directly
+       after the work, so its feedback cannot bury the primary task. */
 }
 
 @media (max-width: 720px) {

@@ -85,6 +85,7 @@
             <section class="learn-shell screen is-active" id="screen-start">
                 <div class="start-wrap">
                     <div class="start-card">
+                        <p class="learn-kicker">YOUR SESSION</p>
                         <h1 class="start-hello" id="start-hello">Welcome back!</h1>
                         <p class="start-lede" id="start-lede">
                             Today you'll solve percentage word problems with your tutor. Take your time — there's
@@ -113,7 +114,7 @@
 
                     <aside class="agent-card">
                         <div class="agent-portrait">
-                            <img id="agent-img-start" src="../../assets/images/char-1.png" alt="Your tutor"
+                            <img id="agent-img-start" src="../../assets/images/cast/char-1.webp" alt="Your tutor"
                                 width="128" height="128">
                         </div>
                         <p class="agent-name" id="agent-name-start">Your tutor</p>
@@ -188,7 +189,7 @@
                     <!-- Agent -->
                     <aside class="agent-panel">
                         <div class="agent-portrait">
-                            <img id="agent-img" src="../../assets/images/char-1.png" alt="Your tutor"
+                            <img id="agent-img" src="../../assets/images/cast/char-1.webp" alt="Your tutor"
                                 width="104" height="104">
                         </div>
                         <p class="agent-name" id="agent-name">Your tutor</p>
@@ -200,6 +201,7 @@
             <!-- ========================================== SUMMARY SCREEN -->
             <section class="learn-shell screen" id="screen-summary">
                 <div class="summary-card">
+                    <p class="learn-kicker">SESSION COMPLETE</p>
                     <h2 class="summary-title">Session complete</h2>
                     <p class="summary-lede" id="summary-lede">Nice work getting all the way through.</p>
 
@@ -218,18 +220,14 @@
                         </div>
                     </dl>
 
-                    <button class="btn btn-secondary" id="summary-signout">
-                        Sign out
-                    </button>
+                    <p class="summary-note">You're done for now. Sign out from the top bar before someone else uses this device.</p>
                 </div>
             </section>
         </main>
     </div>
 
     <!-- ============================================= MODAL · CONFIRM ----
-         Same mechanics as every other dialog in the system: 18px radius, the
-         36×36 close button in flow 21px from the edge, scroll lock that
-         substitutes the scrollbar width. -->
+         One Go back action dismisses the dialog; Escape does the same. -->
     <div class="overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <div class="modal modal-sm">
             <header class="modal-head">
@@ -237,9 +235,6 @@
                     <h2 class="modal-title" id="confirm-title">Are you sure?</h2>
                     <p class="modal-sub" id="confirm-subtitle">Check before you continue.</p>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
             <div class="modal-body">
                 <p class="modal-text" id="confirm-text"></p>

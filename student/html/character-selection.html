@@ -60,11 +60,13 @@
                 <div class="pick-wrap">
                     <div>
                         <div class="pick-head">
+                            <p class="journey-kicker">FIND YOUR FIT</p>
                             <h1 class="pick-title">Choose your tutor</h1>
                             <p class="pick-lede">
                                 Each tutor teaches the same maths, but explains it differently. Tap one to
                                 see how it works, then lock in the one that sounds right for you.
                             </p>
+                            <p class="pick-mobile-note">Select a tutor to see their details below.</p>
                         </div>
 
                         <div class="persona-grid">
@@ -72,13 +74,13 @@
                                 data-character="pia-open"
                                 data-name="PIA Open"
                                 data-role="Conceptual"
-                                data-img="../../assets/images/char-1.png"
+                                data-img="../../assets/images/cast/char-1.webp"
                                 data-desc="Creative and exploratory guidance designed for conceptual problem solvers who enjoy exploring deep mathematical perspectives."
                                 data-style="Explorative &amp; creative"
                                 data-pace="Flexible pace"
                                 data-best="Abstract thinkers">
                                 <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-1.png"
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/cast/char-1.webp"
                                         alt="PIA Open" width="76" height="76">
                                 </span>
                                 <span class="persona-name">PIA Open</span>
@@ -88,13 +90,13 @@
                                 data-character="pia-conscientious"
                                 data-name="PIA Structure"
                                 data-role="Disciplined"
-                                data-img="../../assets/images/char-conscientious.png"
+                                data-img="../../assets/images/cast/char-2.webp"
                                 data-desc="Structured, highly organized, and disciplined pacing for students who thrive in step-by-step routines."
                                 data-style="Step-by-step structure"
                                 data-pace="Steady &amp; methodical"
                                 data-best="Detail-oriented learners">
                                 <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-conscientious.png"
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/cast/char-2.webp"
                                         alt="PIA Structure" width="76" height="76">
                                 </span>
                                 <span class="persona-name">PIA Structure</span>
@@ -104,13 +106,13 @@
                                 data-character="pia-extravert"
                                 data-name="PIA Dynamic"
                                 data-role="High-energy"
-                                data-img="../../assets/images/char-extravert.png"
+                                data-img="../../assets/images/cast/char-3.webp"
                                 data-desc="High-energy, interactive, and enthusiastic reinforcement to keep active problem solvers engaged and motivated."
                                 data-style="Interactive &amp; engaging"
                                 data-pace="Fast &amp; energetic"
                                 data-best="Active participants">
                                 <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-extravert.png"
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/cast/char-3.webp"
                                         alt="PIA Dynamic" width="76" height="76">
                                 </span>
                                 <span class="persona-name">PIA Dynamic</span>
@@ -120,13 +122,13 @@
                                 data-character="pia-agreeable"
                                 data-name="PIA Empath"
                                 data-role="Supportive"
-                                data-img="../../assets/images/char-agreeable.png"
+                                data-img="../../assets/images/cast/char-4.webp"
                                 data-desc="Gentle, supportive, and collaborative encouragement built for learners who prefer a low-stress environment."
                                 data-style="Gentle encouragement"
                                 data-pace="Relaxed pace"
                                 data-best="Collaborative learners">
                                 <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-agreeable.png"
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/cast/char-4.webp"
                                         alt="PIA Empath" width="76" height="76">
                                 </span>
                                 <span class="persona-name">PIA Empath</span>
@@ -136,13 +138,13 @@
                                 data-character="pia-calm"
                                 data-name="PIA Stable"
                                 data-role="Stress-free"
-                                data-img="../../assets/images/char-calm.png"
+                                data-img="../../assets/images/cast/char-5.webp"
                                 data-desc="Stress-free zone focusing on calm feedback, steady progress tracking, and methodical pacing."
                                 data-style="Calm &amp; reassuring"
                                 data-pace="Slow &amp; steady"
                                 data-best="Cautious learners">
                                 <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-calm.png"
+                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/cast/char-5.webp"
                                         alt="PIA Stable" width="76" height="76">
                                 </span>
                                 <span class="persona-name">PIA Stable</span>
@@ -157,10 +159,7 @@
                                 data-style="Standard adaptive"
                                 data-pace="Balanced pace"
                                 data-best="General learners">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/char-neutral.png"
-                                        alt="PIA Neutral" width="76" height="76">
-                                </span>
+                                <span class="persona-thumb" data-mono="NE" aria-hidden="true"></span>
                                 <span class="persona-name">PIA Neutral</span>
                                 <span class="persona-role">Balanced</span>
                             </button>
@@ -219,10 +218,8 @@
     </div>
 
     <!-- =============================================== MODAL · CONFIRM ---
-         Standard dialog mechanics from global.css: 18px radius, the 36×36
-         close button in flow 21px from the edge. The controller toggles
-         `modal-active` / `modal-content-active`, which student-journey.css
-         maps onto the same visual states the rest of the system uses. -->
+         One safe dismiss action in the footer; Escape has the same effect.
+         The controller toggles `modal-active` / `modal-content-active`. -->
     <div class="overlay" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
         <div class="modal modal-sm" id="modal-content">
             <header class="modal-head">
@@ -230,9 +227,6 @@
                     <h2 class="modal-title" id="confirm-heading">Lock in your tutor?</h2>
                     <p class="modal-sub">You keep this tutor for the whole study.</p>
                 </div>
-                <button class="modal-close" data-action="close" aria-label="Close">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">

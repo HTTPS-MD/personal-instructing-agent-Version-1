@@ -19,7 +19,7 @@
 </head>
 
 <!-- requireStudentSession() removes `opacity-0` once the session is verified. -->
-<body class="opacity-0">
+<body class="opacity-0 waiting-room">
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
@@ -57,24 +57,29 @@
         <main class="journey-main">
             <div class="journey-shell">
                 <section class="wait-section" aria-labelledby="waiting-title">
-                    <!-- waiting-room.js swaps the title, description and the
-                         "Waiting for" row between three stage variants. Their
-                         heights are reserved in the stylesheet so nothing below
-                         moves. -->
-                    <h1 class="wait-title" id="waiting-title">Waiting for your teacher</h1>
-                    <p class="wait-desc" id="waiting-desc">
-                        This stage isn't open yet. Keep this page open — it will move you
-                        forward automatically the moment your teacher starts it.
-                    </p>
+                    <div class="wait-intro">
+                        <p class="wait-kicker">YOUR JOURNEY <span aria-hidden="true">/</span> ON HOLD</p>
+                        <!-- The controller swaps this title and description for
+                             the student's next available stage. -->
+                        <h1 class="wait-title" id="waiting-title">Waiting for your teacher</h1>
+                        <p class="wait-desc" id="waiting-desc">
+                            This stage isn't open yet. Keep this page open — it will move you
+                            forward automatically the moment your teacher starts it.
+                        </p>
+                    </div>
 
-                    <dl class="facts-list">
-                        <div><dt>Status</dt><dd>Not open yet</dd></div>
-                        <div><dt>Your stage</dt><dd>Waiting room</dd></div>
-                        <div><dt>Waiting for</dt><dd id="waiting-for">The next stage to open</dd></div>
-                    </dl>
+                    <div class="wait-details">
+                        <p class="wait-details-kicker">WHAT HAPPENS NEXT</p>
+                        <p class="wait-promise">This page moves you forward automatically when the stage opens.</p>
 
-                    <p class="wait-note">You don't need to refresh or do anything. If you close this page,
-                        just sign in again and you'll come right back here.</p>
+                        <dl class="facts-list">
+                            <div><dt>Status</dt><dd>Not open yet</dd></div>
+                            <div><dt>Your stage</dt><dd>Waiting room</dd></div>
+                            <div><dt>Waiting for</dt><dd id="waiting-for">The next stage to open</dd></div>
+                        </dl>
+
+                        <p class="wait-note">No need to refresh. If you close this page, sign in again and you'll return here.</p>
+                    </div>
                 </section>
             </div>
         </main>

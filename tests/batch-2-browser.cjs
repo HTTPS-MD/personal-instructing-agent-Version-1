@@ -129,7 +129,7 @@ function fixture() {
     await p.screenshot({ path: path.join(out, 'ocean-q1-dark-1280.png') });
     await p.context().close();
   });
-  await check('ocean: Back/Next only, Submit absent until the final question', async () => {
+  await check('ocean: Question 50 offers review when answers are missing', async () => {
     const p = await startOcean();
     const submit = p.locator('#btn-submit-ocean');
     assert.equal(await submit.isVisible(), false);
@@ -137,11 +137,39 @@ function fixture() {
     assert.equal(await p.locator('.test-nav button:visible').count(), 2);
     for (let i = 0; i < 49; i++) { assert.equal(await submit.isVisible(), false, 'q' + (i + 1)); await p.locator('#btn-next').click(); }
     assert.match(await p.locator('#question-counter').innerText(), /50 of 50/i);
-    assert.equal(await submit.isVisible(), true);
-    assert.equal(await p.locator('#btn-next').isVisible(), false);
-    assert.equal(await submit.isDisabled(), true, 'unanswered questions keep Submit disabled');
-    await p.locator('#btn-prev').click();
     assert.equal(await submit.isVisible(), false);
+    assert.equal(await p.locator('#btn-next-label').innerText(), 'Review 50');
+    await p.locator('#btn-next').click();
+    assert.match(await p.locator('#question-counter').innerText(), /1 of 50/i);
+    assert.equal(await p.locator('#btn-next-label').innerText(), 'Next missing');
+    assert.equal(await p.locator('#btn-next').isDisabled(), true);
+    assert.equal(await submit.isVisible(), false);
+    await p.context().close();
+  });
+  await check('ocean: skipped questions return in order, then Submit appears', async () => {
+    const p = await startOcean({ width: 375, theme: 'dark' });
+    const submit = p.locator('#btn-submit-ocean');
+    for (let i = 0; i < 50; i++) {
+      if (i !== 2 && i !== 16) await p.locator('#ocean-answer-list button[data-score="4"]').click();
+      if (i < 49) await p.locator('#btn-next').click();
+    }
+    assert.equal(await submit.isVisible(), false);
+    assert.equal(await p.locator('#btn-next-label').innerText(), 'Review 2');
+    assert.match(await p.locator('#submit-hint').innerText(), /2 unanswered/i);
+    await p.screenshot({ path: path.join(out, 'ocean-review-missing-375.png') });
+    await p.locator('#btn-next').click();
+    assert.match(await p.locator('#question-counter').innerText(), /3 of 50/i);
+    assert.equal(await p.locator('#btn-next').isDisabled(), true);
+    await p.locator('#ocean-answer-list button[data-score="4"]').click();
+    assert.equal(await p.locator('#btn-next-label').innerText(), 'Next missing');
+    await p.locator('#btn-next').click();
+    assert.match(await p.locator('#question-counter').innerText(), /17 of 50/i);
+    await p.locator('#ocean-answer-list button[data-score="4"]').click();
+    assert.equal(await submit.isVisible(), true);
+    assert.equal(await submit.isEnabled(), true);
+    await submit.click();
+    await p.waitForURL(/assessment-complete/);
+    assert.deepEqual(submitted, { p_responses: new Array(50).fill(4) });
     await p.context().close();
   });
   await check('ocean: Submit works only when all answered; answers reach the existing RPC', async () => {
@@ -415,7 +443,8 @@ function fixture() {
     assert.equal(await p.locator('.summary-glyph, #screen-summary svg.icon-lg, #summary-signout svg').count(), 0);
     assert.equal(await p.locator('dl.summary-grid dt').count(), 3);
     assert.equal(await p.locator('#screen-summary .summary-title').isVisible(), true);
-    assert.equal(await p.locator('#summary-signout').isVisible(), true);
+    assert.equal(await p.locator('#summary-signout').count(), 0);
+    assert.equal(await p.locator('#signout-btn').isVisible(), true);
     assert.ok(isFlat(await flat(p, '.summary-card')));
     await p.screenshot({ path: path.join(out, 'audit-dash-summary-375.png') });
     await p.locator('#signout-btn').click();
@@ -497,7 +526,7 @@ function fixture() {
       await p.waitForSelector('#btn-continue'); await p.waitForTimeout(250);
       assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
       assert.equal(await p.locator('h1').innerText(), 'Thank you for completing the assessment');
-      assert.match(await p.locator('.gate-lede').innerText(), /^Your answers have been saved\. There is nothing else you need to do here\.$/);
+      assert.match(await p.locator('.gate-lede').innerText(), /^Your answers have been saved\. Continue to your next stage\.$/);
       assert.equal(await p.locator('.gate-glyph, svg.icon-lg, .gate-wrap:not(.gate-open)').count(), 0);
       assert.deepEqual(await iconsOf(p), ['#i-arrow-right']);          // direction on the one action
       assert.equal(await p.locator('main a.btn, main button').count(), 1);
@@ -683,6 +712,94 @@ function fixture() {
       await p.context().close();
     });
   }
+  await check('redesign: OCEAN question controls stay put across all 50 prompts at 320px', async () => {
+    const p = await startOcean({ width: 320, theme: 'light' });
+    const positions = [];
+    for (let i = 0; i < 50; i++) {
+      positions.push(await p.evaluate(() => {
+        const y = selector => document.querySelector(selector).getBoundingClientRect().top + scrollY;
+        return [y('.answer-list'), y('.test-nav')];
+      }));
+      if (i < 49) await p.locator('#btn-next').click();
+    }
+    for (const col of [0, 1]) {
+      const values = positions.map(row => row[col]);
+      const max = Math.max(...values), min = Math.min(...values);
+      assert.ok(max - min <= 1, `question content shifts controls by ${max - min}px at question ${values.indexOf(max) + 1}; first ${values.slice(0, 6).join(', ')}; last ${values.slice(-3).join(', ')}`);
+    }
+    await p.context().close();
+  });
+  await check('redesign: mobile tutor choices come first and preview stays steady', async () => {
+    const p = await pageFor('/student/html/character-selection.html', { width: 320, theme: 'light', account: 'char-redesign', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+    await p.waitForSelector('.persona-card');
+    const order = await p.evaluate(() => ['.pick-head', '.persona-grid', '.preview-card'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
+    assert.ok(order[0] < order[1] && order[1] < order[2], 'instructions and choices precede preview');
+    const heights = [];
+    for (const card of await p.locator('.persona-card').all()) {
+      await card.click();
+      heights.push(await p.locator('.preview-card').evaluate(el => el.getBoundingClientRect().height));
+    }
+    assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, 'tutor copy shifts the preview: ' + heights.join(', '));
+    await p.screenshot({ path: path.join(out, 'redesign-character-320.png') });
+    await p.locator('#lock-in-btn').click();
+    assert.equal(await p.locator('#confirm-modal [data-action="close"]').count(), 1);
+    assert.equal(await p.locator('#confirm-modal .modal-close').count(), 0);
+    await p.context().close();
+  });
+  await check('redesign: dashboard work comes first and each sign-out state has one control', async () => {
+    const p = await pageFor(dash, { width: 375, account: 'dash-redesign' });
+    await p.locator('#tutorial-skip').click();
+    await p.waitForSelector('#modal-tutorial.is-mounted', { state: 'detached' });
+    await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
+    const order = await p.evaluate(() => ['.progress-card', '.problem-card', '.agent-panel'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
+    assert.ok(order[0] < order[1] && order[1] < order[2], 'problem must precede tutor panel on phone');
+    await p.screenshot({ path: path.join(out, 'redesign-dashboard-work-375.png') });
+    await p.evaluate(() => { document.querySelector('#screen-session').classList.remove('is-active'); document.querySelector('#screen-summary').classList.add('is-active'); });
+    assert.equal(await p.locator('#signout-btn:visible').count(), 1);
+    assert.equal(await p.locator('#summary-signout').count(), 0);
+    await p.locator('#signout-btn').click();
+    await p.waitForSelector('#modal-confirm.is-open');
+    assert.equal(await p.locator('#modal-confirm [data-modal-close]').count(), 1);
+    assert.equal(await p.locator('#modal-confirm .modal-close').count(), 0);
+    await p.context().close();
+  });
+  await check('redesign: password validation does not move fields or submit at 320px', async () => {
+    const p = await pwPage({ width: 320, theme: 'light' });
+    await p.waitForFunction(() => document.querySelector('#pw-email').textContent.includes('@'));
+    const positions = () => p.evaluate(() => ['#pw-confirm', '#pw-submit'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
+    const before = await positions();
+    await p.fill('#pw-new', 'abc');
+    await p.fill('#pw-confirm', 'abc');
+    await p.click('#pw-submit');
+    const after = await positions();
+    assert.ok(after.every((y, i) => Math.abs(y - before[i]) <= 1), `password controls moved: ${before} -> ${after}`);
+    await p.screenshot({ path: path.join(out, 'redesign-password-errors-320.png') });
+    await p.context().close();
+  });
+  await check('redesign: student tutor art matches the five landing-page characters', async () => {
+    let p = await pageFor('/student/html/character-selection.html', { account: 'char-art', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+    await p.waitForSelector('.persona-card');
+    await p.waitForFunction(() => [...document.querySelectorAll('.persona-card img')].slice(0, 5).every(img => img.complete && img.naturalWidth > 0));
+    await p.waitForFunction(() => document.querySelectorAll('.persona-thumb[data-mono]').length >= 1);
+    const art = await p.locator('.persona-card').evaluateAll(cards => cards.map(card => ({
+      key: card.dataset.character,
+      src: card.querySelector('img')?.getAttribute('src') || '',
+      loaded: (card.querySelector('img')?.naturalWidth || 0) > 0,
+      fallback: card.querySelector('.persona-thumb').hasAttribute('data-mono')
+    })));
+    art.slice(0, 5).forEach((item, index) => {
+      assert.match(item.src, new RegExp(`cast/char-${index + 1}\\.webp$`));
+      assert.equal(item.loaded, true, item.key + ' art missing');
+      assert.equal(item.fallback, false, item.key + ' fell back to monogram');
+    });
+    assert.equal(art[5].fallback, true, 'Neutral intentionally uses its text placeholder');
+    await p.screenshot({ path: path.join(out, 'redesign-cast-1280.png') });
+    await p.context().close();
+    p = await pageFor(dash, { account: 'dash-neutral', initial: { profile: { selected_character: 'pia-neutral' } } });
+    await p.waitForSelector('#start-btn');
+    assert.equal(await p.locator('.agent-card .agent-portrait').getAttribute('data-mono'), 'PIA');
+    await p.context().close();
+  });
   await check('no request left the loopback server', async () => { assert.deepEqual(leaked.filter(u => /supabase\.co/.test(u)), []); });
 
   await browser.close(); server.close();

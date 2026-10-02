@@ -43,15 +43,17 @@
     var MAX_ATTEMPTS = 2;
 
     var CHARACTER_IMAGES = {
-        'pia-open': '../../assets/images/char-1.png',
-        'pia-conscientious': '../../assets/images/char-conscientious.png',
-        'pia-extravert': '../../assets/images/char-extravert.png',
-        'pia-agreeable': '../../assets/images/char-agreeable.png',
-        'pia-calm': '../../assets/images/char-calm.png',
-        'pia-neutral': '../../assets/images/char-neutral.png'
+        'pia-open': '../../assets/images/cast/char-1.webp',
+        'pia-conscientious': '../../assets/images/cast/char-2.webp',
+        'pia-extravert': '../../assets/images/cast/char-3.webp',
+        'pia-agreeable': '../../assets/images/cast/char-4.webp',
+        'pia-calm': '../../assets/images/cast/char-5.webp'
     };
 
-    var FALLBACK_IMAGE = '../../assets/images/char-1.png';
+    var CHARACTER_MONOGRAMS = {
+        'pia-open': 'OP', 'pia-conscientious': 'ST', 'pia-extravert': 'DY',
+        'pia-agreeable': 'EM', 'pia-calm': 'ST', 'pia-neutral': 'PIA'
+    };
 
     /* Display state only. Every number that matters is re-read from the
        server; these exist so the screen has something to paint between
@@ -282,11 +284,20 @@
     }
 
     function applyCharacter(key) {
-        var src = CHARACTER_IMAGES[key] || FALLBACK_IMAGE;
+        var src = CHARACTER_IMAGES[key];
         ['#agent-img', '#agent-img-start'].forEach(function (sel) {
             var img = $(sel);
             if (!img) { return; }
-            img.addEventListener('error', function () { this.src = FALLBACK_IMAGE; }, { once: true });
+            var portrait = img.closest('.agent-portrait');
+            if (portrait) portrait.removeAttribute('data-mono');
+            if (!src) {
+                img.removeAttribute('src');
+                if (portrait) portrait.setAttribute('data-mono', CHARACTER_MONOGRAMS[key] || 'PIA');
+                return;
+            }
+            img.addEventListener('error', function () {
+                if (portrait) portrait.setAttribute('data-mono', CHARACTER_MONOGRAMS[key] || 'PIA');
+            }, { once: true });
             img.src = src;
         });
 
@@ -927,7 +938,6 @@
         $('#answer-form').addEventListener('submit', handleSubmit);
         $('#hint-btn').addEventListener('click', handleHint);
         $('#signout-btn').addEventListener('click', signOut);
-        $('#summary-signout').addEventListener('click', signOut);
         $('#start-btn').addEventListener('click', handleStart);
         /* Typing is progress: the "stuck?" offer waits while they work. */
         $('#answer-input').addEventListener('input', armHintOffer);
