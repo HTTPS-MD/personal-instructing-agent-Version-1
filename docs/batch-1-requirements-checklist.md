@@ -101,7 +101,7 @@ Rule applied (spec 13/14, extended to the student screens): a card stays only if
 2. **Long names.** A 90-character first name clipped past the right edge of the dashboard heading at 320px (the first geometry assertion missed it; the screenshot showed it). `.start-hello` now wraps with `overflow-wrap: anywhere`; the test now also fails on text overflowing its own box.
 3. **Character Selection lock-in dialog keyboard gap (found while testing).** The irreversible-choice dialog had no Escape, no initial focus, no Tab containment and no focus return. Added, without touching selection logic: focus starts on the safe "Let me look again" button, Tab stays inside, Escape = look again, focus returns to the Lock in button. This is a keyboard/a11y fix, not a navigation or research change.
 
-**The three remaining screens: decision = intentionally OUT OF SCOPE for Batch 2 (limitation recorded, not silently changed).**
+**The three remaining screens: first recorded as out of scope; SUPERSEDED, see "Waiting Room / Assessment Complete / Set New Password layouts" below (the user then explicitly authorised them).**
 
 | Screen | What it looks like now (inspected in rendered screenshots, 375 and 1280, both themes) | Why not changed |
 |---|---|---|
@@ -119,4 +119,25 @@ All three render without horizontal overflow (checked). Recommended follow-up (n
 
 **Final results (this session, isolated Chromium, loopback only):** Batch 2 suite 59/59; Batch 1 regression 33/33 (run after the last source change; the only edit since was a wait added to one Batch 2 test). `node --check` on all `student/js/*.js`: pass. Lint/type/build: not applicable (no tooling in the repo). Widths covered: 320, 375, 768, 1280, 1440 (OCEAN, dashboard, tutorial, Character Selection), both themes; reduced motion on and off.
 
-**Batch 2 status: partially complete.** The three named screens (OCEAN, Character Selection, Tutoring Dashboard) and the tutorial are implemented and pass the isolated checks with screenshots inspected. Not complete: the three journey screens above remain on the old design (recorded as out of scope), tutorial persistence is unverified against live Supabase, and there is no real-device, other-browser or assistive-technology testing.
+**Batch 2 status (before the three-screen follow-up below): partially complete.** The three named screens (OCEAN, Character Selection, Tutoring Dashboard) and the tutorial are implemented and pass the isolated checks with screenshots inspected. Not complete: the three journey screens above remain on the old design (recorded as out of scope), tutorial persistence is unverified against live Supabase, and there is no real-device, other-browser or assistive-technology testing.
+
+
+## Waiting Room / Assessment Complete / Set New Password layouts (explicitly authorised follow-up)
+
+**Files changed:** `student/html/waiting-room.html`, `student/html/assessment-complete.html`, `student/html/set-new-password.html`, `student/js/waiting-room.js` (presentation only: a `setWaitingFor()` helper fills one fact row inside the existing three stage branches), `styles/pages/student-journey.css`, `tests/batch-2-browser.cjs`, this file. `assessment-complete.js` and `set-new-password.js` were NOT edited, so token verification, password policy and session handling are byte-for-byte as before.
+
+All three: `data-surface="comic"` (homepage tokens, themes, reduced motion inherited), Sign out icon removed, no centred gate card, no large glyph.
+
+| Screen | Layout now | Preserved | Deliberately not added |
+|---|---|---|---|
+| Waiting Room | Open section; status heading (existing three title variants); existing explanation; description list: Status = Not open yet, Your stage = Waiting room, Waiting for = questionnaire / character selection / tutoring dashboard (same branch that picks the title); existing "no need to refresh" note as plain text. Clock orb, pulse animation, info icon and note box removed. | Automatic redirect when the stage opens (tested), realtime listener, stage routing. | No primary action: the existing flow has none (it redirects by itself), so none was invented. Group/research condition is not shown. |
+| Assessment Complete | Open section: heading and lede unchanged word for word, one Continue action (arrow kept: direction). Check glyph and card removed. | Continue destination still set by the existing `resolveStudentRedirect` (tested: resolves to the dashboard for a Control fixture). | **No facts list: there is no result data to show.** By design (research integrity, migration 0018) no score, trait or tutor reaches the student, so nothing was invented. |
+| Set New Password | One solid form surface (the existing `.gate-wrap`, now comic-styled), left-aligned title/description; verified email shown as plain text (set by the script from the session profile, unchanged); both fields, requirements list always visible (never placeholders), accessible Show passwords checkbox, single submit. Key glyph and the shaded identity box removed. | Field errors + focus, pending "Saving…", confirmed success then redirect, failure keeps fields, unflagged account is sent on, `updateUser` receives only `{password}` (all tested against a mock; the mock clears `must_change_password` to stand in for the migration-0019 trigger, so the trigger itself is not verified). | No new fields, steps or destinations. |
+
+Two small non-colour cues were added in CSS only (script untouched): a met password rule shows "· met", and an error status shows "Error:" before its text.
+
+Icons left on these screens: Continue arrow (direction), the four rule dots (status), nothing else except the shared header.
+
+**Verification:** 17 new isolated checks plus updated old ones. Final runs: **Batch 2 suite 76/76, Batch 1 regression 33/33.** Widths 320/375/768/1280/1440 and both themes on all three screens (overflow, surface, glyph/card absence, icon list, single action). Screenshots inspected for each screen after the runs. 
+
+**Status:** Waiting Room, Assessment Complete and Set New Password are implemented and verified in the isolated harness. Remaining limits: no real device or other browsers; live token verification, real password change and the live DB trigger are untested (no live access); Waiting Room facts reflect existing page logic only; contrast on these three screens was inspected visually, not computed (the computed 4.5:1 check covers OCEAN, tutorial and dashboard). **Batch 2 overall: implemented and isolated-verified for all six student screens; still limited by unverified live tutorial persistence and no real-device testing.**

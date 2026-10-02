@@ -44,6 +44,13 @@ function fixture() {
       },
       updateUser: async (args) => {
         f.calls.push({ method: 'updateUser', keys: Object.keys(args || {}), dataKeys: Object.keys((args && args.data) || {}) });
+        if (args && args.password !== undefined) {
+          await window.__acct('submit', { pwKeys: Object.keys(args) });
+          if (f.updateDelay) await new Promise(r => setTimeout(r, f.updateDelay));
+          if (f.passwordError) return { data: null, error: f.passwordError };
+          f.profile = Object.assign({}, f.profile, { must_change_password: false });   // MOCK of the migration-0019 trigger
+          return { data: { user }, error: null };
+        }
         if (f.writeError) return { data: null, error: { message: 'unavailable' } };
         await window.__acct('write', args.data);
         return { data: { user }, error: null };
@@ -453,21 +460,131 @@ function fixture() {
       await p.context().close();
     });
   }
-  for (const [name, url, initial, ready] of [
-    ['waiting room', '/student/html/waiting-room.html', { stageOpen: false, profile: { is_ocean_done: false } }, '.wait-card'],
-    ['assessment complete', '/student/html/assessment-complete.html', { profile: { is_ocean_done: true } }, '.gate-wrap'],
-    ['set new password', '/student/html/set-new-password.html', { profile: { must_change_password: true } }, '.gate-wrap']]) {
-    for (const [w, t] of [[375, 'dark'], [1280, 'light']]) {
-      await check(`out-of-scope screen renders: ${name} ${w}px ${t} (no overflow, keeps old surface)`, async () => {
-        const p = await pageFor(url, { width: w, theme: t, account: 'oos', initial });
-        await p.waitForSelector(ready); await p.waitForTimeout(300);
-        assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
-        assert.equal(await p.evaluate(() => document.documentElement.dataset.surface || ''), '');
-        await p.screenshot({ path: path.join(out, `oos-${name.replace(/ /g, '-')}-${w}-${t}.png`) });
-        await p.context().close();
-      });
-    }
+  /* ---------------- WAITING ROOM / ASSESSMENT COMPLETE / SET NEW PASSWORD ---------------- */
+  const WAIT = ['/student/html/waiting-room.html', { stageOpen: false, profile: { is_ocean_done: false } }];
+  for (const [w, t] of [[320, 'light'], [375, 'dark'], [768, 'light'], [1280, 'dark'], [1440, 'light']]) {
+    await check(`waiting room: open section + facts list, no card/glyph/icon/action (${w}px ${t})`, async () => {
+      const p = await pageFor(WAIT[0], { width: w, theme: t, account: 'wr', initial: WAIT[1] });
+      await p.waitForSelector('#waiting-for'); await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'The questionnaire');
+      assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
+      assert.equal(await p.locator('.wait-card, .wait-orb, .gate-glyph, svg.icon-lg').count(), 0);
+      assert.deepEqual(await iconsOf(p), []);
+      assert.equal(await p.locator('main button, main a.btn, main form').count(), 0, 'no action: the existing flow redirects automatically');
+      assert.equal(await p.locator('dl.facts-list > div').count(), 3);
+      assert.deepEqual(await p.locator('dl.facts-list dt').allInnerTexts(), ['Status', 'Your stage', 'Waiting for']);
+      assert.ok(isFlat(await flat(p, '.wait-section')));
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+      await p.screenshot({ path: path.join(out, `final-waiting-${w}-${t}.png`) });
+      await p.context().close();
+    });
   }
+  await check('waiting room: existing redirect behaviour preserved when the stage opens', async () => {
+    const p = await pageFor('/student/html/waiting-room.html', { account: 'wr2', initial: { stageOpen: true, profile: { is_ocean_done: false } } });
+    await p.waitForURL(/ocean-test\.html/);
+    await p.context().close();
+  });
+  await check('waiting room: char/dash variants name the right stage', async () => {
+    let p = await pageFor('/student/html/waiting-room.html', { account: 'wr3', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Non-Assigned', selected_character: null } } });
+    await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'Character selection');
+    await p.context().close();
+    p = await pageFor('/student/html/waiting-room.html', { account: 'wr4', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Control', selected_character: 'pia-open' } } });
+    await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'The tutoring dashboard');
+    await p.context().close();
+  });
+  for (const [w, t] of [[320, 'dark'], [375, 'light'], [768, 'dark'], [1280, 'light'], [1440, 'dark']]) {
+    await check(`assessment complete: heading, same wording, one action, no glyph/card (${w}px ${t})`, async () => {
+      const p = await pageFor('/student/html/assessment-complete.html', { width: w, theme: t, account: 'ac', initial: { profile: { is_ocean_done: true } } });
+      await p.waitForSelector('#btn-continue'); await p.waitForTimeout(250);
+      assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
+      assert.equal(await p.locator('h1').innerText(), 'Thank you for completing the assessment');
+      assert.match(await p.locator('.gate-lede').innerText(), /^Your answers have been saved\. There is nothing else you need to do here\.$/);
+      assert.equal(await p.locator('.gate-glyph, svg.icon-lg, .gate-wrap:not(.gate-open)').count(), 0);
+      assert.deepEqual(await iconsOf(p), ['#i-arrow-right']);          // direction on the one action
+      assert.equal(await p.locator('main a.btn, main button').count(), 1);
+      assert.match(await p.locator('#btn-continue').getAttribute('href'), /student-dashboard\.html$/);   // existing resolveStudentRedirect
+      assert.ok(isFlat(await flat(p, '.gate-wrap')));
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+      await p.screenshot({ path: path.join(out, `final-complete-${w}-${t}.png`) });
+      await p.context().close();
+    });
+  }
+  const PW = ['/student/html/set-new-password.html', { profile: { must_change_password: true } }];
+  const pwPage = (o = {}) => pageFor(PW[0], Object.assign({ account: 'pw' }, o, { initial: Object.assign({}, PW[1], o.initial || {}) }));
+  for (const [w, t] of [[320, 'light'], [375, 'dark'], [768, 'light'], [1280, 'dark'], [1440, 'light']]) {
+    await check(`set new password: one surface, left-aligned, email from session, rules visible (${w}px ${t})`, async () => {
+      const p = await pwPage({ width: w, theme: t });
+      await p.waitForSelector('#pw-new'); await p.waitForFunction(() => document.querySelector('#pw-email').textContent.includes('@'));
+      assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
+      assert.equal(await p.locator('.gate-glyph, svg.icon-lg, .pw-identity[style], .modal-hero').count(), 0);
+      assert.equal(await p.locator('#pw-email').innerText(), 'fixture@example.test');
+      assert.equal(await p.locator('#pw-rules li').count(), 4);
+      assert.equal(await p.locator('#pw-new').getAttribute('placeholder'), null);   // requirements are not placeholders
+      assert.ok(isFlat(await flat(p, '.pw-identity')));
+      assert.equal(await p.locator('h1').evaluate(el => getComputedStyle(el).textAlign), 'start');
+      assert.equal(await p.locator('main button[type=submit]').count(), 1);
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+      await p.screenshot({ path: path.join(out, `final-password-${w}-${t}.png`) });
+      await p.context().close();
+    });
+  }
+  await check('set new password: field-level errors, focus, no request on invalid input', async () => {
+    const p = await pwPage(); await p.waitForSelector('#pw-new');
+    await p.fill('#pw-new', 'abc'); await p.fill('#pw-confirm', 'abc'); await p.click('#pw-submit');
+    assert.match(await p.locator('#pw-new-msg').innerText(), /at least 8 characters/);
+    assert.equal(await p.locator('#pw-new').getAttribute('aria-invalid'), 'true');
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'pw-new');
+    await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg2'); await p.click('#pw-submit');
+    assert.match(await p.locator('#pw-confirm-msg').innerText(), /do not match/);
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'pw-confirm');
+    assert.equal((await calls(p)).filter(c => c.method === 'updateUser').length, 0);
+    await p.context().close();
+  });
+  await check('set new password: show-passwords is an accessible, non-submitting toggle', async () => {
+    const p = await pwPage(); await p.waitForSelector('#pw-new');
+    assert.equal(await p.getByLabel('Show passwords').count(), 1);
+    await p.check('#pw-show-toggle');
+    assert.equal(await p.locator('#pw-new').getAttribute('type'), 'text');
+    assert.equal(await p.locator('#pw-confirm').getAttribute('type'), 'text');
+    await p.uncheck('#pw-show-toggle');
+    assert.equal(await p.locator('#pw-new').getAttribute('type'), 'password');
+    assert.equal((await calls(p)).filter(c => c.method === 'updateUser').length, 0);
+    await p.context().close();
+  });
+  await check('set new password: rules show a text cue (not colour alone) when met', async () => {
+    const p = await pwPage(); await p.waitForSelector('#pw-new');
+    await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1');
+    const cues = await p.locator('#pw-rules li.is-met').evaluateAll(els => els.map(e => getComputedStyle(e, '::after').content));
+    assert.equal(cues.length, 4); assert.ok(cues.every(c => /met/.test(c)), JSON.stringify(cues));
+    await p.screenshot({ path: path.join(out, 'final-password-rules-met.png') });
+    await p.context().close();
+  });
+  await check('set new password: pending state, confirmed success, then existing redirect', async () => {
+    const p = await pwPage({ initial: { updateDelay: 700 } }); await p.waitForSelector('#pw-new');
+    await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1');
+    await p.click('#pw-submit');
+    assert.equal(await p.locator('#pw-submit').isDisabled(), true);
+    assert.equal(await p.locator('#pw-submit').innerText(), 'Saving…');
+    await p.screenshot({ path: path.join(out, 'final-password-pending.png') });
+    await p.waitForURL(u => !/set-new-password/.test(u.pathname), { timeout: 5000 });
+    assert.deepEqual(submitted, { pwKeys: ['password'] });     // only the password, nothing else, was sent
+    await p.context().close();
+  });
+  await check('set new password: confirmed failure keeps the fields and re-enables submit', async () => {
+    const p = await pwPage({ initial: { passwordError: { message: 'Password should be at least 8 characters', code: 'weak_password' } } }); await p.waitForSelector('#pw-new');
+    await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1'); await p.click('#pw-submit');
+    await p.waitForFunction(() => document.querySelector('#pw-status').textContent.length > 0);
+    assert.equal(await p.locator('#pw-status').evaluate(el => el.classList.contains('is-error')), true);
+    assert.equal(await p.locator('#pw-status').evaluate(el => getComputedStyle(el, '::before').content), '"Error: "');
+    assert.equal(await p.inputValue('#pw-new'), 'abcdefg1');
+    assert.equal(await p.locator('#pw-submit').isEnabled(), true);
+    assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
+    await p.screenshot({ path: path.join(out, 'final-password-error-375.png') });
+    await p.context().close();
+  });
+  await check('set new password: an unflagged account is sent on (existing guard unchanged)', async () => {
+    const p = await pageFor('/student/html/set-new-password.html', { account: 'pw2', initial: { profile: { must_change_password: false } } });
+    await p.waitForURL(u => !/set-new-password/.test(u.pathname)); await p.context().close();
+  });
   const zoomCss = 'html { font-size: 200% !important; }';
   await check('zoom 200%: OCEAN question reachable, no overflow (375x667)', async () => {
     const p = await startOcean({ width: 375, height: 667 });

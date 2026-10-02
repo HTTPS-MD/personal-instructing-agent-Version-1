@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-surface="comic">
 
 <head>
     <meta charset="UTF-8">
@@ -23,9 +23,6 @@
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
-            <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4V12l3.1 1.9"/></symbol>
-            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
-            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
         </defs>
     </svg>
 
@@ -51,7 +48,6 @@
 
                 <div class="journey-bar-right">
                     <button class="btn btn-signout" id="signout-btn" data-signout>
-                        <svg class="icon"><use href="#i-logout"></use></svg>
                         Sign out
                     </button>
                 </div>
@@ -60,26 +56,26 @@
 
         <main class="journey-main">
             <div class="journey-shell">
-                <div class="wait-card">
-                    <div class="wait-orb" aria-hidden="true">
-                        <svg class="icon"><use href="#i-clock"></use></svg>
-                    </div>
-
-                    <!-- waiting-room.js swaps both of these between three stage
-                         variants. Their heights are reserved in the stylesheet
-                         so the note and button below never move. -->
+                <section class="wait-section" aria-labelledby="waiting-title">
+                    <!-- waiting-room.js swaps the title, description and the
+                         "Waiting for" row between three stage variants. Their
+                         heights are reserved in the stylesheet so nothing below
+                         moves. -->
                     <h1 class="wait-title" id="waiting-title">Waiting for your teacher</h1>
                     <p class="wait-desc" id="waiting-desc">
                         This stage isn't open yet. Keep this page open — it will move you
                         forward automatically the moment your teacher starts it.
                     </p>
 
-                    <div class="wait-note">
-                        <svg class="icon"><use href="#i-info"></use></svg>
-                        <p>You don't need to refresh or do anything. If you close this page,
-                            just sign in again and you'll come right back here.</p>
-                    </div>
-                </div>
+                    <dl class="facts-list">
+                        <div><dt>Status</dt><dd>Not open yet</dd></div>
+                        <div><dt>Your stage</dt><dd>Waiting room</dd></div>
+                        <div><dt>Waiting for</dt><dd id="waiting-for">The next stage to open</dd></div>
+                    </dl>
+
+                    <p class="wait-note">You don't need to refresh or do anything. If you close this page,
+                        just sign in again and you'll come right back here.</p>
+                </section>
             </div>
         </main>
     </div>

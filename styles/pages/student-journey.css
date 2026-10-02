@@ -142,37 +142,13 @@ body.opacity-0 { opacity: 0; }
 
 /* ================================================== 3. WAITING ROOM ==== */
 
-.wait-card {
-    max-width: 560px;
+/* Waiting room: an open section, no card and no glyph. The student may sit
+   here for minutes, so nothing animates. */
+.wait-section {
+    max-width: 620px;
     margin: 0 auto;
-    padding: var(--sp-9) var(--sp-8);
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-    text-align: center;
+    padding: var(--sp-7) 0;
 }
-
-/* A calm breathing pulse rather than a spinner: the student may be sitting
-   here for several minutes, and a spinner reads as "something is loading and
-   may fail". Opacity only — nothing resizes. */
-.wait-orb {
-    width: 88px;
-    height: 88px;
-    margin: 0 auto var(--sp-6);
-    border-radius: 50%;
-    background: var(--accent-soft);
-    display: grid;
-    place-items: center;
-    color: var(--accent);
-    animation: wait-pulse 2.6s ease-in-out infinite;
-}
-
-@keyframes wait-pulse {
-    0%, 100% { opacity: 0.55; }
-    50% { opacity: 1; }
-}
-
-.wait-orb .icon { width: 34px; height: 34px; }
 
 /* The controller swaps this text between three stage variants. Reserving two
    lines means the button below never moves when it does. */
@@ -192,21 +168,30 @@ body.opacity-0 { opacity: 0; }
     line-height: 1.65;
     color: var(--text-muted);
     max-width: 46ch;
-    margin: 0 auto var(--sp-6);
+    margin: 0 0 var(--sp-6);
 }
 
 .wait-note {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-    text-align: left;
+    margin-top: var(--sp-6);
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+    color: var(--text-muted);
+    max-width: 52ch;
 }
 
-.wait-note .icon { flex: 0 0 18px; color: var(--warning); margin-top: 1px; }
-.wait-note p { font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted); }
+/* Labelled facts: rows separated by thin rules, label left, value right. */
+.facts-list { margin: 0; }
+.facts-list > div {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 11rem) minmax(0, 1fr);
+    gap: var(--sp-4);
+    padding: var(--sp-3) 0;
+    border-top: 1px solid var(--line);
+}
+.facts-list > div:last-child { border-bottom: 1px solid var(--line); }
+.facts-list dt { color: var(--text-muted); font-size: var(--fs-sm); }
+.facts-list dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; min-height: 1.5em; }
+
 
 /* =================================================== 4. OCEAN TEST ===== */
 
@@ -219,20 +204,6 @@ body.opacity-0 { opacity: 0; }
     background: var(--bg-surface);
     box-shadow: var(--shadow-card);
 }
-
-/* Used by waiting/complete/password screens (not yet reworked). */
-.gate-glyph {
-    width: 64px;
-    height: 64px;
-    margin-bottom: var(--sp-5);
-    border-radius: var(--r-lg);
-    display: grid;
-    place-items: center;
-    background: var(--accent-soft);
-    color: var(--accent);
-}
-
-.gate-glyph.is-locked { background: var(--warning-soft); color: var(--warning); }
 
 /* OCEAN consent / locked screen: an open section, no card, no glyph. */
 .gate-wrap.gate-open {
@@ -266,9 +237,6 @@ body.opacity-0 { opacity: 0; }
 /* ---- 4.1b Set new password (forced change after a temporary password) ---- */
 .pw-identity {
     margin-bottom: var(--sp-5);
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
     font-size: var(--fs-sm);
     color: var(--text-muted);
     overflow-wrap: anywhere;
@@ -294,6 +262,8 @@ body.opacity-0 { opacity: 0; }
 .pw-rules .icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--text-faint); }
 .pw-rules li.is-met { color: var(--text); }
 .pw-rules li.is-met .icon { color: var(--accent); }
+/* Not colour alone: a met rule also says so. */
+.pw-rules li.is-met::after { content: "· met"; color: var(--text-muted); font-size: var(--fs-xs); }
 
 @media (max-width: 420px) {
     .pw-rules { grid-template-columns: minmax(0, 1fr); }
@@ -318,6 +288,8 @@ body.opacity-0 { opacity: 0; }
 }
 
 .pw-status.is-error { color: var(--danger); }
+/* Not colour alone: errors announce themselves in words. */
+.pw-status.is-error::before { content: "Error: "; font-weight: 700; }
 .pw-status.is-ok { color: var(--accent); }
 
 /* ---- 4.2 The test ---- */
@@ -637,7 +609,8 @@ body.opacity-0 { opacity: 0; }
 @media (max-width: 720px) {
     .journey-shell { padding: 0 var(--sp-4); }
     .journey-main { padding: var(--sp-5) 0 var(--sp-8); }
-    .wait-card { padding: var(--sp-7) var(--sp-5); }
+    .wait-section { padding: var(--sp-5) 0; }
+    .facts-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
     .gate-wrap { padding: var(--sp-6) var(--sp-5); }
     .gate-wrap.gate-open { padding: var(--sp-5) 0; }
     .question-card { padding: var(--sp-6) var(--sp-4); }

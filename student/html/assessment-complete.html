@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-surface="comic">
 
 <head>
     <meta charset="UTF-8">
@@ -31,9 +31,7 @@
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
-            <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
             <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></symbol>
-            <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.5"/><path d="m16 16.5 4.5-4.5L16 7.5"/><path d="M20.5 12H9"/></symbol>
         </defs>
     </svg>
 
@@ -57,7 +55,6 @@
 
                 <div class="journey-bar-right">
                     <button class="btn btn-signout" id="signout-btn" data-signout>
-                        <svg class="icon"><use href="#i-logout"></use></svg>
                         Sign out
                     </button>
                 </div>
@@ -66,12 +63,8 @@
 
         <main class="journey-main">
             <div class="journey-shell">
-                <div class="gate-wrap">
-                    <div class="gate-glyph">
-                        <svg class="icon icon-lg"><use href="#i-check"></use></svg>
-                    </div>
-
-                    <h1 class="gate-title">Thank you for completing the assessment</h1>
+                <section class="gate-wrap gate-open" aria-labelledby="done-title">
+                    <h1 class="gate-title" id="done-title">Thank you for completing the assessment</h1>
                     <p class="gate-lede">
                         Your answers have been saved. There is nothing else you need to do here.
                     </p>
@@ -84,7 +77,7 @@
                             <svg class="icon"><use href="#i-arrow-right"></use></svg>
                         </a>
                     </div>
-                </div>
+                </section>
             </div>
         </main>
     </div>
