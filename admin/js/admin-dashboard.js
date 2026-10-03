@@ -164,7 +164,7 @@
         return { value: formatScore(score), detail: formatScore(raw) + ' / ' + formatScore(max) };
     }
 
-    var MIGRATION_MISSING = 'The database is missing the newest migrations. Apply 0033 and 0034, then try again.';
+    var MIGRATION_MISSING = 'This database is not fully set up for this, so nothing was saved. Ask whoever maintains the database to finish its setup, then try again.';
 
     function isEmail(value) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -257,7 +257,7 @@
         admins: [],
         totalStudents: 0,
         page: 1,
-        filters: { group: 'all', stage: null, search: '' },
+        filters: { section: '', group: 'all', stage: null, search: '' },
         activeStudent: null,
         resetEmail: null,    // the student the Reset password dialog is acting on
         activeSection: null,
@@ -309,9 +309,10 @@
 
     /* ---- 3.3 View router ---- */
 
-    var VIEWS = ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
+    var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
+        if (view === 'sections') { view = 'students'; }     /* the old Class Sections address */
         if (VIEWS.indexOf(view) === -1) { view = 'overview'; }
 
         $$('[data-view-panel]').forEach(function (panel) {
@@ -344,6 +345,7 @@
         /* Back / forward and edited addresses follow the hash. */
         window.addEventListener('hashchange', function () {
             var target = (window.location.hash || '').replace('#', '');
+            if (target === 'sections') { target = 'students'; }
             if (target && VIEWS.indexOf(target) !== -1) { switchView(target); }
         });
     }
@@ -375,8 +377,11 @@
         var overlay = document.getElementById(id);
         if (!overlay || openLayers.indexOf(overlay) !== -1) { return; }
 
+        /* Each layer remembers what opened it, so closing a dialog that sits on
+           top of another puts focus back in the one underneath. */
+        overlay._returnFocus = trigger || document.activeElement;
         if (!openLayers.length) {
-            lastFocused = trigger || document.activeElement;
+            lastFocused = overlay._returnFocus;
             lockScroll();
         }
 
@@ -420,6 +425,10 @@
 
         setTimeout(function () {
             overlay.classList.remove('is-mounted');
+            if (openLayers.length) {
+                var back = overlay._returnFocus;
+                if (back && back.focus && document.body.contains(back) && back.offsetParent !== null) { back.focus({ preventScroll: true }); }
+            }
             if (!openLayers.length) {
                 unlockScroll();
                 if (lastFocused && lastFocused.focus) { lastFocused.focus({ preventScroll: true }); }
@@ -793,10 +802,10 @@
         /* Where a failed load leaves its placeholders. [selector, 'block'] or
            [selector, 'rows', columns]. */
         var FAILURE = {
-            cohort: [['#live-tbody', 'rows', 4], ['#sections-tbody', 'rows', 6]],
-            sections: [['#sections-tbody', 'rows', 6]],
+            cohort: [['#live-tbody', 'rows', 4], ['#sections-tbody', 'rows', 5]],
+            sections: [['#sections-tbody', 'rows', 5]],
             roster: [['#student-tbody', 'rows', 5]],
-            faculty: [['#faculty-tbody', 'rows', 4]],
+            faculty: [['#faculty-tbody', 'rows', 6]],
             settings: [['#gates-grid', 'block']],
             admins: [['#admin-tbody', 'rows', 2]],
             admindevices: [['#admin-device-list', 'block']]
@@ -942,10 +951,10 @@
         };
 
         fill('#live-tbody', skeletonRows(4, 4));
-        fill('#sections-tbody', skeletonRows(6, 4));
+        fill('#sections-tbody', skeletonRows(5, 4));
         fill('#gates-grid', GATES.map(skeletonGate).join(''));
         fill('#student-tbody', skeletonRows(5, 6));
-        fill('#faculty-tbody', skeletonRows(4, 4));
+        fill('#faculty-tbody', skeletonRows(6, 4));
         fill('#admin-tbody', skeletonRows(2, 2));
         fill('#admin-device-list', skeletonDevice());
     }
@@ -1044,6 +1053,7 @@
         renderLiveSessions();
         renderSections();
         renderGateAccess();
+        renderFaculty($('#faculty-search') ? $('#faculty-search').value : '');   /* section progress reads the cohort */
     }
 
     /* Active seconds per stage and the last heartbeat (migration 0035). Read
@@ -1088,12 +1098,12 @@
         state.sectionsLoaded = true;
         fillSectionSelects();
         renderSections();
-        $('#nav-count-sections').textContent = state.sections.length;
     }
 
     /* Group and stage filters shared by the roster query and the tab counts,
        so a count always describes the same rows the tab would show. */
     function applyGroupFilter(query) {
+        if (state.filters.section) { query = query.eq('section', state.filters.section); }
         var g = state.filters.group;
         if (g === 'experimental') { return query.in('group_type', ['assigned', 'non-assigned', 'neutral']); }
         if (g === 'assigned' || g === 'non-assigned' || g === 'neutral' || g === 'control') {
@@ -1249,6 +1259,19 @@
             select.innerHTML = markup || '<option value="">No sections yet</option>';
             if (current) { select.value = current; }
         });
+
+        /* The Students filter: "All sections" first, then one option per section. */
+        var filter = $('#section-filter');
+        if (filter) {
+            var keep = state.filters.section;
+            filter.innerHTML = '<option value="">All sections</option>' + markup;
+            if (keep && !state.sections.some(function (sec) { return sec.name === keep; })) {
+                state.filters.section = keep = '';          /* the section no longer exists */
+                state.page = 1;
+                if (state.sectionsLoaded) { loadRoster(); loadStageCounters(); }
+            }
+            filter.value = keep;
+        }
     }
 
     /* ================================ 5. PRESENCE AND LIVE SESSIONS ===== */
@@ -1451,7 +1474,7 @@
 
         if (state.stageTimes === null) {
             message('Active time is not available',
-                'The stage-time table is not set up on this database. Apply supabase/migrations/20260929_0035_stage_time_tracking.sql, then refresh.');
+                'Active time is not set up on this database yet. Ask whoever maintains the database to finish its setup, then refresh.');
             return;
         }
         if (!state.cohortLoaded || state.stageTimes === undefined) {
@@ -1600,17 +1623,26 @@
         return offline === members.length ? { online: false } : null;
     }
 
+    /* "5 of 8 (63%)": the same wording wherever OCEAN completion is shown. */
+    function oceanFraction(done, total) {
+        return total ? done + ' of ' + total + ' (' + pct(done, total) + '%)' : '—';
+    }
+
+    /* The sections dialog. Each section's name is a real button that shows
+       that section in the Students view, so opening one never depends on a
+       clickable row. */
     function renderSections() {
+        renderScope();
         var tbody = $('#sections-tbody');
         if (!tbody) { return; }
 
         if (!state.sectionsLoaded || !state.cohortLoaded) {
-            tbody.innerHTML = skeletonRows(6, 4);
+            tbody.innerHTML = skeletonRows(5, 4);
             return;
         }
 
         if (!state.sections.length) {
-            tbody.innerHTML = '<tr><td colspan="6"><div class="state-block">' +
+            tbody.innerHTML = '<tr><td colspan="5"><div class="state-block">' +
                 '<p class="state-title">No sections yet</p></div></td></tr>';
             return;
         }
@@ -1627,74 +1659,66 @@
 
             return '' +
                 '<tr>' +
-                '<td><span class="cell-name">' + esc(section.name) + '</span></td>' +
+                '<td><button type="button" class="cell-link" data-section-open="' + esc(section.name) + '">' +
+                esc(section.name) + '</button></td>' +
                 '<td>' + (prof ? esc(prof.name) : '<span class="muted">—</span>') + '</td>' +
                 '<td class="col-right mono">' + members.length + '</td>' +
-                '<td class="col-right mono">' + done + (members.length ? ' · ' + pct(done, members.length) + '%' : '') + '</td>' +
+                '<td class="col-right mono">' + esc(oceanFraction(done, members.length)) + '</td>' +
                 '<td>' + statusCell + '</td>' +
-                '<td class="col-right"><button type="button" class="btn btn-secondary btn-sm" data-section-open="' +
-                esc(section.name) + '" aria-label="View roster for section ' + esc(section.name) + '">View</button></td>' +
                 '</tr>';
         }).join('');
+    }
+
+    /* The one line above the Students table: which section it is showing and
+       the figures that are real for it. OCEAN completed is the only completion
+       the database records; the other stages are where students are now. */
+    function renderScope() {
+        var line = $('#scope-line');
+        if (!line) { return; }
+        var section = state.filters.section;
+        var scores = $('#section-scores-open');
+        if (scores) { scores.classList.toggle('is-hidden', !section); }
+        var search = $('#student-search');
+        if (search) { search.placeholder = 'Name or email, in ' + (section || 'all sections'); }
+
+        if (!state.cohortLoaded) { line.textContent = 'Loading…'; return; }
+
+        var members = section
+            ? state.cohort.filter(function (s) { return s.section === section; })
+            : state.cohort;
+        var done = members.filter(hasCurrentResult).length;
+        var parts = [section || 'All sections'];
+        var prof = section && state.faculty.filter(function (f) { return f.assigned_section === section; })[0];
+        if (prof) { parts.push('Professor ' + prof.name); }
+        parts.push(members.length + (members.length === 1 ? ' student' : ' students'));
+        if (members.length) { parts.push('OCEAN completed ' + oceanFraction(done, members.length)); }
+        line.textContent = parts.join(' · ');
+    }
+
+    /* Shows one section in the Students view (from the sections dialog, the
+       Faculty table or the quick find), clearing the other filters so the
+       table is that whole section. */
+    function showSection(name) {
+        state.filters = { section: name || '', group: 'all', stage: null, search: '' };
+        state.page = 1;
+        var filter = $('#section-filter'); if (filter) { filter.value = state.filters.section; }
+        $('#group-filter').value = 'all';
+        $('#student-search').value = '';
+        setStageTab('');
+        renderScope();
+        switchView('students');
+        loadRoster();
+        loadStageCounters();
     }
 
     function initSectionsTable() {
         $('#sections-tbody').addEventListener('click', function (event) {
             var btn = event.target.closest('[data-section-open]');
-            if (btn) { openSectionDetails(btn.getAttribute('data-section-open'), btn); }
+            if (!btn) { return; }
+            var name = btn.getAttribute('data-section-open');
+            closeModal('modal-manage-sections');
+            showSection(name);
         });
-    }
-
-    function professorFor(sectionName) {
-        var match = state.faculty.filter(function (f) { return f.assigned_section === sectionName; })[0];
-        return match ? match.name : 'No professor assigned';
-    }
-
-    async function openSectionDetails(sectionName, trigger) {
-        state.activeSection = sectionName;
-        $('#section-details-title').textContent = 'Section ' + sectionName;
-        $('#section-details-sub').textContent = 'Loading enrolled students…';
-        $('#section-students-tbody').innerHTML = skeletonRows(5, 4);
-        openModal('modal-section-details', trigger);
-
-        var res = await sb.from('profiles')
-            .select('role, full_name, email, group_type, status, pre_test_score, post_test_score')
-            .eq('section', sectionName)
-            .order('full_name', { ascending: true });
-
-        if (res.error) {
-            $('#section-details-sub').textContent = 'Could not load this section.';
-            $('#section-students-tbody').innerHTML = '';
-            toastErr('Section failed to load', friendlyDbError(res.error, 'Unknown database error.'));
-            return;
-        }
-
-        var students = (res.data || []).filter(function (row) {
-            return (row.role || '').toLowerCase() !== 'admin';
-        });
-
-        $('#section-details-sub').textContent = students.length +
-            ' student' + (students.length === 1 ? '' : 's') + ' enrolled.';
-
-        if (!students.length) {
-            $('#section-students-tbody').innerHTML = '<tr><td colspan="5">' +
-                '<div class="state-block" style="min-height:200px">' +
-                '<span class="state-glyph">' + icon('users', 'icon-lg') + '</span>' +
-                '<p class="state-title">No students in this section</p>' +
-                '</div></td></tr>';
-            return;
-        }
-
-        $('#section-students-tbody').innerHTML = students.map(function (s) {
-            return '' +
-                '<tr>' +
-                '<td>' + userCell(s) + '</td>' +
-                conditionCell(s) +
-                '<td>' + activationBadge(s) + '</td>' +
-                '<td class="tnum muted">' + esc(s.pre_test_score == null ? '—' : s.pre_test_score) + '</td>' +
-                '<td class="tnum muted">' + esc(s.post_test_score == null ? '—' : s.post_test_score) + '</td>' +
-                '</tr>';
-        }).join('');
     }
 
     /* ============================================== 7. ALL STUDENTS ===== */
@@ -1724,7 +1748,7 @@
     }
 
     function filtersActive() {
-        return !!(state.filters.stage || state.filters.group !== 'all' || state.filters.search.trim());
+        return !!(state.filters.section || state.filters.stage || state.filters.group !== 'all' || state.filters.search.trim());
     }
 
     function renderRoster() {
@@ -1778,6 +1802,20 @@
             loadStageCounters();       /* the counts follow the group */
         });
 
+        /* Same table, same stage tabs, search and paging for all sections or
+           one: only the rows' scope changes, and the tab counts follow it. */
+        $('#section-filter').addEventListener('change', function (event) {
+            state.filters.section = event.target.value;
+            state.page = 1;
+            renderScope();
+            loadRoster();
+            loadStageCounters();
+        });
+
+        $('#section-scores-open').addEventListener('click', function () {
+            if (state.filters.section) { openScoresModal(state.filters.section); }
+        });
+
         $$('[data-stage-filter]').forEach(function (tab) {
             tab.addEventListener('click', function () {
                 setStageTab(tab.getAttribute('data-stage-filter'));
@@ -1787,11 +1825,13 @@
         });
 
         $('#reset-filters').addEventListener('click', function () {
-            state.filters = { group: 'all', stage: null, search: '' };
+            state.filters = { section: '', group: 'all', stage: null, search: '' };
             $('#student-search').value = '';
             $('#group-filter').value = 'all';
+            $('#section-filter').value = '';
             setStageTab('');
             state.page = 1;
+            renderScope();
             loadRoster();
             loadStageCounters();
         });
@@ -1855,6 +1895,16 @@
         $('#drawer-section').textContent = s.section || '—';
         $('#drawer-stage').textContent = stageLabel(stageOf(s));
         $('#drawer-tutor').textContent = tutorLabel(s);
+        /* A Control student takes the OCEAN test only. If the record shows more,
+           say so plainly; nothing here changes the record. */
+        var controlNote = $('#drawer-control-note');
+        var beyondOcean = s.group_type === 'control' &&
+            (s.is_in_game === true || s.current_stage === 'Character Selection' || s.current_stage === 'Tutoring Dashboard');
+        controlNote.classList.toggle('is-hidden', !beyondOcean);
+        controlNote.textContent = beyondOcean
+            ? 'Control students take the OCEAN test only, but this record shows ' +
+              (s.is_in_game === true ? 'a tutoring session in progress' : 'the ' + stageLabel(s.current_stage).toLowerCase() + ' stage') + '.'
+            : '';
         /* Clearing a tutor to re-pick only makes sense where the student picks one. */
         var reselect = $('[data-student-action="retake-character"]');
         if (reselect) { reselect.classList.toggle('is-hidden', s.group_type !== 'non-assigned'); }
@@ -2611,6 +2661,21 @@
 
     /* ================================================== 9. FACULTY ====== */
 
+    /* Progress for a professor's assigned section, only where the data is
+       real: the student count and OCEAN completion are read from the same
+       cohort as the Students view. A professor with no section, a section
+       that does not exist, or a cohort that has not loaded shows a dash,
+       never a zero. */
+    function facultyProgress(f) {
+        var dash = '<td class="col-right muted">—</td><td class="col-right muted">—</td>';
+        if (!f.assigned_section || !state.cohortLoaded) { return dash; }
+        if (!state.sections.some(function (sec) { return sec.name === f.assigned_section; })) { return dash; }
+        var members = state.cohort.filter(function (s) { return s.section === f.assigned_section; });
+        var done = members.filter(hasCurrentResult).length;
+        return '<td class="col-right mono">' + members.length + '</td>' +
+            '<td class="col-right mono">' + esc(oceanFraction(done, members.length)) + '</td>';
+    }
+
     function renderFaculty(term) {
         var needle = sanitizeFilterTerm(term).toLowerCase();
         var rows = state.faculty.filter(function (f) {
@@ -2632,7 +2697,11 @@
                 ' aria-label="Open profile: ' + esc(f.name || f.email) + '">' +
                 '<td>' + userCell({ full_name: f.name, email: f.email }) + '</td>' +
                 '<td class="muted">' + esc(f.department || '—') + '</td>' +
-                '<td><span class="badge">' + esc(f.assigned_section || 'Unassigned') + '</span></td>' +
+                '<td>' + (f.assigned_section
+                    ? '<button type="button" class="cell-link" data-section-open="' + esc(f.assigned_section) + '"' +
+                      ' aria-label="Show students in section ' + esc(f.assigned_section) + '">' + esc(f.assigned_section) + '</button>'
+                    : '<span class="badge">Unassigned</span>') + '</td>' +
+                facultyProgress(f) +
                 '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
                 (active ? 'Active' : 'Inactive') + '</span></td>' +
                 '</tr>';
@@ -2645,6 +2714,8 @@
         }, 200));
 
         $('#faculty-tbody').addEventListener('click', function (event) {
+            var section = event.target.closest('[data-section-open]');
+            if (section) { showSection(section.getAttribute('data-section-open')); return; }
             var row = event.target.closest('[data-faculty]');
             if (row) { openFacultyProfile(row.getAttribute('data-faculty'), row); }
         });
@@ -2898,7 +2969,7 @@
             return '<tr><th scope="row" class="policy-group">' + esc(g.label) + '</th>' +
                 cell(g.ocean) + cell(g.char) + cell(g.dash) + '</tr>';
         }).join('');
-        $('#policy-foot').textContent = 'Shown from the server’s stage rule (migration 0038). Neutral is a tutor persona, not a group: free-choice students can pick it and assigned students can be given it; records still marked Neutral behave as Assigned. This page cannot change which stages a group can enter; it opens or closes a stage for whole sections below.';
+        $('#policy-foot').textContent = 'Reference only; it does not change anything here. Control takes the OCEAN test only. Neutral is a tutor choice, not a group.';
     }
 
     var GATE_ACCESS_TIP = 'Granting moves a section’s eligible students in right away. Grant a section ' +
@@ -2996,7 +3067,7 @@
             return head() + '<span class="skeleton-text gate-access-skeleton" aria-hidden="true"></span>';
         }
         if (!state.sections.length) {
-            return head() + '<p class="gate-access-note">No sections yet. Create one under Class Sections.</p>';
+            return head() + '<p class="gate-access-note">No sections yet. Create one with Manage sections in Students.</p>';
         }
 
         var selected = state.gateSelected[gate.key];
@@ -3026,7 +3097,7 @@
 
         if (state.overrides === null) {
             html += '<p class="gate-access-note">' + (state.overridesMissing
-                ? 'Which sections are open needs migration 0033.'
+                ? 'Which sections are open is not available: the database is not fully set up.'
                 : 'Couldn’t load which sections are open. Refresh to retry.') + '</p>';
         }
 
@@ -3214,7 +3285,7 @@
 
         if (res.error) {
             toastErr('Access not revoked', res.error.code === 'PGRST202' || res.error.code === '42883'
-                ? 'The database is missing migration 0036 (admin_revoke_stage). Apply it, then try again.'
+                ? 'Revoking access is not available: the database is not fully set up. Ask whoever maintains the database to finish its setup, then try again.'
                 : friendlyDbError(res.error, 'The request did not complete.'));
             return;
         }
@@ -3387,7 +3458,7 @@
             return 'The server refused the request' + code + ': ' + fields.message;
         }
         if (fields.code === 'PGRST202' || fields.code === '42883') {
-            return 'The claim_device function was not found' + code + '. Apply the latest database migrations.';
+            return 'Device registration is not set up on this database' + code + '. Ask whoever maintains the database to finish its setup.';
         }
         return 'claim_device failed' + code + ': ' + (fields.message || 'no reason given') +
             ' Details are in the browser console; search for “[PIA device]”.';
@@ -3970,7 +4041,7 @@
                 '<div class="state-block" style="min-height:200px">' +
                 '<p class="state-title">' + (missing ? 'Raw scores are not set up yet' : 'Could not load scores') + '</p>' +
                 '<p class="state-desc">' + esc(missing
-                    ? 'Apply supabase/migrations/20260929_0034_raw_and_transmuted_test_scores.sql, then reopen this dialog.'
+                    ? 'Score entry is not set up on this database yet. Ask whoever maintains the database to finish its setup, then reopen this dialog.'
                     : friendlyDbError(res.error, 'Unknown database error.')) + '</p>' +
                 '</div></td></tr>';
             return;
@@ -4344,13 +4415,6 @@
             $('#scores-max-' + test).addEventListener('input', function () { repaintScores(test); });
         });
         $('#device-limit-signout').addEventListener('click', signOut);
-
-        $('#section-scores-btn').addEventListener('click', function () {
-            var section = state.activeSection;
-            closeModal('modal-section-details');
-            setTimeout(function () { openScoresModal(section); }, 200);
-        });
-
     }
 
     async function boot() {
@@ -4425,7 +4489,7 @@
             go: switchView,
             openModal: openModal,
             openStudent: openStudentByEmail,
-            openSection: function (name) { switchView('sections'); openSectionDetails(name); },
+            openSection: showSection,
             getSections: function () { return state.sections; },
             searchStudents: searchStudentsRemote,
             signOut: signOut,

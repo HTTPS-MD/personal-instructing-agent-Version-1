@@ -135,10 +135,8 @@
                             <svg class="icon nav-chevron" aria-hidden="true"><use href="#i-chev-down"></use></svg>
                         </button>
                         <ul class="nav-sub" id="nav-people-list" hidden>
-                            <li><button type="button" class="nav-item" data-view="sections">
-                                <span>Class Sections</span><span class="nav-count mono" id="nav-count-sections">—</span></button></li>
                             <li><button type="button" class="nav-item" data-view="students">
-                                <span>All Students</span><span class="nav-count mono" id="nav-count-students">—</span></button></li>
+                                <span>Students</span><span class="nav-count mono" id="nav-count-students">—</span></button></li>
                             <li><button type="button" class="nav-item" data-view="faculty">
                                 <span>Faculty</span><span class="nav-count mono" id="nav-count-faculty">—</span></button></li>
                         </ul>
@@ -184,14 +182,14 @@
                         <ol id="crumbs-list"><li>Admin</li><li aria-current="page">Overview</li></ol>
                     </nav>
                 </div>
-                <div class="topbar-center">
-                    <button type="button" class="btn-icon search-trigger" id="palette-open" aria-haspopup="dialog"
-                        aria-label="Search students, sections, or commands" aria-keyshortcuts="Control+K Meta+K"
-                        title="Search">
-                        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
-                    </button>
-                </div>
                 <div class="topbar-right">
+                    <!-- A global jump: open any student or section, or run a command, from
+                         any page. Students and Faculty also have their own search fields,
+                         which only filter the table on that page. -->
+                    <button type="button" class="quickfind" id="palette-open" aria-haspopup="dialog"
+                        aria-label="Quick find: students, sections or commands" aria-keyshortcuts="Control+K Meta+K">
+                        <span>Quick find</span><kbd class="quickfind-keys" id="quickfind-keys" aria-hidden="true">Ctrl K</kbd>
+                    </button>
                     <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="Switch to light theme">
                         <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
                         <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
@@ -248,58 +246,50 @@
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 3 · CLASS SECTIONS = -->
-                <section class="page is-hidden" id="view-sections" data-view-panel="sections">
-                    <div class="page-head">
-                        <h1 class="page-title">Class Sections</h1>
-                        <div class="page-actions">
-                            <button type="button" class="btn btn-primary" data-modal-open="modal-new-section">New section</button>
-                        </div>
-                    </div>
-
-                    <div class="panel" data-region="cohort sections">
-                        <div class="table-wrap" tabindex="0" role="region" aria-label="Class sections table">
-                            <table class="table">
-                                <caption class="sr-only">Class sections</caption>
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Section</th>
-                                        <th scope="col">Professor</th>
-                                        <th scope="col" class="col-right">Students</th>
-                                        <th scope="col" class="col-right">OCEAN done</th>
-                                        <th scope="col">Status</th>
-                                        <th scope="col" class="col-right col-w-actions"><span class="sr-only">Actions</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sections-tbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- ============================== VIEW 4 · ALL STUDENTS == -->
+                <!-- ============================== VIEW 3 · STUDENTS ====== -->
                 <section class="page is-hidden" id="view-students" data-view-panel="students">
                     <div class="page-head">
-                        <h1 class="page-title">All Students</h1>
+                        <h1 class="page-title">Students</h1>
                         <div class="page-actions">
+                            <button type="button" class="btn btn-secondary" data-modal-open="modal-manage-sections">Manage sections</button>
                             <button type="button" class="btn btn-primary" data-modal-open="modal-register-student">Register student</button>
                         </div>
+                    </div>
+
+                    <!-- What the table below is showing, in words. The line keeps its height
+                         while it loads so nothing under it moves. "OCEAN completed" is the one
+                         completion the database records (a stored result that has not been
+                         reset for a retake); the other stages are where students are, not
+                         something they have finished. -->
+                    <div class="scope-row">
+                        <p class="scope-line" id="scope-line" aria-live="polite">Loading…</p>
+                        <button type="button" class="btn btn-secondary btn-sm is-hidden" id="section-scores-open">Input scores</button>
                     </div>
 
                     <div class="panel" data-region="roster stages">
                         <div class="panel-bar">
                             <!-- Counts come from head-only queries over the whole table,
-                                 never from the rows on this page. The data-stage value is
-                                 the exact profiles.current_stage string the database stores. -->
-                            <div class="tabs" role="group" aria-label="Stage filter" id="stage-tabs">
+                                 never from the rows on this page. They follow the section
+                                 and group filters. The data-stage value is the exact
+                                 profiles.current_stage string the database stores. -->
+                            <div class="tabs" role="group" aria-label="Current stage" id="stage-tabs">
                                 <button type="button" class="tab is-active" data-stage-filter="" aria-pressed="true">All <span class="mono" data-stage-count="all">—</span></button>
                                 <button type="button" class="tab" data-stage-filter="OCEAN" aria-pressed="false">OCEAN test <span class="mono" data-stage-count="OCEAN">—</span></button>
                                 <button type="button" class="tab" data-stage-filter="Character Selection" aria-pressed="false">Character select <span class="mono" data-stage-count="Character Selection">—</span></button>
                                 <button type="button" class="tab" data-stage-filter="Tutoring Dashboard" aria-pressed="false">Tutoring dashboard <span class="mono" data-stage-count="Tutoring Dashboard">—</span></button>
-                                <button type="button" class="tab" data-stage-filter="Active Game" aria-pressed="false">Active session <span class="mono" data-stage-count="Active Game">—</span></button>
+                                <button type="button" class="tab" data-stage-filter="Active Game" aria-pressed="false" title="Marked as in a tutoring session by the student’s own page. It can be out of date if the page closed unexpectedly.">Active session <span class="mono" data-stage-count="Active Game">—</span></button>
                             </div>
-                            <div class="panel-tools">
-                                <label class="sr-only" for="group-filter">Research group</label>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="filter-field">
+                                <label class="filter-label" for="section-filter">Section</label>
+                                <select class="input input-sm" id="section-filter">
+                                    <option value="">All sections</option>
+                                </select>
+                            </div>
+                            <div class="filter-field">
+                                <label class="filter-label" for="group-filter">Research group</label>
                                 <select class="input input-sm" id="group-filter">
                                     <option value="all">All groups</option>
                                     <option value="experimental">Experimental</option>
@@ -308,17 +298,17 @@
                                     <option value="neutral">· Neutral (legacy)</option>
                                     <option value="control">Control</option>
                                 </select>
-                                <label class="search">
-                                    <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
-                                    <input type="search" class="input input-sm" id="student-search"
-                                        placeholder="Search students" aria-label="Search students">
-                                </label>
+                            </div>
+                            <div class="filter-field filter-search">
+                                <label class="filter-label" for="student-search">Search</label>
+                                <input type="search" class="input input-sm" id="student-search"
+                                    placeholder="Name or email, in all sections">
                             </div>
                         </div>
 
-                        <div class="table-wrap" tabindex="0" role="region" aria-label="All students table">
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Students table">
                             <table class="table">
-                                <caption class="sr-only">All students</caption>
+                                <caption class="sr-only">Students</caption>
                                 <thead id="roster-thead">
                                     <tr><th scope="col">Student</th><th scope="col">Section</th><th scope="col">Condition</th><th scope="col">Stage</th><th scope="col">Status</th></tr>
                                 </thead>
@@ -349,15 +339,16 @@
                         </div>
                     </div>
 
+                    <div class="scope-row">
+                        <p class="scope-line">Each professor sees only their assigned section. Student counts and OCEAN completion are for that section.</p>
+                    </div>
+
                     <div class="panel" data-region="faculty">
-                        <div class="panel-bar">
-                            <p class="panel-note muted">Each professor sees only their assigned section.</p>
-                            <div class="panel-tools">
-                                <label class="search">
-                                    <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
-                                    <input type="search" class="input input-sm" id="faculty-search"
-                                        placeholder="Search faculty" aria-label="Search faculty">
-                                </label>
+                        <div class="filter-row">
+                            <div class="filter-field filter-search">
+                                <label class="filter-label" for="faculty-search">Search</label>
+                                <input type="search" class="input input-sm" id="faculty-search"
+                                    placeholder="Name, email or department">
                             </div>
                         </div>
                         <div class="table-wrap" tabindex="0" role="region" aria-label="Faculty table">
@@ -368,6 +359,8 @@
                                         <th scope="col">Professor</th>
                                         <th scope="col">Department</th>
                                         <th scope="col">Section</th>
+                                        <th scope="col" class="col-right">Students</th>
+                                        <th scope="col" class="col-right">OCEAN completed</th>
                                         <th scope="col">Account status</th>
                                     </tr>
                                 </thead>
@@ -385,14 +378,13 @@
                     <div class="page-head"><h1 class="page-title">Stage Controls</h1></div>
 
                     <div class="stack-lg">
-                        <!-- What the server allows each research group to enter, read from
-                             the stage rule in migration 0005 (pia_can_enter_stage). Read
-                             only: nothing here changes a research assignment. -->
+                        <!-- A reference for the study design. Nothing here changes access or
+                             any research assignment. -->
                         <section class="panel" aria-labelledby="policy-title">
-                            <div class="panel-bar"><h2 class="panel-title" id="policy-title">Stage availability by group</h2></div>
-                            <div class="table-wrap" tabindex="0" role="region" aria-label="Stage availability by group">
+                            <div class="panel-bar"><h2 class="panel-title" id="policy-title">Who can enter each stage</h2></div>
+                            <div class="table-wrap" tabindex="0" role="region" aria-label="Who can enter each stage">
                                 <table class="table policy-table">
-                                    <caption class="sr-only">Which stages each research group can enter</caption>
+                                    <caption class="sr-only">Which stages each group can enter</caption>
                                     <thead>
                                         <tr><th scope="col">Group</th><th scope="col">OCEAN test</th><th scope="col">Character selection</th><th scope="col">Tutoring dashboard</th></tr>
                                     </thead>
@@ -871,42 +863,35 @@
     </div>
 
     <!-- ======================================== MODAL · SECTION DETAILS -->
-    <div class="overlay" id="modal-section-details" role="dialog" aria-modal="true" aria-labelledby="section-details-title">
-        <div class="modal modal-xl">
+    <!-- ============================================ MODAL · MANAGE SECTIONS -->
+    <div class="overlay" id="modal-manage-sections" role="dialog" aria-modal="true" aria-labelledby="manage-sections-title">
+        <div class="modal modal-lg">
             <header class="modal-head">
                 <div class="modal-head-text">
-                    <h2 class="modal-title" id="section-details-title">Section</h2>
-                    <p class="modal-sub" id="section-details-sub">Enrolled students and activation status.</p>
+                    <h2 class="modal-title" id="manage-sections-title">Manage sections</h2>
+                    <p class="modal-sub">Choose a section to see its students.</p>
                 </div>
-                <!-- Close is a DIRECT child of .modal-head, as in every other dialog,
-                     so its nested corner geometry is preserved. The two actions use
-                     .modal-head-actions rather than borrowing .modal-foot-actions:
-                     the footer variant stretches its buttons on mobile, which was
-                     crushing this title to zero width. -->
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
                 </button>
                 <div class="modal-head-actions">
-                    <button class="btn btn-primary" id="section-scores-btn">
-                        <svg class="icon"><use href="#i-file"></use></svg>
-                        Input scores
-                    </button>
+                    <button type="button" class="btn btn-primary" data-modal-open="modal-new-section">New section</button>
                 </div>
             </header>
-
             <div class="modal-body modal-body-flush">
-                <div class="table-wrap" style="border-top:0">
+                <div class="table-wrap" tabindex="0" role="region" aria-label="Sections table" style="border-top:0">
                     <table class="table">
+                        <caption class="sr-only">Sections</caption>
                         <thead>
                             <tr>
-                                <th>Student</th>
-                                <th>Condition</th>
-                                <th>Status</th>
-                                <th>Pre-test</th>
-                                <th>Post-test</th>
+                                <th scope="col">Section</th>
+                                <th scope="col">Professor</th>
+                                <th scope="col" class="col-right">Students</th>
+                                <th scope="col" class="col-right">OCEAN completed</th>
+                                <th scope="col">Status</th>
                             </tr>
                         </thead>
-                        <tbody id="section-students-tbody"></tbody>
+                        <tbody id="sections-tbody"></tbody>
                     </table>
                 </div>
             </div>
@@ -1190,6 +1175,8 @@
                         <p class="cell-mail" id="drawer-email">—</p>
                     </div>
                 </div>
+
+                <p class="drawer-note is-hidden" id="drawer-control-note" role="note"></p>
 
                 <div class="kv-grid">
                     <div class="kv">

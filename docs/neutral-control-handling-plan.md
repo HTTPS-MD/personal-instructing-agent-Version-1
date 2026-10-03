@@ -16,7 +16,7 @@ Read-only inspection: `supabase/INSPECT_neutral_and_control.sql`
 |---|---|
 | `pia_can_enter_stage` | Control is refused `Tutoring Dashboard`. Every other group is evaluated exactly as in 0005. `set_student_stage`, the stage-time heartbeat (0035) and the student route guards all read this one function. |
 | `submit_ocean_results` | Redefined from the 0018 text with one change: a Control student's next stage is `Waiting Room` (always permitted) instead of `Tutoring Dashboard`. Scoring, validation, storage and grants are unchanged. |
-| Trigger `trg_pia_control_stage_guard` | No writer, a `SECURITY DEFINER` admin RPC included, can move a Control student into Character Selection or the Tutoring Dashboard: the write is kept at the student's current stage (with `stage_started_at` and `is_in_game`). It does not raise, so a section grant still completes for the section's other students. A Control student already in the dashboard is not moved. |
+| Trigger `trg_pia_control_stage_guard` | No writer, a `SECURITY DEFINER` admin RPC included, can move a Control student into Character Selection or the Tutoring Dashboard: the write is kept at the student's current stage (with `stage_started_at` and `is_in_game`). It also drops a write that would set `is_in_game` to true for a Control student (that flag is written by the student's own browser). It does not raise, so a section grant still completes for the section's other students. A Control student already in the dashboard, or already flagged in a session, is not changed by the migration. |
 | Trigger `trg_pia_no_new_neutral_group` | Refuses to insert a profile as `neutral` or to change an existing row **to** `neutral`. A row that is already `neutral` can still be edited (name, section, stage, scores) and can be moved out of neutral. |
 | Profiles | **No row is updated.** The migration snapshots every profile at its start and its postflight aborts (rolling everything back) if any row differs at the end. |
 | Not touched | `question_bank`, `settings`, `stage_overrides`, other RPCs, RLS, consent/assent rules. |
@@ -80,3 +80,15 @@ Research group (`profiles.group_type`) and tutor (`profiles.selected_character`)
 
 - The tutor assignment is not restricted to the six keys in the database (a CHECK constraint could collide with unknown live values); the console restricts it.
 - Nothing was run against the live database. See the checklist for what was tested locally.
+
+## Finding: why a Control student can appear as "Active session"
+
+Traced in the repository; **not verified against live data** (no database access from this environment).
+
+- The console shows "Active session" for any student whose `profiles.is_in_game` is true, whatever their `current_stage` is.
+- `is_in_game` is written only by the student's own page (`student/js/student-dashboard.js`: set true when the student presses Start, false when the lesson ends; the page-hide beacon in `function.js` is meant to clear it). It is a student-writable column (0001). **No admin function and no grant writes it**, so `admin_grant_stage__inner` is not how a Control student gets this flag.
+- Before this branch, nothing stopped a Control student reaching the dashboard: the server rule (0005) and the client rule (`canEnterStage`) had no Control case. Any Control student whose stage was opened (by a section grant or a global flag) could load the dashboard and press Start. **The live site still runs that old rule**, because migration 0038 and the changed student pages are not deployed. So a Control student shown as "Active session" is explained by the pre-change rules, not by a new fault.
+- The flag can also be **stale**: if the page closes without sending its beacon, `is_in_game` stays true. The console now says so in the tab's hint.
+- Relevance of 0038 and the live grant function: 0038's stage rule and guard stop *new* movement into the dashboard and, with this revision, a Control browser starting a new session. They deliberately do **not** clear a flag already set (no silent record changes). The grant function matters only for `current_stage`, covered by the guard whichever way it is written.
+- What remains a live-backend dependency: apply 0038 (after you review the records), deploy the changed student pages (the client rule), and decide per student what to do with Control rows already flagged (inspection query 4 lists them; it also matches `is_in_game`).
+- Admin behaviour now: the row stays truthful ("Active session") and the participant profile adds one plain line: "Control students take the OCEAN test only, but this record shows a tutoring session in progress." Nothing is hidden or rewritten.

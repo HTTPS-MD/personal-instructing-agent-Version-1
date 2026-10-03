@@ -11,7 +11,7 @@
  *   host.go(view)                       switch view
  *   host.openModal(id, trigger)         open an existing dialog
  *   host.openStudent(email)             open the participant profile
- *   host.openSection(name)              open a class section's roster
+ *   host.openSection(name)              show one section in the Students view
  *   host.getSections()                  [{ name }]
  *   host.searchStudents(term, signal)   Promise<[{ full_name, email, section }]>
  *   host.signOut()                      the existing sign-out
@@ -39,15 +39,14 @@
     var ROUTES = {
         overview: { trail: ['Overview'] },
         live: { trail: ['Live Sessions'] },
-        sections: { trail: ['People', 'Class Sections'] },
-        students: { trail: ['People', 'All Students'] },
+        students: { trail: ['People', 'Students'] },
         faculty: { trail: ['People', 'Faculty'] },
         controls: { trail: ['Stage Controls'] },
         mathtask: { trail: ['Math Task'] },
         profile: { trail: ['Profile'] },
         settings: { trail: ['Settings'] }
     };
-    var PEOPLE_CHILDREN = { sections: 1, students: 1, faculty: 1 };
+    var PEOPLE_CHILDREN = { students: 1, faculty: 1 };
 
     function titleOf(view) {
         var r = ROUTES[view];
@@ -213,8 +212,7 @@
         return [
             { label: 'Overview', run: function () { host.go('overview'); } },
             { label: 'Live Sessions', run: function () { host.go('live'); } },
-            { label: 'Class Sections', run: function () { host.go('sections'); } },
-            { label: 'All Students', run: function () { host.go('students'); } },
+            { label: 'Students', run: function () { host.go('students'); } },
             { label: 'Faculty', run: function () { host.go('faculty'); } },
             { label: 'Stage Controls', run: function () { host.go('controls'); } },
             { label: 'Math Task', run: function () { host.go('mathtask'); } }
@@ -224,8 +222,9 @@
     function paletteCommands() {
         return [
             { label: 'Register student', run: function () { host.openModal('modal-register-student'); } },
-            { label: 'New section', run: function () { host.openModal('modal-new-section'); } },
+            { label: 'Manage sections', run: function () { host.openModal('modal-manage-sections'); } },
             { label: 'Go to Settings', run: function () { host.go('settings'); } },
+            { label: 'New section', run: function () { host.openModal('modal-new-section'); } },
             { label: 'Go to Profile', run: function () { host.go('profile'); } },
             { label: 'Add professor', run: function () { host.openModal('modal-add-professor'); } },
             { label: 'Add administrator', run: function () { host.openModal('modal-add-admin'); } }
@@ -248,7 +247,7 @@
         }
         var sections = host.getSections().filter(function (s) { return matches(s.name, term); });
         if (sections.length) {
-            groups.push({ title: 'Class Sections', items: sections.slice(0, 6).map(function (s) {
+            groups.push({ title: 'Sections', items: sections.slice(0, 6).map(function (s) {
                 return { label: s.name, run: function () { host.openSection(s.name); } };
             }) });
         }
@@ -388,6 +387,8 @@
         var overlay = $('#palette');
 
         $('#palette-open').addEventListener('click', openPalette);
+        var keys = $('#quickfind-keys');
+        if (keys && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '')) { keys.textContent = '⌘ K'; }
 
         input.addEventListener('input', function () {
             var term = input.value.trim().toLowerCase();

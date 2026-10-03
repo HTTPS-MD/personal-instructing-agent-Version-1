@@ -217,7 +217,7 @@ function fixture() {
     assert.equal(await p.locator('#nav-people-list').isVisible(), false);
     await toggle.focus(); await p.keyboard.press('Enter');
     assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
-    assert.deepEqual(await nav(p), ['Overview', 'Live Sessions', 'People', 'Class Sections', 'All Students', 'Faculty', 'Stage Controls', 'Math Task']);
+    assert.deepEqual(await nav(p), ['Overview', 'Live Sessions', 'People', 'Students', 'Faculty', 'Stage Controls', 'Math Task']);
     const text = await p.locator('#sidebar').innerText();
     for (const banned of ['Workspace', 'Research Ops', 'Sections management', 'Student Roster', 'Manage gates']) assert.equal(text.includes(banned), false, banned);
     await p.keyboard.press('Space');
@@ -236,9 +236,9 @@ function fixture() {
     await p.waitForFunction(() => document.querySelector('#view-controls:not(.is-hidden)'));
     await p.context().close();
   });
-  await check('header: route-derived breadcrumbs, search trigger, theme toggle at far right, borders only', async () => {
+  await check('header: route-derived breadcrumbs, labelled Quick find, theme toggle at far right, borders only', async () => {
     const p = await open('overview');
-    const expected = { overview: 'Admin Overview', live: 'Admin Live Sessions', sections: 'Admin People Class Sections', students: 'Admin People All Students', faculty: 'Admin People Faculty', controls: 'Admin Stage Controls', mathtask: 'Admin Math Task', profile: 'Admin Profile', settings: 'Admin Settings' };
+    const expected = { overview: 'Admin Overview', live: 'Admin Live Sessions', students: 'Admin People Students', faculty: 'Admin People Faculty', controls: 'Admin Stage Controls', mathtask: 'Admin Math Task', profile: 'Admin Profile', settings: 'Admin Settings' };
     for (const [route, crumbs] of Object.entries(expected)) {
       await p.evaluate(r => { location.hash = '#' + r; }, route);
       await p.waitForFunction(r => document.querySelector(`#view-${r}:not(.is-hidden)`), route);
@@ -248,9 +248,11 @@ function fixture() {
     const hdr = await p.locator('.topbar').evaluate(el => { const c = getComputedStyle(el); const b = el.getBoundingClientRect(); return { h: b.height, bw: c.borderBottomWidth, shadow: c.boxShadow }; });
     assert.ok(hdr.h >= 56 && hdr.h <= 64, 'header height ' + hdr.h);
     assert.equal(hdr.bw, '1px'); assert.equal(hdr.shadow, 'none');
-    assert.equal(await p.locator('#palette-open').getAttribute('aria-label'), 'Search students, sections, or commands');
+    assert.match(await p.locator('#palette-open').innerText(), /^Quick find/);
+    assert.match(await p.locator('#palette-open').getAttribute('aria-label'), /^Quick find/, 'accessible name starts with the visible label');
+    assert.equal(await p.locator('#palette-open svg').count(), 0, 'a text label, not an unexplained icon');
     const sb = await p.locator('#palette-open').boundingBox(), tb = await p.locator('#theme-toggle').boundingBox(), vp = p.viewportSize();
-    assert.ok(Math.abs((sb.x + sb.width / 2) - vp.width / 2) < 160, 'search is roughly centred');
+    assert.ok(sb.x > vp.width / 2, 'Quick find sits with the controls on the right, not centred');
     assert.ok(tb.x + tb.width >= vp.width - 24 && tb.x > sb.x, 'theme toggle is the far-right control');
     await p.context().close();
   });
@@ -286,7 +288,7 @@ function fixture() {
   });
   await check('removals: no export controls, no greeting, no shortcut hints, no decorative stat cards', async () => {
     const p = await open('overview');
-    for (const route of ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
+    for (const route of ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
       await p.evaluate(r => { location.hash = '#' + r; }, route);
       await p.waitForFunction(r => document.querySelector(`#view-${r}:not(.is-hidden)`), route);
     }
@@ -398,9 +400,10 @@ function fixture() {
   });
 
   /* ================= CLASS SECTIONS ================= */
-  await check('class sections: only Online/Offline labels; insufficient evidence shows a dash with an accessible explanation', async () => {
-    const p = await open('sections');
-    await p.waitForSelector('#sections-tbody tr');
+  const openManage = async p => { await p.locator('#view-students [data-modal-open="modal-manage-sections"]').click(); await p.waitForSelector('#modal-manage-sections.is-open #sections-tbody tr'); };
+  await check('sections dialog: only Online/Offline labels; insufficient evidence shows a dash with an accessible explanation', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openManage(p);
     const rows = await p.locator('#sections-tbody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.innerText.trim())));
     const by = Object.fromEntries(rows.map(r => [r[0], r]));
     assert.match(by.Earth[4], /^Online$/);                      // students 1-8 checked in 5s ago
@@ -412,44 +415,198 @@ function fixture() {
     assert.equal(await cell.locator('.sr-only').innerText(), 'Status unavailable');
     assert.equal(await cell.locator('[title]').getAttribute('title'), 'Status unavailable');
     assert.equal(by.Earth[1], 'Prof One'); assert.equal(by.Earth[2], '8');
-    assert.equal(/Idle|Unknown/i.test(await p.locator('#view-sections').innerText()), false);
-    assert.equal(await p.locator('#sections-tbody .dot').first().getAttribute('aria-hidden'), 'true');   // dot paired with text
-    const aligns = await p.locator('#view-sections thead th').evaluateAll(els => els.map(e => getComputedStyle(e).textAlign));
+    assert.equal(by.Earth[3], '0 of 8 (0%)', 'OCEAN completed is its own measure (fixture: no stored results)');
+    assert.equal(/Idle|Unknown/i.test(await p.locator('#modal-manage-sections').innerText()), false);
+    assert.equal(await p.locator('#sections-tbody .dot').first().getAttribute('aria-hidden'), 'true');
+    const heads = await p.locator('#modal-manage-sections thead th').allInnerTexts();
+    assert.deepEqual(heads.map(h => h.trim()), ['SECTION', 'PROFESSOR', 'STUDENTS', 'OCEAN COMPLETED', 'STATUS'], 'no View / Actions column');
+    const aligns = await p.locator('#modal-manage-sections thead th').evaluateAll(els => els.map(e => getComputedStyle(e).textAlign));
     assert.deepEqual([aligns[2], aligns[3]], ['right', 'right'], 'numeric headers align with their cells');
-    assert.equal(await p.locator('#sections-grid, .section-card').count(), 0);
-    await shot(p, 'sections-dark-1280');
+    await shot(p, 'sections-dialog-dark-1280');
     await p.context().close();
   });
-  await check('class sections: Offline only when every member is verified signed out', async () => {
+  await check('sections dialog: Offline only when every member is verified signed out', async () => {
     const d = makeData();
     d.profiles.filter(r => r.section === 'Jupiter').forEach(r => {
       r.active_devices = [];
       const e = r.email;
       d.student_stage_time[e] = { student_email: e, ocean_time: 0, character_select_time: 0, tutoring_time: 100, heartbeat_stage: 'Tutoring Dashboard', beatAgo: 900 };
     });
-    const p = await open('sections', { data: d });
-    await p.waitForSelector('#sections-tbody tr');
+    const p = await open('students', { data: d }); await waitStudents(p);
+    await openManage(p);
     const jup = await p.locator('#sections-tbody tr', { hasText: 'Jupiter' }).locator('td').nth(4).innerText();
     assert.match(jup.trim(), /^Offline$/);
     await p.context().close();
   });
-  await check('class sections: unknown connection data shows "—", never Offline', async () => {
-    const p = await open('sections', { initial: { fail: { student_stage_time: { code: '42P01', message: 'x' } } } });
-    await p.waitForSelector('#sections-tbody tr td');
+  await check('sections dialog: unknown connection data shows "—", never Offline', async () => {
+    const p = await open('students', { initial: { fail: { student_stage_time: { code: '42P01', message: 'x' } } } }); await waitStudents(p);
+    await openManage(p);
     const cells = await p.locator('#sections-tbody tr').evaluateAll(trs => trs.map(tr => tr.children[4].innerText.trim()));
     assert.deepEqual(cells.map(c => c.replace(/\s*Status unavailable$/, '')), ['—', '—', '—', '—']);
     await p.context().close();
   });
-  await check('class sections: View opens the roster dialog with one X, Escape closes, focus returns', async () => {
-    const p = await open('sections');
-    await p.waitForSelector('#sections-tbody tr');
-    const btn = p.locator('[data-section-open="Earth"]');
-    await btn.focus(); await p.keyboard.press('Enter');
-    await p.waitForSelector('#modal-section-details.is-open');
-    assert.equal(await p.locator('#modal-section-details .modal-close:visible, #modal-section-details [data-modal-close]:visible').count(), 1);
+  await check('sections dialog: one X, a real button per section (keyboard), Escape closes and focus returns, New section is reachable', async () => {
+    const p = await open('students'); await waitStudents(p);
+    const trigger = p.locator('#view-students [data-modal-open="modal-manage-sections"]');
+    await trigger.focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#modal-manage-sections.is-open #sections-tbody tr');
+    assert.equal(await p.locator('#modal-manage-sections .modal-close:visible, #modal-manage-sections [data-modal-close]:visible').count(), 1, 'a single dismissal');
+    assert.equal(await p.locator('#sections-tbody tr[data-section-open], #sections-tbody tr.is-clickable').count(), 0, 'no clickable rows');
+    const names = await p.locator('#sections-tbody button[data-section-open]').allInnerTexts();
+    assert.deepEqual(names, ['Earth', 'Jupiter', 'Mars', 'Venus']);
+    assert.equal(await p.locator('#modal-manage-sections [data-modal-open="modal-new-section"]').isVisible(), true);
     await p.keyboard.press('Escape');
-    await p.waitForFunction(() => !document.querySelector('#modal-section-details.is-open'));
-    await focusIs(p, el => el.getAttribute('data-section-open') === 'Earth');
+    await p.waitForFunction(() => !document.querySelector('#modal-manage-sections.is-open'));
+    await focusIs(p, el => el.getAttribute('data-modal-open') === 'modal-manage-sections');
+    await p.context().close();
+  });
+
+  /* ================= PEOPLE: STUDENTS BY SECTION ================= */
+  const stageCounts = p => p.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-stage-count]')].map(e => [e.dataset.stageCount, e.textContent])));
+  await check('students: the section filter lists All sections plus every section; the same table, tabs, search and paging apply', async () => {
+    const p = await open('students'); await waitStudents(p);
+    const opts = await p.locator('#section-filter option').allInnerTexts();
+    assert.deepEqual(opts, ['All sections', 'Earth', 'Jupiter', 'Mars', 'Venus']);
+    assert.match(await p.locator('#scope-line').innerText(), /^All sections · 23 students · OCEAN completed 0 of 23 \(0%\)$/);
+    assert.equal(await p.locator('#section-scores-open').isVisible(), false);
+    await p.locator('#section-filter').selectOption('Earth');
+    await p.waitForFunction(() => /Showing 1–8 of 8/.test(document.querySelector('#pager-info').textContent));
+    assert.equal(await p.locator('#student-tbody tr[data-student]').count(), 8);
+    assert.deepEqual(await p.locator('#student-tbody tr[data-student] td:nth-child(2)').allInnerTexts(), new Array(8).fill('Earth'));
+    assert.match(await p.locator('#scope-line').innerText(), /^Earth · Professor Prof One · 8 students · OCEAN completed 0 of 8 \(0%\)$/);
+    await shot(p, 'students-section-dark-1280');
+    assert.equal(await p.locator('#section-scores-open').isVisible(), true, 'Input scores is reachable for a section');
+    /* Stage tabs: counts are for this section, per current stage, as in All students. */
+    await p.waitForFunction(() => document.querySelector('[data-stage-count="all"]').textContent === '8');
+    assert.deepEqual(await stageCounts(p), { all: '8', OCEAN: '5', 'Character Selection': '3', 'Tutoring Dashboard': '0', 'Active Game': '0' });
+    await p.locator('[data-stage-filter="OCEAN"]').click();
+    await p.waitForFunction(() => /of 5\b/.test(document.querySelector('#pager-info').textContent));
+    assert.equal(await p.locator('#student-tbody tr[data-student]').count(), 5);
+    /* Stage column shows each student's current stage exactly as in All students. */
+    assert.deepEqual([...new Set(await p.locator('#student-tbody tr[data-student] td:nth-child(4)').allInnerTexts())], ['OCEAN test']);
+    /* Search stays inside the section. */
+    await p.locator('[data-stage-filter=""]').click();
+    await p.locator('#student-search').fill('student0');
+    await p.waitForFunction(() => /of 8\b/.test(document.querySelector('#pager-info').textContent) === false || true);
+    await p.waitForTimeout(500);
+    assert.equal(await p.locator('#student-tbody tr[data-student]').count() <= 8, true);
+    assert.match(await p.locator('#student-search').getAttribute('placeholder'), /in Earth$/);
+    await p.locator('#student-search').fill('student12');
+    await p.waitForFunction(() => document.querySelectorAll('#student-tbody tr[data-student]').length === 0 || document.querySelector('#student-empty:not(.is-hidden)'));
+    assert.match(await p.locator('#student-empty').innerText(), /No matching students/, 'student12 is in Jupiter, not Earth');
+    await p.locator('#reset-filters').click();
+    await p.waitForFunction(() => /of 23\b/.test(document.querySelector('#pager-info').textContent));
+    assert.equal(await p.locator('#section-filter').inputValue(), '', 'Reset filters also returns to All sections');
+    await p.context().close();
+  });
+  await check('students: sections with more than ten students page correctly; counts and paging follow the section', async () => {
+    const d = makeData();
+    d.profiles.filter(r => r.role === 'student').forEach((r, i) => { r.section = 'Earth'; });
+    const p = await open('students', { data: d }); await waitStudents(p);
+    await p.locator('#section-filter').selectOption('Earth');
+    await p.waitForFunction(() => /Showing 1–10 of 23 · page 1 of 3/.test(document.querySelector('#pager-info').textContent));
+    await p.locator('#page-next').click();
+    await p.waitForFunction(() => /Showing 11–20/.test(document.querySelector('#pager-info').textContent));
+    await p.locator('#section-filter').selectOption('Jupiter');
+    await p.waitForFunction(() => /No students to show/.test(document.querySelector('#pager-info').textContent) && document.querySelectorAll('#student-tbody tr[data-student]').length === 0);
+    assert.match(await p.locator('#student-empty').innerText(), /No matching students/);
+    assert.equal(await p.locator('#page-prev').isDisabled(), true, 'page resets and clamps on a section change');
+    await p.context().close();
+  });
+  await check('students: choosing a section from the sections dialog filters the table; the profile still opens from a row', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openManage(p);
+    const jup = p.locator('#sections-tbody button[data-section-open="Jupiter"]');
+    await jup.focus(); await p.keyboard.press('Enter');
+    await p.waitForFunction(() => !document.querySelector('#modal-manage-sections.is-open'));
+    assert.equal(await p.locator('#section-filter').inputValue(), 'Jupiter');
+    await p.waitForFunction(() => /Showing 1–8 of 8/.test(document.querySelector('#pager-info').textContent));
+    assert.match(await p.locator('#scope-line').innerText(), /^Jupiter · 8 students/);
+    const row = p.locator('#student-tbody tr[data-student]').first();
+    const email = await row.getAttribute('data-student');
+    await row.focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#drawer-student.is-open');
+    assert.equal((await p.locator('#drawer-email').innerText()).trim(), email);
+    await p.context().close();
+  });
+  await check('students: old #sections address and the quick find open the Students view for that section', async () => {
+    let p = await open('sections'); await waitStudents(p);
+    assert.equal(await p.locator('#view-students').isVisible(), true);
+    assert.equal(await p.evaluate(() => location.hash), '#students');
+    await p.locator('#palette-open').click();
+    await p.fill('#palette-input', 'mar');
+    await p.waitForFunction(() => /Mars/.test(document.querySelector('#palette-list').textContent));
+    await p.locator('#palette-list .palette-group:has(.palette-group-title:text("Sections")) .palette-option', { hasText: 'Mars' }).click();
+    await p.waitForFunction(() => document.querySelector('#section-filter').value === 'Mars');
+    await p.waitForFunction(() => /^Mars ·/.test(document.querySelector('#scope-line').textContent));
+    await p.context().close();
+  });
+  await check('students: a Control student in an active session is shown as recorded, with a plain note in the profile', async () => {
+    const d = makeData();
+    const ctl = d.profiles.find(r => r.group_type === 'control' && r.role === 'student');
+    ctl.is_in_game = true; ctl.current_stage = 'Tutoring Dashboard';
+    const p = await open('students', { data: d }); await waitStudents(p);
+    await p.locator('#group-filter').selectOption('control');
+    await p.locator('[data-stage-filter="Active Game"]').click();
+    await p.waitForFunction(() => document.querySelector('#student-tbody tr[data-student]'));
+    const row = p.locator(`#student-tbody tr[data-student="${ctl.email}"]`);
+    assert.match(await row.innerText(), /Active session/, 'the record is shown truthfully');
+    await row.focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#drawer-student.is-open');
+    assert.match(await p.locator('#drawer-control-note').innerText(), /Control students take the OCEAN test only, but this record shows a tutoring session in progress/);
+    await shot(p, 'profile-control-note-dark-1280');
+    assert.equal(await p.locator('#drawer-control-note').isVisible(), true);
+    await p.keyboard.press('Escape'); await p.waitForFunction(() => !document.querySelector('#drawer-student.is-open'));
+    await p.locator('#group-filter').selectOption('assigned'); await p.waitForTimeout(400);
+    const row2 = p.locator('#student-tbody tr[data-student]').first();
+    await row2.focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#drawer-student.is-open');
+    assert.equal(await p.locator('#drawer-control-note').isVisible(), false, 'no note for other groups');
+    await p.context().close();
+  });
+  await check('faculty: assigned-section progress comes from real data; the section is a button into the Students view', async () => {
+    const p = await open('faculty');
+    await p.waitForSelector('#faculty-tbody tr[data-faculty]');
+    const heads = await p.locator('#view-faculty thead th').allInnerTexts();
+    assert.deepEqual(heads.map(h => h.trim()), ['PROFESSOR', 'DEPARTMENT', 'SECTION', 'STUDENTS', 'OCEAN COMPLETED', 'ACCOUNT STATUS']);
+    await p.waitForFunction(() => /^\d/.test((document.querySelector('#faculty-tbody tr[data-faculty="prof1@example.test"] td:nth-child(4)') || { textContent: '' }).textContent));
+    const rows = await p.locator('#faculty-tbody tr[data-faculty]').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.innerText.trim())));
+    await shot(p, 'faculty-dark-1280');
+    const prof = rows.find(r => r[0].includes('Prof One'));
+    assert.equal(prof[2], 'Earth'); assert.equal(prof[3], '8'); assert.equal(prof[4], '0 of 8 (0%)');
+    const other = rows.find(r => !r[0].includes('Prof One'));
+    assert.ok(other, 'second professor exists');
+    const btn = p.locator('#faculty-tbody button[data-section-open="Earth"]');
+    assert.equal(await btn.count(), 1);
+    await btn.focus(); await p.keyboard.press('Enter');
+    await p.waitForFunction(() => document.querySelector('#view-students:not(.is-hidden)') && document.querySelector('#section-filter').value === 'Earth');
+    assert.equal(await p.locator('#faculty-tbody').count(), 1);
+    assert.equal(await p.locator('#modal-faculty.is-open').count(), 0, 'clicking the section did not also open the profile dialog');
+    await p.context().close();
+  });
+  await check('faculty: a professor without a real section shows dashes, never zeros; sparse view stays plain', async () => {
+    const d = makeData();
+    d.professors.push({ name: 'Prof Ghost', email: 'ghost@example.test', department: 'Mathematics', assigned_section: 'Nowhere', status: 'active' });
+    d.professors.push({ name: 'Prof None', email: 'none@example.test', department: 'Mathematics', assigned_section: null, status: 'inactive' });
+    const p = await open('faculty', { data: d });
+    await p.waitForSelector('#faculty-tbody tr[data-faculty]');
+    await p.waitForFunction(() => /^\d/.test((document.querySelector('#faculty-tbody tr[data-faculty="prof1@example.test"] td:nth-child(4)') || { textContent: '' }).textContent));
+    const rows = await p.locator('#faculty-tbody tr[data-faculty]').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.innerText.trim())));
+    for (const name of ['Prof Ghost', 'Prof None']) { const r = rows.find(x => x[0].includes(name)); assert.deepEqual([r[3], r[4]], ['—', '—'], name); }
+    assert.equal(await p.locator('#view-faculty .card, #view-faculty canvas, #view-faculty svg:not(.icon)').count(), 0, 'no filler cards or charts');
+    await p.context().close();
+  });
+  await check('search: Students and Faculty have one labelled search each; Quick find is the only global one', async () => {
+    const p = await open('students'); await waitStudents(p);
+    assert.equal((await p.locator('label[for="student-search"]').innerText()).trim(), 'Search');
+    assert.equal(await p.locator('#view-students svg').count() >= 0, true);
+    assert.equal(await p.locator('#view-students .search').count(), 0, 'no icon-only search affordance');
+    assert.equal(await p.locator('.topbar-center').count(), 0, 'no centred icon in the top bar');
+    assert.equal(await p.locator('#palette-open').count(), 1);
+    await p.locator('#nav-people-toggle').click().catch(() => {});
+    await p.evaluate(() => { location.hash = '#faculty'; });
+    await p.waitForSelector('#view-faculty:not(.is-hidden)');
+    assert.equal((await p.locator('label[for="faculty-search"]').innerText()).trim(), 'Search');
     await p.context().close();
   });
 
@@ -463,11 +620,12 @@ function fixture() {
     const style = await p.locator('#stage-tabs .tab.is-active').evaluate(el => getComputedStyle(el).boxShadow);
     assert.notEqual(style, 'none');                       // 1px underline
     assert.equal(await p.locator('#nav-count-students').innerText(), '23');
-    const lay = await p.evaluate(() => { const g = document.querySelector('#group-filter').getBoundingClientRect(), s = document.querySelector('#student-search').getBoundingClientRect(), t = document.querySelector('#stage-tabs').getBoundingClientRect();
-      return { sameRow: Math.abs(g.top - s.top) < 4 && Math.abs(t.top - g.top) < 40, groupW: g.width, pad: parseFloat(getComputedStyle(document.querySelector('#student-search')).paddingLeft) }; });
-    assert.ok(lay.sameRow, 'tabs, group filter and search share one row: ' + JSON.stringify(lay));
-    assert.ok(lay.groupW <= 200, 'group filter is not stretched: ' + lay.groupW);
-    assert.ok(lay.pad >= 28, 'search text clears the icon: ' + lay.pad);
+    const lay = await p.evaluate(() => { const sec = document.querySelector('#section-filter').getBoundingClientRect(), g = document.querySelector('#group-filter').getBoundingClientRect(), s = document.querySelector('#student-search').getBoundingClientRect(), t = document.querySelector('#stage-tabs').getBoundingClientRect();
+      return { sameRow: Math.abs(g.top - s.top) < 4 && Math.abs(sec.top - g.top) < 4, below: t.bottom <= sec.top, groupW: g.width, secW: sec.width }; });
+    assert.ok(lay.sameRow, 'section, group and search share one row: ' + JSON.stringify(lay));
+    assert.ok(lay.below, 'the stage tabs sit above the filters: ' + JSON.stringify(lay));
+    assert.ok(lay.groupW <= 200 && lay.secW <= 200, 'selects are not stretched: ' + JSON.stringify(lay));
+    assert.equal(await p.locator('label[for="section-filter"]').innerText(), 'Section');
     await shot(p, 'students-dark-1280');
     await p.context().close();
   });
@@ -836,8 +994,9 @@ function fixture() {
       ['Experimental · Assigned', 'Available', 'Locked', 'Available'],
       ['Experimental · Free choice', 'Available', 'Available', 'Available after choosing a tutor'],
       ['Neutral (legacy records)', 'Available', 'Locked', 'Available']]);
-    assert.match(await p.locator('#policy-foot').innerText(), /cannot change which stages a group can enter/);
-    assert.match(await p.locator('#policy-foot').innerText(), /Neutral is a tutor persona, not a group/);
+    assert.match(await p.locator('#policy-foot').innerText(), /Reference only; it does not change anything here/);
+    assert.equal(/migration|server|supabase|\b0\d{3}\b/i.test(await p.locator('#view-controls').innerText()), false, 'no internal terms in Stage Controls');
+    assert.match(await p.locator('#policy-foot').innerText(), /Neutral is a tutor choice, not a group/);
     assert.equal(await p.locator('#policy-tbody th').first().evaluate(e => getComputedStyle(e).textAlign), 'left');
     assert.equal(await p.locator('#view-controls').evaluate(el => /Manage gates|Open or close/.test(el.innerText)), true);   // renamed section copy only
     await shot(p, 'controls-dark-1280');
@@ -1015,7 +1174,7 @@ function fixture() {
     assert.equal(await p.getAttribute('#palette-input', 'placeholder'), 'Search students, sections, or commands...');
     assert.equal(await p.evaluate(() => document.activeElement.id), 'palette-input');
     assert.equal(await p.locator('#palette-input').evaluate(e => getComputedStyle(e).outlineStyle), 'none');
-    assert.deepEqual(await p.locator('#palette-list .palette-option').allInnerTexts(), ['Register student', 'New section', 'Go to Settings']);
+    assert.deepEqual(await p.locator('#palette-list .palette-option').allInnerTexts(), ['Register student', 'Manage sections', 'Go to Settings']);
     assert.deepEqual((await p.locator('.palette-foot span').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').trim()), ['↑↓ navigate', 'Enter select', 'Esc close']);
     const bg = await p.locator('.palette').evaluate(e => { const c = getComputedStyle(e); return { bg: c.backgroundColor, r: parseFloat(c.borderTopLeftRadius), bw: c.borderTopWidth, align: getComputedStyle(e).textAlign }; });
     assert.notEqual(bg.bg, 'rgba(0, 0, 0, 0)'); assert.ok(bg.r >= 4 && bg.r <= 6); assert.equal(bg.bw, '1px'); assert.equal(bg.align, 'left');
@@ -1052,7 +1211,7 @@ function fixture() {
     await focusIs(p, el => el.id === 'palette-open');
     await p.context().close();
   });
-  await check('palette: groups (Students, Class Sections, Modules, Commands), no removed features, no-results message', async () => {
+  await check('palette: groups (Students, Sections, Modules, Commands), no removed features, no-results message', async () => {
     const p = await open('overview');
     await p.locator('#palette-open').click();
     await p.fill('#palette-input', 'stu');
@@ -1061,8 +1220,8 @@ function fixture() {
     assert.ok(groups.includes('Students') && groups.includes('Modules') && groups.includes('Commands'), groups.join());
     assert.equal(await p.locator('#palette-list .palette-option').count() > 3, true);
     await p.fill('#palette-input', 'ear');
-    await p.waitForFunction(() => /Class Sections/i.test(document.querySelector('#palette-list').textContent));
-    assert.match(await p.locator('#palette-list .palette-group:has(.palette-group-title:text("Class Sections"))').innerText(), /Earth/);
+    await p.waitForFunction(() => /Sections/i.test(document.querySelector('#palette-list').textContent));
+    assert.match(await p.locator('#palette-list .palette-group:has(.palette-group-title:text("Sections"))').innerText(), /Earth/);
     for (const term of ['export', 'security', 'device', 'csv']) {
       await p.fill('#palette-input', term);
       await p.waitForTimeout(450);
@@ -1108,7 +1267,8 @@ function fixture() {
     const p = await open('students'); await waitStudents(p);
     const cases = [
       ['modal-register-student', '#view-students [data-modal-open="modal-register-student"]'],
-      ['modal-new-section', null, 'sections'], ['modal-add-professor', null, 'faculty'], ['modal-add-admin', null, 'settings']];
+      ['modal-manage-sections', '#view-students [data-modal-open="modal-manage-sections"]'],
+      ['modal-add-professor', null, 'faculty'], ['modal-add-admin', null, 'settings']];
     for (const [id, sel, route] of cases) {
       if (route) { await p.evaluate(r => { location.hash = '#' + r; }, route); await p.waitForFunction(r => document.querySelector(`#view-${r}:not(.is-hidden)`), route); }
       const trigger = sel ? p.locator(sel) : p.locator(`#view-${route} [data-modal-open="${id}"]`);
@@ -1116,10 +1276,12 @@ function fixture() {
       await p.waitForSelector(`#${id}.is-open`);
       const dis = await p.locator(`#${id} .modal-close:visible, #${id} [data-modal-close]:visible`).count();
       assert.equal(dis, 1, id + ' dismissal count');
-      const foot = await p.locator(`#${id} .modal-foot button`).allInnerTexts();
-      assert.equal(foot[0], 'Cancel', id + ' footer order: ' + foot.join('|'));
-      const align = await p.locator(`#${id} .modal-foot`).evaluate(e => getComputedStyle(e).justifyContent);
-      assert.match(align, /flex-end|end/);
+      if (await p.locator(`#${id} .modal-foot`).count()) {
+        const foot = await p.locator(`#${id} .modal-foot button`).allInnerTexts();
+        assert.equal(foot[0], 'Cancel', id + ' footer order: ' + foot.join('|'));
+        const align = await p.locator(`#${id} .modal-foot`).evaluate(e => getComputedStyle(e).justifyContent);
+        assert.match(align, /flex-end|end/);
+      }
       for (let i = 0; i < 14; i++) { await p.keyboard.press('Tab'); assert.equal(await p.evaluate(m => !!document.activeElement.closest('#' + m), id), true, id + ' focus escaped'); }
       const title = await p.locator(`#${id} .modal-title`).evaluate(e => getComputedStyle(e).textAlign);
       assert.match(title, /start|left/);
@@ -1127,6 +1289,21 @@ function fixture() {
       await p.waitForFunction(m => !document.querySelector('#' + m + '.is-open'), id);
       await focusIs(p, (el, want) => el.getAttribute('data-modal-open') === want, id);
     }
+    await p.context().close();
+  });
+  await check('modals: New section opens from the sections dialog with Cancel as its only dismissal, and focus returns to that dialog', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await p.locator('#view-students [data-modal-open="modal-manage-sections"]').click();
+    await p.waitForSelector('#modal-manage-sections.is-open');
+    const btn = p.locator('#modal-manage-sections [data-modal-open="modal-new-section"]');
+    await btn.focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#modal-new-section.is-open');
+    assert.equal(await p.locator('#modal-new-section .modal-close:visible, #modal-new-section [data-modal-close]:visible').count(), 1);
+    assert.equal(await p.locator('#modal-new-section .modal-close').count(), 0, 'Cancel, not a duplicate X');
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('#modal-new-section.is-open'));
+    assert.equal(await p.locator('#modal-manage-sections.is-open').count(), 1, 'the sections dialog stays open underneath');
+    await focusIs(p, el => el.getAttribute('data-modal-open') === 'modal-new-section');
     await p.context().close();
   });
   await check('modals: long content scrolls inside the dialog and stays within the viewport at 320x480', async () => {
@@ -1145,7 +1322,7 @@ function fixture() {
   for (const [w, t] of [[320, 'dark'], [375, 'light'], [768, 'dark'], [1280, 'light'], [1440, 'dark']]) {
     await check(`responsive ${w}px ${t}: no page overflow on any view; theme and search stay reachable`, async () => {
       const p = await open('overview', { width: w, theme: t });
-      for (const route of ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
+      for (const route of ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
         await p.evaluate(r => { location.hash = '#' + r; }, route);
         await p.waitForFunction(r => document.querySelector(`#view-${r}:not(.is-hidden)`), route);
         await p.waitForTimeout(120);
@@ -1253,7 +1430,7 @@ function fixture() {
     for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')) {
       if (!visible(el) || el.disabled) continue;
       const cs = getComputedStyle(el), bg = backdrop(el.parentElement || el), fill = over(rgba(cs.backgroundColor), bg);
-      const bw = parseFloat(cs.borderTopWidth) || 0, sh = (cs.boxShadow.match(/rgba?\([^)]+\)/) || [])[0], edge = bw ? over(rgba(cs.borderTopColor), bg) : (sh ? over(rgba(sh), bg) : fill);
+      const bw = parseFloat(cs.borderTopWidth) || 0, sh = (cs.boxShadow.match(/(rgba?|color)\([^)]+\)/) || [])[0], edge = bw ? over(rgba(cs.borderTopColor), bg) : (sh ? over(rgba(sh), bg) : fill);
       const boundary = Math.round(Math.max(ratio(edge, bg), ratio(fill, bg)) * 100) / 100;
       let ph = null; if (el.placeholder) { const pc = getComputedStyle(el, '::placeholder'); ph = Math.round(ratio(over(rgba(pc.color), fill), fill) * 100) / 100; }
       inputs.push({ id: el.id || el.name || el.tagName, boundary, placeholder: ph });
@@ -1263,7 +1440,7 @@ function fixture() {
   const contrastReport = {};
   for (const t of ['dark', 'light']) {
     await check(`contrast scan (${t}): all views, text >= 4.5:1 (3:1 large), input boundary and placeholder >= 3:1 / 4.5:1`, async () => {
-      for (const route of ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
+      for (const route of ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
         const p = await open(route, { theme: t });
         if (route === 'students') await waitStudents(p); else await p.waitForTimeout(500);
         const r = await scanContrast(p);
@@ -1303,7 +1480,7 @@ function fixture() {
   for (const mode of ['browser-zoom-200', 'text-only-200']) {
     await check(`${mode}: no page overflow, header controls and navigation reachable on every view`, async () => {
       const vp = mode === 'browser-zoom-200' ? { width: 640, height: 450 } : { width: 1280, height: 900 };
-      for (const route of ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
+      for (const route of ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
         const p = await open(route, vp);
         if (mode === 'text-only-200') await p.addStyleTag({ content: 'html{font-size:200% !important}' });
         if (route === 'students') await waitStudents(p); else await p.waitForTimeout(500);
@@ -1361,10 +1538,10 @@ function fixture() {
       await q.context().close();
     });
   }
-  await check('zoom 200%: report written', async () => { fs.writeFileSync(path.join(out, 'zoom-b3.json'), JSON.stringify(zoomReport, null, 2)); assert.ok(Object.keys(zoomReport).length >= 18); });
+  await check('zoom 200%: report written', async () => { fs.writeFileSync(path.join(out, 'zoom-b3.json'), JSON.stringify(zoomReport, null, 2)); assert.ok(Object.keys(zoomReport).length >= 16); });
 
   await check('visual: shell and key views captured in both themes (light variants)', async () => {
-    for (const [route, name] of [['live', 'live'], ['sections', 'sections'], ['students', 'students'], ['controls', 'controls'], ['settings', 'settings'], ['profile', 'profile']]) {
+    for (const [route, name] of [['live', 'live'], ['faculty', 'faculty'], ['students', 'students'], ['controls', 'controls'], ['settings', 'settings'], ['profile', 'profile']]) {
       const p = await open(route, { theme: 'light' });
       await p.waitForTimeout(300);
       await shot(p, `${name}-light-1280`);

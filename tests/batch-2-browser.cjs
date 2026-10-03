@@ -568,6 +568,30 @@ function fixture() {
     await p.waitForURL(/character-selection\.html/);
     await p.context().close();
   });
+  await check('student pages show only that student\u2019s own status and next step, never the research-group policy', async () => {
+    const BANNED = /\bcontrol group\b|\bControl\b|Experimental|research group|Free choice|free-choice|\bAssigned\b|non-assigned|\bcondition\b|OCEAN only/i;
+    const pages = [
+      ['/student/html/waiting-room.html', { stageOpen: false }],
+      ['/student/html/assessment-complete.html', { stageOpen: true }],
+      ['/student/html/student-dashboard.html', { stageOpen: true }],
+      ['/student/html/character-selection.html', { stageOpen: true }],
+      ['/student/html/ocean-test.html', { stageOpen: true }]
+    ];
+    const groups = [['Control', null], ['Assigned', 'pia-open'], ['Non-Assigned', null]];
+    let n = 0;
+    for (const [group, tutor] of groups) {
+      for (const [url, extra] of pages) {
+        const done = !/ocean-test/.test(url);
+        const prof = { group_type: group, selected_character: tutor, is_ocean_done: done };
+        const p = await pageFor(url, { account: 'priv' + (n++), initial: Object.assign({ profile: prof }, extra) });
+        await p.waitForTimeout(700);
+        const text = await p.evaluate(() => document.body.innerText);
+        const hit = text.match(BANNED);
+        assert.equal(hit, null, `${group} on ${url.split('/').pop()} says "${hit && hit[0]}"`);
+        await p.context().close();
+      }
+    }
+  });
   await check('control (OCEAN only): before OCEAN they are still routed to the questionnaire', async () => {
     const p = await pageFor('/student/html/waiting-room.html', { account: 'ctl-pre', initial: { stageOpen: true, profile: { is_ocean_done: false, group_type: 'Control' } } });
     await p.waitForURL(/ocean-test\.html/);

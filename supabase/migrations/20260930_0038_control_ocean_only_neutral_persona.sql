@@ -26,7 +26,8 @@
 --
 --   4. A row-level guard, trg_pia_control_stage_guard: no writer at all, a
 --      SECURITY DEFINER admin RPC included, can move a Control student INTO
---      'Character Selection' or 'Tutoring Dashboard'. The body of
+--      'Character Selection' or 'Tutoring Dashboard', and a Control student's
+--      own browser cannot start a tutoring session (is_in_game). The body of
 --      admin_grant_stage__inner is not in this repository (it was created
 --      outside the migration files), so whether a section grant defers to
 --      pia_can_enter_stage could not be established from source; this guard
@@ -253,13 +254,23 @@ begin
       new.is_in_game       := old.is_in_game;
     end if;
   end if;
+
+  -- "In a tutoring session" is written by the student's own browser
+  -- (is_in_game is student-writable). A Control student has no session, so a
+  -- write that would start one is dropped. A row that already says true is
+  -- left as it is (not cleared by this migration).
+  if lower(trim(coalesce(new.group_type, ''))) = 'control'
+     and coalesce(new.is_in_game, false)
+     and (tg_op = 'INSERT' or not coalesce(old.is_in_game, false)) then
+    new.is_in_game := false;
+  end if;
   return new;
 end;
 $$;
 
 drop trigger if exists trg_pia_control_stage_guard on public.profiles;
 create trigger trg_pia_control_stage_guard
-  before insert or update of current_stage on public.profiles
+  before insert or update of current_stage, is_in_game, group_type on public.profiles
   for each row execute function public.pia_control_stage_guard();
 
 
@@ -356,6 +367,16 @@ begin
       select count(*) into v_n from public.profiles
        where email = 'probe-control@pia-0038.test' and current_stage = 'OCEAN';
       if v_n <> 1 then v_fail := v_fail || 'a Control student could not be moved to OCEAN; '; end if;
+      -- A Control student cannot start a tutoring session; others can.
+      update public.profiles set is_in_game = true where email = 'probe-control@pia-0038.test';
+      select count(*) into v_n from public.profiles
+       where email = 'probe-control@pia-0038.test' and is_in_game = false;
+      if v_n <> 1 then v_fail := v_fail || 'a Control student could start a tutoring session; '; end if;
+      update public.profiles set is_in_game = true where email = 'probe-assigned@pia-0038.test';
+      select count(*) into v_n from public.profiles
+       where email = 'probe-assigned@pia-0038.test' and is_in_game = true;
+      if v_n <> 1 then v_fail := v_fail || 'the Control guard blocked an Assigned student starting a session; '; end if;
+      update public.profiles set is_in_game = false where email = 'probe-assigned@pia-0038.test';
       update public.profiles set current_stage = 'Tutoring Dashboard' where email = 'probe-assigned@pia-0038.test';
       select count(*) into v_n from public.profiles
        where email = 'probe-assigned@pia-0038.test' and current_stage = 'Tutoring Dashboard';
