@@ -67,6 +67,7 @@
     --text-faint: #5f5f69;      /* 6.1:1 */
     --line: #d4d4d8;
     --line-soft: #e8e8eb;
+    --line-input: #8a8a93;      /* form-control boundary: 3.4:1 on white (WCAG 1.4.11) */
     --stripe: transparent;
 
     --accent: #146c36;          /* "on": 6.0:1 on white, 5.5:1 on its soft fill */
@@ -109,6 +110,7 @@
     --text-faint: #8e8e98;      /* 5.5:1 */
     --line: #3a3a41;            /* 1.9:1 hairline between panels */
     --line-soft: #26262b;
+    --line-input: #71717a;      /* form-control boundary: 3.6:1 on the dark surfaces (WCAG 1.4.11) */
 
     --accent: #4ade80;          /* "on" green */
     --accent-strong: #86efac;
@@ -238,7 +240,7 @@ html[data-surface="admin"] :focus-visible {
 .sidebar-user:hover, .sidebar-user[aria-expanded="true"] { background: var(--bg-chip); }
 .sidebar-user-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.3; }
 .sidebar-user-name { font-size: var(--fs-sm); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-user-mail { font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-user-mail { font-size: var(--fs-xs); color: var(--text-muted); overflow-wrap: anywhere; }
 .user-chevron { flex: 0 0 auto; color: var(--text-muted); width: 14px; height: 14px; }
 
 .user-menu {
@@ -464,12 +466,12 @@ html[data-surface="admin"] .btn-block { width: 100%; }
 html[data-surface="admin"] .input,
 html[data-surface="admin"] .select,
 html[data-surface="admin"] .textarea {
-    height: var(--field-h);
+    height: auto; min-height: var(--field-h);   /* grows with the text at 200% zoom */
     padding: 0 10px;
     border-radius: 4px;
     font-size: var(--fs-body);
     background: var(--bg-field);
-    box-shadow: inset 0 0 0 1px var(--line);
+    box-shadow: inset 0 0 0 1px var(--line-input);
 }
 html[data-surface="admin"] .textarea { height: auto; padding: 8px 10px; }
 html[data-surface="admin"] .input:focus,
@@ -479,7 +481,7 @@ html[data-surface="admin"] .textarea:focus {
 }
 html[data-surface="admin"] .label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); letter-spacing: 0; }
 html[data-surface="admin"] .field { gap: 4px; }
-.input-sm { height: 32px; }
+.input-sm { height: auto; min-height: 32px; }
 select.input { padding-right: 28px; }
 .search { position: relative; display: inline-flex; align-items: center; }
 .search .icon { position: absolute; left: 9px; width: 14px; height: 14px; color: var(--text-faint); pointer-events: none; }
@@ -538,6 +540,7 @@ html[data-surface="admin"] .table thead th.col-right { text-align: right; }
 .dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--text-faint); box-shadow: none; }
 .dot-on, .dot-live { background: var(--accent); box-shadow: none; }
 .dot-off { background: var(--text-faint); }
+.dot-unknown { background: transparent; box-shadow: inset 0 0 0 2px var(--text-muted); }
 .dot-warn { background: var(--warning); box-shadow: none; }
 .avatar-dot {
     position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%;
@@ -706,6 +709,7 @@ html[data-surface="admin"] .modal-text { max-width: none; }
 }
 .overlay.is-open .palette { transform: none; opacity: 1; }
 .palette-input-row { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.palette-input::placeholder { color: var(--text-muted); opacity: 1; }
 .palette-input-row .icon { width: 16px; height: 16px; color: var(--text-muted); flex: 0 0 16px; }
 .palette-input {
     flex: 1 1 auto; height: 48px; border: 0; background: transparent; color: var(--text);

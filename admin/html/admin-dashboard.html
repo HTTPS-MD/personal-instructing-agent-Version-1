@@ -145,7 +145,7 @@
                     </li>
                     <li><button type="button" class="nav-item" data-view="controls">Stage Controls</button></li>
                     <li><button type="button" class="nav-item" data-view="mathtask">
-                        <span>Math Task</span><span class="nav-count mono" id="nav-count-mathtask">—</span></button></li>
+                        <span>Math Task</span></button></li>
                 </ul>
             </nav>
 
@@ -218,6 +218,7 @@
                                 <button type="button" class="tab is-active" data-live-filter="all" aria-pressed="true">All <span class="mono" data-live-count="all">—</span></button>
                                 <button type="button" class="tab" data-live-filter="connected" aria-pressed="false">Connected <span class="mono" data-live-count="connected">—</span></button>
                                 <button type="button" class="tab" data-live-filter="offline" aria-pressed="false">Offline <span class="mono" data-live-count="offline">—</span></button>
+                                <button type="button" class="tab" data-live-filter="unknown" aria-pressed="false">Unknown <span class="mono" data-live-count="unknown">—</span></button>
                             </div>
                         </div>
                         <div class="table-wrap" tabindex="0" role="region" aria-label="Live sessions table">
@@ -242,7 +243,7 @@
                             </div>
                         </div>
                         <p class="panel-foot muted" id="live-foot">
-                            Connected means this student’s stage page checked in within the last minute. Active time is counted by the server and stops when check-ins stop.
+                            Connected: the stage page checked in within the last minute. Offline: signed out. Unknown: signed in without a stage check-in. Active time is counted by the server and stops when check-ins stop.
                         </p>
                     </div>
                 </section>
@@ -465,146 +466,12 @@
                 </section>
 
                 <!-- ============================== VIEW 8 · MATH TASK ===== -->
-                <!-- The question bank for the three percentage topics, and the
-                     adaptive rules per topic. Admin-only in the database
-                     (migration 0028): every row carries its answers. -->
+                <!-- Deliberately blank per the Batch 3 specification. The question
+                     bank (question_bank, app_config) and the student tutoring that
+                     reads it are untouched; only the editor UI was removed. -->
                 <section class="page is-hidden" id="view-mathtask" data-view-panel="mathtask">
-                    <div class="page-head">
-                        <div class="page-head-text">
-                            <div class="with-tip">
-                                <h1 class="page-title">Math task bank</h1>
-                                <button type="button" class="info-tip" data-tip="Live: every tutoring session is served from this bank. Changes apply from the next question a student gets. Keep at least 10 questions per topic." aria-label="About the math task bank"><svg class="icon"><use href="#i-info"></use></svg></button>
-                            </div>
-                        </div>
-                        <div class="page-actions">
-                            <button class="btn btn-secondary" type="button" id="qb-generate-btn">
-                                <svg class="icon"><use href="#i-sparkle"></use></svg>
-                                Auto-generate
-                            </button>
-                            <button class="btn btn-primary" type="button" id="qb-add-btn">
-                                <svg class="icon"><use href="#i-plus"></use></svg>
-                                Add question
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="stack-lg">
-
-                        <div class="segment qb-topics" role="group" aria-label="Topic">
-                            <button class="segment-btn is-active" type="button" data-qb-topic="EASY" aria-pressed="true">
-                                <span class="qb-topic-num tnum" aria-hidden="true">1</span>Finding %
-                            </button>
-                            <button class="segment-btn" type="button" data-qb-topic="MEDIUM" aria-pressed="false">
-                                <span class="qb-topic-num tnum" aria-hidden="true">2</span>% Increase
-                            </button>
-                            <button class="segment-btn" type="button" data-qb-topic="HARD" aria-pressed="false">
-                                <span class="qb-topic-num tnum" aria-hidden="true">3</span>% Decrease
-                            </button>
-                        </div>
-
-                        <div class="grid grid-main">
-                            <!-- Question bank -->
-                            <div class="card" data-region="mathtask">
-                                <div class="card-head">
-                                    <div class="card-head-text">
-                                        <h2 class="card-title" id="qb-title">Topic 1 · Finding a percentage</h2>
-                                        <p class="card-sub" id="qb-sub">Loading questions…</p>
-                                    </div>
-                                    <div class="card-tools">
-                                        <button class="btn btn-danger-soft" type="button" id="qb-delete-all" disabled>
-                                            <svg class="icon"><use href="#i-trash"></use></svg>
-                                            Delete all
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <form class="qb-bulk" id="qb-bulk-form" novalidate>
-                                    <label class="label" for="qb-bulk-points">Points for every question in this topic</label>
-                                    <div class="qb-bulk-row">
-                                        <input class="input tnum" type="number" id="qb-bulk-points" min="1" max="500"
-                                            step="1" inputmode="numeric" placeholder="Mixed" disabled>
-                                        <button class="btn btn-secondary" type="submit" id="qb-bulk-apply" disabled>Apply to all</button>
-                                    </div>
-                                    <p class="field-msg" data-msg-for="qb-bulk-points"></p>
-                                </form>
-
-                                <div class="table-wrap">
-                                    <table class="table qb-table">
-                                        <caption class="sr-only" id="qb-caption">Questions in topic 1</caption>
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">Problem</th>
-                                                <th scope="col" class="qb-col-answer">Final answer</th>
-                                                <th scope="col" class="qb-col-points">Points</th>
-                                                <th scope="col" class="col-right qb-col-actions">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="qb-tbody"></tbody>
-                                    </table>
-                                    <div id="qb-empty" class="state-block is-hidden">
-                                        <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-math"></use></svg></span>
-                                        <p class="state-title" id="qb-empty-title">No questions in this topic yet</p>
-                                        <p class="state-desc" id="qb-empty-desc"></p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Adaptive rules -->
-                            <form class="card qb-config" id="qb-config-form" data-region="mathtask" novalidate>
-                                <div class="card-head">
-                                    <div class="card-head-text">
-                                        <h2 class="card-title">Adaptive rules</h2>
-                                        <p class="card-sub" id="qb-config-sub">Topic 1 · Finding %</p>
-                                    </div>
-                                    <div class="card-tools">
-                                        <!-- Space is always reserved; only its visibility changes. -->
-                                        <span class="badge badge-warn qb-dirty" id="qb-dirty">Unsaved</span>
-                                    </div>
-                                </div>
-                                <div class="card-body stack">
-                                    <div class="field">
-                                        <div class="qb-range-top">
-                                            <span class="with-tip">
-                                                <label class="label" for="qb-mastery">Mastery threshold</label>
-                                                <button type="button" class="info-tip" data-tip="Accuracy a student needs on this topic to move up." aria-label="About the mastery threshold"><svg class="icon"><use href="#i-info"></use></svg></button>
-                                            </span>
-                                            <output class="qb-range-val tnum" id="qb-mastery-out" for="qb-mastery">80%</output>
-                                        </div>
-                                        <input class="qb-range" type="range" id="qb-mastery" min="50" max="100" step="5"
-                                            value="80" disabled>
-                                    </div>
-
-                                    <div class="form-grid form-grid-2">
-                                        <div class="field">
-                                            <label class="label" for="qb-min-questions">Solved to level up</label>
-                                            <input class="input tnum" type="number" id="qb-min-questions" min="1" max="10"
-                                                step="1" inputmode="numeric" value="3" disabled>
-                                            <p class="field-msg" data-msg-for="qb-min-questions"></p>
-                                        </div>
-                                        <div class="field">
-                                            <label class="label" for="qb-max-errors">Wrong to level down</label>
-                                            <input class="input tnum" type="number" id="qb-max-errors" min="1" max="10"
-                                                step="1" inputmode="numeric" value="3" disabled>
-                                            <p class="field-msg" data-msg-for="qb-max-errors"></p>
-                                        </div>
-                                    </div>
-
-                                    <div class="field qb-global">
-                                        <label class="label" for="qb-max-points">Max points <span class="qb-scope">All topics</span></label>
-                                        <input class="input tnum" type="number" id="qb-max-points" min="1" max="500"
-                                            step="1" inputmode="numeric" value="10" disabled>
-                                        <p class="field-msg" data-msg-for="qb-max-points"></p>
-                                    </div>
-                                </div>
-                                <div class="card-foot">
-                                    <button class="btn btn-primary btn-block" type="submit" id="qb-config-save" disabled>
-                                        <svg class="icon"><use href="#i-check"></use></svg>
-                                        Save rules
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    <div class="page-head"><h1 class="page-title">Math Task</h1></div>
+                    <div class="empty-panel"><p>Nothing to show here yet.</p></div>
                 </section>
 
             </main>
@@ -1229,177 +1096,6 @@
             </div>
         </div>
     </div>
-
-    <!-- ========================================= MODAL · MATH QUESTION --
-         Add or edit one sentence problem and its step-by-step breakdown.
-         Steps are cloned from #tpl-qb-step; every value is assigned through
-         .value, never written into markup. -->
-    <div class="overlay" id="modal-qb-edit" role="dialog" aria-modal="true" aria-labelledby="qb-edit-title">
-        <div class="modal modal-lg">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <h2 class="modal-title" id="qb-edit-title">Add question</h2>
-                    <p class="modal-sub" id="qb-edit-sub">Topic 1 · Finding a percentage</p>
-                </div>
-            </header>
-
-            <div class="modal-body">
-                <form id="qb-edit-form" novalidate>
-                    <div class="form-section">
-                        <p class="form-section-title">Problem</p>
-                        <div class="form-grid">
-                            <div class="field">
-                                <label class="label" for="qb-question">Sentence problem <span class="req">*</span></label>
-                                <textarea class="textarea" id="qb-question" rows="3" maxlength="2000"
-                                    placeholder="A jacket originally priced at PHP 1,200 is on sale for PHP 900. What is the percentage discount?"></textarea>
-                                <p class="field-msg" data-msg-for="qb-question"></p>
-                            </div>
-                        </div>
-                        <div class="form-grid qb-answer-grid" style="margin-top:16px">
-                            <div class="field">
-                                <label class="label" for="qb-final">Final answer</label>
-                                <input class="input" type="text" id="qb-final" maxlength="200" autocomplete="off"
-                                    placeholder="25%">
-                                <p class="field-msg" data-msg-for="qb-final"></p>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="qb-points">Points <span class="req">*</span></label>
-                                <input class="input tnum" type="number" id="qb-points" min="1" max="500" step="1"
-                                    inputmode="numeric" value="10">
-                                <p class="field-msg" data-msg-for="qb-points"></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <div class="qb-steps-head">
-                            <p class="form-section-title">Step-by-step breakdown &amp; hints</p>
-                            <button class="btn btn-secondary" type="button" id="qb-add-step">
-                                <svg class="icon"><use href="#i-plus"></use></svg>
-                                Add step
-                            </button>
-                        </div>
-                        <ol class="qb-steps" id="qb-steps"></ol>
-                    </div>
-                </form>
-            </div>
-
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" type="button" data-modal-close>Cancel</button>
-                <button class="btn btn-primary" type="submit" form="qb-edit-form" id="qb-edit-save">Save question</button>
-            </footer>
-        </div>
-    </div>
-
-    <template id="tpl-qb-step">
-        <li class="qb-step">
-            <div class="qb-step-head">
-                <p class="qb-step-title">Step <span class="qb-step-num tnum">1</span></p>
-                <button class="btn-icon" type="button" data-qb-remove-step aria-label="Remove step" title="Remove step">
-                    <svg class="icon"><use href="#i-trash"></use></svg>
-                </button>
-            </div>
-            <div class="form-grid qb-step-grid">
-                <div class="field">
-                    <label class="label" data-for="prompt">Step prompt</label>
-                    <input class="input" type="text" data-step="prompt" maxlength="300" autocomplete="off"
-                        placeholder="Calculate the discount amount">
-                </div>
-                <div class="field">
-                    <label class="label" data-for="answer">Step answer</label>
-                    <input class="input" type="text" data-step="answer" maxlength="100" autocomplete="off"
-                        placeholder="300">
-                </div>
-            </div>
-            <div class="form-grid qb-hints">
-                <div class="field">
-                    <label class="label" data-for="hint1"><span class="badge">Hint 1</span> Concept</label>
-                    <input class="input" type="text" data-step="hint1" maxlength="300" autocomplete="off"
-                        placeholder="Subtract the sale price from the original price.">
-                </div>
-                <div class="field">
-                    <label class="label" data-for="hint2"><span class="badge">Hint 2</span> Setup</label>
-                    <input class="input" type="text" data-step="hint2" maxlength="300" autocomplete="off"
-                        placeholder="1200 - 900">
-                </div>
-                <div class="field">
-                    <label class="label" data-for="hint3"><span class="badge">Hint 3</span> Worked calculation</label>
-                    <input class="input" type="text" data-step="hint3" maxlength="300" autocomplete="off"
-                        placeholder="1200 - 900 = 300">
-                </div>
-            </div>
-        </li>
-    </template>
-
-    <!-- ===================================== MODAL · AUTO-GENERATE -------
-         Drafts sentence problems for the current topic. Nothing reaches the
-         database until "Save" -- each draft can be edited or dropped first. -->
-    <div class="overlay" id="modal-qb-generate" role="dialog" aria-modal="true" aria-labelledby="qb-gen-title">
-        <div class="modal modal-lg">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <h2 class="modal-title" id="qb-gen-title">Auto-generate questions</h2>
-                    <p class="modal-sub" id="qb-gen-sub">Topic 1 · Finding a percentage</p>
-                </div>
-            </header>
-
-            <div class="modal-body">
-                <form class="qb-gen-controls" id="qb-gen-form" novalidate>
-                    <div class="field">
-                        <label class="label" for="qb-gen-count">How many</label>
-                        <select class="select" id="qb-gen-count">
-                            <option value="1">1 question</option>
-                            <option value="3">3 questions</option>
-                            <option value="5" selected>5 questions</option>
-                            <option value="10">10 questions</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-secondary" type="submit" id="qb-gen-run">
-                        <svg class="icon"><use href="#i-sparkle"></use></svg>
-                        Generate drafts
-                    </button>
-                </form>
-
-                <p class="sr-only" id="qb-gen-status" role="status" aria-live="polite"></p>
-                <ol class="qb-previews" id="qb-previews"></ol>
-                <div class="state-block qb-gen-empty" id="qb-gen-empty">
-                    <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-sparkle"></use></svg></span>
-                    <p class="state-title">No drafts yet</p>
-                </div>
-            </div>
-
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" type="button" data-modal-close>Cancel</button>
-                <button class="btn btn-primary" type="button" id="qb-gen-save" disabled>Save to bank</button>
-            </footer>
-        </div>
-    </div>
-
-    <template id="tpl-qb-preview">
-        <li class="qb-preview">
-            <div class="qb-step-head">
-                <p class="qb-step-title">Draft <span class="qb-preview-num tnum">1</span></p>
-                <button class="btn-icon" type="button" data-qb-remove-preview aria-label="Remove draft" title="Remove draft">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
-            </div>
-            <div class="field">
-                <label class="label" data-for="q">Problem</label>
-                <textarea class="textarea qb-preview-q" data-preview="q" rows="2" maxlength="2000"></textarea>
-            </div>
-            <div class="form-grid qb-answer-grid">
-                <div class="field">
-                    <label class="label" data-for="final">Final answer</label>
-                    <input class="input" type="text" data-preview="final" maxlength="200" autocomplete="off">
-                </div>
-                <div class="field">
-                    <label class="label" data-for="points">Points</label>
-                    <input class="input tnum" type="number" data-preview="points" min="1" max="500" step="1" inputmode="numeric">
-                </div>
-            </div>
-            <p class="qb-help qb-preview-meta"></p>
-        </li>
-    </template>
 
             <!-- ====================================== MODAL · GENERIC CONFIRM -->
     <div class="overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">

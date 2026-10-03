@@ -25,7 +25,7 @@ const server = createServer((req, res) => {
 /* ------------------------------------------------------------------ data -- */
 function makeData(overrides = {}) {
   const students = [];
-  const sections = ['Earth', 'Jupiter', 'Mars'];
+  const sections = ['Earth', 'Jupiter', 'Mars', 'Venus'];   /* Venus has no students */
   const groups = ['assigned', 'non-assigned', 'neutral', 'control'];
   for (let i = 1; i <= 23; i++) {
     const n = String(i).padStart(2, '0');
@@ -38,7 +38,7 @@ function makeData(overrides = {}) {
       section: i <= 8 ? 'Earth' : i <= 16 ? 'Jupiter' : (i <= 22 ? 'Mars' : null),
       group_type: groups[i % 4], status: i % 8 === 0 ? 'inactive' : 'active',
       current_stage: stage, is_in_game: game, stage_started_at: null,
-      active_devices: i % 3 === 0 ? ['abc [Windows PC]'] : [], max_devices: 1,
+      active_devices: [3, 6, 9, 10, 18].includes(i) ? ['abc [Windows PC]'] : [], max_devices: 1,   /* signed in: 3,6 (connected), 9,10 (stale beat), 18 (never beat: waiting room) */
       is_ocean_done: i > 5, pre_test_score: null, post_test_score: null,
       parental_consent: true, student_assent: true, must_change_password: false
     });
@@ -305,32 +305,35 @@ function fixture() {
     await shot(p, 'overview-dark-1280');
     await p.context().close();
   });
-  await check('math task: existing question bank page still renders (verified data exists), compact', async () => {
+  await check('math task: blank page per spec, no question-bank UI or modals', async () => {
     const p = await open('mathtask');
-    await p.waitForSelector('#qb-title');
-    assert.match(await p.locator('#view-mathtask .page-title').innerText(), /Math task bank/i);
+    await p.waitForSelector('#view-mathtask .empty-panel');
+    assert.equal((await p.locator('#view-mathtask .page-title').innerText()).trim(), 'Math Task');
+    assert.equal(await p.locator('#view-mathtask table, #view-mathtask button, #view-mathtask input, #view-mathtask .card').count(), 0);
+    assert.equal(await p.locator('#modal-qb-edit, #modal-qb-generate, #tpl-qb-step, #nav-count-mathtask').count(), 0);
     assert.equal(await overflow(p), true);
     await shot(p, 'mathtask-dark-1280');
     await p.context().close();
   });
 
   /* ================= LIVE SESSIONS ================= */
-  await check('live: Connected/Offline only, hh:mm:ss in mono, connected first, sections and stages truthful', async () => {
+  await check('live: Connected/Offline/Unknown only, hh:mm:ss in mono, connected first, sections and stages truthful', async () => {
     const p = await open('live');
     await p.waitForSelector('#live-tbody tr[data-live-row]');
-    const rows = await p.locator('#live-tbody tr[data-live-row]').evaluateAll(trs => trs.map(tr => ({ text: tr.innerText, clock: tr.querySelector('[data-live-clock]').innerText, conn: tr.querySelector('[data-live-clock]').dataset.liveConn })));
+    const rows = await p.locator('#live-tbody tr[data-live-row]').evaluateAll(trs => trs.map(tr => ({ text: tr.innerText, clock: tr.querySelector('.duration-cell').innerText, conn: tr.querySelector('.duration-cell').dataset.liveConn })));
     assert.equal(rows.length, 10);
     assert.ok(rows.every(r => /^\d\d:\d\d:\d\d$/.test(r.clock)), JSON.stringify(rows.map(r => r.clock)));
     const conns = rows.map(r => r.conn);
-    assert.deepEqual(conns, ['connected', 'connected', 'connected', 'connected', 'connected', 'connected', 'connected', 'connected', 'offline', 'offline']);
+    assert.deepEqual(conns, ['connected', 'connected', 'connected', 'connected', 'connected', 'connected', 'connected', 'connected', 'unknown', 'unknown']);
     const all = (await p.locator('#view-live').innerText());
-    assert.equal(/\bActive\b(?! time)|\bIdle\b|Away/.test(all.replace(/Active time/ig, '')), false, 'no Active / Idle / Away labels');
-    assert.match(all, /Connected/); assert.match(all, /Offline/);
+    assert.equal(/\bActive\b(?! time)|\bIdle\b|Away/.test(all.replace(/Active (time|session)/ig, '')), false, 'no Active / Idle / Away labels');
+    assert.match(all, /Connected/); assert.match(all, /Unknown/);
     assert.match(await p.locator('[data-live-clock]').first().evaluate(e => getComputedStyle(e).fontFamily), /JetBrains Mono/);
     assert.equal(await p.locator('#live-tbody tr[data-live-row] .avatar').first().evaluate(e => { const b = e.getBoundingClientRect(); return Math.round(b.width) + 'x' + Math.round(b.height); }), '24x24');
-    assert.equal(await p.locator('[data-live-count="all"]').innerText(), '12');
+    assert.equal(await p.locator('[data-live-count="all"]').innerText(), '13');
     assert.equal(await p.locator('[data-live-count="connected"]').innerText(), '8');
-    assert.equal(await p.locator('[data-live-count="offline"]').innerText(), '4');
+    assert.equal(await p.locator('[data-live-count="offline"]').innerText(), '2');
+    assert.equal(await p.locator('[data-live-count="unknown"]').innerText(), '3');
     await shot(p, 'live-dark-1280');
     await p.context().close();
   });
@@ -348,7 +351,7 @@ function fixture() {
     assert.ok(advanced >= 2 && advanced <= 3, 'advanced ' + advanced);
     await p.locator('[data-live-filter="offline"]').click();
     assert.deepEqual(await p.locator('[data-live-conn="offline"]').allInnerTexts(), off1);
-    assert.deepEqual(off1, ['01:02:14', '01:02:15', '01:02:16', '01:02:17']);   /* server-counted seconds, 1h 2m 14s... */
+    assert.deepEqual(off1, ['01:02:16', '01:02:17']);   /* server-counted seconds, 1h 2m 14s... */
     await p.context().close();
   });
   await check('live: a student whose check-ins stop becomes Offline and their clock freezes', async () => {
@@ -370,14 +373,14 @@ function fixture() {
     assert.equal(await p.locator('#live-prev').isDisabled(), true);
     assert.equal(await p.locator('#live-next').isDisabled(), false);
     await p.locator('#live-next').click();
-    assert.equal(await p.locator('#live-tbody tr[data-live-row]').count(), 2);
+    assert.equal(await p.locator('#live-tbody tr[data-live-row]').count(), 3);
     assert.equal(await p.locator('#live-next').isDisabled(), true);
     assert.equal(await p.locator('#live-prev').isDisabled(), false);
     await p.locator('[data-live-filter="offline"]').click();            // page resets / clamps
-    assert.equal(await p.locator('#live-tbody tr[data-live-row]').count(), 4);
+    assert.equal(await p.locator('#live-tbody tr[data-live-row]').count(), 2);
     assert.equal(await p.locator('#live-prev').isDisabled(), true);
     assert.equal(await p.locator('#live-next').isDisabled(), true);
-    assert.match(await p.locator('#live-pager-info').innerText(), /Showing 1–4 of 4/);
+    assert.match(await p.locator('#live-pager-info').innerText(), /Showing 1–2 of 2/);
     await p.context().close();
   });
   await check('live: unavailable table, load error and empty states are explicit (never zero)', async () => {
@@ -386,7 +389,7 @@ function fixture() {
     assert.match(await p.locator('#live-tbody').innerText(), /not available/i);
     assert.equal(await p.locator('[data-live-count="all"]').innerText(), '—');
     await p.context().close();
-    const none = makeData(); none.student_stage_time = {};
+    const none = makeData(); none.student_stage_time = {}; none.profiles.forEach(r => { r.active_devices = []; });
     p = await open('live', { data: none });
     await p.waitForSelector('#live-tbody .state-block');
     assert.match(await p.locator('#live-tbody').innerText(), /No student activity recorded yet/);
@@ -394,14 +397,15 @@ function fixture() {
   });
 
   /* ================= CLASS SECTIONS ================= */
-  await check('class sections: compact table, Online/Offline only, aggregation from heartbeats, no Idle', async () => {
+  await check('class sections: compact table, Online/Unknown/Offline, aggregation from heartbeats, no Idle', async () => {
     const p = await open('sections');
     await p.waitForSelector('#sections-tbody tr');
     const rows = await p.locator('#sections-tbody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.innerText.trim())));
     const by = Object.fromEntries(rows.map(r => [r[0], r]));
     assert.match(by.Earth[4], /^Online$/);                      // students 1-8 checked in 5s ago
-    assert.match(by.Jupiter[4], /^Offline$/);                   // 9-12 are 10 minutes stale, 13-16 never checked in
-    assert.match(by.Mars[4], /^Offline$/);
+    assert.match(by.Jupiter[4], /^Unknown$/);                   // 9,10 stale but signed in; 11,12 signed out
+    assert.match(by.Mars[4], /^Unknown$/);                      // 18 signed in with no stage check-in (waiting room)
+    assert.match(by.Venus[4], /^Offline$/);                     // no students
     assert.equal(by.Earth[1], 'Prof One'); assert.equal(by.Earth[2], '8');
     assert.equal(/Idle/i.test(await p.locator('#view-sections').innerText()), false);
     assert.equal(await p.locator('#sections-tbody .dot').first().getAttribute('aria-hidden'), 'true');   // dot paired with text
@@ -415,7 +419,7 @@ function fixture() {
     const p = await open('sections', { initial: { fail: { student_stage_time: { code: '42P01', message: 'x' } } } });
     await p.waitForSelector('#sections-tbody tr td');
     const cells = await p.locator('#sections-tbody tr').evaluateAll(trs => trs.map(tr => tr.children[4].innerText.trim()));
-    assert.deepEqual(cells, ['—', '—', '—']);
+    assert.deepEqual(cells, ['—', '—', '—', '—']);
     await p.context().close();
   });
   await check('class sections: View opens the roster dialog with one X, Escape closes, focus returns', async () => {
@@ -1014,6 +1018,142 @@ function fixture() {
       await p.context().close();
     });
   }
+
+  /* ---- Full-surface scan: every visible text node and form-control boundary, every view, both themes. ---- */
+  const scanContrast = p => p.evaluate(() => {
+    const cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = cv.height = 1;
+    const rgba = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+    const over = (t, b) => { const a = t[3]; return [0, 1, 2].map(i => t[i] * a + b[i] * (1 - a)).concat([1]); };
+    const lum = c => { const a = c.slice(0, 3).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * a[0] + .7152 * a[1] + .0722 * a[2]; };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+    const backdrop = el => { const layers = []; let n = el; while (n && n.nodeType === 1) { const c = rgba(getComputedStyle(n).backgroundColor); if (c[3] > 0) layers.push(c); if (c[3] === 1) break; n = n.parentElement; }
+      let base = layers.length && layers[layers.length - 1][3] === 1 ? layers.pop() : rgba(getComputedStyle(document.body).backgroundColor); if (base[3] !== 1) base = [255, 255, 255, 1];
+      while (layers.length) base = over(layers.pop(), base); return base; };
+    const visible = el => { if (!el.getClientRects().length) return false; for (let n = el; n && n.nodeType === 1; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) return false; } const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const bad = [], inputs = []; let texts = 0, worst = 99;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let t; (t = walker.nextNode());) {
+      if (!t.nodeValue.trim()) continue; const el = t.parentElement;
+      if (!el || /^(SCRIPT|STYLE|OPTION|NOSCRIPT)$/.test(el.tagName) || el.closest('[disabled],[aria-disabled="true"],[hidden],.is-hidden,template,svg,.sr-only,.skip-link')) continue;
+      if (!visible(el)) continue;
+      const cs = getComputedStyle(el), bg = backdrop(el), fg = over(rgba(cs.color), bg), r = ratio(fg, bg);
+      const px = parseFloat(cs.fontSize), large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700), need = large ? 3 : 4.5;
+      texts++; worst = Math.min(worst, r);
+      if (r < need) bad.push({ text: t.nodeValue.trim().slice(0, 30), cls: el.className && el.className.toString().slice(0, 30), ratio: Math.round(r * 100) / 100 });
+    }
+    for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')) {
+      if (!visible(el) || el.disabled) continue;
+      const cs = getComputedStyle(el), bg = backdrop(el.parentElement || el), fill = over(rgba(cs.backgroundColor), bg);
+      const bw = parseFloat(cs.borderTopWidth) || 0, sh = (cs.boxShadow.match(/rgba?\([^)]+\)/) || [])[0], edge = bw ? over(rgba(cs.borderTopColor), bg) : (sh ? over(rgba(sh), bg) : fill);
+      const boundary = Math.round(Math.max(ratio(edge, bg), ratio(fill, bg)) * 100) / 100;
+      let ph = null; if (el.placeholder) { const pc = getComputedStyle(el, '::placeholder'); ph = Math.round(ratio(over(rgba(pc.color), fill), fill) * 100) / 100; }
+      inputs.push({ id: el.id || el.name || el.tagName, boundary, placeholder: ph });
+    }
+    return { texts, worst: Math.round(worst * 100) / 100, bad, inputs };
+  });
+  const contrastReport = {};
+  for (const t of ['dark', 'light']) {
+    await check(`contrast scan (${t}): all views, text >= 4.5:1 (3:1 large), input boundary and placeholder >= 3:1 / 4.5:1`, async () => {
+      for (const route of ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
+        const p = await open(route, { theme: t });
+        if (route === 'students') await waitStudents(p); else await p.waitForTimeout(500);
+        const r = await scanContrast(p);
+        contrastReport[`${t}/${route}`] = { texts: r.texts, worstTextRatio: r.worst, inputs: r.inputs };
+        assert.deepEqual(r.bad, [], `${t}/${route} text`);
+        assert.deepEqual(r.inputs.filter(i => i.boundary < 3 || (i.placeholder !== null && i.placeholder < 4.5)), [], `${t}/${route} inputs`);
+        await p.context().close();
+      }
+      /* Overlays: command palette, user menu, a modal, the student drawer. */
+      const p = await open('students', { theme: t }); await waitStudents(p);
+      await p.keyboard.press('Control+k'); await p.waitForSelector('#palette.is-open'); await p.waitForTimeout(300);
+      let r = await scanContrast(p); contrastReport[`${t}/palette`] = { texts: r.texts, worstTextRatio: r.worst, inputs: r.inputs };
+      assert.deepEqual(r.bad, [], t + '/palette'); assert.deepEqual(r.inputs.filter(i => i.placeholder !== null && i.placeholder < 4.5), [], t + '/palette placeholder');
+      await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+      await p.locator('#user-menu-btn').click(); await p.waitForTimeout(200);
+      r = await scanContrast(p); contrastReport[`${t}/user-menu`] = { texts: r.texts, worstTextRatio: r.worst };
+      assert.deepEqual(r.bad, [], t + '/user-menu');
+      await p.keyboard.press('Escape');
+      await p.locator('#student-tbody tr').first().locator('button, a').first().click().catch(() => {});
+      await p.waitForTimeout(500);
+      r = await scanContrast(p); contrastReport[`${t}/drawer-or-roster`] = { texts: r.texts, worstTextRatio: r.worst };
+      assert.deepEqual(r.bad, [], t + '/drawer');
+      await p.context().close();
+      const q = await open('profile', { theme: t }); await q.waitForTimeout(400);
+      await q.locator('[data-modal-open="modal-change-password"]').first().click().catch(() => {});
+      await q.waitForTimeout(400);
+      r = await scanContrast(q); contrastReport[`${t}/change-password-modal`] = { texts: r.texts, worstTextRatio: r.worst, inputs: r.inputs };
+      assert.deepEqual(r.bad, [], t + '/modal');
+      assert.deepEqual(r.inputs.filter(i => i.boundary < 3 || (i.placeholder !== null && i.placeholder < 4.5)), [], t + '/modal inputs');
+      await q.context().close();
+    });
+  }
+  await check('contrast scan: report written', async () => { fs.writeFileSync(path.join(out, 'contrast-b3.json'), JSON.stringify(contrastReport, null, 2)); assert.ok(Object.keys(contrastReport).length >= 22, String(Object.keys(contrastReport).length)); });
+
+  /* ---- 200% zoom ---- browser zoom 200% of a 1280x900 window is a 640x450 CSS-pixel viewport; text-only zoom is a 200% root size. */
+  const zoomReport = {};
+  for (const mode of ['browser-zoom-200', 'text-only-200']) {
+    await check(`${mode}: no page overflow, header controls and navigation reachable on every view`, async () => {
+      const vp = mode === 'browser-zoom-200' ? { width: 640, height: 450 } : { width: 1280, height: 900 };
+      for (const route of ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings']) {
+        const p = await open(route, vp);
+        if (mode === 'text-only-200') await p.addStyleTag({ content: 'html{font-size:200% !important}' });
+        if (route === 'students') await waitStudents(p); else await p.waitForTimeout(500);
+        await p.waitForTimeout(250);
+        const m = await p.evaluate(() => {
+          const inView = el => { if (!el || !el.getClientRects().length) return false; const r = el.getBoundingClientRect(); return r.left >= -1 && r.right <= window.innerWidth + 1 && r.top >= -1 && r.bottom <= window.innerHeight + 1; };
+          const mq = window.innerWidth <= 900;
+          return { scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth,
+            palette: inView(document.querySelector('#palette-open')), theme: inView(document.querySelector('#theme-toggle')),
+            toggle: inView(document.querySelector('#mobile-nav-toggle')), drawerMode: getComputedStyle(document.querySelector('#sidebar')).visibility === 'hidden',
+            title: !!document.querySelector('.page:not(.is-hidden) .page-title') && document.querySelector('.page:not(.is-hidden) .page-title').getBoundingClientRect().right <= window.innerWidth + 1, mq };
+        });
+        zoomReport[`${mode}/${route}`] = m;
+        assert.ok(m.scrollW <= m.innerW + 1, `${mode}/${route} overflow ${m.scrollW}>${m.innerW}`);
+        assert.ok(m.title, `${mode}/${route} title clipped`);
+        assert.ok(m.palette && m.theme, `${mode}/${route} header controls out of view ${JSON.stringify(m)}`);
+        /* Navigation: visible in place or reachable through the drawer toggle; every item then scrollable into view. */
+        if (route === 'students' || route === 'live' || route === 'controls') await shot(p, `zoom200-${mode}-${route}`);
+        if (m.drawerMode) { assert.ok(m.toggle, `${mode}/${route} nav toggle out of view`); await p.locator('#mobile-nav-toggle').click(); await p.waitForTimeout(300); }
+        const items = await p.locator('.nav-item').evaluateAll(els => els.filter(e => e.getClientRects().length).map(e => { e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return r.right <= window.innerWidth + 1 && r.left >= -1; }));
+        assert.ok(items.length >= 5 && items.every(Boolean), `${mode}/${route} nav items unreachable`);
+        const userOk = await p.locator('#user-menu-btn').evaluate(e => { e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); return r.right <= window.innerWidth + 1 && r.bottom <= window.innerHeight + 1 && r.top >= -1; });
+        assert.ok(userOk, `${mode}/${route} user menu trigger unreachable`);
+        if (m.drawerMode && route === 'students') await shot(p, `zoom200-${mode}-${route}-drawer`);
+        await p.context().close();
+      }
+    });
+    await check(`${mode}: palette, user menu, modal and drawer stay inside the viewport and usable`, async () => {
+      const vp = mode === 'browser-zoom-200' ? { width: 640, height: 450 } : { width: 1280, height: 900 };
+      const p = await open('students', vp);
+      if (mode === 'text-only-200') await p.addStyleTag({ content: 'html{font-size:200% !important}' });
+      await waitStudents(p);
+      const fits = sel => p.locator(sel).evaluate(e => { const r = e.getBoundingClientRect(); return r.left >= -1 && r.right <= window.innerWidth + 1 && r.top >= -1 && r.bottom <= window.innerHeight + 1; });
+      await p.keyboard.press('Control+k'); await p.waitForSelector('#palette.is-open'); await p.waitForTimeout(300);
+      assert.ok(await fits('#palette .palette'), 'palette inside viewport');
+      assert.equal(await p.evaluate(() => document.activeElement.id), 'palette-input');
+      await shot(p, `zoom200-${mode}-palette`);
+      await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+      if (mode === 'browser-zoom-200') { await p.locator('#mobile-nav-toggle').click(); await p.waitForTimeout(300); }
+      await p.locator('#user-menu-btn').click(); await p.waitForTimeout(250);
+      assert.ok(await fits('#user-menu'), 'user menu inside viewport');
+      await shot(p, `zoom200-${mode}-user-menu`);
+      await p.keyboard.press('Escape'); if (mode === 'browser-zoom-200') await p.keyboard.press('Escape');
+      await p.context().close();
+      const q = await open('profile', vp);
+      if (mode === 'text-only-200') await q.addStyleTag({ content: 'html{font-size:200% !important}' });
+      await q.waitForTimeout(400);
+      await q.locator('[data-modal-open="modal-change-password"]').click();
+      await q.waitForTimeout(400);
+      const box = await q.locator('#modal-change-password .modal').evaluate(e => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight }; });
+      assert.ok(box.l >= -1 && box.r <= box.vw + 1 && box.t >= -1 && box.b <= box.vh + 1, JSON.stringify(box));
+      const reach = await q.locator('#modal-change-password button').evaluateAll(bs => bs.filter(b => b.getClientRects().length).map(b => { b.scrollIntoView({ block: 'nearest' }); const r = b.getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top >= -1; }));
+      assert.ok(reach.length >= 2 && reach.every(Boolean), 'modal buttons reachable ' + JSON.stringify(reach));
+      await shot(q, `zoom200-${mode}-modal`);
+      await q.context().close();
+    });
+  }
+  await check('zoom 200%: report written', async () => { fs.writeFileSync(path.join(out, 'zoom-b3.json'), JSON.stringify(zoomReport, null, 2)); assert.ok(Object.keys(zoomReport).length >= 18); });
+
   await check('visual: shell and key views captured in both themes (light variants)', async () => {
     for (const [route, name] of [['live', 'live'], ['sections', 'sections'], ['students', 'students'], ['controls', 'controls'], ['settings', 'settings'], ['profile', 'profile']]) {
       const p = await open(route, { theme: 'light' });
