@@ -334,15 +334,44 @@ function fixture() {
     await shot(p, 'overview-dark-1280');
     await p.context().close();
   });
-  await check('math task: blank page per spec, no question-bank UI or modals', async () => {
-    const p = await open('mathtask');
-    await p.waitForSelector('#view-mathtask .empty-panel');
-    assert.equal((await p.locator('#view-mathtask .page-title').innerText()).trim(), 'Math Task');
-    assert.equal(await p.locator('#view-mathtask table, #view-mathtask button, #view-mathtask input, #view-mathtask .card').count(), 0);
-    assert.equal(await p.locator('#modal-qb-edit, #modal-qb-generate, #tpl-qb-step, #nav-count-mathtask').count(), 0);
-    assert.equal(await overflow(p), true);
+  await check('math task: admin bank follows game step counts and avoids duplicate modal exits', async () => {
+    const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, time_limit: 10, max_points: 10 }] }) });
+    await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    assert.equal((await p.locator('#view-mathtask .page-title').innerText()).trim(), 'Math task bank');
+    assert.equal(await p.locator('#qb-time-limit').isEnabled(), true);
     await shot(p, 'mathtask-dark-1280');
+    await p.locator('#qb-add-btn').click();
+    assert.equal(await p.locator('#qb-steps .qb-step').count(), 2);
+    assert.equal(await p.locator('#modal-qb-edit [data-modal-close]').count(), 1);
+    await p.locator('#qb-question').fill('What is 25% of 80?');
+    await p.locator('#qb-edit-save').click();
+    assert.match(await p.locator('#qb-step-error').innerText(), /prompt and answer/i);
+    assert.equal((await calls(p)).filter(c => c.table === 'question_bank' && c.write).length, 0);
+    await p.locator('#qb-steps .qb-step').nth(0).locator('[data-step="prompt"]').fill('Convert the percent');
+    await p.locator('#qb-steps .qb-step').nth(0).locator('[data-step="answer"]').fill('0.25');
+    await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="prompt"]').fill('Multiply by 80');
+    await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="answer"]').fill('20');
+    await p.locator('#qb-edit-save').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'question_bank' && c.write === 'insert'));
+    const write = (await calls(p)).find(c => c.table === 'question_bank' && c.write === 'insert');
+    assert.equal(JSON.parse(write.values[0].hint).steps.length, 2);
+    assert.equal(write.values[0].final_answer, '20');
+    await p.locator('#modal-qb-edit .modal-close').click();
+    await p.locator('[data-qb-topic="MEDIUM"]').click();
+    await p.locator('#qb-add-btn').click();
+    assert.equal(await p.locator('#qb-steps .qb-step').count(), 3);
+    assert.equal(await overflow(p), true);
+    await p.locator('#modal-qb-edit .modal-close').click();
+    await p.locator('#qb-time-limit').fill('15');
+    await p.locator('#qb-config-save').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
+    const configWrite = (await calls(p)).find(c => c.table === 'app_config' && c.write === 'upsert');
+    assert.equal(configWrite.values.time_limit, 15);
     await p.context().close();
+    const beforeGameMigration = await open('mathtask');
+    await beforeGameMigration.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    assert.equal(await beforeGameMigration.locator('#qb-time-limit').isEnabled(), false);
+    await beforeGameMigration.context().close();
   });
 
   /* ================= LIVE SESSIONS ================= */
@@ -1482,7 +1511,7 @@ function fixture() {
       texts++; worst = Math.min(worst, r);
       if (r < need) bad.push({ text: t.nodeValue.trim().slice(0, 30), cls: el.className && el.className.toString().slice(0, 30), ratio: Math.round(r * 100) / 100 });
     }
-    for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')) {
+    for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea')) {
       if (!visible(el) || el.disabled) continue;
       const cs = getComputedStyle(el), bg = backdrop(el.parentElement || el), fill = over(rgba(cs.backgroundColor), bg);
       const bw = parseFloat(cs.borderTopWidth) || 0, sh = (cs.boxShadow.match(/(rgba?|color)\([^)]+\)/) || [])[0], edge = bw ? over(rgba(cs.borderTopColor), bg) : (sh ? over(rgba(sh), bg) : fill);

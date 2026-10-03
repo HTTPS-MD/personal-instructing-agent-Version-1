@@ -836,7 +836,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
    The question bank and adaptive rules (view "mathtask", migration 0028).
    ----------------------------------------------------------------------------
    MOBILE FIRST. On a phone each question is a card: the problem, then its
-   step count beside Edit / Delete, then the answer and points fields with
+   step count beside Edit / Delete, then the answer and points values with
    their own labels. From 48rem it is a table with a fixed layout.
 
    ZERO CLS. Every row is the same height in both layouts: the problem text
@@ -886,9 +886,10 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     background: var(--bg-chip);
     font-size: var(--fs-xs);
     font-weight: 700;
+    color: var(--text);
 }
 
-.qb-topics .segment-btn.is-active .qb-topic-num { background: var(--accent-soft); color: var(--accent); }
+.qb-topics .segment-btn.is-active .qb-topic-num { background: var(--accent-soft); color: var(--text); }
 
 @media (min-width: 30rem) {
     .qb-topics .segment-btn { padding: 0 var(--sp-2); }
@@ -974,15 +975,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     color: var(--text-muted);
 }
 
-.qb-inline {
-    height: var(--control-h);
-    padding: 0 var(--sp-3);
-}
-
-.qb-inline[type="number"] { text-align: center; }
-
-/* Saving: dimmed, never resized. Further edits queue behind the save. */
-.qb-row[aria-busy="true"] { opacity: 0.6; }
+.qb-cell-value { display: flex; align-items: center; min-height: var(--control-h); overflow-wrap: anywhere; }
 
 /* Skeleton pieces sized exactly like what replaces them. */
 .qb-skel-q { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
@@ -1065,6 +1058,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
     line-height: 1.5;
     color: var(--text-muted);
 }
+#qb-step-error { min-height: 36px; }
 
 .qb-global {
     padding-top: var(--sp-4);
@@ -1074,7 +1068,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 .qb-scope {
     margin-left: var(--sp-2);
     font-weight: 700;
-    color: var(--accent);
+    color: var(--text-muted);
 }
 
 /* Range: a 44px hit area around a 6px track. The filled part is drawn from
