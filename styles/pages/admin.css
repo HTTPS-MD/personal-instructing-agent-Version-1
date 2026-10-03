@@ -571,6 +571,7 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .boot-text { font-size: var(--fs-sm); color: var(--text-muted); }
+.boot-veil [hidden] { display: none; }
 
 /* ---- 16.2 Global error banner ----
    Fixed overlay, so showing it never pushes the topbar or content down. */

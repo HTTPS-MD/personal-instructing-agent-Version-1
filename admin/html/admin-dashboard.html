@@ -20,6 +20,7 @@
          verifies profiles.role = 'admin' against the live session.
          --------------------------------------------------------------------- -->
     <script src="../../assets/js/page-guard.js"></script>
+    <script src="../js/admin-boot-watchdog.js"></script>
 
     <!-- Supabase JS v2 — defines window.supabase, which function.js turns into
          the shared `sb` client. Must load before function.js. -->
@@ -95,6 +96,7 @@
     <div class="boot-veil" id="boot-veil">
         <div class="spinner" aria-hidden="true"></div>
         <p class="boot-text" id="boot-text">Verifying administrator access…</p>
+        <button type="button" class="btn btn-primary" id="boot-retry" hidden>Reload and try again</button>
     </div>
 
     <!-- Non-fatal data-load failures surface here instead of evicting the admin. -->
@@ -183,13 +185,16 @@
                     </nav>
                 </div>
                 <div class="topbar-right">
-                    <!-- A global jump: open any student or section, or run a command, from
-                         any page. Students and Faculty also have their own search fields,
-                         which only filter the table on that page. -->
-                    <button type="button" class="quickfind" id="palette-open" aria-haspopup="dialog"
-                        aria-label="Quick find: students, sections or commands" aria-keyshortcuts="Control+K Meta+K">
-                        <span>Quick find</span><kbd class="quickfind-keys" id="quickfind-keys" aria-hidden="true">Ctrl K</kbd>
-                    </button>
+                    <!-- Search across students and sections; list-page fields still filter
+                         only their own tables. Results stay anchored to this field. -->
+                    <div class="header-search" id="palette">
+                        <input id="palette-input" type="search" role="combobox" autocomplete="off"
+                            aria-label="Search students or sections" aria-autocomplete="list"
+                            aria-expanded="false" aria-controls="palette-list"
+                            placeholder="Search students or sections">
+                        <div class="header-search-results" id="palette-list" role="listbox" aria-label="Search results" hidden></div>
+                        <p class="sr-only" id="palette-status" role="status" aria-live="polite"></p>
+                    </div>
                     <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="Switch to light theme">
                         <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
                         <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
@@ -1244,30 +1249,6 @@
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ================================================== COMMAND PALETTE -->
-    <!-- Opened by the header search button or Ctrl/Cmd+K (admin-shell.js).
-         The field is a combobox over a listbox; the active option is exposed
-         through aria-activedescendant. Destinations and commands are the ones
-         that already exist in this console. -->
-    <div class="overlay palette-overlay" id="palette" role="dialog" aria-modal="true" aria-label="Search">
-        <div class="palette">
-            <div class="palette-input-row">
-                <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
-                <input class="palette-input" id="palette-input" type="text" role="combobox"
-                    aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
-                    aria-label="Search students, sections, or commands"
-                    placeholder="Search students, sections, or commands..." autocomplete="off" spellcheck="false">
-            </div>
-            <div class="palette-body" id="palette-list" role="listbox" aria-label="Results"></div>
-            <p class="sr-only" id="palette-status" role="status" aria-live="polite"></p>
-            <div class="palette-foot">
-                <span><kbd>↑↓</kbd> navigate</span>
-                <span><kbd>Enter</kbd> select</span>
-                <span><kbd>Esc</kbd> close</span>
             </div>
         </div>
     </div>

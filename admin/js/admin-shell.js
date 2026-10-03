@@ -4,8 +4,8 @@
  * ============================================================================
  * Everything about the console's frame that is not data: which nav item is
  * current, the collapsible People submenu, route-derived breadcrumbs, the
- * theme toggle, the account menu, the small-screen drawer and the command
- * palette (Ctrl/Cmd+K or the header search button).
+ * theme toggle, the account menu, the small-screen drawer, and the header
+ * search field with its anchored results.
  *
  * admin-dashboard.js owns routing and data and hands this file a `host`:
  *   host.go(view)                       switch view
@@ -200,46 +200,18 @@
         });
     }
 
-    /* --------------------------------------------------- command palette -- */
+    /* ---------------------------------------------------- header search -- */
     var palette = {
-        open: false, items: [], active: -1, returnFocus: null,
+        open: false, items: [], active: -1,
         request: 0, controller: null, timer: null, students: null, pending: false
     };
-
-    /* Verified destinations and actions only: each one maps to an existing
-       view or dialog. Nothing for export, security log or devices. */
-    function paletteModules() {
-        return [
-            { label: 'Overview', run: function () { host.go('overview'); } },
-            { label: 'Live Sessions', run: function () { host.go('live'); } },
-            { label: 'Students', run: function () { host.go('students'); } },
-            { label: 'Faculty', run: function () { host.go('faculty'); } },
-            { label: 'Stage Controls', run: function () { host.go('controls'); } },
-            { label: 'Math Task', run: function () { host.go('mathtask'); } }
-        ];
-    }
-
-    function paletteCommands() {
-        return [
-            { label: 'Register student', run: function () { host.openModal('modal-register-student'); } },
-            { label: 'Manage sections', run: function () { host.openModal('modal-manage-sections'); } },
-            { label: 'Go to Settings', run: function () { host.go('settings'); } },
-            { label: 'New section', run: function () { host.openModal('modal-new-section'); } },
-            { label: 'Go to Profile', run: function () { host.go('profile'); } },
-            { label: 'Add professor', run: function () { host.openModal('modal-add-professor'); } },
-            { label: 'Add administrator', run: function () { host.openModal('modal-add-admin'); } }
-        ];
-    }
 
     function matches(label, term) { return label.toLowerCase().indexOf(term) !== -1; }
 
     /* Builds the grouped result list for the current input. */
     function buildGroups(term) {
         var groups = [];
-        if (!term) {
-            groups.push({ title: 'Commands', items: paletteCommands().slice(0, 3) });
-            return groups;
-        }
+        if (!term) return groups;
         if (palette.students && palette.students.term === term && palette.students.rows.length) {
             groups.push({ title: 'Students', items: palette.students.rows.map(function (s) {
                 return { label: s.full_name || s.email, detail: s.full_name ? s.email : (s.section || ''), run: function () { host.openStudent(s.email); } };
@@ -251,10 +223,6 @@
                 return { label: s.name, run: function () { host.openSection(s.name); } };
             }) });
         }
-        var modules = paletteModules().filter(function (m) { return matches(m.label, term); });
-        if (modules.length) { groups.push({ title: 'Modules', items: modules }); }
-        var commands = paletteCommands().filter(function (c) { return matches(c.label, term); });
-        if (commands.length) { groups.push({ title: 'Commands', items: commands }); }
         return groups;
     }
 
@@ -342,21 +310,12 @@
     }
 
     function openPalette() {
-        if (palette.open || (host.isModalOpen && host.isModalOpen())) { return; }
+        if (palette.open || !$('#palette-input').value.trim() || (host.isModalOpen && host.isModalOpen())) { return; }
         closeUserMenu(false);
         palette.open = true;
-        palette.returnFocus = document.activeElement;
-        palette.students = null; palette.pending = false; palette.studentError = false;
-        var overlay = $('#palette');
-        overlay.classList.add('is-mounted');
-        document.body.classList.add('is-locked');
-        void overlay.offsetWidth;
-        overlay.classList.add('is-open');
-        $('#palette-open').setAttribute('aria-expanded', 'true');
-        var input = $('#palette-input');
-        input.value = '';
+        $('#palette-list').hidden = false;
+        $('#palette-input').setAttribute('aria-expanded', 'true');
         renderPalette();
-        input.focus();
     }
 
     function closePalette(restoreFocus) {
@@ -365,39 +324,34 @@
         clearTimeout(palette.timer);
         palette.request++;
         if (palette.controller) { palette.controller.abort(); palette.controller = null; }
-        var overlay = $('#palette');
-        overlay.classList.remove('is-open');
-        $('#palette-open').setAttribute('aria-expanded', 'false');
-        document.body.classList.remove('is-locked');
-        setTimeout(function () { if (!palette.open) { overlay.classList.remove('is-mounted'); } }, 120);
-        if (restoreFocus !== false && palette.returnFocus && palette.returnFocus.focus) {
-            palette.returnFocus.focus({ preventScroll: true });
-        }
+        $('#palette-list').hidden = true;
+        $('#palette-input').setAttribute('aria-expanded', 'false');
+        $('#palette-input').removeAttribute('aria-activedescendant');
+        if (restoreFocus) $('#palette-input').focus({ preventScroll: true });
     }
 
     function choose(index) {
         var item = palette.items[index];
         if (!item) { return; }
-        closePalette(true);      /* focus goes back first, so a dialog remembers the right opener */
+        closePalette(true);
+        $('#palette-input').value = '';
         item.run();
     }
 
     function initPalette() {
         var input = $('#palette-input');
-        var overlay = $('#palette');
-
-        $('#palette-open').addEventListener('click', openPalette);
-        var keys = $('#quickfind-keys');
-        if (keys && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '')) { keys.textContent = '⌘ K'; }
 
         input.addEventListener('input', function () {
             var term = input.value.trim().toLowerCase();
+            if (!term) { closePalette(false); return; }
+            openPalette();
             searchStudents(term);
             renderPalette();
         });
+        input.addEventListener('focus', openPalette);
 
-        overlay.addEventListener('mousedown', function (e) {
-            if (e.target === overlay) { closePalette(true); }
+        document.addEventListener('mousedown', function (e) {
+            if (palette.open && !$('#palette').contains(e.target)) closePalette(false);
         });
         $('#palette-list').addEventListener('mousemove', function (e) {
             var opt = e.target.closest('.palette-option');
@@ -412,15 +366,7 @@
         });
 
         document.addEventListener('keydown', function (e) {
-            /* Ctrl+K / Cmd+K opens it (and the browser's own binding is cancelled). */
-            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) {
-                if (host.isModalOpen && host.isModalOpen() && !palette.open) { return; }
-                e.preventDefault();
-                if (palette.open) { closePalette(true); } else { openPalette(); }
-                return;
-            }
-
-            if (palette.open) {
+            if (palette.open && e.target === input) {
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePalette(true); }
                 else if (e.key === 'ArrowDown' && palette.items.length) {
                     e.preventDefault(); palette.active = (palette.active + 1) % palette.items.length; paintActive();
@@ -429,7 +375,7 @@
                 } else if (e.key === 'Enter') {
                     e.preventDefault(); choose(palette.active);
                 } else if (e.key === 'Tab') {
-                    e.preventDefault();      /* the field is the only stop */
+                    closePalette(false);
                 }
                 return;
             }
