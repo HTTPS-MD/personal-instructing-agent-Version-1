@@ -13,6 +13,26 @@
 --   the game's own rules onto the server so the browser can show the new
 --   screen without ever holding an answer.
 --
+-- THE TIME LIMIT (the game's rule, kept; enforced here, not in the browser)
+--   * app_config.time_limit is the admin's limit in MINUTES (default 10, the
+--     game's own fallback of 600 s). Added below; the Admin Math Task editor
+--     (deferred) is where it gets edited.
+--   * ONE continuous deadline for the whole session, not one per problem. It
+--     starts when the first problem is served and does not stop or reset
+--     between questions or topics.
+--   * When it passes, the server refuses further answers and hints
+--     ('time_expired'). The browser shows the game's "Time limit reached"
+--     dialog (limit, started, finished, spent).
+--   * "Try again" (restart_after_expiry) is the game's Try Again: the open
+--     problem is reloaded from step 1 with its error and hint counts back at
+--     zero (as loadCurrentProblem does), a NEW window with a fresh deadline
+--     starts, and the student's topic and topic progress are kept. Every
+--     expired window is logged in game_windows.
+--   * The deadline is wall-clock, so reloading the page or signing out does
+--     not give more time. (The game kept its timer in the page and a reload
+--     restarted everything; resume is a requirement here, so the deadline
+--     lives on the server.)
+--
 -- THE GAME'S RULES, AS PORTED (from index.html in pia-test-main)
 --   * A question has N steps. A step is solved when the student gives its
 --     value. Wrong answers do not end the question: there is no try limit.
@@ -56,11 +76,9 @@
 --                                direct RPC call.
 --
 -- DEPARTURES FROM THE ATTACHED GAME, ON PURPOSE
---   * No per-session time limit and no timer. The game ended a session when a
---     countdown expired (app_config.time_limit, a column this database does
---     not have). Here a session ends after 10 questions, as 0029 did. Time is
---     still recorded server-side: served_at, step_events.happened_at, and
---     tutoring_attempts.time_taken_ms. DECISION PENDING with the researcher.
+--   * The game's time limit IS implemented (it was the first draft's gap).
+--     See "THE TIME LIMIT" below. There is no 10-question ending any more:
+--     like the game, a session continues until the student stops.
 --   * No external ML call. The tutor's wording profile stays "average", the
 --     game's own default. DECISION PENDING with the researcher.
 --   * Questions whose steps JSON is missing or short are not served. The game
@@ -157,7 +175,7 @@ create table if not exists public.step_events (
   step_index    int         not null,
   stage         text        not null,
   submitted     text        not null,
-  outcome       text        not null,   -- wrong | needs_final | format_error | step_done | question_done
+  outcome       text        not null,   -- wrong | needs_final | format_error | step_done | question_done | restart
   happened_at   timestamptz not null default now()
 );
 create index if not exists step_events_lookup_idx on public.step_events (session_id, student_email, problem_id);
@@ -187,15 +205,49 @@ create table if not exists public.topic_offers (
   primary key (session_id, student_email, problem_id)
 );
 
+alter table public.app_config
+  add column if not exists time_limit int not null default 10;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'app_config_time_limit_check') then
+    alter table public.app_config add constraint app_config_time_limit_check
+      check (time_limit between 1 and 240);
+  end if;
+end;
+$$;
+
+alter table public.step_states add column if not exists passed boolean;
+alter table public.step_states add column if not exists score  int;
+
+-- One row per time window. The newest row is the live one; it is expired when
+-- now() >= deadline_at and ended_at is null (restart_after_expiry closes it).
+create table if not exists public.game_windows (
+  session_id      uuid        not null,
+  student_email   text        not null,
+  window_no       int         not null,
+  started_at      timestamptz not null default now(),
+  limit_seconds   int         not null,
+  deadline_at     timestamptz not null,
+  ended_at        timestamptz,
+  ended_reason    text,
+  topic           int,
+  open_problem_id text,
+  errors          int,
+  hints           int,
+  primary key (session_id, student_email, window_no)
+);
+
 alter table public.step_states  enable row level security;
 alter table public.step_events  enable row level security;
 alter table public.step_hints   enable row level security;
 alter table public.topic_offers enable row level security;
+alter table public.game_windows enable row level security;
 
 revoke all on public.step_states  from public, anon, authenticated;
 revoke all on public.step_events  from public, anon, authenticated;
 revoke all on public.step_hints   from public, anon, authenticated;
 revoke all on public.topic_offers from public, anon, authenticated;
+revoke all on public.game_windows from public, anon, authenticated;
 
 drop policy if exists step_events_admin_read on public.step_events;
 create policy step_events_admin_read on public.step_events
@@ -211,7 +263,12 @@ create policy topic_offers_admin_read on public.topic_offers
   using (public.pia_caller_role() = 'admin' and public.jwt_is_current());
 grant select on public.step_events  to authenticated;
 grant select on public.step_hints   to authenticated;
+drop policy if exists game_windows_admin_read on public.game_windows;
+create policy game_windows_admin_read on public.game_windows
+  for select to authenticated
+  using (public.pia_caller_role() = 'admin' and public.jwt_is_current());
 grant select on public.topic_offers to authenticated;
+grant select on public.game_windows to authenticated;
 
 
 -- ---------------------------------------------------------------------------
@@ -438,6 +495,52 @@ as $$
     'locked',         st.completed);
 $$;
 
+-- The live window of a session; opened on first use (the first problem served).
+create or replace function public.pia_game_window(p_session_id uuid, p_email text)
+returns public.game_windows
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  w   public.game_windows%rowtype;
+  v_s int;
+begin
+  select * into w from public.game_windows
+   where session_id = p_session_id and student_email = p_email
+   order by window_no desc limit 1;
+  if found then return w; end if;
+
+  select coalesce(c.time_limit, 10) * 60 into v_s from public.app_config c where c.id = 1;
+  v_s := coalesce(v_s, 600);
+  insert into public.game_windows (session_id, student_email, window_no, limit_seconds, deadline_at)
+  values (p_session_id, p_email, 1, v_s, now() + make_interval(secs => v_s))
+  returning * into w;
+  return w;
+end;
+$$;
+
+create or replace function public.pia_window_expired(w public.game_windows)
+returns boolean language sql stable as $$
+  select w.ended_at is null and now() >= w.deadline_at;
+$$;
+
+-- What the browser needs to draw the clock and the expiry dialog.
+create or replace function public.pia_clock_json(w public.game_windows)
+returns jsonb language sql stable as $$
+  select jsonb_build_object(
+    'window',            w.window_no,
+    'limit_seconds',     w.limit_seconds,
+    'started_at',        w.started_at,
+    'finished_at',       least(now(), w.deadline_at),
+    'remaining_seconds', greatest(0, ceil(extract(epoch from (w.deadline_at - now()))))::int,
+    'expired',           public.pia_window_expired(w));
+$$;
+
+revoke all on function public.pia_game_window(uuid, text)               from public, anon, authenticated;
+revoke all on function public.pia_window_expired(public.game_windows)   from public, anon, authenticated;
+revoke all on function public.pia_clock_json(public.game_windows)       from public, anon, authenticated;
+
 -- Signed in, current, a student, and allowed into the Tutoring Dashboard for
 -- their research group. Returns the email.
 create or replace function public.pia_game_email()
@@ -502,14 +605,16 @@ set search_path = public, extensions
 as $$
 declare
   v_email    text;
-  c_target   constant int := 10;       -- SESSION_TARGET in student-dashboard.js
   v_offer    public.topic_offers%rowtype;
   v_sq       public.served_questions%rowtype;
   v_st       public.step_states%rowtype;
-  v_answered int;
+  v_w        public.game_windows%rowtype;
   v_topic    int;
   v_q        record;
   v_parsed   jsonb;
+  v_number   int;
+  v_repeat   int;
+  v_last_q   bigint;
 begin
   v_email := public.pia_game_email();
   if p_session_id is null then
@@ -518,13 +623,17 @@ begin
 
   perform pg_advisory_xact_lock(hashtext('pia-lesson:' || v_email));
 
+  -- The session clock starts with the first problem and never pauses.
+  v_w := public.pia_game_window(p_session_id, v_email);
+
   select * into v_offer from public.topic_offers
    where session_id = p_session_id and student_email = v_email and status = 'pending'
    order by created_at desc limit 1;
   if found then
-    return jsonb_build_object('done', false, 'pending_offer', jsonb_build_object(
-      'problem_id', v_offer.problem_id, 'type', v_offer.offer,
-      'from_topic', v_offer.from_topic, 'target_topic', v_offer.target_topic));
+    return jsonb_build_object('done', false, 'clock', public.pia_clock_json(v_w),
+      'pending_offer', jsonb_build_object(
+        'problem_id', v_offer.problem_id, 'type', v_offer.offer,
+        'from_topic', v_offer.from_topic, 'target_topic', v_offer.target_topic));
   end if;
 
   select sq.* into v_sq
@@ -542,19 +651,17 @@ begin
   if found then
     select * into v_st from public.step_states
      where session_id = v_sq.session_id and student_email = v_email and problem_id = v_sq.problem_id;
-    return public.pia_step_state_json(v_sq, v_st);
-  end if;
-
-  select count(*) into v_answered
-    from public.tutoring_attempts t
-   where t.session_id = p_session_id and t.student_email = v_email and t.problem_id like 'qb-%';
-
-  if v_answered >= c_target then
-    return jsonb_build_object('done', true, 'reason', 'target', 'problems_answered', v_answered);
+    return public.pia_step_state_json(v_sq, v_st) || jsonb_build_object('clock', public.pia_clock_json(v_w));
   end if;
 
   v_topic := public.pia_student_topic(v_email);
 
+  select coalesce(max(problem_number), 0) + 1, (array_agg(question_id order by problem_number desc))[1]
+    into v_number, v_last_q
+    from public.served_questions where session_id = p_session_id and student_email = v_email;
+
+  -- The game uses every question once, shuffled, before any repeats, and never
+  -- shows the same one twice in a row: fewest times seen this session first.
   select q.id, q.question, q.final_answer, q.hint,
          case upper(q.difficulty) when 'EASY' then 1 when 'MEDIUM' then 2 else 3 end as topic
     into v_q
@@ -564,18 +671,21 @@ begin
      and public.pia_steps_valid(
            public.pia_parse_hint(q.hint) -> 'steps',
            case upper(q.difficulty) when 'EASY' then 1 when 'MEDIUM' then 2 else 3 end)
-     and not exists (select 1 from public.served_questions s
-                      where s.session_id = p_session_id and s.student_email = v_email
-                        and s.question_id = q.id)
    order by abs((case upper(q.difficulty) when 'EASY' then 1 when 'MEDIUM' then 2 else 3 end) - v_topic),
+            (select count(*) from public.served_questions s
+              where s.session_id = p_session_id and s.student_email = v_email and s.question_id = q.id),
+            (q.id = v_last_q),
             (select count(*) from public.served_questions s2
               where s2.student_email = v_email and s2.question_id = q.id),
             random()
    limit 1;
 
   if not found then
-    return jsonb_build_object('done', true, 'reason', 'bank_empty', 'problems_answered', v_answered);
+    return jsonb_build_object('done', true, 'reason', 'bank_empty', 'clock', public.pia_clock_json(v_w));
   end if;
+
+  select count(*) into v_repeat from public.served_questions
+   where session_id = p_session_id and student_email = v_email and question_id = v_q.id;
 
   v_parsed := public.pia_parse_hint(v_q.hint);
 
@@ -583,7 +693,9 @@ begin
     session_id, student_email, problem_id, problem_number, question_id,
     topic, student_topic, question, final_answer, steps, default_hint)
   values (
-    p_session_id, v_email, 'qb-' || v_q.id, v_answered + 1, v_q.id,
+    p_session_id, v_email,
+    'qb-' || v_q.id || case when v_repeat > 0 then '#' || v_repeat else '' end,
+    v_number, v_q.id,
     v_q.topic, v_topic, v_q.question, coalesce(v_q.final_answer, ''),
     v_parsed -> 'steps', nullif(v_parsed ->> 'defaultHint', ''))
   returning * into v_sq;
@@ -597,7 +709,7 @@ begin
   values (p_session_id, v_email, v_sq.problem_id, v_sq.problem_number)
   on conflict (session_id, problem_id) do nothing;
 
-  return public.pia_step_state_json(v_sq, v_st);
+  return public.pia_step_state_json(v_sq, v_st) || jsonb_build_object('clock', public.pia_clock_json(v_w));
 end;
 $$;
 
@@ -625,6 +737,7 @@ declare
   v_outcome  text;
   v_text     text;
   v_confirm  text;
+  v_w        public.game_windows%rowtype;
 begin
   v_email := public.pia_game_email();
   if v_sub = '' then
@@ -642,10 +755,19 @@ begin
     raise exception 'PIA: this question was not served to you.' using errcode = '42501';
   end if;
 
+  v_w := public.pia_game_window(p_session_id, v_email);
+
   if v_st.completed
      or exists (select 1 from public.tutoring_attempts t
                  where t.session_id = p_session_id and t.student_email = v_email and t.problem_id = p_problem_id) then
-    return jsonb_build_object('outcome', 'locked', 'state', public.pia_step_state_json(v_sq, v_st));
+    return jsonb_build_object('outcome', 'locked', 'state', public.pia_step_state_json(v_sq, v_st),
+                              'clock', public.pia_clock_json(v_w));
+  end if;
+
+  -- The session time limit has passed: nothing more is checked or counted.
+  if public.pia_window_expired(v_w) then
+    return jsonb_build_object('outcome', 'time_expired', 'state', public.pia_step_state_json(v_sq, v_st),
+                              'clock', public.pia_clock_json(v_w));
   end if;
 
   v_required := public.pia_step_required(v_sq.topic);
@@ -715,7 +837,8 @@ begin
     'outcome',   v_outcome,
     'step_text', v_text,
     'confirmed', v_confirm,
-    'state',     public.pia_step_state_json(v_sq, v_st));
+    'state',     public.pia_step_state_json(v_sq, v_st),
+    'clock',     public.pia_clock_json(v_w));
 end;
 $$;
 
@@ -733,6 +856,7 @@ declare
   v_st    public.step_states%rowtype;
   v_list  text[];
   v_tier  int;
+  v_w     public.game_windows%rowtype;
 begin
   v_email := public.pia_game_email();
   perform pg_advisory_xact_lock(hashtext('pia-lesson:' || v_email));
@@ -746,8 +870,10 @@ begin
     raise exception 'PIA: this question was not served to you.' using errcode = '42501';
   end if;
 
-  if v_st.completed or not v_st.hint_unlocked then
-    return jsonb_build_object('hint', null, 'state', public.pia_step_state_json(v_sq, v_st));
+  v_w := public.pia_game_window(p_session_id, v_email);
+  if v_st.completed or not v_st.hint_unlocked or public.pia_window_expired(v_w) then
+    return jsonb_build_object('hint', null, 'state', public.pia_step_state_json(v_sq, v_st),
+                              'clock', public.pia_clock_json(v_w));
   end if;
 
   v_list := public.pia_step_hints(v_sq.steps -> v_st.step_index, v_sq.default_hint);
@@ -765,7 +891,8 @@ begin
     'hint', jsonb_build_object(
       'text', v_list[v_tier], 'tier', v_tier, 'tiers_total', cardinality(v_list),
       'step', v_st.step_index + 1),
-    'state', public.pia_step_state_json(v_sq, v_st));
+    'state', public.pia_step_state_json(v_sq, v_st),
+    'clock', public.pia_clock_json(v_w));
 end;
 $$;
 
@@ -861,6 +988,12 @@ begin
      set stint_answered = v_done, stint_correct = v_good, failed_streak = v_streak, updated_at = now()
    where student_email = v_email;
 
+  -- The game logged PASSED when errors < the topic's max errors, with a score
+  -- of 100 (else 50). Kept as columns so the analysis can use them.
+  update public.step_states
+     set passed = (v_st.errors < v_rule.max_err), score = case when v_st.errors < v_rule.max_err then 100 else 50 end
+   where session_id = p_session_id and student_email = v_email and problem_id = p_problem_id;
+
   if v_offer is not null then
     insert into public.topic_offers (session_id, student_email, problem_id, offer, from_topic, target_topic)
     values (p_session_id, v_email, p_problem_id, v_offer, v_topic, v_target)
@@ -954,6 +1087,71 @@ end;
 $$;
 
 
+-- The game's "Try again" after the time limit: the open problem starts again
+-- from step 1 (errors and hints back at zero, as loadCurrentProblem does), a
+-- new window with a fresh deadline opens, topic and topic progress are kept.
+create or replace function public.restart_after_expiry(p_session_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_email text;
+  v_w     public.game_windows%rowtype;
+  v_sq    public.served_questions%rowtype;
+  v_st    public.step_states%rowtype;
+  v_s     int;
+begin
+  v_email := public.pia_game_email();
+  perform pg_advisory_xact_lock(hashtext('pia-lesson:' || v_email));
+
+  v_w := public.pia_game_window(p_session_id, v_email);
+  if not public.pia_window_expired(v_w) then
+    return public.serve_next_step_question(p_session_id) || jsonb_build_object('restarted', false);
+  end if;
+
+  select sq.* into v_sq
+    from public.served_questions sq
+   where sq.session_id = p_session_id and sq.student_email = v_email
+     and not exists (select 1 from public.tutoring_attempts t
+                      where t.session_id = sq.session_id and t.student_email = sq.student_email
+                        and t.problem_id = sq.problem_id)
+   order by sq.problem_number desc limit 1;
+
+  if found then
+    select * into v_st from public.step_states
+     where session_id = p_session_id and student_email = v_email and problem_id = v_sq.problem_id;
+  end if;
+
+  update public.game_windows
+     set ended_at = now(), ended_reason = 'expired',
+         topic = public.pia_student_topic(v_email),
+         open_problem_id = v_sq.problem_id, errors = v_st.errors, hints = v_st.hints
+   where session_id = p_session_id and student_email = v_email and window_no = v_w.window_no;
+
+  select coalesce(c.time_limit, 10) * 60 into v_s from public.app_config c where c.id = 1;
+  v_s := coalesce(v_s, 600);
+  insert into public.game_windows (session_id, student_email, window_no, limit_seconds, deadline_at)
+  values (p_session_id, v_email, v_w.window_no + 1, v_s, now() + make_interval(secs => v_s));
+
+  -- A question whose last step was already accepted keeps its result.
+  if v_sq.problem_id is not null and not v_st.completed then
+    update public.step_states
+       set step_index = 0, stage = 'work', work_text = null, wrong_streak = 0, hint_tier = 0,
+           errors = 0, hints = 0, hint_unlocked = false, done_steps = '[]'::jsonb, updated_at = now()
+     where session_id = p_session_id and student_email = v_email and problem_id = v_sq.problem_id;
+    update public.problem_serves set served_at = now()
+     where session_id = p_session_id and problem_id = v_sq.problem_id;
+    insert into public.step_events (session_id, student_email, problem_id, step_index, stage, submitted, outcome)
+    values (p_session_id, v_email, v_sq.problem_id, 0, 'work', '', 'restart');
+  end if;
+
+  return public.serve_next_step_question(p_session_id) || jsonb_build_object('restarted', true);
+end;
+$$;
+
+
 -- ---------------------------------------------------------------------------
 -- 4. Resume: the same as 0029, behind the same access check.
 -- ---------------------------------------------------------------------------
@@ -986,7 +1184,7 @@ begin
       from public.tutoring_attempts
      where session_id = v_session and student_email = v_email and problem_id like 'qb-%';
 
-    if v_answered < 10 then
+    if true then   -- no question-count ending: the session continues until the student stops
       select sq.problem_id into v_pending
         from public.served_questions sq
        where sq.session_id = v_session and sq.student_email = v_email
@@ -1016,6 +1214,7 @@ begin
         'correct_count',       v_correct,
         'topic',               public.pia_student_topic(v_email),
         'consecutive_correct', v_streak,
+        'time_limit_seconds',  coalesce((select c.time_limit * 60 from public.app_config c where c.id = 1), 600),
         'pending_problem_id',  v_pending);
     end if;
   end if;
@@ -1027,6 +1226,7 @@ begin
     'correct_count',       0,
     'topic',               public.pia_student_topic(v_email),
     'consecutive_correct', 0,
+    'time_limit_seconds',  coalesce((select c.time_limit * 60 from public.app_config c where c.id = 1), 600),
     'pending_problem_id',  null);
 end;
 $$;
@@ -1040,12 +1240,14 @@ revoke all on function public.check_step_answer(uuid, text, text)              f
 revoke all on function public.consume_step_hint(uuid, text)                    from public, anon;
 revoke all on function public.finish_step_question(uuid, text)                 from public, anon;
 revoke all on function public.respond_topic_offer(uuid, text, boolean)         from public, anon;
+revoke all on function public.restart_after_expiry(uuid)                       from public, anon;
 revoke all on function public.resume_or_start_game_session()                   from public, anon;
 grant execute on function public.serve_next_step_question(uuid)                to authenticated;
 grant execute on function public.check_step_answer(uuid, text, text)           to authenticated;
 grant execute on function public.consume_step_hint(uuid, text)                 to authenticated;
 grant execute on function public.finish_step_question(uuid, text)              to authenticated;
 grant execute on function public.respond_topic_offer(uuid, text, boolean)      to authenticated;
+grant execute on function public.restart_after_expiry(uuid)                   to authenticated;
 grant execute on function public.resume_or_start_game_session()               to authenticated;
 
 

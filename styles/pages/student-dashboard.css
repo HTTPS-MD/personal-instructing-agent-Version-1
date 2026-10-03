@@ -114,7 +114,7 @@
 .who-meta { display: block; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* ------------------------------------------------------ 3. SCREEN SWAP ---
-   The page has three screens (start / session / summary). Only one is in the
+   The page has three screens (start / session). Only one is in the
    DOM flow at a time; each one owns its own height, so switching is a
    navigation, never a jump inside a screen. */
 .screen { display: none; }
@@ -169,8 +169,7 @@
 
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); margin: 0 0 var(--sp-7); }
 /* Labelled facts, not cards: a rule above each, value over label. */
-.fact,
-.summary-tile {
+.fact {
     display: flex;
     flex-direction: column-reverse;
     justify-content: flex-end;
@@ -178,7 +177,7 @@
     padding-top: var(--sp-3);
     border-top: var(--edge-w, 2px) solid var(--line);
 }
-.fact dd, .summary-tile dd { margin: 0; }
+.fact dd { margin: 0; }
 
 .fact-value {
     font-family: var(--font-mono);
@@ -352,6 +351,27 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* The countdown: in the progress card, mono, and clearly red-ish when low. */
+.time-left {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.time-left.is-low { color: var(--danger); }
+
+.sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- Time limit dialog ---- */
+.time-facts { margin: 0; display: grid; gap: var(--sp-3); }
+.time-facts > div { display: flex; justify-content: space-between; gap: var(--sp-4); padding-top: var(--sp-3); box-shadow: 0 -1px 0 var(--line-soft); }
+.time-facts dt { color: var(--text-muted); font-size: var(--fs-sm); }
+.time-facts dd { margin: 0; font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+
 /* ---- 5.3 The problem and its steps ---- */
 .problem-card {
     padding: var(--sp-6);
@@ -496,38 +516,6 @@
 .offer-figure { flex: 0 0 auto; height: 11.75rem; width: auto; }
 .offer-destination { margin: var(--sp-3) 0 0; font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 700; color: var(--text); }
 
-/* --------------------------------------------------- 6. SUMMARY SCREEN */
-.summary-card {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: var(--sp-6) 0;
-    text-align: center;
-}
-
-.summary-title {
-    font-family: var(--font-display);
-    font-size: clamp(2.5rem, 5vw, 4.25rem);
-    font-weight: 700;
-    letter-spacing: -.055em;
-    line-height: 1.06;
-    margin-bottom: var(--sp-3);
-}
-
-.summary-card .learn-kicker { margin-inline: auto; }
-.summary-note { margin-top: var(--sp-7); font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted); }
-
-.summary-lede { font-size: 15px; color: var(--text-muted); line-height: 1.65; margin-bottom: var(--sp-7); }
-
-
-.summary-value {
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-}
-
-.summary-label { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-muted); }
-
 /* -------------------------------------------------------- 7. BOOT GATE */
 body[data-boot="pending"] .learn { visibility: hidden; }
 
@@ -587,7 +575,6 @@ body:not([data-boot="pending"]) .learn-veil[hidden] { display: none; }
     .start-card { padding: var(--sp-5) 0; }
     .problem-card { padding: var(--sp-5) var(--sp-4); }
     .step { padding: var(--sp-4); }
-    .summary-card { padding: var(--sp-5) 0; }
     .start-facts { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
     .who-text { display: none; }
     .stage-chip.hide-sm { display: none; }
@@ -597,11 +584,6 @@ body:not([data-boot="pending"]) .learn-veil[hidden] { display: none; }
     .step-row { flex-direction: column; }
     .btn-step { width: 100%; }
     .offer-body { flex-direction: column; text-align: center; }
-}
-
-@media (max-width: 380px) {
-    .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); }
-    .summary-value { font-size: 20px; }
 }
 
 /* ----------------------------------------------------------- 9. TUTORIAL --

@@ -31,10 +31,10 @@ const DASH = '/student/html/student-dashboard.html';
   const results = [];
   const leaked = [];
 
-  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', ctx } = {}) {
+  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, ctx } = {}) {
     const context = ctx || await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', serviceWorkers: 'block' });
     if (!ctx) {
-      await context.addInitScript(([p, t]) => { localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme]);
+      await context.addInitScript(([p, t, l]) => { if (!sessionStorage.getItem('__limit_set')) { localStorage.setItem('__mock_limit', String(l)); sessionStorage.setItem('__limit_set', '1'); } localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme, limit]);
       await context.route('**/*', route => {
         const u = route.request().url();
         if (u.startsWith(origin + '/')) return route.continue();
@@ -66,7 +66,7 @@ const DASH = '/student/html/student-dashboard.html';
     const q = await p.locator('#problem-expression').innerText();
     const b = (await bank(p)).find(x => x.question === q);
     for (let i = 0; i < b.steps.length; i++) { await submit(p, b.steps[i].answer); }
-    await p.waitForFunction(q0 => document.querySelector('#problem-expression').textContent !== q0 || document.querySelector('#modal-offer.is-open') || document.querySelector('#screen-summary.is-active'), q, { timeout: 5000 });
+    await p.waitForFunction(q0 => document.querySelector('#problem-expression').textContent !== q0 || document.querySelector('#modal-offer.is-open'), q, { timeout: 5000 });
   }
   const settle = (p, sel, path_) => p.waitForFunction(x => location.pathname === x, path_);
 
@@ -132,8 +132,24 @@ const DASH = '/student/html/student-dashboard.html';
     });
   }
 
+  await check('art consistency: the Character Selection card art for each key is the very file the game shows (pia-calm excluded, pending)', async () => {
+    const sel = await open('/student/html/character-selection.html', { profile: { group_type: 'Non-Assigned', selected_character: null } });
+    await sel.waitForSelector('.persona-card');
+    const cards = await sel.locator('.persona-card').evaluateAll(c => c.map(x => [x.dataset.character, x.querySelector('img').getAttribute('src')]));
+    await sel.screenshot({ path: path.join(out, 'character-selection.png') });
+    await sel.context().close();
+    for (const [key, src] of cards) {
+      if (key === 'pia-calm') continue;
+      const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: key } });
+      await start(p);
+      const game = await p.locator('#agent-img').getAttribute('src');
+      assert.equal(game.replace(/^\.\.\/\.\.\//, ''), src.replace(/^\.\.\/\.\.\//, '').replace('approval', key === 'pia-neutral' ? 'approval' : 'default'), key);
+      await p.context().close();
+    }
+  });
+
   /* ---------------- removed elements ---------------- */
-  await check('removed: timer strip, ML test badge, Start Over, Guest Student, color picker, big header, character choice', async () => {
+  await check('removed: top strip (timer-badge element), ML test badge, Start Over, Guest Student, color picker, big header, character choice', async () => {
     const p = await open(DASH);
     await start(p);
     const html = await p.evaluate(() => document.documentElement.outerHTML);
@@ -167,7 +183,7 @@ const DASH = '/student/html/student-dashboard.html';
     assert.equal(await p.locator('.step.is-done output').count(), 2, 'working and confirmed value both shown');
     await submit(p, b.steps[1].answer);
     await p.waitForFunction(q0 => document.querySelector('#problem-expression').textContent !== q0, q, { timeout: 5000 });
-    assert.match(await p.locator('#progress-count').innerText(), /^1 \/ 10/);
+    assert.equal(await p.locator('#stat-solved').innerText(), '1');
     assert.equal(await p.locator('#solved-list > li').count(), 1);
     await p.context().close();
   });
@@ -213,21 +229,108 @@ const DASH = '/student/html/student-dashboard.html';
     assert.equal(await p.locator('#hint-btn').isVisible(), true);
     await p.context().close();
   });
-  await check('full session: 10 questions to the summary; only the new RPCs; no key field in any response; stage time finalised', async () => {
+  await check('no 10-question ending: 16 questions in a row, still in the game, repeats allowed, never the same one twice running', async () => {
     const p = await open(DASH);
     await start(p);
-    for (let guard = 0; guard < 40 && !(await p.locator('#screen-summary.is-active').count()); guard++) {
-      if (await p.locator('#modal-offer.is-open').count()) { await p.locator('#offer-accept').click(); await p.waitForTimeout(400); continue; }
-      if (!(await p.locator('#step-input').count())) { await p.waitForTimeout(300); continue; }
-      await solveCurrent(p); await p.waitForTimeout(150);
-      if (await p.locator('#solved-list > li').count() && !(await p.locator('.step:not(.is-done)').count())) await p.waitForTimeout(1300);
+    const seen = [];
+    for (let i = 0; i < 16; i++) {
+      if (await p.locator('#modal-offer.is-open').count()) { await p.locator('#offer-stay').click(); await p.waitForSelector('#step-input'); }
+      seen.push(await p.locator('#problem-expression').innerText());
+      await finishQuestion(p);
+      if (await p.locator('#modal-offer.is-open').count()) { await p.locator('#offer-stay').click(); }
+      await p.waitForSelector('#step-input');
     }
-    await p.waitForSelector('#screen-summary.is-active', { timeout: 8000 });
+    assert.equal(await p.locator('#screen-session.is-active').count(), 1);
+    assert.equal(await p.locator('#stat-solved').innerText(), '16');
+    for (let i = 1; i < seen.length; i++) assert.notEqual(seen[i], seen[i - 1], 'same question twice in a row');
+    assert.ok(new Set(seen).size < seen.length, 'bank cycled and repeated');
     const names = await p.evaluate(() => [...new Set(window.__calls.filter(c => c.m === 'rpc').map(c => c.name))]);
-    for (const old of ['serve_next_question', 'check_question_answer', 'consume_question_hint', 'reveal_question_solution', 'record_question_result']) assert.equal(names.includes(old), false, old);
-    for (const must of ['serve_next_step_question', 'check_step_answer', 'finish_step_question', 'end_game_session', 'finalize_stage_time']) assert.ok(names.includes(must), must);
+    for (const old of ['serve_next_question', 'check_question_answer', 'consume_question_hint', 'reveal_question_solution', 'record_question_result', 'end_game_session']) assert.equal(names.includes(old), false, old);
     assert.equal(await p.evaluate(() => window.__responses.filter(r => /"answer"|final_answer|stepAnswer/.test(r.body)).length), 0);
-    assert.equal(await p.evaluate(() => window.__calls.some(c => c.m === 'update' && c.keys.some(k => /^ocean_/.test(k)))), false);
+    await p.context().close();
+  });
+
+  /* ---------------- the time limit ---------------- */
+  await check('clock: shown in the progress card as mm:ss (role=timer), counts down, start screen states the limit', async () => {
+    const p = await open(DASH, { limit: 600 });
+    await p.waitForFunction(() => /10 mins/.test(document.querySelector('#fact-limit').textContent));
+    await start(p);
+    assert.match(await p.locator('#time-left').innerText(), /^(10:00|09:5\d)$/);
+    assert.equal(await p.locator('#time-left').getAttribute('role'), 'timer');
+    assert.equal(await p.locator('.progress-card #time-left').count(), 1, 'inside the redesigned game, not a top strip');
+    const a = await p.locator('#time-left').innerText(); await p.waitForTimeout(1300);
+    assert.notEqual(await p.locator('#time-left').innerText(), a, 'counts down');
+    await p.context().close();
+  });
+  await check('clock: one continuous deadline - questions, topics and a page reload do not reset it', async () => {
+    const p = await open(DASH, { limit: 600 });
+    await start(p);
+    const w1 = await p.evaluate(() => window.__mockWindow().deadline);
+    await finishQuestion(p); await finishQuestion(p);
+    assert.equal(await p.evaluate(() => window.__mockWindow().deadline), w1);
+    await p.reload(); await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape'); await p.locator('#start-btn').click(); await p.waitForSelector('#step-input');
+    assert.equal(await p.evaluate(() => window.__mockWindow().deadline), w1, 'reload did not give more time');
+    await p.context().close();
+  });
+  await check('clock: low-time warning style and polite screen-reader announcements; expiry announced', async () => {
+    const p = await open(DASH, { limit: 32 });
+    await start(p);
+    await p.waitForFunction(() => /30 seconds left/.test(document.querySelector('#time-announce').textContent), null, { timeout: 8000 });
+    assert.equal(await p.locator('#time-left.is-low').count(), 1);
+    assert.equal(await p.locator('#time-announce').getAttribute('aria-live'), 'polite');
+    await p.waitForSelector('#modal-time.is-open', { timeout: 40000 });
+    assert.match(await p.locator('#time-announce').innerText(), /Time limit reached/);
+    await p.context().close();
+  });
+  await check('expiry: dialog with limit/started/finished/spent, inputs locked, not dismissible, focus trapped, Try again restarts the problem', async () => {
+    const p = await open(DASH, { limit: 4 });
+    await start(p);
+    const q = await p.locator('#problem-expression').innerText();
+    await submit(p, '9'); await submit(p, '8');          // two errors, hint unlocked
+    await p.waitForSelector('#modal-time.is-open', { timeout: 8000 });
+    assert.equal(await p.locator('#modal-time').getAttribute('role'), 'alertdialog');
+    assert.match(await p.locator('#time-limit').innerText(), /4 secs/);
+    assert.match(await p.locator('#time-started').innerText(), /\d/); assert.match(await p.locator('#time-finished').innerText(), /\d/);
+    assert.match(await p.locator('#time-spent').innerText(), /sec/);
+    assert.equal(await p.locator('#step-input').isDisabled(), true); assert.equal(await p.locator('#step-submit').isDisabled(), true); assert.equal(await p.locator('#hint-btn').isDisabled(), true);
+    assert.match(await p.locator('#agent-speech').innerText(), /Time is up/);
+    await p.keyboard.press('Escape'); await p.mouse.click(4, 4);
+    assert.equal(await p.locator('#modal-time.is-open').count(), 1, 'cannot be dismissed');
+    for (let i = 0; i < 3; i++) { await p.keyboard.press('Tab'); assert.equal(await p.evaluate(() => !!document.activeElement.closest('#modal-time')), true); }
+    await p.screenshot({ path: path.join(out, 'game-time-expired.png') });
+    await p.evaluate(() => localStorage.setItem('__mock_limit', '600'));
+    await p.locator('#time-retry').click();
+    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'));
+    assert.equal(await p.locator('#problem-expression').innerText(), q, 'same problem reloaded');
+    assert.equal(await p.locator('.step').count(), 1, 'from step 1'); assert.equal(await p.locator('#step-input').isDisabled(), false);
+    assert.equal(await p.locator('#hint-btn').isVisible(), false, 'errors and hints back at zero');
+    assert.match(await p.locator('#time-left').innerText(), /^(10:00|09:5\d)$/, 'fresh limit');
+    assert.equal(await p.evaluate(() => window.__mockWindow().no), 2);
+    await submit(p, '7'); assert.match(await p.locator('#step-feedback').innerText(), /Incorrect/);
+    await p.context().close();
+  });
+  await check('expiry: an answer sent after the server says time is up is refused and shows the dialog; reload while expired shows it again', async () => {
+    const p = await open(DASH, { limit: 600 });
+    await start(p);
+    await p.evaluate(() => window.__mockExpireNow());
+    await submit(p, '9');
+    await p.waitForSelector('#modal-time.is-open');
+    assert.equal(await p.locator('#error-list li').count(), 0, 'the refused answer is not counted');
+    await p.reload(); await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape'); await p.locator('#start-btn').click();
+    await p.waitForSelector('#modal-time.is-open');
+    assert.equal(await p.locator('#time-retry').isVisible(), true);
+    await p.context().close();
+  });
+  await check('expiry: topic progress and topic are kept across Try again', async () => {
+    const p = await open(DASH, { limit: 600 });
+    await start(p);
+    for (let i = 0; i < 3; i++) await finishQuestion(p);
+    await p.waitForSelector('#modal-offer.is-open'); await p.locator('#offer-accept').click(); await p.waitForSelector('#step-input');
+    assert.equal(await p.locator('#stat-level').innerText(), '2');
+    await p.evaluate(() => window.__mockExpireNow()); await submit(p, '1');
+    await p.waitForSelector('#modal-time.is-open'); await p.locator('#time-retry').click();
+    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'));
+    assert.equal(await p.locator('#stat-level').innerText(), '2'); assert.equal(await p.locator('#stat-solved').innerText(), '3');
     await p.context().close();
   });
   await check('privacy: no ocean_* column is ever selected by the game page', async () => {

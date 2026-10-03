@@ -10,7 +10,7 @@
     return Object.assign({ email: user.email, full_name: 'Mia Santos', role: 'student', group_type: 'Assigned',
       is_ocean_done: true, selected_character: 'pia-open', current_stage: '', section: '7-A' }, load(K_PROFILE, {}));
   }
-  var S = load(K_STATE, { sessionId: 'sess-1', served: [], states: {}, done: [], progress: { topic: 1, answered: 0, good: 0, fail: 0 }, offers: [] });
+  var S = load(K_STATE, { sessionId: 'sess-1', served: [], states: {}, done: [], progress: { topic: 1, answered: 0, good: 0, fail: 0 }, offers: [], win: null });
   function persist() { save(K_STATE, S); }
   window.__calls = window.__calls || []; window.__responses = [];
 
@@ -45,14 +45,20 @@
   var label = function (t, i) { return t === 1 ? ['Conversion', 'Multiplication'][i] : ['Subtraction', 'Division', 'Conversion'][i]; };
   var kindOf = function (t, i) { return label(t, i) === 'Conversion' ? (t === 1 ? 'decimal' : 'percentage') : 'number'; };
   function sj(q, st) {
-    return { done: false, problem_id: 'qb-' + q.id, problem_number: q.number, question: q.question, topic: S.progress.topic, question_topic: q.topic,
+    return { done: false, problem_id: q.pid, problem_number: q.number, question: q.question, topic: S.progress.topic, question_topic: q.topic,
       steps_total: req(q.topic), step_labels: [0, 1, 2].slice(0, req(q.topic)).map(function (i) { return label(q.topic, i); }),
       current_step: st.step, stage: st.stage, confirm_kind: st.stage === 'confirm' ? kindOf(q.topic, st.step) : null, work_text: st.work,
       done_steps: st.doneSteps, wrong_streak: st.wrong, hint_unlocked: st.unlocked, hint_tier: st.tier, errors: st.errors, hints_used: st.hints, locked: st.completed };
   }
-  function find(pid) { return S.served.filter(function (q) { return 'qb-' + q.id === pid; })[0]; }
+  function find(pid) { return S.served.filter(function (q) { return q.pid === pid; })[0]; }
   function bankq(id) { return BANK.filter(function (b) { return b.id === id; })[0]; }
   var rules = { mastery: 80, min: 3, max: 3 };
+  function limitSec() { return Number(localStorage.getItem('__mock_limit')) || 600; }
+  function win() { if (!S.win) { S.win = { no: 1, limit: limitSec(), started: Date.now(), deadline: Date.now() + limitSec() * 1000 }; persist(); } return S.win; }
+  function expired() { return Date.now() >= win().deadline; }
+  function clock() { var w = win(); return { window: w.no, limit_seconds: w.limit, started_at: new Date(w.started).toISOString(), finished_at: new Date(Math.min(Date.now(), w.deadline)).toISOString(), remaining_seconds: Math.max(0, Math.ceil((w.deadline - Date.now()) / 1000)), expired: expired() }; }
+  window.__mockExpireNow = function () { var w = win(); w.deadline = Date.now() - 1000; persist(); };
+  window.__mockWindow = function () { return S.win; };
 
   var RPC = {
     set_student_stage: function () {   /* migration 0038 (Control OCEAN-only) rule: a tutor is NOT required to enter the stage */
@@ -61,28 +67,40 @@
     },
     resume_or_start_game_session: function () {
       var g = guard(); if (g) return g;
-      var pend = S.served.filter(function (q) { return S.done.indexOf('qb-' + q.id) < 0; })[0];
-      return { data: { session_id: S.sessionId, resumed: S.served.length > 0 && S.progress.answered < 10, problems_answered: S.progress.answered, correct_count: S.progress.clean || 0, topic: S.progress.topic, consecutive_correct: 0, pending_problem_id: pend ? 'qb-' + pend.id : null } };
+      var pend = S.served.filter(function (q) { return S.done.indexOf(q.pid) < 0; })[0];
+      return { data: { session_id: S.sessionId, resumed: S.served.length > 0, time_limit_seconds: limitSec(), problems_answered: S.progress.answered, correct_count: S.progress.clean || 0, topic: S.progress.topic, consecutive_correct: 0, pending_problem_id: pend ? pend.pid : null } };
     },
     serve_next_step_question: function () {
       var g = guard(); if (g) return g;
+      var ck = clock();
       var o = S.offers.filter(function (x) { return x.status === 'pending'; })[0];
-      if (o) return { data: { done: false, pending_offer: { problem_id: o.pid, type: o.type, from_topic: o.from, target_topic: o.to } } };
-      var open = S.served.filter(function (q) { return S.done.indexOf('qb-' + q.id) < 0; })[0];
-      if (open) return { data: sj(open, S.states['qb-' + open.id]) };
-      if (S.progress.answered >= 10) return { data: { done: true, reason: 'target', problems_answered: S.progress.answered } };
-      var seen = S.served.map(function (q) { return q.id; });
-      var cand = BANK.filter(function (b) { return seen.indexOf(b.id) < 0; }).sort(function (a, b) { return Math.abs(a.topic - S.progress.topic) - Math.abs(b.topic - S.progress.topic) || a.id - b.id; })[0];
-      if (!cand) return { data: { done: true, reason: 'bank_empty', problems_answered: S.progress.answered } };
-      var q = { id: cand.id, topic: cand.topic, question: cand.question, number: S.progress.answered + 1 };
+      if (o) return { data: { done: false, clock: ck, pending_offer: { problem_id: o.pid, type: o.type, from_topic: o.from, target_topic: o.to } } };
+      var open = S.served.filter(function (q) { return S.done.indexOf(q.pid) < 0; })[0];
+      if (open) return { data: Object.assign(sj(open, S.states[open.pid]), { clock: ck }) };
+      var cnt = function (id) { return S.served.filter(function (q) { return q.id === id; }).length; };
+      var last = S.served.length ? S.served[S.served.length - 1].id : null;
+      var cand = BANK.slice().sort(function (a, b) { return Math.abs(a.topic - S.progress.topic) - Math.abs(b.topic - S.progress.topic) || cnt(a.id) - cnt(b.id) || ((a.id === last) - (b.id === last)) || a.id - b.id; })[0];
+      if (!cand) return { data: { done: true, reason: 'bank_empty', clock: ck } };
+      var rep = cnt(cand.id);
+      var q = { id: cand.id, pid: 'qb-' + cand.id + (rep ? '#' + rep : ''), topic: cand.topic, question: cand.question, number: S.served.length + 1 };
       S.served.push(q);
-      S.states['qb-' + q.id] = { step: 0, stage: 'work', work: null, wrong: 0, tier: 0, errors: 0, hints: 0, unlocked: false, doneSteps: [], completed: false };
-      persist(); return { data: sj(q, S.states['qb-' + q.id]) };
+      S.states[q.pid] = { step: 0, stage: 'work', work: null, wrong: 0, tier: 0, errors: 0, hints: 0, unlocked: false, doneSteps: [], completed: false };
+      persist(); return { data: Object.assign(sj(q, S.states[q.pid]), { clock: ck }) };
+    },
+    restart_after_expiry: function () {
+      var g = guard(); if (g) return g;
+      if (!expired()) { var r0 = RPC.serve_next_step_question(); r0.data.restarted = false; return r0; }
+      var w = win(); w.log = (w.log || []); S.windowsLog = (S.windowsLog || []).concat([{ no: w.no }]);
+      S.win = { no: w.no + 1, limit: limitSec(), started: Date.now(), deadline: Date.now() + limitSec() * 1000 };
+      var open = S.served.filter(function (q) { return S.done.indexOf(q.pid) < 0; })[0];
+      if (open && !S.states[open.pid].completed) S.states[open.pid] = { step: 0, stage: 'work', work: null, wrong: 0, tier: 0, errors: 0, hints: 0, unlocked: false, doneSteps: [], completed: false };
+      persist(); var r = RPC.serve_next_step_question(); r.data.restarted = true; return r;
     },
     check_step_answer: function (a) {
       var g = guard(); if (g) return g;
       var q = find(a.p_problem_id), st = S.states[a.p_problem_id], b = bankq(q.id), sub = String(a.p_submitted).trim().slice(0, 60);
-      if (st.completed) return { data: { outcome: 'locked', state: sj(q, st) } };
+      if (st.completed) return { data: { outcome: 'locked', state: sj(q, st), clock: clock() } };
+      if (expired()) return { data: { outcome: 'time_expired', state: sj(q, st), clock: clock() } };
       var key = b.steps[st.step].answer, kind = kindOf(q.topic, st.step), out, text, confirmed;
       if (st.stage === 'work') {
         if (!matches(sub, key)) out = 'wrong';
@@ -95,15 +113,15 @@
       if (out === 'wrong' || out === 'format_error') { st.errors++; st.wrong++; if (st.wrong >= 2) st.unlocked = true; }
       else if (out === 'needs_final') { st.stage = 'confirm'; st.work = sub; st.wrong = 0; st.tier = 0; }
       else { st.doneSteps.push({ text: text, confirmed: confirmed || null }); st.step++; st.stage = 'work'; st.work = null; st.wrong = 0; st.tier = 0; if (st.step >= req(q.topic)) { st.completed = true; out = 'question_done'; } }
-      persist(); return { data: { outcome: out, step_text: text, confirmed: confirmed, state: sj(q, st) } };
+      persist(); return { data: { outcome: out, step_text: text, confirmed: confirmed, state: sj(q, st), clock: clock() } };
     },
     consume_step_hint: function (a) {
       var g = guard(); if (g) return g;
       var q = find(a.p_problem_id), st = S.states[a.p_problem_id], b = bankq(q.id);
-      if (st.completed || !st.unlocked) return { data: { hint: null, state: sj(q, st) } };
+      if (st.completed || !st.unlocked || expired()) return { data: { hint: null, state: sj(q, st), clock: clock() } };
       var s = b.steps[st.step], list = [s.hint1, s.hint2, s.hint3].filter(Boolean); if (!list.length) list = ['Check your calculations carefully.'];
       st.tier = Math.min(st.tier + 1, list.length); st.hints++; persist();
-      return { data: { hint: { text: list[st.tier - 1], tier: st.tier, tiers_total: list.length, step: st.step + 1 }, state: sj(q, st) } };
+      return { data: { hint: { text: list[st.tier - 1], tier: st.tier, tiers_total: list.length, step: st.step + 1 }, state: sj(q, st), clock: clock() } };
     },
     finish_step_question: function (a) {
       var g = guard(); if (g) return g;

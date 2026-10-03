@@ -88,14 +88,14 @@
                         <p class="learn-kicker">YOUR SESSION</p>
                         <h1 class="start-hello" id="start-hello">Welcome back!</h1>
                         <p class="start-lede" id="start-lede">
-                            Today you'll solve percentage word problems with your tutor, one step at a time. Take your time — there's
-                            no timer, and hints are there when you're stuck.
+                            Today you'll solve percentage word problems with your tutor, one step at a time. Work through
+                            as many as you can before the time limit, and use hints when you're stuck.
                         </p>
 
                         <dl class="facts start-facts">
                             <div class="fact">
-                                <dt class="fact-label">Problems this session</dt>
-                                <dd class="fact-value" id="fact-target">10</dd>
+                                <dt class="fact-label">Session time limit</dt>
+                                <dd class="fact-value" id="fact-limit">10 mins</dd>
                             </div>
                             <div class="fact">
                                 <dt class="fact-label">Steps per problem</dt>
@@ -146,15 +146,16 @@
                     <div class="work">
                         <div class="progress-card">
                             <div class="progress-top">
-                                <span class="progress-label">Your progress</span>
-                                <span class="progress-count" id="progress-count">0 / 10</span>
+                                <span class="progress-label" id="time-label">Time left</span>
+                                <span class="time-left" id="time-left" aria-labelledby="time-label" role="timer" aria-live="off">--:--</span>
                             </div>
-                            <div class="bar"><div class="bar-fill" id="progress-fill" style="width:0%"></div></div>
                             <div class="progress-stats">
+                                <span class="pstat"><b id="stat-solved">0</b> solved</span>
                                 <span class="pstat"><b id="stat-correct">0</b> clean</span>
                                 <span class="pstat"><b id="stat-streak">0</b> in a row</span>
                                 <span class="pstat"><b id="stat-level">1</b> topic</span>
                             </div>
+                            <p class="sr-only" id="time-announce" role="status" aria-live="polite"></p>
                         </div>
 
                         <div class="problem-card">
@@ -180,31 +181,6 @@
                 </div>
             </section>
 
-            <!-- ========================================== SUMMARY SCREEN -->
-            <section class="learn-shell screen" id="screen-summary">
-                <div class="summary-card">
-                    <p class="learn-kicker">SESSION COMPLETE</p>
-                    <h2 class="summary-title">Session complete</h2>
-                    <p class="summary-lede" id="summary-lede">Nice work getting all the way through.</p>
-
-                    <dl class="facts summary-grid">
-                        <div class="summary-tile">
-                            <dt class="summary-label">No mistakes</dt>
-                            <dd class="summary-value" id="summary-correct">0 / 0</dd>
-                        </div>
-                        <div class="summary-tile">
-                            <dt class="summary-label">Accuracy</dt>
-                            <dd class="summary-value" id="summary-accuracy">0%</dd>
-                        </div>
-                        <div class="summary-tile">
-                            <dt class="summary-label">Reached</dt>
-                            <dd class="summary-value" id="summary-level">Level 1</dd>
-                        </div>
-                    </dl>
-
-                    <p class="summary-note">You're done for now. Sign out from the top bar before someone else uses this device.</p>
-                </div>
-            </section>
         </main>
     </div>
 
@@ -224,6 +200,33 @@
             <footer class="modal-foot">
                 <button class="btn btn-secondary" data-modal-close id="confirm-cancel">Go back</button>
                 <button class="btn btn-danger" id="confirm-accept">Sign out</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================ MODAL · TIME LIMIT ----
+         The game's "Time limit reached" dialog. Not dismissible: the only way on
+         is Try again, which restarts the open problem with a fresh limit. -->
+    <div class="overlay" id="modal-time" role="alertdialog" aria-modal="true"
+        aria-labelledby="time-title" aria-describedby="time-sub" data-static>
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <p class="tutorial-step">Session</p>
+                    <h2 class="modal-title" id="time-title">Time limit reached</h2>
+                    <p class="modal-sub" id="time-sub">The session time limit has been reached.</p>
+                </div>
+            </header>
+            <div class="modal-body">
+                <dl class="time-facts">
+                    <div><dt>Time limit</dt><dd id="time-limit">--</dd></div>
+                    <div><dt>Time started</dt><dd id="time-started">--:--:--</dd></div>
+                    <div><dt>Time finished</dt><dd id="time-finished">--:--:--</dd></div>
+                    <div><dt>Time spent</dt><dd id="time-spent">0 secs</dd></div>
+                </dl>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-primary" id="time-retry" type="button">Try again</button>
             </footer>
         </div>
     </div>

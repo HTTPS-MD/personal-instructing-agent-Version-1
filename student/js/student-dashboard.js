@@ -3,7 +3,7 @@
  * PIA SYSTEM — STUDENT WORKSPACE (the tutoring game)
  * ============================================================================
  * The Grade 7 tutoring surface: a start screen, the step-by-step game, and a
- * summary. One page, because function.js routes STUDENT_STAGES.dash here.
+ * time-limit dialog. One page, because function.js routes STUDENT_STAGES.dash here.
  *
  * WHO GETS HERE. Only an experimental group with a saved tutor: assigned and
  * neutral students have the tutor their admin set; free-choice students have
@@ -29,9 +29,13 @@
  *      sends "correct: true", never evaluates an answer, never picks a
  *      question and never decides a topic.
  *
- * TIME. There is no visible timer. Time on the stage and on each question is
- * still recorded by the server (finalizeStageTime, problem_serves,
- * step_events), and nothing here reads or sends a clock for the research.
+ * TIME. The attached game's rule: one session time limit (app_config.time_limit
+ * minutes), one continuous deadline, no pause between questions or topics. The
+ * SERVER owns the deadline (game_windows); this file only draws it. When it
+ * passes, the server refuses answers and hints, the page shows the "Time limit
+ * reached" dialog, and "Try again" restarts the open problem with a fresh limit
+ * (restart_after_expiry). The countdown sits in the progress card, not in a top
+ * strip, and its milestones and the expiry are announced to screen readers.
  *
  * TUTOR WORDING. The words the tutor says come from tutor-personas.js and are
  * cosmetic. Their "learning profile" is fixed at 'average'; the attached
@@ -50,9 +54,6 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
-
-    /* Kept in step with c_target in serve_next_step_question (migration 0038). */
-    var SESSION_TARGET = 10;
 
     /* The tutor's wording profile. The attached game raised or lowered it from
        an external ML service; that service is not connected, so the game's own
@@ -125,6 +126,12 @@
         pendingOffer: null,
         starting: false,
         bankEmpty: false,
+        clock: null,         /* { limit, base, at, expired, started, finished } from the server */
+        clockTimer: null,
+        announced: {},
+        expired: false,
+        expiring: false,
+        restarting: false,
         finished: false,
         inSession: false,   /* a lesson has been started and not yet ended (see PIA_HAS_ACTIVE_WORK) */
         ended: false        /* another device took the account (function.js 1C-6) */
@@ -453,9 +460,7 @@
     /* ============================================ 4. PROGRESS ========== */
 
     function paintProgress() {
-        var done = Math.min(state.answered, SESSION_TARGET);
-        $('#progress-count').textContent = done + ' / ' + SESSION_TARGET;
-        $('#progress-fill').style.width = Math.round((done / SESSION_TARGET) * 100) + '%';
+        $('#stat-solved').textContent = state.answered;
         $('#stat-correct').textContent = state.clean;
         $('#stat-streak').textContent = state.streak;
         $('#stat-level').textContent = state.topic;
@@ -503,6 +508,150 @@
         state.errors.slice(-30).forEach(function (e) { list.appendChild(el('li', null, e)); });
         $('#error-empty').hidden = state.errors.length > 0;
         list.scrollTop = list.scrollHeight;
+    }
+
+    /* ============================================ 4b. THE CLOCK ======== */
+
+    /* The deadline lives on the server. Every reply that carries a `clock`
+       re-bases this display; between replies it counts down on the browser's
+       monotonic clock, so changing the computer's clock changes nothing the
+       server enforces. */
+    function fmtClock(sec) {
+        sec = Math.max(0, Math.round(sec));
+        var m = Math.floor(sec / 60), r = sec % 60;
+        return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+    }
+
+    function fmtLimit(sec) {
+        var m = Math.floor(sec / 60), r = sec % 60;
+        if (m > 0) { return r > 0 ? m + 'm ' + r + 's' : m + (m > 1 ? ' mins' : ' min'); }
+        return r + ' secs';
+    }
+
+    function fmtTime(iso) {
+        var d = new Date(iso);
+        return isNaN(d) ? '--:--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function fmtSpent(a, b) {
+        var sec = Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+        var m = Math.floor(sec / 60), r = sec % 60;
+        return (m ? m + (m > 1 ? ' mins ' : ' min ') : '') + r + (r === 1 ? ' sec' : ' secs');
+    }
+
+    function secondsLeft() {
+        var c = state.clock;
+        if (!c) { return null; }
+        if (c.expired) { return 0; }
+        return Math.max(0, c.base - (performance.now() - c.at) / 1000);
+    }
+
+    function syncClock(c) {
+        if (!c) { return; }
+        var newWindow = !state.clock || state.clock.window !== c.window;
+        state.clock = {
+            window: c.window, limit: Number(c.limit_seconds) || 600, base: Number(c.remaining_seconds) || 0,
+            at: performance.now(), expired: c.expired === true, started: c.started_at, finished: c.finished_at
+        };
+        if (newWindow) { state.announced = {}; }
+        paintClock();
+        if (!state.clockTimer) { state.clockTimer = setInterval(tickClock, 250); }
+        if (state.clock.expired && state.inSession) { expire(); }
+    }
+
+    function paintClock() {
+        var left = secondsLeft();
+        if (left === null) { return; }
+        var node = $('#time-left');
+        node.textContent = fmtClock(left);
+        node.classList.toggle('is-low', left <= 30);
+    }
+
+    /* Said once each, politely, so a screen-reader user is told without a
+       countdown being read every second. */
+    var MILESTONES = [[300, 'About 5 minutes left.'], [60, 'About 1 minute left.'], [30, '30 seconds left.']];
+
+    function tickClock() {
+        var left = secondsLeft();
+        if (left === null || state.expired || !state.inSession) { return; }
+        paintClock();
+        MILESTONES.forEach(function (m) {
+            if (left <= m[0] && left > 0 && state.clock.limit > m[0] && !state.announced[m[0]]) {
+                state.announced[m[0]] = true;
+                $('#time-announce').textContent = m[1];
+            }
+        });
+        if (left <= 0 && !state.expiring) { confirmExpiry(); }
+    }
+
+    /* The page thinks time is up. Only the server's word counts: ask it. */
+    async function confirmExpiry() {
+        state.expiring = true;
+        var res = await sb.rpc('serve_next_step_question', { p_session_id: state.sessionId });
+        state.expiring = false;
+        if (res.error || !res.data || !res.data.clock) { return; }
+        syncClock(res.data.clock);
+    }
+
+    function lockForExpiry() {
+        var input = $('#step-input'), submit = $('#step-submit');
+        if (input) { input.disabled = true; }
+        if (submit) { submit.disabled = true; }
+        $('#hint-btn').disabled = true;
+    }
+
+    function expire() {
+        if (state.expired) { return; }
+        state.expired = true;
+        paintClock();
+        lockForExpiry();
+        speak('Time is up! Let me show your session summary.', 'sad');
+        $('#time-announce').textContent = 'Time limit reached.';
+
+        var c = state.clock;
+        $('#time-limit').textContent = fmtLimit(c.limit);
+        $('#time-started').textContent = fmtTime(c.started);
+        $('#time-finished').textContent = fmtTime(c.finished);
+        $('#time-spent').textContent = fmtSpent(c.started, c.finished);
+        openModal('modal-time');
+    }
+
+    /* The game's "Try Again": the open problem is reloaded from step 1 with a
+       fresh limit; topic and topic progress are kept. */
+    async function tryAgain() {
+        if (state.restarting) { return; }
+        state.restarting = true;
+        var release = setBusy($('#time-retry'), 'Restarting…');
+
+        var res = await sb.rpc('restart_after_expiry', { p_session_id: state.sessionId });
+        release();
+        state.restarting = false;
+
+        if (res.error || !res.data) {
+            console.error('Could not restart:', res.error && res.error.message);
+            toast('Could not restart', 'Please try again.', 'danger');
+            return;
+        }
+
+        state.expired = false;
+        closeModal('modal-time');
+        state.problem = null;
+        state.stepWrong = 0;
+        state.stepStartedAt = Date.now();
+        syncClock(res.data.clock);
+        if (res.data.pending_offer) { return showOffer(res.data.pending_offer); }
+        if (res.data.done) { return noQuestions(); }
+        applyQuestion(res.data);
+        renderProblem();
+        speak(line('greet') || 'Let’s try again. Read the problem carefully.', 'default');
+    }
+
+    function noQuestions() {
+        state.bankEmpty = true;
+        $('#problem-kicker').textContent = 'No problems yet';
+        $('#problem-expression').textContent = 'No configured questions are available. Please ask your teacher to check the question bank.';
+        $('#steps').textContent = '';
+        speak(null, 'default');
     }
 
     /* ============================================ 5. SESSION =========== */
@@ -562,7 +711,7 @@
        open comes back as it was left, so reloading cannot swap it or undo a
        step; an unanswered topic offer comes back instead of a question. */
     async function nextProblem() {
-        if (state.ended || state.finished) { return; }
+        if (state.ended) { return; }
 
         var res = await sb.rpc('serve_next_step_question', { p_session_id: state.sessionId });
 
@@ -574,10 +723,8 @@
         }
 
         var d = res.data;
-        if (d.done) {
-            state.bankEmpty = d.reason === 'bank_empty';
-            return endSession();
-        }
+        syncClock(d.clock);
+        if (d.done) { return noQuestions(); }
         if (d.pending_offer) {
             return showOffer(d.pending_offer);
         }
@@ -587,6 +734,7 @@
         state.stepStartedAt = Date.now();
         renderProblem();
         syncProgress();
+        if (state.expired) { lockForExpiry(); }
 
         /* Finished on an earlier visit but never recorded: record it now. */
         if (state.problem.locked) { finishProblem(); }
@@ -781,8 +929,11 @@
         var kind = p.confirmKind;
         var outcome = d.outcome;
 
+        syncClock(d.clock);
         applyQuestion(d.state);
         input.disabled = false;
+
+        if (outcome === 'time_expired') { renderSteps(false); lockForExpiry(); return; }
 
         if (outcome === 'locked') {
             renderSteps(false);
@@ -873,6 +1024,7 @@
         }
 
         var d = res.data;
+        syncClock(d.clock);
         var keep = state.problem.hint;
         applyQuestion(d.state);
         state.problem.hint = keep;
@@ -920,7 +1072,6 @@
         paintProgress();
         syncProgress();
 
-        if (state.answered >= SESSION_TARGET) { return endSession(); }
         if (r.offer) {
             r.offer.problem_id = r.offer.problem_id || state.problem.id;
             return showOffer(r.offer);
@@ -995,56 +1146,13 @@
         }).eq('email', state.email);
     }
 
-    async function endSession() {
-        if (state.finished) { return; }
-        state.finished = true;
-
-        showScreen('summary');
-
-        /* The summary comes from the server view, so the number the student
-           sees and the number in the research data are the same number. */
-        var summary = null;
-        if (state.sessionId) {
-            var res = await sb.from('v_tutoring_session_summary')
-                .select('problems_answered, correct_count, final_level')
-                .eq('session_id', state.sessionId).maybeSingle();
-            summary = res.data;
-        }
-
-        var answered = summary ? Number(summary.problems_answered) || 0 : state.answered;
-        var correct = summary ? Number(summary.correct_count) || 0 : state.clean;
-        var topic = state.topic;
-        var accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-
-        $('#summary-correct').textContent = correct + ' / ' + answered;
-        $('#summary-accuracy').textContent = accuracy + '%';
-        $('#summary-level').textContent = 'Topic ' + topic;
-        $('#summary-lede').textContent = state.bankEmpty && answered < SESSION_TARGET
-            ? 'That’s every question available for now. Your teacher will add more.'
-            : (accuracy >= 70
-                ? 'Strong session — you worked through the harder ones too.'
-                : 'Good effort. Every one of these gets easier with practice.');
-
-        await sb.from('profiles').update({
-            is_in_game: false,
-            current_difficulty: 'Topic ' + topic + ' · ' + topicOf(topic).short
-        }).eq('email', state.email);
-
-        if (state.sessionId) {
-            await sb.rpc('end_game_session', { p_session_id: state.sessionId });
-        }
-
-        /* The final payload: locks the seconds spent on this stage. */
-        await finalizeStageTime('Tutoring Dashboard');
-    }
-
     /* ============================================ 10. SIGN OUT ========= */
 
     /* On a shared lab PC an open session means the next student's answers
        land in this student's row. executeForceLogout() releases the device
        slot, signs out globally and clears storage. */
     async function signOut() {
-        var mid = state.sessionId && !state.finished;
+        var mid = !!state.sessionId;
         var ok = await confirmAction({
             title: 'Sign out',
             heading: mid ? 'Leave this session?' : 'Sign out?',
@@ -1081,7 +1189,7 @@
 
         /* A stage closed mid-lesson lets the student finish it (function.js
            1C-5c); time in the stage is counted while the tab is visible. */
-        window.PIA_HAS_ACTIVE_WORK = function () { return state.inSession && !state.finished; };
+        window.PIA_HAS_ACTIVE_WORK = function () { return state.inSession; };
 
         /* Tell the admin view where this student is. If the stage was closed
            in the meantime the server says so, and we follow it. */
@@ -1112,6 +1220,7 @@
         $('#start-btn').addEventListener('click', handleStart);
         $('#offer-accept').addEventListener('click', function () { answerOffer(true); });
         $('#offer-stay').addEventListener('click', function () { answerOffer(false); });
+        $('#time-retry').addEventListener('click', tryAgain);
         paintSolved();
         paintErrors();
         paintHintButton();
@@ -1138,16 +1247,16 @@
             applySession(peek.data);
 
             $('#fact-progress').textContent = state.answered;
-            $('#fact-target').textContent = SESSION_TARGET;
+            $('#fact-limit').textContent = fmtLimit(Number(peek.data.time_limit_seconds) || 600);
 
             var where = 'You are on topic ' + state.topic + ': ' + topicOf(state.topic).short.toLowerCase() + '.';
             if (peek.data.resumed) {
                 $('#start-btn-label').textContent = 'Continue my session';
                 $('#start-lede').textContent = (state.answered > 0
-                    ? 'You already answered ' + state.answered + ' of ' + SESSION_TARGET + '. '
+                    ? 'You already answered ' + state.answered + ' questions. '
                     : '') + where + ' Pick up right where you left off.';
             } else if (state.topic > 1) {
-                $('#start-lede').textContent = where + ' Take your time — there’s no timer, and you can ask ' +
+                $('#start-lede').textContent = where + ' The session has a time limit, and you can ask ' +
                     'for a hint whenever you’re stuck.';
             }
         }

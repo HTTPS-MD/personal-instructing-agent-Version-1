@@ -28,7 +28,7 @@
 
     var STEPS = [
         { title: 'Welcome to your tutoring session',
-          text: 'You will solve percentage word problems with your tutor, one step at a time. There is no timer, so take your time.' },
+          text: 'You will solve percentage word problems with your tutor, one step at a time. The session has a time limit, shown as Time left, so keep an eye on it.' },
         { title: 'Work one step at a time',
           text: 'Each problem has a few steps. Type the answer for the step you are on, then press Submit step. The next step appears when you get it right.' },
         { title: 'Show your working, then the value',

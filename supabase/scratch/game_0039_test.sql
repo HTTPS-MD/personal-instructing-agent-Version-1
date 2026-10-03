@@ -207,5 +207,69 @@ do $$ declare s jsonb; sid uuid; q jsonb; d jsonb; pid text; begin
   perform pg_temp.rec('0029 regression: serve + wrong answer + attempts_left', (d->>'attempts_left')='1' and q::text !~ 'final_answer', d::text);
 end $$;
 
+
+-- 8. the time limit (game rule): one continuous deadline, enforced on the server
+do $$ declare s jsonb; sid uuid; q jsonb; d jsonb; pid text; w record; lastq text; n int; seen_ids text[] := '{}'; dup boolean := false;
+begin
+  execute 'reset role';
+  insert into profiles(email, full_name, role, group_type, is_ocean_done, selected_character, parental_consent, student_assent) values ('timed@t.test','T','student','assigned',true,'pia-open',true,true);
+  update app_config set time_limit = 2 where id = 1;
+  perform pg_temp.as_user('timed@t.test');
+  s := public.resume_or_start_game_session(); sid := (s->>'session_id')::uuid;
+  q := public.serve_next_step_question(sid); pid := q->>'problem_id';
+  perform pg_temp.rec('serve returns the clock: 120 s limit from app_config.time_limit', (q->'clock'->>'limit_seconds')='120' and (q->'clock'->>'expired')='false' and (q->'clock'->>'remaining_seconds')::int between 100 and 120, (q->'clock')::text);
+  perform pg_temp.rec('clock carries no answer', (q->'clock')::text !~ 'answer');
+  d := public.check_step_answer(sid,pid,'99');
+  perform pg_temp.rec('answers are counted while time remains', d->>'outcome'='wrong' and (d->'clock'->>'expired')='false');
+  -- one continuous deadline: a second serve does not move it
+  perform pg_temp.rec('deadline does not move between calls', (public.serve_next_step_question(sid)->'clock'->>'remaining_seconds')::int <= (q->'clock'->>'remaining_seconds')::int);
+  -- let time pass
+  execute 'reset role';
+  update game_windows set deadline_at = now() - interval '5 seconds', started_at = now() - interval '125 seconds' where session_id = sid;
+  perform pg_temp.as_user('timed@t.test');
+  d := public.check_step_answer(sid,pid,'0.1');
+  perform pg_temp.rec('after the limit: answer refused as time_expired', d->>'outcome'='time_expired' and (d->'clock'->>'expired')='true' and (d->'clock'->>'remaining_seconds')='0', d::text);
+  execute 'reset role';
+  perform pg_temp.rec('refused answer is not logged as an event', (select count(*) from step_events where session_id=sid)=1);
+  perform pg_temp.as_user('timed@t.test');
+  d := public.consume_step_hint(sid,pid);
+  perform pg_temp.rec('after the limit: hint refused', d->'hint' = 'null'::jsonb and (d->'clock'->>'expired')='true', d::text);
+  d := public.serve_next_step_question(sid);
+  perform pg_temp.rec('serve after the limit reports expiry and the same open question', (d->'clock'->>'expired')='true' and d->>'problem_id'=pid, left(d::text,200));
+  -- try again
+  d := public.restart_after_expiry(sid);
+  perform pg_temp.rec('Try again: new window, same problem from step 1, counts reset, topic kept',
+    d->>'restarted'='true' and (d->'clock'->>'window')='2' and (d->'clock'->>'expired')='false' and d->>'problem_id'=pid
+    and (d->>'current_step')='0' and (d->>'errors')='0' and (d->>'hints_used')='0' and (d->>'hint_unlocked')='false' and jsonb_array_length(d->'done_steps')=0, d::text);
+  execute 'reset role';
+  select * into w from game_windows where session_id=sid and window_no=1;
+  perform pg_temp.rec('expired window logged with reason and open problem', w.ended_reason='expired' and w.open_problem_id=pid and w.errors=1, row_to_json(w)::text);
+  perform pg_temp.rec('restart is logged as a step event', exists(select 1 from step_events where session_id=sid and outcome='restart'));
+  perform pg_temp.as_user('timed@t.test');
+  d := public.restart_after_expiry(sid);
+  perform pg_temp.rec('Try again when not expired is a no-op', d->>'restarted'='false' and (d->'clock'->>'window')='2', left(d::text,120));
+  d := public.check_step_answer(sid,pid,'99');
+  perform pg_temp.rec('answers count again after Try again', d->>'outcome'='wrong');
+  -- no 10-question ending; cycling never repeats back-to-back; repeats get their own problem id
+  for n in 1..14 loop
+    q := public.serve_next_step_question(sid); pid := q->>'problem_id';
+    perform pg_temp.rec('serve #'||n||' never "done" (no question-count ending)', coalesce(q->>'done','false')='false' and pid is not null, left(q::text,100));
+    if pid = any(seen_ids) then dup := true; end if;
+    seen_ids := seen_ids || pid;
+    d := public.check_step_answer(sid,pid,'0.1'); d := public.check_step_answer(sid,pid,'0.2'); d := public.check_step_answer(sid,pid,'0.3'); d := public.check_step_answer(sid,pid,'0.4');
+    -- answer with the correct values for whichever question this is
+    d := public.check_step_answer(sid,pid,pg_temp.ans(q->>'question',0));
+    d := public.check_step_answer(sid,pid,pg_temp.ans(q->>'question',1));
+    exit when q->>'question' is null;
+    d := public.finish_step_question(sid,pid);
+    if d->'offer' is not null and d->'offer' <> 'null'::jsonb then d := public.respond_topic_offer(sid,pid,false); end if;
+  end loop;
+  execute 'reset role';
+  perform pg_temp.rec('repeats are served under distinct problem ids (cycle)', (select count(distinct problem_id)=count(*) from served_questions where session_id=sid) and (select count(*) from served_questions where session_id=sid) > 4);
+  perform pg_temp.rec('no question twice in a row', not exists (select 1 from served_questions a join served_questions b on a.session_id=b.session_id and b.problem_number=a.problem_number+1 and a.question_id=b.question_id where a.session_id=sid));
+  perform pg_temp.rec('passed/score recorded per question', (select count(*) from step_states where session_id=sid and passed is not null and score in (50,100)) > 3);
+  update app_config set time_limit = 10 where id = 1;
+end $$;
+
 select count(*) filter (where ok) as passed, count(*) filter (where not ok) as failed, count(*) as total from res;
 select n, name, detail from res where not ok order by n;
