@@ -50,6 +50,10 @@ async function checkUserAndStage() {
         document.getElementById('waiting-desc').textContent = "The character selection stage is currently closed. Please wait for your instructor to open it.";
         checkAndListen('stage_char', 'character-selection.html');
     }
+    else if (isControlGroup(profile)) {
+        // Nothing follows OCEAN for Control: the thank-you screen, not a wait.
+        window.location.replace('assessment-complete.html');
+    }
     else {
         document.getElementById('waiting-title').textContent = "Waiting for Dashboard";
         setWaitingFor('The tutoring dashboard');

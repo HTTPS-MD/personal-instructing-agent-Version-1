@@ -26,7 +26,7 @@ const server = createServer((req, res) => {
 function fixture() {
   const f = window.fixture = Object.assign({ calls: [], profile: null, readError: false, writeError: false }, window.fixtureInitial || {});
   const user = { id: 'isolated-user', email: 'fixture@example.test' };
-  const profile = () => Object.assign({ email: user.email, full_name: 'Fixture Learner', role: 'student', group_type: 'Control', is_ocean_done: true, selected_character: 'pia-open', current_stage: '', section: 'Earth', must_change_password: false }, f.profile || {});
+  const profile = () => Object.assign({ email: user.email, full_name: 'Fixture Learner', role: 'student', group_type: 'Assigned', is_ocean_done: true, selected_character: 'pia-open', current_stage: '', section: 'Earth', must_change_password: false }, f.profile || {});
   const chain = (table) => {
     const c = { select() { return c; }, eq() { return c; }, update() { f.calls.push({ method: 'profile-update' }); return c; },
       maybeSingle: async () => table === 'settings' ? { data: { value: f.stageOpen !== false }, error: null } : { data: profile(), error: null },
@@ -516,8 +516,31 @@ function fixture() {
     let p = await pageFor('/student/html/waiting-room.html', { account: 'wr3', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Non-Assigned', selected_character: null } } });
     await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'Character selection');
     await p.context().close();
-    p = await pageFor('/student/html/waiting-room.html', { account: 'wr4', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Control', selected_character: 'pia-open' } } });
+    p = await pageFor('/student/html/waiting-room.html', { account: 'wr4', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Assigned', selected_character: 'pia-open' } } });
     await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'The tutoring dashboard');
+    await p.context().close();
+  });
+  await check('control (OCEAN only): thank-you screen has no next stage; waiting room and dashboard URL send Control there', async () => {
+    const ctl = { is_ocean_done: true, group_type: 'Control', selected_character: null };
+    let p = await pageFor('/student/html/assessment-complete.html', { account: 'ctl-ac', initial: { stageOpen: true, profile: ctl } });
+    await p.waitForSelector('h1'); await p.waitForTimeout(400);
+    assert.equal(await p.locator('#btn-continue').count(), 0, 'no Continue for Control');
+    assert.equal(await p.locator('main a.btn, main button').count(), 0);
+    assert.match(await p.locator('.gate-lede').innerText(), /^Your answers have been saved\. That is everything for now\.$/);
+    await p.context().close();
+    p = await pageFor('/student/html/waiting-room.html', { account: 'ctl-wr', initial: { stageOpen: true, profile: ctl } });
+    await p.waitForURL(/assessment-complete\.html/);
+    await p.context().close();
+    p = await pageFor('/student/html/student-dashboard.html', { account: 'ctl-dash', initial: { stageOpen: true, profile: ctl } });
+    await p.waitForURL(/assessment-complete\.html/);
+    await p.context().close();
+    p = await pageFor('/student/html/character-selection.html', { account: 'ctl-char', initial: { stageOpen: true, profile: ctl } });
+    await p.waitForURL(/assessment-complete\.html/);
+    await p.context().close();
+  });
+  await check('control (OCEAN only): before OCEAN they are still routed to the questionnaire', async () => {
+    const p = await pageFor('/student/html/waiting-room.html', { account: 'ctl-pre', initial: { stageOpen: true, profile: { is_ocean_done: false, group_type: 'Control' } } });
+    await p.waitForURL(/ocean-test\.html/);
     await p.context().close();
   });
   for (const [w, t] of [[320, 'dark'], [375, 'light'], [768, 'dark'], [1280, 'light'], [1440, 'dark']]) {

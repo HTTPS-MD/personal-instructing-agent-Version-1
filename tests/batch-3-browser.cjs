@@ -107,7 +107,7 @@ function fixture() {
       then(resolve, reject) { return run().then(resolve, reject); }
     };
     async function run() {
-      f.calls.push({ method: 'from', table: name, write: b.write && b.write.op, cols: b.cols });
+      f.calls.push({ method: 'from', table: name, write: b.write && b.write.op, cols: b.cols, values: b.write && b.write.v, filters: b.filters.length });
       const wait = f.delay[name] || 0;
       if (wait) await new Promise(r => setTimeout(r, wait));
       if (b.signal && b.signal.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
@@ -397,17 +397,21 @@ function fixture() {
   });
 
   /* ================= CLASS SECTIONS ================= */
-  await check('class sections: compact table, Online/Unknown/Offline, aggregation from heartbeats, no Idle', async () => {
+  await check('class sections: only Online/Offline labels; insufficient evidence shows a dash with an accessible explanation', async () => {
     const p = await open('sections');
     await p.waitForSelector('#sections-tbody tr');
     const rows = await p.locator('#sections-tbody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.innerText.trim())));
     const by = Object.fromEntries(rows.map(r => [r[0], r]));
     assert.match(by.Earth[4], /^Online$/);                      // students 1-8 checked in 5s ago
-    assert.match(by.Jupiter[4], /^Unknown$/);                   // 9,10 stale but signed in; 11,12 signed out
-    assert.match(by.Mars[4], /^Unknown$/);                      // 18 signed in with no stage check-in (waiting room)
-    assert.match(by.Venus[4], /^Offline$/);                     // no students
+    for (const name of ['Jupiter', 'Mars', 'Venus']) {          // signed-in members without a heartbeat, never-seen members, no members
+      assert.match(by[name][4], /^—/, name);
+      assert.equal(/Offline|Unknown/i.test(by[name][4]), false, name + ' is not labelled Offline or Unknown');
+    }
+    const cell = p.locator('#sections-tbody tr', { hasText: 'Jupiter' }).locator('td').nth(4);
+    assert.equal(await cell.locator('.sr-only').innerText(), 'Status unavailable');
+    assert.equal(await cell.locator('[title]').getAttribute('title'), 'Status unavailable');
     assert.equal(by.Earth[1], 'Prof One'); assert.equal(by.Earth[2], '8');
-    assert.equal(/Idle/i.test(await p.locator('#view-sections').innerText()), false);
+    assert.equal(/Idle|Unknown/i.test(await p.locator('#view-sections').innerText()), false);
     assert.equal(await p.locator('#sections-tbody .dot').first().getAttribute('aria-hidden'), 'true');   // dot paired with text
     const aligns = await p.locator('#view-sections thead th').evaluateAll(els => els.map(e => getComputedStyle(e).textAlign));
     assert.deepEqual([aligns[2], aligns[3]], ['right', 'right'], 'numeric headers align with their cells');
@@ -415,11 +419,24 @@ function fixture() {
     await shot(p, 'sections-dark-1280');
     await p.context().close();
   });
+  await check('class sections: Offline only when every member is verified signed out', async () => {
+    const d = makeData();
+    d.profiles.filter(r => r.section === 'Jupiter').forEach(r => {
+      r.active_devices = [];
+      const e = r.email;
+      d.student_stage_time[e] = { student_email: e, ocean_time: 0, character_select_time: 0, tutoring_time: 100, heartbeat_stage: 'Tutoring Dashboard', beatAgo: 900 };
+    });
+    const p = await open('sections', { data: d });
+    await p.waitForSelector('#sections-tbody tr');
+    const jup = await p.locator('#sections-tbody tr', { hasText: 'Jupiter' }).locator('td').nth(4).innerText();
+    assert.match(jup.trim(), /^Offline$/);
+    await p.context().close();
+  });
   await check('class sections: unknown connection data shows "—", never Offline', async () => {
     const p = await open('sections', { initial: { fail: { student_stage_time: { code: '42P01', message: 'x' } } } });
     await p.waitForSelector('#sections-tbody tr td');
     const cells = await p.locator('#sections-tbody tr').evaluateAll(trs => trs.map(tr => tr.children[4].innerText.trim()));
-    assert.deepEqual(cells, ['—', '—', '—', '—']);
+    assert.deepEqual(cells.map(c => c.replace(/\s*Status unavailable$/, '')), ['—', '—', '—', '—']);
     await p.context().close();
   });
   await check('class sections: View opens the roster dialog with one X, Escape closes, focus returns', async () => {
@@ -616,6 +633,51 @@ function fixture() {
     await p.context().close();
   });
 
+  /* ================= NEUTRAL / CONTROL POLICY (migration 0038) ================= */
+  await check('conditions: Register offers Assigned, Free choice and Control only (Neutral is a persona, not a condition)', async () => {
+    const p = await open('students'); await waitStudents(p);
+    const vals = await p.locator('#modal-register-student input[name="rs-condition"]').evaluateAll(els => els.map(e => e.value));
+    assert.deepEqual(vals, ['assigned', 'non-assigned', 'control']);
+    assert.equal(/Neutral/i.test(await p.locator('#modal-register-student').evaluate(e => e.textContent)), false);
+    await p.context().close();
+  });
+  await check('conditions: a legacy Neutral student keeps the value on an unrelated edit; nobody else is offered it', async () => {
+    const p = await open('students'); await waitStudents(p);
+    /* student02 is group_type "neutral" in the fixture (i % 4 === 2). */
+    await p.locator('#student-tbody tr[data-student="student02@example.test"]').focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#drawer-student.is-open');
+    assert.match(await p.locator('#student-tbody tr[data-student="student02@example.test"]').innerText(), /Neutral \(legacy\)/);
+    await p.locator('[data-student-action="edit"]').click();
+    await p.waitForSelector('#modal-edit-student.is-open');
+    assert.equal(await p.locator('#es-neutral-choice').isVisible(), true);
+    assert.equal(await p.locator('input[name="es-condition"][value="neutral"]').isChecked(), true);
+    assert.match(await p.locator('#es-neutral-choice').innerText(), /legacy, unchanged/i);
+    await p.locator('#es-first').fill('Renamed');
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'update'));
+    const upd = (await calls(p)).find(c => c.table === 'profiles' && c.write === 'update');
+    assert.equal(Object.prototype.hasOwnProperty.call(upd.values, 'group_type'), false, 'group_type is not re-sent: ' + JSON.stringify(upd.values));
+    assert.equal(upd.values.full_name.startsWith('Renamed'), true);
+    await p.context().close();
+    const q = await open('students'); await waitStudents(q);
+    await q.locator('#student-tbody tr[data-student="student01@example.test"]').focus(); await q.keyboard.press('Enter');
+    await q.waitForSelector('#drawer-student.is-open');
+    await q.locator('[data-student-action="edit"]').click();
+    await q.waitForSelector('#modal-edit-student.is-open');
+    assert.equal(await q.locator('#es-neutral-choice').isVisible(), false, 'Neutral is not offered for a non-neutral student');
+    const vis = await q.locator('#modal-edit-student input[name="es-condition"]').evaluateAll(els => els.filter(e => e.getClientRects().length).map(e => e.value));
+    assert.deepEqual(vis, ['assigned', 'non-assigned', 'control']);
+    await q.context().close();
+  });
+  await check('conditions: Control policy row says OCEAN only and Neutral is explained as a persona', async () => {
+    const p = await open('controls');
+    await p.waitForSelector('#policy-tbody tr');
+    const ctl = await p.locator('#policy-tbody tr').first().locator('td').allInnerTexts();
+    assert.deepEqual(ctl.map(t => t.trim()), ['Available', 'Locked', 'Locked']);
+    await p.context().close();
+  });
+
   /* ================= STAGE CONTROLS ================= */
   await check('stage controls: three stages with real ids, group availability table from the server rule, no bypass', async () => {
     const p = await open('controls');
@@ -624,11 +686,12 @@ function fixture() {
     assert.deepEqual(await p.locator('#gates-grid .gate-title').allInnerTexts(), ['OCEAN personality test', 'Character selection', 'Tutoring dashboard']);
     const rows = await p.locator('#policy-tbody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(c => c.innerText.trim())));
     assert.deepEqual(rows, [
-      ['Control', 'Available', 'Locked', 'Available'],
+      ['Control', 'Available', 'Locked', 'Locked'],
       ['Experimental · Assigned', 'Available', 'Locked', 'Available'],
       ['Experimental · Free choice', 'Available', 'Available', 'Available after choosing a tutor'],
-      ['Experimental · Neutral', 'Available', 'Locked', 'Available']]);
+      ['Neutral (legacy records)', 'Available', 'Locked', 'Available']]);
     assert.match(await p.locator('#policy-foot').innerText(), /cannot change which stages a group can enter/);
+    assert.match(await p.locator('#policy-foot').innerText(), /Neutral is a tutor persona, not a group/);
     assert.equal(await p.locator('#policy-tbody th').first().evaluate(e => getComputedStyle(e).textAlign), 'left');
     assert.equal(await p.locator('#view-controls').evaluate(el => /Manage gates|Open or close/.test(el.innerText)), true);   // renamed section copy only
     await shot(p, 'controls-dark-1280');

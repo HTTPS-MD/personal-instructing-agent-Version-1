@@ -230,7 +230,7 @@
     var CONDITIONS = {
         'assigned': { short: 'EXP · Assigned', badge: 'badge-accent', family: 'experimental' },
         'non-assigned': { short: 'EXP · Free choice', badge: 'badge', family: 'experimental' },
-        'neutral': { short: 'EXP · Neutral', badge: 'badge-warn', family: 'experimental' },
+        'neutral': { short: 'EXP · Neutral (legacy)', badge: 'badge-warn', family: 'experimental' },
         'control': { short: 'CTRL · Traditional', badge: '', family: 'control' }
     };
 
@@ -1581,24 +1581,23 @@
 
     /* ================================================ 6. CLASS SECTIONS === */
 
-    /* A section is Online while at least one of its students is Connected by
-       the same heartbeat rule Live Sessions uses. With nobody connected it is
-       Unknown while any member has no readable signal (signed in without a
-       stage heartbeat, e.g. on the Waiting Room), otherwise Offline. With the
-       stage-time data unavailable the status is "—", never Offline. */
-    var SECTION_DOT = { connected: 'dot-on', unknown: 'dot-unknown', offline: 'dot-off' };
-    var SECTION_TEXT = { connected: 'Online', unknown: 'Unknown', offline: 'Offline' };
-
+    /* A section has exactly two labels. Online: at least one member is
+       Connected by the same heartbeat rule Live Sessions uses. Offline: there
+       are members and every one of them is verified signed out. Anything else
+       (a member signed in without a stage check-in, no members, unreadable
+       stage-time data) is not enough evidence for either, so there is no
+       label at all: the cell shows a dash with a "Status unavailable"
+       explanation. It is never reported as Offline. */
     function sectionStatus(members) {
-        if (!state.stageTimes) { return null; }
+        if (!state.stageTimes || !members.length) { return null; }
         var now = Date.now();
-        var seen = { connected: 0, unknown: 0, offline: 0 };
-        members.forEach(function (s) {
-            var c = presenceOf(s, state.stageTimes[String(s.email || '').toLowerCase()], now);
-            if (c) { seen[c] += 1; }
-        });
-        var key = seen.connected > 0 ? 'connected' : (seen.unknown > 0 ? 'unknown' : 'offline');
-        return { key: key, connected: seen.connected };
+        var offline = 0;
+        for (var i = 0; i < members.length; i++) {
+            var c = presenceOf(members[i], state.stageTimes[String(members[i].email || '').toLowerCase()], now);
+            if (c === 'connected') { return { online: true }; }
+            if (c === 'offline') { offline += 1; }
+        }
+        return offline === members.length ? { online: false } : null;
     }
 
     function renderSections() {
@@ -1621,9 +1620,9 @@
             var done = members.filter(hasCurrentResult).length;
             var status = sectionStatus(members);
             var statusCell = status === null
-                ? '<span class="muted" title="Connection data is not available">—</span>'
-                : '<span class="presence"><span class="dot ' + SECTION_DOT[status.key] +
-                  '" aria-hidden="true"></span>' + SECTION_TEXT[status.key] + '</span>';
+                ? '<span class="muted status-na" title="Status unavailable">—<span class="sr-only">Status unavailable</span></span>'
+                : '<span class="presence"><span class="dot ' + (status.online ? 'dot-on' : 'dot-off') +
+                  '" aria-hidden="true"></span>' + (status.online ? 'Online' : 'Offline') + '</span>';
             var prof = state.faculty.filter(function (f) { return f.assigned_section === section.name; })[0];
 
             return '' +
@@ -2357,6 +2356,9 @@
         }
         sectionSelect.value = s.section || '';
 
+        /* "Neutral" is a retired condition (0038). Only a student who already has
+           it sees it, selected, so saving cannot silently change them. */
+        $('#es-neutral-choice').hidden = s.group_type !== 'neutral';
         var radio = $('input[name="es-condition"][value="' + (s.group_type || '') + '"]');
         if (radio) { radio.checked = true; }
 
@@ -2450,9 +2452,11 @@
                exist in the database, so that path never worked either.) */
             var payload = {
                 full_name: fullName,
-                section: section,
-                group_type: groupType
+                section: section
             };
+            /* A legacy neutral student who is left as neutral is not re-sent:
+               their assignment is not touched by an unrelated edit. */
+            if (groupType !== 'neutral') { payload.group_type = groupType; }
             /* Only a test whose fields changed is sent, and only its raw data:
                the database calculates the transmuted score. Untouched fields
                leave a score entered before 0034 as it was. */
@@ -2750,18 +2754,21 @@
        revoke). After a successful Grant or Revoke every tick is cleared, so a
        second press cannot repeat the action on the same sections. */
 
-    /* What the SERVER lets each research group enter, read from the stage rule
-       in migration 0005 (pia_can_enter_stage): OCEAN until it is submitted;
-       Character Selection only for the free-choice group (non-assigned) until
-       a tutor is chosen; the Tutoring Dashboard for everyone with OCEAN done,
-       except a free-choice student who has not chosen yet. Nothing on this
-       page edits it, and a stage closed to a section stays closed whatever a
-       group's rule says. */
+    /* What the SERVER lets each group enter, from pia_can_enter_stage as
+       replaced by migration 0038: OCEAN until it is submitted; Character
+       Selection only for the free-choice group (non-assigned) until a tutor is
+       chosen; the Tutoring Dashboard for everyone with OCEAN done except
+       Control (OCEAN only) and a free-choice student who has not chosen yet.
+       Neutral is a tutor persona, not a group: free-choice students can pick
+       it, assigned students can be given it. Records still carrying the old
+       "neutral" group behave as Assigned. Nothing on this page edits the rule,
+       and a stage closed to a section stays closed whatever a group's rule
+       says. */
     var GROUP_POLICY = [
-        { label: 'Control', ocean: 'Available', char: 'Locked', dash: 'Available' },
+        { label: 'Control', ocean: 'Available', char: 'Locked', dash: 'Locked' },
         { label: 'Experimental · Assigned', ocean: 'Available', char: 'Locked', dash: 'Available' },
         { label: 'Experimental · Free choice', ocean: 'Available', char: 'Available', dash: 'Available after choosing a tutor' },
-        { label: 'Experimental · Neutral', ocean: 'Available', char: 'Locked', dash: 'Available' }
+        { label: 'Neutral (legacy records)', ocean: 'Available', char: 'Locked', dash: 'Available' }
     ];
 
     function renderPolicy() {
@@ -2772,7 +2779,7 @@
             return '<tr><th scope="row" class="policy-group">' + esc(g.label) + '</th>' +
                 cell(g.ocean) + cell(g.char) + cell(g.dash) + '</tr>';
         }).join('');
-        $('#policy-foot').textContent = 'Shown from the server’s stage rule. This page cannot change which stages a group can enter; it opens or closes a stage for whole sections below.';
+        $('#policy-foot').textContent = 'Shown from the server’s stage rule (migration 0038). Neutral is a tutor persona, not a group: free-choice students can pick it and assigned students can be given it; records still marked Neutral behave as Assigned. This page cannot change which stages a group can enter; it opens or closes a stage for whole sections below.';
     }
 
     var GATE_ACCESS_TIP = 'Granting moves a section’s eligible students in right away. Grant a section ' +

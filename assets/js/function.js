@@ -141,6 +141,8 @@ async function resolveStudentRedirect(profile) {
         return (await isStageOpen('stage_char'))
             ? '/student/html/character-selection.html' : '/student/html/waiting-room.html';
     }
+    // Control has nothing after OCEAN; the thank-you screen is where they stay.
+    if (isControlGroup(profile)) return '/student/html/assessment-complete.html';
     return (await isStageOpen('stage_dash'))
         ? '/student/html/student-dashboard.html' : '/student/html/waiting-room.html';
 }
@@ -311,6 +313,14 @@ function isNonAssignedGroup(profile) {
     return (g === 'non-assigned' || g === 'non_assigned');
 }
 
+// Control takes OCEAN only (migration 0038): no Character Selection, no
+// Tutoring Dashboard. The server enforces it in pia_can_enter_stage; this is
+// the same rule for the route guards and redirects.
+function isControlGroup(profile) {
+    const g = profile.group_type ? profile.group_type.trim().toLowerCase() : '';
+    return g === 'control';
+}
+
 // ISANG SOURCE OF TRUTH para sa prerequisite chain. Ginagamit ng route guard
 // (para harangan ang direct-URL access) AT ng waiting room (para hindi nito
 // i-redirect ang student sa page na hindi naman nila pwedeng puntahan).
@@ -321,7 +331,7 @@ function canEnterStage(profile, pageKey) {
 
     if (pageKey === 'ocean') return !profile.is_ocean_done;
     if (pageKey === 'char') return !!profile.is_ocean_done && needsCharacter;
-    if (pageKey === 'dash') return !!profile.is_ocean_done && !needsCharacter;
+    if (pageKey === 'dash') return !!profile.is_ocean_done && !needsCharacter && !isControlGroup(profile);
     return false;
 }
 

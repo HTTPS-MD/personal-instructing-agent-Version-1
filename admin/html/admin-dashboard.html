@@ -305,7 +305,7 @@
                                     <option value="experimental">Experimental</option>
                                     <option value="assigned">· Assigned</option>
                                     <option value="non-assigned">· Free choice</option>
-                                    <option value="neutral">· Neutral</option>
+                                    <option value="neutral">· Neutral (legacy)</option>
                                     <option value="control">Control</option>
                                 </select>
                                 <label class="search">
@@ -547,10 +547,6 @@
                                 <span class="choice-title">EXP · Free choice</span>
                             </label>
                             <label class="choice">
-                                <input type="radio" name="rs-condition" value="neutral">
-                                <span class="choice-title">EXP · Neutral persona</span>
-                            </label>
-                            <label class="choice">
                                 <input type="radio" name="rs-condition" value="control">
                                 <span class="choice-title">CTRL · Traditional</span>
                             </label>
@@ -659,9 +655,12 @@
                                 <input type="radio" name="es-condition" value="non-assigned">
                                 <span class="choice-title">EXP · Free choice</span>
                             </label>
-                            <label class="choice">
+                            <!-- Legacy only: shown when the student already holds this value so it is
+                                 kept unless the admin chooses another. Never offered for anyone else
+                                 (the database refuses new neutral assignments, migration 0038). -->
+                            <label class="choice" id="es-neutral-choice" hidden>
                                 <input type="radio" name="es-condition" value="neutral">
-                                <span class="choice-title">EXP · Neutral persona</span>
+                                <span class="choice-title">EXP · Neutral (legacy, unchanged)</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="es-condition" value="control">

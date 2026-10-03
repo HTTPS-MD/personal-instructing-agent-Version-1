@@ -26,7 +26,15 @@
     // route guard: character selection para sa free-choice group, ang
     // dashboard para sa iba, o ang waiting room kapag sarado pa ang stage.
     const continueBtn = document.getElementById('btn-continue');
-    if (continueBtn) continueBtn.href = await resolveStudentRedirect(profile);
+    if (isControlGroup(profile)) {
+        // Control ends here (migration 0038): no next stage, so no Continue.
+        const actions = continueBtn && continueBtn.closest('.gate-actions');
+        if (actions) actions.remove();
+        const lede = document.querySelector('.gate-lede');
+        if (lede) lede.textContent = 'Your answers have been saved. That is everything for now.';
+    } else if (continueBtn) {
+        continueBtn.href = await resolveStudentRedirect(profile);
+    }
 
     document.body.classList.remove('opacity-0');
 })();
