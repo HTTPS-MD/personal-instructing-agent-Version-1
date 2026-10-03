@@ -84,10 +84,22 @@ begin
 end;
 $$;
 
--- A snapshot of every row this migration must leave alone. Compared at the end.
-create temporary table pia_0038_before on commit drop as
-  select email, group_type, section, current_stage, selected_character, is_ocean_done
+-- A fingerprint of the profiles table, taken before anything changes and compared
+-- by the postflight. It is an ORDINARY table, not a temporary one: the Supabase SQL
+-- Editor can run the pieces of a script on different connections, and a TEMP table
+-- (or ON COMMIT DROP) then vanishes before the postflight reads it (42P01). It holds
+-- only a row count and a hash, no emails, and nothing can read it through the API.
+-- Dropped by the postflight on success; a rollback removes it with the rest, and
+-- the drop-if-exists below makes a re-run after any interruption safe.
+drop table if exists public.pia_0038_snapshot;
+create table public.pia_0038_snapshot as
+  select count(*)::bigint as n,
+         coalesce(md5(string_agg(md5(row(email, group_type, section, current_stage,
+                                          selected_character, is_ocean_done)::text),
+                                 ',' order by email)), '') as digest
     from public.profiles;
+alter table public.pia_0038_snapshot enable row level security;
+revoke all on public.pia_0038_snapshot from public, anon, authenticated;
 
 
 -- ---------------------------------------------------------------------------
@@ -284,6 +296,10 @@ declare
   v_legacy int;
   v_ctl    int;
   v_def    text;
+  v_n0     bigint;
+  v_n1     bigint;
+  v_d0     text;
+  v_d1     text;
 begin
   -- (1) The rule, group by group (pure function, no data).
   if public.pia_can_enter_stage(true,  'control',      null,  'Tutoring Dashboard')   then v_fail := v_fail || 'control can enter the dashboard; '; end if;
@@ -307,14 +323,17 @@ begin
   end if;
 
   -- (3) Nothing was written to any profile by this migration.
-  select count(*) into v_n from (
-    select email, group_type, section, current_stage, selected_character, is_ocean_done from public.profiles
-    except
-    select email, group_type, section, current_stage, selected_character, is_ocean_done from pia_0038_before) d;
-  if v_n <> 0 then v_fail := v_fail || v_n || ' profile row(s) changed during the migration; '; end if;
-  select count(*) into v_n from pia_0038_before b
-   where not exists (select 1 from public.profiles p where p.email = b.email);
-  if v_n <> 0 then v_fail := v_fail || v_n || ' profile row(s) disappeared; '; end if;
+  select s.n, s.digest into v_n0, v_d0 from public.pia_0038_snapshot s;
+  select count(*)::bigint,
+         coalesce(md5(string_agg(md5(row(email, group_type, section, current_stage,
+                                          selected_character, is_ocean_done)::text),
+                                 ',' order by email)), '')
+    into v_n1, v_d1 from public.profiles;
+  if v_n1 <> v_n0 then
+    v_fail := v_fail || 'profile row count changed (' || v_n0 || ' -> ' || v_n1 || '); ';
+  elsif v_d1 <> v_d0 then
+    v_fail := v_fail || 'a profile row changed during the migration; ';
+  end if;
 
   -- (4) The no-new-neutral trigger, rehearsed on probe rows and rolled back.
   begin
@@ -409,6 +428,9 @@ begin
   if v_fail <> '' then
     raise exception 'PIA 0038 ABORT: %', v_fail using errcode = 'P0001';
   end if;
+
+  -- Checks passed: the fingerprint has done its job.
+  drop table public.pia_0038_snapshot;
   raise notice 'PIA 0038 OK: Control is OCEAN-only; Neutral can no longer be assigned as a condition; no profile was changed.';
 end;
 $$;
