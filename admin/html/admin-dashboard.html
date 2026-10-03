@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-surface="admin">
 
 <head>
     <meta charset="UTF-8">
@@ -25,11 +25,14 @@
          the shared `sb` client. Must load before function.js. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Typeface: Plus Jakarta Sans (primary) with Inter as the metric fallback. -->
+    <!-- Admin typefaces: Inter (UI) and JetBrains Mono (numbers, timers, identifiers),
+         requested without blocking render by admin-fonts.js, the same way theme-boot.js
+         loads the site fonts. -->
+    <script src="../../assets/js/admin-fonts.js"></script>
 
     <link rel="stylesheet" href="../../styles/global.css">
-    <link rel="stylesheet" href="../../styles/shell.css">
     <link rel="stylesheet" href="../../styles/pages/admin.css">
+    <link rel="stylesheet" href="../../styles/pages/admin-console.css">
 </head>
 
 <body data-boot="pending">
@@ -82,6 +85,9 @@
             <!-- Math Task: the four operations, one per quadrant. -->
             <symbol id="i-math" viewBox="0 0 24 24"><path d="M7 4v6M4 7h6"/><path d="M14 7h6"/><path d="m4.9 14.9 4.2 4.2M9.1 14.9l-4.2 4.2"/><path d="M14 17h6"/><circle cx="17" cy="14" r=".9" fill="currentColor" stroke="none"/><circle cx="17" cy="20" r=".9" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.4 2.1 5.9 6.5 6.5-4.4.6-5.9 2.1-6.5 6.5-.6-4.4-2.1-5.9-6.5-6.5 4.4-.6 5.9-2.1 6.5-6.5Z"/><path d="M18.5 15.5c.3 1.9.9 2.5 2.8 2.8-1.9.3-2.5.9-2.8 2.8-.3-1.9-.9-2.5-2.8-2.8 1.9-.3 2.5-.9 2.8-2.8Z"/></symbol>
+            <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></symbol>
+            <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z"/></symbol>
+            <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
         </defs>
     </svg>
 
@@ -108,95 +114,61 @@
     <div class="scrim" id="nav-scrim" aria-hidden="true"></div>
 
     <!-- =====================================================================
-         APPLICATION SHELL
+         APPLICATION SHELL — sidebar, header, main, user area (admin-console.css)
          ===================================================================== -->
-    <div class="app" id="app" data-rail="collapsed">
+    <div class="app" id="app">
 
-        <!-- ---------------------------------------------------------------
-             HOVER RAIL
-             Collapsed to 76px, expands to 264px on hover and overlays the
-             workspace. Every icon lives in a .rail-slot of exactly
-             (76 − 2×8) = 60px, so its centre sits on the rail's midpoint in
-             both states and never moves. Everything that only exists when
-             expanded is wrapped in .rail-reveal and is faded, not re-laid-out.
-             --------------------------------------------------------------- -->
         <aside class="sidebar" id="sidebar" aria-label="Primary">
-
             <div class="sidebar-brand">
-                <span class="rail-slot">
-                    <a class="brand-link" href="#overview" data-view-link="overview"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA — Admin overview" width="48" height="48"></a>
-                </span>
-                <div class="brand-text rail-reveal">
-                    <div class="brand-name">PIA System</div>
-                    <div class="brand-sub">Admin Console</div>
-                </div>
+                <a class="brand-link" href="#overview" data-view-link="overview"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA — Admin overview" width="28" height="28"></a>
+                <span class="brand-name">PIA Admin</span>
             </div>
 
-            <div class="sidebar-scroll">
-                <nav class="nav-group" aria-label="Workspace">
-                    <p class="nav-group-label rail-reveal">Workspace</p>
+            <nav class="sidebar-nav" aria-label="Main">
+                <ul class="nav-list">
+                    <li><button type="button" class="nav-item" data-view="overview">Overview</button></li>
+                    <li><button type="button" class="nav-item" data-view="live">Live Sessions</button></li>
+                    <li class="nav-parent" id="nav-people">
+                        <button type="button" class="nav-item nav-toggle" id="nav-people-toggle"
+                            aria-expanded="false" aria-controls="nav-people-list">
+                            <span>People</span>
+                            <svg class="icon nav-chevron" aria-hidden="true"><use href="#i-chev-down"></use></svg>
+                        </button>
+                        <ul class="nav-sub" id="nav-people-list" hidden>
+                            <li><button type="button" class="nav-item" data-view="sections">
+                                <span>Class Sections</span><span class="nav-count mono" id="nav-count-sections">—</span></button></li>
+                            <li><button type="button" class="nav-item" data-view="students">
+                                <span>All Students</span><span class="nav-count mono" id="nav-count-students">—</span></button></li>
+                            <li><button type="button" class="nav-item" data-view="faculty">
+                                <span>Faculty</span><span class="nav-count mono" id="nav-count-faculty">—</span></button></li>
+                        </ul>
+                    </li>
+                    <li><button type="button" class="nav-item" data-view="controls">Stage Controls</button></li>
+                    <li><button type="button" class="nav-item" data-view="mathtask">
+                        <span>Math Task</span><span class="nav-count mono" id="nav-count-mathtask">—</span></button></li>
+                </ul>
+            </nav>
 
-                    <button class="nav-item is-active" data-view="overview">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-grid"></use></svg></span>
-                        <span class="nav-label rail-reveal">Overview</span>
-                    </button>
-
-                    <button class="nav-item" data-view="sections">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-layers"></use></svg></span>
-                        <span class="nav-label rail-reveal">Sections</span>
-                        <span class="nav-count rail-reveal" id="nav-count-sections">—</span>
-                    </button>
-
-                    <button class="nav-item" data-view="students">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-users"></use></svg></span>
-                        <span class="nav-label rail-reveal">Student Roster</span>
-                        <span class="nav-count rail-reveal" id="nav-count-students">—</span>
-                    </button>
-
-                    <button class="nav-item" data-view="faculty">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-cap"></use></svg></span>
-                        <span class="nav-label rail-reveal">Faculty</span>
-                        <span class="nav-count rail-reveal" id="nav-count-faculty">—</span>
-                    </button>
-                </nav>
-
-                <nav class="nav-group" aria-label="Research operations">
-                    <p class="nav-group-label rail-reveal">Research Ops</p>
-
-                    <button class="nav-item" data-view="controls">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-sliders"></use></svg></span>
-                        <span class="nav-label rail-reveal">Stage Controls</span>
-                    </button>
-
-                    <button class="nav-item" data-view="mathtask">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-math"></use></svg></span>
-                        <span class="nav-label rail-reveal">Math Task</span>
-                        <span class="nav-count rail-reveal" id="nav-count-mathtask">—</span>
-                    </button>
-
-                    <button class="nav-item" data-view="settings">
-                        <span class="rail-slot"><svg class="icon"><use href="#i-gear"></use></svg></span>
-                        <span class="nav-label rail-reveal">Settings</span>
-                    </button>
-                </nav>
-            </div>
-
+            <!-- Anchored to the bottom of the sidebar (margin-top:auto). -->
             <div class="sidebar-foot">
-                <button class="sidebar-user" data-view="profile" title="Profile" aria-label="Profile">
-                    <span class="rail-slot">
-                        <span class="avatar" id="admin-initials" aria-hidden="true">··</span>
-                    </span>
-                    <span class="sidebar-user-text rail-reveal">
+                <button type="button" class="sidebar-user" id="user-menu-btn" aria-haspopup="menu"
+                    aria-expanded="false" aria-controls="user-menu">
+                    <span class="avatar avatar-md" id="admin-initials" aria-hidden="true">··</span>
+                    <span class="sidebar-user-text">
                         <span class="sidebar-user-name" id="admin-name">Loading…</span>
-                        <span class="sidebar-user-role" id="admin-email">—</span>
+                        <span class="sidebar-user-mail" id="admin-email">—</span>
                     </span>
+                    <svg class="icon icon-sm user-chevron" aria-hidden="true"><use href="#i-chev-up"></use></svg>
                 </button>
-
-                <!-- The last thing in the rail, where a way out belongs. -->
-                <button class="nav-item nav-item-signout" data-modal-open="modal-signout">
-                    <span class="rail-slot"><svg class="icon"><use href="#i-logout"></use></svg></span>
-                    <span class="nav-label rail-reveal">Sign out</span>
-                </button>
+                <div class="user-menu" id="user-menu" role="menu" aria-label="Account" hidden>
+                    <button type="button" class="user-menu-item" role="menuitem" data-user-action="profile">
+                        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-user"></use></svg>Profile</button>
+                    <button type="button" class="user-menu-item" role="menuitem" data-user-action="settings">
+                        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-gear"></use></svg>Settings</button>
+                    <button type="button" class="user-menu-item is-signout" role="menuitem" id="user-signout" data-user-action="signout">
+                        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-logout"></use></svg>Sign Out</button>
+                </div>
+                <p class="sr-only" id="signout-status" role="status" aria-live="polite"></p>
             </div>
         </aside>
 
@@ -204,479 +176,292 @@
 
             <header class="topbar">
                 <div class="topbar-left">
-                    <button class="btn-icon nav-toggle-mobile" id="mobile-nav-toggle" title="Open navigation">
-                        <svg class="icon"><use href="#i-menu"></use></svg>
-                        <span class="sr-only">Open navigation</span>
+                    <button type="button" class="btn-icon nav-toggle-mobile" id="mobile-nav-toggle"
+                        aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+                        <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
                     </button>
-
                     <nav class="crumbs" aria-label="Breadcrumb">
-                        <span class="crumbs-trail">Admin</span>
-                        <svg class="icon icon-sm crumbs-trail"><use href="#i-chev-right"></use></svg>
-                        <strong id="crumb-current">Overview</strong>
+                        <ol id="crumbs-list"><li>Admin</li><li aria-current="page">Overview</li></ol>
                     </nav>
+                </div>
+                <div class="topbar-center">
+                    <button type="button" class="btn-icon search-trigger" id="palette-open" aria-haspopup="dialog"
+                        aria-label="Search students, sections, or commands" aria-keyshortcuts="Control+K Meta+K"
+                        title="Search">
+                        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                    </button>
+                </div>
+                <div class="topbar-right">
+                    <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="Switch to light theme">
+                        <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+                        <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+                    </button>
                 </div>
             </header>
 
-            <main class="main">
+            <main class="main" id="main">
 
                 <!-- ============================== VIEW 1 · OVERVIEW ====== -->
+                <!-- Deliberately blank: no charts, metrics or greeting. -->
                 <section class="page" id="view-overview" data-view-panel="overview">
-                    <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title" id="overview-greeting">Overview</h1>
-                        </div>
-                        <div class="page-actions">
-                            <button class="btn btn-secondary" id="export-overview">
-                                <svg class="icon"><use href="#i-download"></use></svg>
-                                Export dataset
-                            </button>
-                            <button class="btn btn-primary" data-modal-open="modal-register-student">
-                                <svg class="icon"><use href="#i-plus"></use></svg>
-                                Register student
-                            </button>
-                        </div>
-                    </div>
+                    <div class="page-head"><h1 class="page-title">Overview</h1></div>
+                    <div class="empty-panel"><p>Nothing to show here yet.</p></div>
+                </section>
 
-                    <div class="stack-lg">
-                        <div class="grid grid-4 stat-grid">
-                            <div class="stat" data-region="cohort sections">
-                                <div class="stat-top">
-                                    <span class="stat-label">Enrolled students</span>
-                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-users"></use></svg></span>
-                                </div>
-                                <p class="stat-value" id="kpi-enrolled"><span class="skeleton skeleton-line"></span></p>
-                            </div>
+                <!-- ============================== VIEW 2 · LIVE SESSIONS == -->
+                <section class="page is-hidden" id="view-live" data-view-panel="live">
+                    <div class="page-head"><h1 class="page-title">Live Sessions</h1></div>
 
-                            <div class="stat" data-region="cohort sections">
-                                <div class="stat-top">
-                                    <span class="stat-label">Online now</span>
-                                    <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-activity"></use></svg></span>
-                                </div>
-                                <p class="stat-value" id="kpi-online"><span class="skeleton skeleton-line"></span></p>
-                            </div>
-
-                            <div class="stat" data-region="cohort sections">
-                                <div class="stat-top">
-                                    <span class="stat-label">OCEAN completion</span>
-                                    <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-brain"></use></svg></span>
-                                </div>
-                                <p class="stat-value" id="kpi-ocean"><span class="skeleton skeleton-line"></span></p>
-                                <div class="bar"><div class="bar-fill f-amber" id="kpi-ocean-bar" style="width:0%"></div></div>
-                            </div>
-
-                            <div class="stat" data-region="cohort sections">
-                                <div class="stat-top">
-                                    <span class="stat-label">Awaiting activation</span>
-                                    <span class="stat-glyph g-danger"><svg class="icon"><use href="#i-mail"></use></svg></span>
-                                </div>
-                                <p class="stat-value" id="kpi-inactive"><span class="skeleton skeleton-line"></span></p>
+                    <div class="panel" data-region="cohort">
+                        <div class="panel-bar">
+                            <div class="tabs" role="group" aria-label="Connection filter" id="live-tabs">
+                                <button type="button" class="tab is-active" data-live-filter="all" aria-pressed="true">All <span class="mono" data-live-count="all">—</span></button>
+                                <button type="button" class="tab" data-live-filter="connected" aria-pressed="false">Connected <span class="mono" data-live-count="connected">—</span></button>
+                                <button type="button" class="tab" data-live-filter="offline" aria-pressed="false">Offline <span class="mono" data-live-count="offline">—</span></button>
                             </div>
                         </div>
-
-                        <!-- The two columns share one row height and the last card in
-                             each fills it (.overview-split), so neither leaves a hole
-                             beneath it. -->
-                        <div class="grid grid-main overview-split">
-                            <div class="stack">
-                                <div class="card" data-region="cohort">
-                                    <div class="card-head">
-                                        <div class="card-head-text">
-                                            <h2 class="card-title">Study pipeline</h2>
-                                        </div>
-                                        <div class="card-tools">
-                                            <button class="btn btn-secondary btn-sm" data-view-link="controls">Manage gates</button>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="funnel" id="pipeline-strip"></div>
-                                    </div>
-                                </div>
-
-                                <div class="card" data-region="cohort">
-                                    <div class="card-head">
-                                        <div class="card-head-text">
-                                            <div class="with-tip">
-                                                <h2 class="card-title">Live sessions</h2>
-                                                <button type="button" class="info-tip" data-tip="Students whose page has checked in within the last 60 seconds. Time counts only while their tab is visible, so a student on another tab or offline drops off." aria-label="About live sessions"><svg class="icon"><use href="#i-info"></use></svg></button>
-                                            </div>
-                                        </div>
-                                        <div class="card-tools">
-                                            <button class="btn btn-secondary btn-sm" data-view-link="students">Open roster</button>
-                                        </div>
-                                    </div>
-                                    <div class="table-wrap">
-                                        <table class="table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Student</th>
-                                                    <th>Section</th>
-                                                    <th>Stage</th>
-                                                    <th>Active time</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="live-tbody"></tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="stack">
-                                <div class="card" data-region="settings">
-                                    <div class="card-head">
-                                        <div class="card-head-text">
-                                            <h2 class="card-title">Access gates</h2>
-                                        </div>
-                                    </div>
-                                    <div class="card-body stack" id="gate-summary"></div>
-                                </div>
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Live sessions table">
+                            <table class="table">
+                                <caption class="sr-only">Students with recorded stage activity</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Student</th>
+                                        <th scope="col">Section</th>
+                                        <th scope="col">Stage</th>
+                                        <th scope="col" class="col-right col-w-time">Active time</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="live-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div class="pager">
+                            <span id="live-pager-info" class="muted">Loading…</span>
+                            <div class="pager-btns">
+                                <button type="button" class="btn btn-secondary btn-sm" id="live-prev" disabled>Previous</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="live-next" disabled>Next</button>
                             </div>
                         </div>
-
-                        <!-- One tile per section in a grid that fills the width, so a new
-                             section adds a column (then a row) instead of lengthening
-                             the page. Past three rows it scrolls inside the card. -->
-                        <div class="card" data-region="cohort sections">
-                            <div class="card-head">
-                                <div class="card-head-text">
-                                    <h2 class="card-title">OCEAN by section</h2>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="health-grid" id="section-health" role="region"
-                                    aria-label="OCEAN completion by section" tabindex="0"></div>
-                            </div>
-                        </div>
+                        <p class="panel-foot muted" id="live-foot">
+                            Connected means this student’s stage page checked in within the last minute. Active time is counted by the server and stops when check-ins stop.
+                        </p>
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 2 · SECTIONS ====== -->
+                <!-- ============================== VIEW 3 · CLASS SECTIONS = -->
                 <section class="page is-hidden" id="view-sections" data-view-panel="sections">
                     <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title">Sections</h1>
-                        </div>
+                        <h1 class="page-title">Class Sections</h1>
                         <div class="page-actions">
-                            <button class="btn btn-primary" data-modal-open="modal-new-section">
-                                <svg class="icon"><use href="#i-plus"></use></svg>
-                                New section
-                            </button>
+                            <button type="button" class="btn btn-primary" data-modal-open="modal-new-section">New section</button>
                         </div>
                     </div>
 
-                    <div class="grid grid-3" id="sections-grid" data-region="cohort sections"></div>
+                    <div class="panel" data-region="cohort sections">
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Class sections table">
+                            <table class="table">
+                                <caption class="sr-only">Class sections</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Section</th>
+                                        <th scope="col">Professor</th>
+                                        <th scope="col" class="col-right">Students</th>
+                                        <th scope="col" class="col-right">OCEAN done</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col" class="col-right col-w-actions"><span class="sr-only">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sections-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
 
-                <!-- ============================== VIEW 3 · ROSTER ======== -->
+                <!-- ============================== VIEW 4 · ALL STUDENTS == -->
                 <section class="page is-hidden" id="view-students" data-view-panel="students">
                     <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title">Student roster</h1>
-                        </div>
+                        <h1 class="page-title">All Students</h1>
                         <div class="page-actions">
-                            <button class="btn btn-secondary" id="export-roster">
-                                <svg class="icon"><use href="#i-download"></use></svg>
-                                Export CSV
-                            </button>
-                            <button class="btn btn-primary" data-modal-open="modal-register-student">
-                                <svg class="icon"><use href="#i-plus"></use></svg>
-                                Register student
-                            </button>
+                            <button type="button" class="btn btn-primary" data-modal-open="modal-register-student">Register student</button>
                         </div>
                     </div>
 
-                    <div class="stack">
-                        <!-- Stage drill-down tiles. The data-stage value is the exact
-                             profiles.current_stage string the database stores. -->
-                        <div class="grid grid-4 stat-grid" id="stage-tiles">
-                            <button class="stat" aria-pressed="false" data-stage-filter="OCEAN" data-region="stages">
-                                <span class="stat-top">
-                                    <span class="stat-label">OCEAN test</span>
-                                    <span class="stat-glyph g-amber"><svg class="icon"><use href="#i-brain"></use></svg></span>
-                                </span>
-                                <span class="stat-value" data-stage-count="OCEAN"><span class="skeleton skeleton-line"></span></span>
-                            </button>
-                            <button class="stat" aria-pressed="false" data-stage-filter="Character Selection" data-region="stages">
-                                <span class="stat-top">
-                                    <span class="stat-label">Character select</span>
-                                    <span class="stat-glyph g-teal"><svg class="icon"><use href="#i-user"></use></svg></span>
-                                </span>
-                                <span class="stat-value" data-stage-count="Character Selection"><span class="skeleton skeleton-line"></span></span>
-                            </button>
-                            <button class="stat" aria-pressed="false" data-stage-filter="Tutoring Dashboard" data-region="stages">
-                                <span class="stat-top">
-                                    <span class="stat-label">Tutoring dashboard</span>
-                                    <span class="stat-glyph"><svg class="icon"><use href="#i-grid"></use></svg></span>
-                                </span>
-                                <span class="stat-value" data-stage-count="Tutoring Dashboard"><span class="skeleton skeleton-line"></span></span>
-                            </button>
-                            <button class="stat" aria-pressed="false" data-stage-filter="Active Game" data-region="stages">
-                                <span class="stat-top">
-                                    <span class="stat-label">Active session</span>
-                                    <span class="stat-glyph g-accent"><svg class="icon"><use href="#i-gamepad"></use></svg></span>
-                                </span>
-                                <span class="stat-value" data-stage-count="Active Game"><span class="skeleton skeleton-line"></span></span>
-                            </button>
+                    <div class="panel" data-region="roster stages">
+                        <div class="panel-bar">
+                            <!-- Counts come from head-only queries over the whole table,
+                                 never from the rows on this page. The data-stage value is
+                                 the exact profiles.current_stage string the database stores. -->
+                            <div class="tabs" role="group" aria-label="Stage filter" id="stage-tabs">
+                                <button type="button" class="tab is-active" data-stage-filter="" aria-pressed="true">All <span class="mono" data-stage-count="all">—</span></button>
+                                <button type="button" class="tab" data-stage-filter="OCEAN" aria-pressed="false">OCEAN test <span class="mono" data-stage-count="OCEAN">—</span></button>
+                                <button type="button" class="tab" data-stage-filter="Character Selection" aria-pressed="false">Character select <span class="mono" data-stage-count="Character Selection">—</span></button>
+                                <button type="button" class="tab" data-stage-filter="Tutoring Dashboard" aria-pressed="false">Tutoring dashboard <span class="mono" data-stage-count="Tutoring Dashboard">—</span></button>
+                                <button type="button" class="tab" data-stage-filter="Active Game" aria-pressed="false">Active session <span class="mono" data-stage-count="Active Game">—</span></button>
+                            </div>
+                            <div class="panel-tools">
+                                <label class="sr-only" for="group-filter">Research group</label>
+                                <select class="input input-sm" id="group-filter">
+                                    <option value="all">All groups</option>
+                                    <option value="experimental">Experimental</option>
+                                    <option value="assigned">· Assigned</option>
+                                    <option value="non-assigned">· Free choice</option>
+                                    <option value="neutral">· Neutral</option>
+                                    <option value="control">Control</option>
+                                </select>
+                                <label class="search">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                                    <input type="search" class="input input-sm" id="student-search"
+                                        placeholder="Search students" aria-label="Search students">
+                                </label>
+                            </div>
                         </div>
 
-                        <div class="card" data-region="roster">
-                            <div class="card-head">
-                                <div class="card-head-text">
-                                    <h2 class="card-title" id="roster-title">All students</h2>
-                                </div>
-                                <div class="card-tools">
-                                    <label class="search">
-                                        <svg class="icon"><use href="#i-search"></use></svg>
-                                        <input type="search" class="input" id="student-search"
-                                            placeholder="Search name or email" aria-label="Search students">
-                                    </label>
-                                </div>
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="All students table">
+                            <table class="table">
+                                <caption class="sr-only">All students</caption>
+                                <thead id="roster-thead">
+                                    <tr><th scope="col">Student</th><th scope="col">Section</th><th scope="col">Condition</th><th scope="col">Stage</th><th scope="col">Status</th></tr>
+                                </thead>
+                                <tbody id="student-tbody"></tbody>
+                            </table>
+                            <div id="student-empty" class="state-block is-hidden">
+                                <p class="state-title">No matching students</p>
+                                <button type="button" class="btn btn-secondary btn-sm" id="reset-filters">Reset filters</button>
                             </div>
+                        </div>
 
-                            <div class="card-head" style="min-height:60px" id="roster-filter-bar">
-                                <div class="segment" role="group" aria-label="Group filter">
-                                    <button class="segment-btn is-active" data-group-filter="all">All</button>
-                                    <button class="segment-btn" data-group-filter="experimental">Experimental</button>
-                                    <button class="segment-btn" data-group-filter="control">Control</button>
-                                </div>
-                                <div class="segment is-hidden" id="subgroup-segment" role="group" aria-label="Persona filter">
-                                    <button class="segment-btn is-active" data-sub-filter="all">All personas</button>
-                                    <button class="segment-btn" data-sub-filter="assigned">Assigned</button>
-                                    <button class="segment-btn" data-sub-filter="non-assigned">Free choice</button>
-                                    <button class="segment-btn" data-sub-filter="neutral">Neutral</button>
-                                </div>
-                            </div>
-
-                            <div class="table-wrap">
-                                <table class="table">
-                                    <thead id="roster-thead"></thead>
-                                    <tbody id="student-tbody"></tbody>
-                                </table>
-                                <div id="student-empty" class="state-block is-hidden">
-                                    <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-search"></use></svg></span>
-                                    <p class="state-title">No matching students</p>
-                                    <button class="btn btn-secondary btn-sm" id="reset-filters">Reset filters</button>
-                                </div>
-                            </div>
-
-                            <div class="pager">
-                                <span id="pager-info">Loading…</span>
-                                <div class="pager-btns">
-                                    <button class="btn btn-secondary btn-sm" id="page-prev" disabled>
-                                        <svg class="icon"><use href="#i-chev-left"></use></svg> Previous
-                                    </button>
-                                    <button class="btn btn-secondary btn-sm" id="page-next" disabled>
-                                        Next <svg class="icon"><use href="#i-chev-right"></use></svg>
-                                    </button>
-                                </div>
+                        <div class="pager">
+                            <span id="pager-info" class="muted">Loading…</span>
+                            <div class="pager-btns">
+                                <button type="button" class="btn btn-secondary btn-sm" id="page-prev" disabled>Previous</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="page-next" disabled>Next</button>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 4 · FACULTY ======= -->
+                <!-- ============================== VIEW 5 · FACULTY ======= -->
                 <section class="page is-hidden" id="view-faculty" data-view-panel="faculty">
                     <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title">Faculty</h1>
-                        </div>
+                        <h1 class="page-title">Faculty</h1>
                         <div class="page-actions">
-                            <button class="btn btn-primary" data-modal-open="modal-add-professor">
-                                <svg class="icon"><use href="#i-plus"></use></svg>
-                                Add professor
-                            </button>
+                            <button type="button" class="btn btn-primary" data-modal-open="modal-add-professor">Add professor</button>
                         </div>
                     </div>
 
-                    <div class="card" data-region="faculty">
-                        <div class="card-head">
-                            <div class="card-head-text">
-                                <div class="with-tip">
-                                    <h2 class="card-title">Faculty roster</h2>
-                                    <button type="button" class="info-tip" data-tip="Each professor sees only their assigned section." aria-label="About faculty access"><svg class="icon"><use href="#i-info"></use></svg></button>
-                                </div>
-                            </div>
-                            <div class="card-tools">
+                    <div class="panel" data-region="faculty">
+                        <div class="panel-bar">
+                            <p class="panel-note muted">Each professor sees only their assigned section.</p>
+                            <div class="panel-tools">
                                 <label class="search">
-                                    <svg class="icon"><use href="#i-search"></use></svg>
-                                    <input type="search" class="input" id="faculty-search"
+                                    <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                                    <input type="search" class="input input-sm" id="faculty-search"
                                         placeholder="Search faculty" aria-label="Search faculty">
                                 </label>
                             </div>
                         </div>
-                        <div class="table-wrap">
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Faculty table">
                             <table class="table">
+                                <caption class="sr-only">Faculty</caption>
                                 <thead>
                                     <tr>
-                                        <th>Professor</th>
-                                        <th>Department</th>
-                                        <th>Section</th>
-                                        <th>Status</th>
+                                        <th scope="col">Professor</th>
+                                        <th scope="col">Department</th>
+                                        <th scope="col">Section</th>
+                                        <th scope="col">Account status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="faculty-tbody"></tbody>
                             </table>
                             <div id="faculty-empty" class="state-block is-hidden">
-                                <span class="state-glyph"><svg class="icon icon-lg"><use href="#i-cap"></use></svg></span>
                                 <p class="state-title">No faculty yet</p>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 5 · CONTROLS ====== -->
+                <!-- ============================== VIEW 6 · STAGE CONTROLS = -->
                 <section class="page is-hidden" id="view-controls" data-view-panel="controls">
-                    <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title">Stage controls</h1>
-                        </div>
-                    </div>
+                    <div class="page-head"><h1 class="page-title">Stage Controls</h1></div>
 
                     <div class="stack-lg">
+                        <!-- What the server allows each research group to enter, read from
+                             the stage rule in migration 0005 (pia_can_enter_stage). Read
+                             only: nothing here changes a research assignment. -->
+                        <section class="panel" aria-labelledby="policy-title">
+                            <div class="panel-bar"><h2 class="panel-title" id="policy-title">Stage availability by group</h2></div>
+                            <div class="table-wrap" tabindex="0" role="region" aria-label="Stage availability by group">
+                                <table class="table policy-table">
+                                    <caption class="sr-only">Which stages each research group can enter</caption>
+                                    <thead>
+                                        <tr><th scope="col">Group</th><th scope="col">OCEAN test</th><th scope="col">Character selection</th><th scope="col">Tutoring dashboard</th></tr>
+                                    </thead>
+                                    <tbody id="policy-tbody"></tbody>
+                                </table>
+                            </div>
+                            <p class="panel-foot muted" id="policy-foot"></p>
+                        </section>
 
-                        <div class="grid grid-3" id="gates-grid" data-region="settings"></div>
+                        <section aria-labelledby="gates-title">
+                            <h2 class="panel-title section-title" id="gates-title">Open or close a stage by section</h2>
+                            <div class="gates" id="gates-grid" data-region="settings"></div>
+                        </section>
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 6 · PROFILE ======= -->
-                <!-- The signed-in administrator's own account: who they are, their
-                     password, and the browsers signed in as them. Everything here
-                     is about this one person; system-wide administration is under
-                     Settings. -->
-                <section class="page is-hidden" id="view-profile" data-view-panel="profile">
-                    <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title">Profile</h1>
-                        </div>
-                    </div>
+                <!-- ============================== VIEW 7 · PROFILE ======= -->
+                <section class="page page-narrow is-hidden" id="view-profile" data-view-panel="profile">
+                    <div class="page-head"><h1 class="page-title">Profile</h1></div>
 
-                    <div class="profile-grid">
-                        <div class="card profile-details">
-                            <div class="card-head">
-                                <div class="card-head-text">
-                                    <h2 class="card-title">Personal details</h2>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="kv-grid">
-                                    <div class="kv">
-                                        <p class="kv-label">Name</p>
-                                        <p class="kv-value" id="profile-name">—</p>
-                                    </div>
-                                    <div class="kv">
-                                        <p class="kv-label">Email</p>
-                                        <p class="kv-value" id="profile-email">—</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="stack">
+                        <section class="panel panel-pad" aria-labelledby="profile-details-title">
+                            <h2 class="panel-title" id="profile-details-title">Personal details</h2>
+                            <dl class="facts">
+                                <div><dt>Name</dt><dd id="profile-name">—</dd></div>
+                                <div><dt>Email</dt><dd id="profile-email">—</dd></div>
+                            </dl>
+                        </section>
 
-                        <!-- The current password is checked against Supabase Auth before
-                             anything changes (see handleChangePassword): updateUser()
-                             alone would let anyone at an unlocked laptop set a new one. -->
-                        <form class="card profile-password" id="change-password-form" novalidate>
-                            <div class="card-head">
-                                <div class="card-head-text">
-                                    <div class="with-tip">
-                                        <h2 class="card-title">Change password</h2>
-                                        <button type="button" class="info-tip" data-tip="At least 8 characters, with a letter and a number. Saving signs your other devices out; this one stays signed in." aria-label="About password changes"><svg class="icon"><use href="#i-info"></use></svg></button>
-                                    </div>
+                        <section class="panel panel-pad" aria-labelledby="profile-password-title">
+                            <div class="panel-row">
+                                <div>
+                                    <h2 class="panel-title" id="profile-password-title">Password</h2>
+                                    <p class="muted">Changing it signs your other devices out; this one stays signed in.</p>
                                 </div>
+                                <button type="button" class="btn btn-secondary" data-modal-open="modal-change-password">Change password</button>
                             </div>
-                            <div class="card-body stack">
-                                <div class="field">
-                                    <label class="label" for="cp-current">Current password</label>
-                                    <input class="input" type="password" id="cp-current" autocomplete="current-password">
-                                    <p class="field-msg" data-msg-for="cp-current"></p>
-                                </div>
-                                <div class="field">
-                                    <label class="label" for="cp-new">New password</label>
-                                    <input class="input" type="password" id="cp-new" autocomplete="new-password" maxlength="72">
-                                    <p class="field-msg" data-msg-for="cp-new"></p>
-                                </div>
-                                <div class="field">
-                                    <label class="label" for="cp-confirm">Confirm password</label>
-                                    <input class="input" type="password" id="cp-confirm" autocomplete="new-password" maxlength="72">
-                                    <p class="field-msg" data-msg-for="cp-confirm"></p>
-                                </div>
-                                <label class="check">
-                                    <input type="checkbox" id="cp-show">
-                                    <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
-                                    <span class="check-text">Show passwords</span>
-                                </label>
-                            </div>
-                            <div class="card-foot profile-password-foot">
-                                <button class="btn btn-primary" type="submit" id="cp-submit">
-                                    <svg class="icon"><use href="#i-key"></use></svg>
-                                    Update password
-                                </button>
-                            </div>
-                        </form>
+                        </section>
 
-                        <!-- No device limit for administrators (migration 0032): just
-                             the browsers signed in to this account, and a way to end
-                             any of them. Devices whose login has ended drop off the
-                             list by themselves. -->
-                        <div class="card profile-sessions" data-region="admindevices">
-                            <div class="card-head">
-                                <div class="card-head-text">
-                                    <h2 class="card-title">Active sessions</h2>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div id="admin-device-list"></div>
-                            </div>
-                        </div>
+                        <!-- No device limit for administrators (migration 0032): the
+                             browsers signed in to this account, and a way to end any
+                             of them. -->
+                        <section class="panel panel-pad" aria-labelledby="profile-sessions-title" data-region="admindevices">
+                            <h2 class="panel-title" id="profile-sessions-title">Active sessions</h2>
+                            <div id="admin-device-list"></div>
+                        </section>
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 7 · SETTINGS ====== -->
+                <!-- ============================== VIEW 8 · SETTINGS ====== -->
                 <section class="page is-hidden" id="view-settings" data-view-panel="settings">
                     <div class="page-head">
-                        <div class="page-head-text">
-                            <h1 class="page-title">Settings</h1>
-                        </div>
+                        <h1 class="page-title">Settings</h1>
                         <div class="page-actions">
-                            <!-- Written by the database, read on demand: see the dialog. -->
-                            <button class="btn btn-secondary" type="button" id="audit-open">
-                                <svg class="icon"><use href="#i-shield"></use></svg>
-                                Security log
-                            </button>
+                            <button type="button" class="btn btn-outline" data-modal-open="modal-add-admin">+ Add administrator</button>
                         </div>
                     </div>
 
-                    <!-- Every administrator account. Adding one creates the
-                         sign-in account and an admin profile, then emails a
-                         one-time link where they choose their own password --
-                         no password is ever known here. -->
-                    <div class="card" data-region="admins">
-                        <div class="card-head">
-                            <div class="card-head-text">
-                                <div class="with-tip">
-                                    <h2 class="card-title">Administrators</h2>
-                                    <button type="button" class="info-tip" data-tip="Full access to every participant and result. Administrators can’t remove, change or sign out one another — the project owner does that in Supabase." aria-label="About administrators"><svg class="icon"><use href="#i-info"></use></svg></button>
-                                </div>
-                            </div>
-                            <div class="card-tools">
-                                <button class="btn btn-primary" data-modal-open="modal-add-admin">
-                                    <svg class="icon"><use href="#i-plus"></use></svg>
-                                    Add administrator
-                                </button>
-                            </div>
-                        </div>
-                        <div class="table-wrap">
+                    <section class="panel" data-region="admins" aria-labelledby="admins-title">
+                        <div class="panel-bar"><h2 class="panel-title" id="admins-title">Administrators</h2></div>
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Administrators table">
                             <table class="table">
+                                <caption class="sr-only">Administrators</caption>
                                 <thead>
-                                    <tr>
-                                        <th>Administrator</th>
-                                        <th>Status</th>
-                                        <th>Devices</th>
-                                        <th class="col-right col-w-actions">Actions</th>
-                                    </tr>
+                                    <tr><th scope="col">Admin Name</th><th scope="col">Status</th></tr>
                                 </thead>
                                 <tbody id="admin-tbody"></tbody>
                             </table>
                         </div>
-                    </div>
+                    </section>
                 </section>
 
                 <!-- ============================== VIEW 8 · MATH TASK ===== -->
@@ -840,9 +625,6 @@
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="register-student-title">Register student</h2>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -952,9 +734,6 @@
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="edit-student-title">Edit participant</h2>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -1105,9 +884,6 @@
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="new-section-title">New section</h2>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -1134,9 +910,6 @@
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="add-prof-title">Add professor</h2>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -1182,9 +955,6 @@
                 <div class="modal-head-text">
                     <h2 class="modal-title" id="add-admin-title">Add administrator</h2>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -1254,10 +1024,6 @@
                     </table>
                 </div>
             </div>
-
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" data-modal-close>Close</button>
-            </footer>
         </div>
     </div>
 
@@ -1271,9 +1037,6 @@
                         <button type="button" class="info-tip" data-tip="Transmuted score = (raw ÷ highest possible) × 50 + 50. Only changed rows are saved." aria-label="About transmuted scores"><svg class="icon"><use href="#i-info"></use></svg></button>
                     </div>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body modal-body-flush">
@@ -1319,33 +1082,7 @@
         </div>
     </div>
 
-    <!-- ========================================= MODAL · DEVICE MANAGER -->
-    <div class="overlay" id="modal-devices" role="dialog" aria-modal="true" aria-labelledby="devices-title">
-        <div class="modal modal-md">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <h2 class="modal-title" id="devices-title">Active devices</h2>
-                    <p class="modal-sub" id="devices-subject">—</p>
-                </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
-            </header>
-
-            <div class="modal-body">
-                <div id="student-device-list"></div>
-            </div>
-
-            <footer class="modal-foot">
-                <div class="modal-foot-actions">
-                    <button class="btn btn-secondary" data-modal-close>Close</button>
-                    <button class="btn btn-danger-soft" id="revoke-all-btn">Sign out of all devices</button>
-                </div>
-            </footer>
-        </div>
-    </div>
-
-    <!-- ===================================== MODAL · ADMIN DEVICE LIMIT --
+        <!-- ===================================== MODAL · ADMIN DEVICE LIMIT --
          Forced action: no backdrop dismiss, no close button. The admin must
          free a slot before the console will continue loading. -->
     <div class="overlay" id="modal-device-limit" role="dialog" aria-modal="true" data-no-dismiss
@@ -1385,23 +1122,18 @@
                     <h2 class="modal-title" id="reset-pw-title">Reset password</h2>
                     <p class="modal-sub" id="reset-pw-sub">—</p>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body stack">
                 <section class="reset-route">
-                    <p class="reset-route-title"><svg class="icon"><use href="#i-mail"></use></svg>
-                        Email a reset link and code</p>
+                    <p class="reset-route-title">Email a reset link</p>
                     <button type="button" class="btn btn-secondary" id="reset-pw-email">
-                        <svg class="icon"><use href="#i-send"></use></svg> Send reset email
+                        Send reset email
                     </button>
                 </section>
 
                 <section class="reset-route">
-                    <p class="reset-route-title"><svg class="icon"><use href="#i-key"></use></svg>
-                        Set a temporary password
+                    <p class="reset-route-title">Set a temporary password
                         <button type="button" class="info-tip" data-tip="For a student who can’t receive email. Tell them in person. They are signed out everywhere now and must replace it at their next sign-in." aria-label="About temporary passwords"><svg class="icon"><use href="#i-info"></use></svg></button></p>
 
                     <form id="reset-pw-form" novalidate>
@@ -1412,7 +1144,7 @@
                                     autocomplete="off" autocapitalize="off" spellcheck="false"
                                     placeholder="8+ characters, letters and numbers" aria-describedby="temp-password-msg">
                                 <button type="button" class="btn btn-secondary" id="temp-password-generate">
-                                    <svg class="icon"><use href="#i-refresh"></use></svg> Generate
+                                    Generate
                                 </button>
                             </div>
                             <p class="field-msg" id="temp-password-msg" data-msg-for="temp-password"></p>
@@ -1427,7 +1159,7 @@
                             <p class="notice-title">Temporary password set</p>
                             <p class="notice-text">Share it in person. It can&rsquo;t be shown again after you close this.</p>
                             <button type="button" class="btn btn-secondary btn-sm" id="temp-password-copy">
-                                <svg class="icon"><use href="#i-copy"></use></svg> Copy password
+                                Copy password
                             </button>
                         </div>
                     </div>
@@ -1435,9 +1167,9 @@
             </div>
 
             <footer class="modal-foot">
-                <button class="btn btn-secondary" data-modal-close>Close</button>
+                <button class="btn btn-secondary" data-modal-close>Cancel</button>
                 <button class="btn btn-primary" type="submit" form="reset-pw-form" id="temp-password-submit">
-                    <svg class="icon"><use href="#i-key"></use></svg> Set temporary password
+                    Set temporary password
                 </button>
             </footer>
         </div>
@@ -1480,19 +1212,21 @@
                 </div>
 
                 <div class="action-list">
+                    <!-- Manual recovery, secondary to the person using Forgot password
+                         themselves: emails them the same secure reset link (no code,
+                         no password is set or shown here). -->
+                    <button class="action-list-item" id="faculty-reset">Reset password</button>
                     <!-- The same "Sign out everywhere" students have: ends every
                          session and frees every device slot (admin_revoke_sessions). -->
                     <button class="action-list-item" id="faculty-signout">
-                        <svg class="icon"><use href="#i-logout"></use></svg> Sign out everywhere
+                        Sign out everywhere
                     </button>
                     <button class="action-list-item is-danger" id="faculty-delete">
-                        <svg class="icon"><use href="#i-trash"></use></svg> Remove faculty account
+                        Remove faculty account
                     </button>
                 </div>
+                <p class="form-status" id="faculty-status-msg" role="status" aria-live="polite"></p>
             </div>
-            <footer class="modal-foot">
-                <button class="btn btn-secondary btn-block" data-modal-close>Close</button>
-            </footer>
         </div>
     </div>
 
@@ -1507,9 +1241,6 @@
                     <h2 class="modal-title" id="qb-edit-title">Add question</h2>
                     <p class="modal-sub" id="qb-edit-sub">Topic 1 · Finding a percentage</p>
                 </div>
-                <button class="modal-close" type="button" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -1610,9 +1341,6 @@
                     <h2 class="modal-title" id="qb-gen-title">Auto-generate questions</h2>
                     <p class="modal-sub" id="qb-gen-sub">Topic 1 · Finding a percentage</p>
                 </div>
-                <button class="modal-close" type="button" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
 
             <div class="modal-body">
@@ -1673,72 +1401,7 @@
         </li>
     </template>
 
-    <!-- ============================================ MODAL · SECURITY LOG --
-         Migration 0031. Written by the database, never by this page; administrators
-         can only read it, and it is fetched when this opens, not at load. Refused
-         attempts are in the Postgres logs, not here: a refusal rolls back its own
-         transaction. -->
-    <div class="overlay" id="modal-audit" role="dialog" aria-modal="true" aria-labelledby="audit-title">
-        <div class="modal modal-xl">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <div class="with-tip">
-                        <h2 class="modal-title" id="audit-title">Security log</h2>
-                        <button type="button" class="info-tip" data-tip="Staff accounts created, accounts deleted, role and email changes, and devices or sessions ended. Latest 50." aria-label="About the security log"><svg class="icon"><use href="#i-info"></use></svg></button>
-                    </div>
-                </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
-            </header>
-
-            <div class="modal-body modal-body-flush">
-                <div class="table-wrap" style="border-top:0" data-region="audit">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>When</th>
-                                <th>Action</th>
-                                <th>Account</th>
-                                <th>By</th>
-                            </tr>
-                        </thead>
-                        <tbody id="audit-tbody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" data-modal-close>Close</button>
-            </footer>
-        </div>
-    </div>
-
-    <!-- ============================================== MODAL · SIGN OUT -->
-    <div class="overlay" id="modal-signout" role="dialog" aria-modal="true" aria-labelledby="signout-title">
-        <div class="modal modal-sm">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <h2 class="modal-title" id="signout-title">Sign out</h2>
-                </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
-            </header>
-            <div class="modal-body">
-                <div class="modal-hero">
-                    <span class="modal-hero-glyph g-accent"><svg class="icon icon-lg"><use href="#i-logout"></use></svg></span>
-                    <p class="modal-hero-title">Sign out of the console?</p>
-                </div>
-            </div>
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" data-modal-close>Stay signed in</button>
-                <button class="btn btn-primary" id="signout-confirm">Sign out</button>
-            </footer>
-        </div>
-    </div>
-
-    <!-- ====================================== MODAL · GENERIC CONFIRM -->
+            <!-- ====================================== MODAL · GENERIC CONFIRM -->
     <div class="overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
         <div class="modal modal-sm">
             <header class="modal-head">
@@ -1746,9 +1409,6 @@
                     <h2 class="modal-title" id="confirm-title">Confirm action</h2>
                     <p class="modal-sub" id="confirm-subtitle"></p>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
             <div class="modal-body">
                 <div class="modal-hero">
@@ -1776,9 +1436,6 @@
                     <h2 class="modal-title" id="notice-title">Notice</h2>
                     <p class="modal-sub" id="notice-subtitle"></p>
                 </div>
-                <button class="modal-close" data-modal-close aria-label="Close dialog">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
             </header>
             <div class="modal-body stack">
                 <div class="modal-hero">
@@ -1800,13 +1457,10 @@
         aria-labelledby="drawer-student-name">
         <div class="drawer">
             <header class="drawer-head">
-                <button class="btn-icon" data-modal-close aria-label="Close profile">
-                    <svg class="icon"><use href="#i-arrow-left"></use></svg>
+                <button class="btn-icon" data-modal-close aria-label="Back to students">
+                    <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
                 </button>
-                <p class="card-title" style="flex:1 1 auto">Participant profile</p>
-                <button class="modal-close" data-modal-close aria-label="Close profile">
-                    <svg class="icon"><use href="#i-x"></use></svg>
-                </button>
+                <h2 class="drawer-title">Participant profile</h2>
             </header>
 
             <div class="drawer-body stack-lg">
@@ -1832,16 +1486,8 @@
                         <p class="kv-value" id="drawer-stage">—</p>
                     </div>
                     <div class="kv">
-                        <p class="kv-label">Devices</p>
-                        <p class="kv-value tnum" id="drawer-devices">—</p>
-                    </div>
-                    <div class="kv">
                         <p class="kv-label">Account status</p>
                         <p class="kv-value" id="drawer-status">—</p>
-                    </div>
-                    <div class="kv">
-                        <p class="kv-label">Parental consent</p>
-                        <p class="kv-value" id="drawer-consent">—</p>
                     </div>
                     <div class="kv">
                         <p class="kv-label">Student assent</p>
@@ -1875,34 +1521,93 @@
                 <div>
                     <p class="eyebrow" style="margin-bottom:12px">Actions</p>
                     <div class="action-list">
-                        <button class="action-list-item" data-student-action="activate">
-                            <svg class="icon"><use href="#i-mail"></use></svg> Send activation email
-                        </button>
                         <button class="action-list-item" data-student-action="edit">
-                            <svg class="icon"><use href="#i-pencil"></use></svg> Edit details
-                        </button>
-                        <button class="action-list-item" data-student-action="devices">
-                            <svg class="icon"><use href="#i-monitor"></use></svg> Manage active devices
+                            Edit details
                         </button>
                         <button class="action-list-item" data-student-action="retake-ocean">
-                            <svg class="icon"><use href="#i-rotate"></use></svg> Allow OCEAN retake
+                            Allow OCEAN retake
                         </button>
                         <button class="action-list-item" data-student-action="retake-character">
-                            <svg class="icon"><use href="#i-user"></use></svg> Allow character re-selection
+                            Allow character re-selection
                         </button>
                         <button class="action-list-item" data-student-action="reset-password">
-                            <svg class="icon"><use href="#i-key"></use></svg> Reset password…
+                            Reset password…
                         </button>
                         <button class="action-list-item is-danger" data-student-action="delete">
-                            <svg class="icon"><use href="#i-trash"></use></svg> Delete participant
+                            Delete participant
                         </button>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <footer class="modal-foot">
-                <button class="btn btn-secondary btn-block" data-modal-close>Close</button>
-            </footer>
+    <!-- ================================================== COMMAND PALETTE -->
+    <!-- Opened by the header search button or Ctrl/Cmd+K (admin-shell.js).
+         The field is a combobox over a listbox; the active option is exposed
+         through aria-activedescendant. Destinations and commands are the ones
+         that already exist in this console. -->
+    <div class="overlay palette-overlay" id="palette" role="dialog" aria-modal="true" aria-label="Search">
+        <div class="palette">
+            <div class="palette-input-row">
+                <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                <input class="palette-input" id="palette-input" type="text" role="combobox"
+                    aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
+                    aria-label="Search students, sections, or commands"
+                    placeholder="Search students, sections, or commands..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="palette-body" id="palette-list" role="listbox" aria-label="Results"></div>
+            <p class="sr-only" id="palette-status" role="status" aria-live="polite"></p>
+            <div class="palette-foot">
+                <span><kbd>↑↓</kbd> navigate</span>
+                <span><kbd>Enter</kbd> select</span>
+                <span><kbd>Esc</kbd> close</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ MODAL · CHANGE PASSWORD -->
+    <!-- The current password is checked against Supabase Auth before anything
+         changes (see handleChangePassword): updateUser() alone would let anyone
+         at an unlocked laptop set a new one. -->
+    <div class="overlay" id="modal-change-password" role="dialog" aria-modal="true"
+        aria-labelledby="cp-title" aria-describedby="cp-sub">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="cp-title">Change password</h2>
+                    <p class="modal-sub" id="cp-sub">At least 8 characters, with a letter and a number.</p>
+                </div>
+            </header>
+            <form id="change-password-form" novalidate>
+                <div class="modal-body stack">
+                    <div class="field">
+                        <label class="label" for="cp-current">Current password</label>
+                        <input class="input" type="password" id="cp-current" autocomplete="current-password" data-clear-on-close>
+                        <p class="field-msg" data-msg-for="cp-current"></p>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="cp-new">New password</label>
+                        <input class="input" type="password" id="cp-new" autocomplete="new-password" maxlength="72" data-clear-on-close>
+                        <p class="field-msg" data-msg-for="cp-new"></p>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="cp-confirm">Confirm password</label>
+                        <input class="input" type="password" id="cp-confirm" autocomplete="new-password" maxlength="72" data-clear-on-close>
+                        <p class="field-msg" data-msg-for="cp-confirm"></p>
+                    </div>
+                    <label class="check">
+                        <input type="checkbox" id="cp-show">
+                        <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                        <span class="check-text">Show passwords</span>
+                    </label>
+                    <p class="form-status" id="cp-status" role="status" aria-live="polite"></p>
+                </div>
+                <footer class="modal-foot">
+                    <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="cp-submit">Update</button>
+                </footer>
+            </form>
         </div>
     </div>
 
@@ -1912,7 +1617,7 @@
     <!-- Shared client + helpers (defines `sb`, escapeHTML, getOrCreateDeviceId,
          registerChannel, executeForceLogout, normalizeOceanScore …) -->
     <script src="../../assets/js/function.js"></script>
-    <script src="../../assets/js/shell.js"></script>
+    <script src="../js/admin-shell.js"></script>
     <!-- The 50 statements and the 1-5 scale, for the drawer's answer list. -->
     <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/admin-dashboard.js"></script>

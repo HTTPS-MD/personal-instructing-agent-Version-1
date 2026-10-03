@@ -14,16 +14,15 @@
  *   2.  Application state
  *   3.  UI kit: sidebar, router, modals, toasts, confirm/notice, busy buttons
  *   4.  Data layer (all Supabase reads)
- *   5.  Overview renderers
- *   6.  Sections
- *   7.  Student roster
- *   8.  Student drawer and per-student actions
+ *   5.  Presence helpers and Live Sessions
+ *   6.  Class Sections
+ *   7.  All Students
+ *   8.  Participant profile and per-student actions
  *   9.  Faculty
- *   10. Stage controls (access by section)
+ *   10. Stage Controls (access by section)
  *   11. Profile (password, sessions) and Settings (administrators)
  *   12. Scores encoding
  *   13. Realtime subscriptions
- *   14. CSV export
  *   16. Math task bank (question_bank + app_config, migration 0028)
  *   15. Boot sequence
  * ==========================================================================*/
@@ -245,7 +244,7 @@
         { key: 'dash', stage: 'Stage 3', title: 'Tutoring dashboard', open: false, label: 'Tutoring Dashboard' }
     ];
 
-    var PAGE_SIZE = 50;
+    var PAGE_SIZE = 10;   /* students per page: the server pages, never more than ten rows */
 
     var state = {
         adminEmail: null,
@@ -258,9 +257,8 @@
         admins: [],
         totalStudents: 0,
         page: 1,
-        filters: { group: 'all', sub: 'all', stage: null, search: '' },
+        filters: { group: 'all', stage: null, search: '' },
         activeStudent: null,
-        managingEmail: null,
         resetEmail: null,    // the student the Reset password dialog is acting on
         activeSection: null,
         deviceDiag: [],      // the last device-registration problems (see deviceProblem)
@@ -302,41 +300,25 @@
         if (banner) { banner.hidden = true; }
     }
 
-    /* ---- 3.2 Rail ----
-       Behaviour lives in assets/js/shell.js, shared with the teacher console.
-       The rail is told when a modal owns the Escape key so the two do not
-       fight over it. */
+    /* ---- 3.2 Shell ----
+       The frame (sidebar, People submenu, breadcrumbs, theme toggle, account
+       menu, command palette) lives in admin-shell.js; this file owns routing
+       and data and hands it a `host`. */
 
-    var app = $('#app');
-
-    function closeMobileNav() { PIAShell.closeMobileNav(); }
+    function closeMobileNav() { PIAAdminShell.closeMobileNav(); }
 
     /* ---- 3.3 View router ---- */
 
-    var VIEW_TITLES = {
-        overview: 'Overview',
-        sections: 'Sections',
-        students: 'Student Roster',
-        faculty: 'Faculty',
-        controls: 'Stage Controls',
-        profile: 'Profile',
-        settings: 'Settings',
-        mathtask: 'Math Task'
-    };
+    var VIEWS = ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
-        if (!VIEW_TITLES[view]) { view = 'overview'; }
+        if (VIEWS.indexOf(view) === -1) { view = 'overview'; }
 
         $$('[data-view-panel]').forEach(function (panel) {
             panel.classList.toggle('is-hidden', panel.getAttribute('data-view-panel') !== view);
         });
-        /* The account block at the foot of the rail is the Profile link. */
-        $$('.nav-item, .sidebar-user').forEach(function (item) {
-            item.classList.toggle('is-active', item.getAttribute('data-view') === view);
-        });
 
-        $('#crumb-current').textContent = VIEW_TITLES[view];
-        document.title = VIEW_TITLES[view] + ' — PIA Admin Console';
+        PIAAdminShell.setRoute(view);
 
         try { sessionStorage.setItem('pia.admin.view', view); } catch (err) { /* ignore */ }
         if (window.location.hash !== '#' + view) {
@@ -348,27 +330,23 @@
         /* The bank loads at boot; a failed load (or one run before 0028
            existed) is retried when the view is opened. */
         if (view === 'mathtask' && (qb.status === 'missing' || qb.status === 'error')) { loadMathTask(); }
+        if (view === 'live') { renderLiveSessions(); }
 
         closeMobileNav();
         window.scrollTo({ top: 0, behavior: 'auto' });
     }
 
     function initRouter() {
-        $$('.nav-item[data-view], .sidebar-user').forEach(function (item) {
-            item.addEventListener('click', function () {
-                switchView(item.getAttribute('data-view'));
-            });
-        });
-        $$('[data-view-link]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                switchView(btn.getAttribute('data-view-link'));
-            });
-        });
-
         var fromHash = (window.location.hash || '').replace('#', '');
         var stored = '';
         try { stored = sessionStorage.getItem('pia.admin.view') || ''; } catch (err) { /* ignore */ }
         switchView(fromHash || stored || 'overview');
+
+        /* Back / forward and edited addresses follow the hash. */
+        window.addEventListener('hashchange', function () {
+            var target = (window.location.hash || '').replace('#', '');
+            if (target && VIEWS.indexOf(target) !== -1) { switchView(target); }
+        });
     }
 
     /* ---- 3.4 Modal manager ---- */
@@ -377,7 +355,7 @@
     /* Matches --z-overlay in global.css; see the stacking ladder there. */
     var Z_OVERLAY_BASE = 100;
     var lastFocused = null;
-    var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]),' +
+    var FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]),' +
         ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
     function lockScroll() {
@@ -434,6 +412,12 @@
         /* Fields holding something sensitive (a temporary password) are
            wiped however the dialog closes: button, X, backdrop or Escape. */
         $$('[data-clear-on-close]', overlay).forEach(function (field) { field.value = ''; });
+
+        /* The password dialog never reopens showing what was typed. */
+        if (overlay.id === 'modal-change-password') {
+            setPasswordsShown(false);
+            clearFormErrors('change-password-form');
+        }
 
         setTimeout(function () {
             overlay.classList.remove('is-mounted');
@@ -801,7 +785,6 @@
 
         function errorBlock(key, message) {
             return '<div class="state-block region-error">' +
-                '<span class="state-glyph">' + icon('alert', 'icon-lg') + '</span>' +
                 '<p class="state-title">Couldn’t load this</p>' +
                 '<p class="state-desc">' + esc(message) + '</p>' +
                 '<button class="btn btn-secondary" type="button" data-retry="' + esc(key) + '">Try again</button>' +
@@ -811,14 +794,12 @@
         /* Where a failed load leaves its placeholders. [selector, 'block'] or
            [selector, 'rows', columns]. */
         var FAILURE = {
-            cohort: [['#pipeline-strip', 'block'], ['#live-tbody', 'rows', 4],
-                     ['#section-health', 'block'], ['#sections-grid', 'block']],
-            sections: [['#sections-grid', 'block'], ['#section-health', 'block']],
+            cohort: [['#live-tbody', 'rows', 4], ['#sections-tbody', 'rows', 6]],
+            sections: [['#sections-tbody', 'rows', 6]],
             roster: [['#student-tbody', 'rows', 5]],
             faculty: [['#faculty-tbody', 'rows', 4]],
-            settings: [['#gates-grid', 'block'], ['#gate-summary', 'block']],
-            admins: [['#admin-tbody', 'rows', 4]],
-            audit: [['#audit-tbody', 'rows', 4]],
+            settings: [['#gates-grid', 'block']],
+            admins: [['#admin-tbody', 'rows', 2]],
             admindevices: [['#admin-device-list', 'block']]
         };
 
@@ -836,8 +817,7 @@
             });
 
             /* A number that is still a placeholder becomes a dash. */
-            var dashed = key === 'cohort' ? '#view-overview .stat-value'
-                : (key === 'stages' ? '[data-stage-count]' : null);
+            var dashed = key === 'stages' ? '[data-stage-count]' : null;
             if (dashed) {
                 $$(dashed).forEach(function (node) {
                     if (node.querySelector('.skeleton')) { node.textContent = '—'; }
@@ -926,41 +906,6 @@
         return '<span class="skeleton skeleton-pill" style="width:' + width + 'px"></span>';
     }
 
-    function skeletonStep(label) {
-        return '<div class="funnel-step" aria-hidden="true">' +
-            '<div><p class="funnel-num">' + sk('00') + '</p><p class="funnel-name">' + sk(label) + '</p></div>' +
-            '<div class="funnel-foot"><div class="bar"></div>' +
-            '<p class="funnel-meta">' + sk('00% of 00 participants') + '</p></div></div>';
-    }
-
-    function skeletonGateRow(gate) {
-        return '<div class="device-row" aria-hidden="true">' +
-            '<span class="skeleton" style="width:8px;height:8px;border-radius:50%;flex:0 0 8px"></span>' +
-            '<div class="device-text"><p class="device-name">' + sk(gate.title) + '</p>' +
-            '<p class="device-meta">' + sk(gate.stage) + '</p></div>' + skeletonPill(56) + '</div>';
-    }
-
-    function skeletonHealth() {
-        return '<div class="health-tile" aria-hidden="true"><div class="health-top">' +
-            '<span class="health-name">' + sk('Section name') + '</span>' +
-            '<span class="health-val tnum">' + sk('00%') + '</span></div><div class="bar"></div>' +
-            '<p class="health-meta">' + sk('00 of 00 done') + '</p></div>';
-    }
-
-    function skeletonSectionCard() {
-        var metric = function (label) {
-            return '<div><p class="metric-label">' + sk(label) + '</p><p class="metric-value tnum">' + sk('00') + '</p></div>';
-        };
-        return '<article class="section-card" aria-hidden="true"><div class="section-card-body">' +
-            '<div class="section-card-top"><div><h3 class="section-name">' + sk('Section name') + '</h3>' +
-            '<p class="section-prof">' + sk('Professor name here') + '</p></div>' + skeletonPill(72) + '</div>' +
-            '<div class="section-metrics">' + metric('Students') + metric('OCEAN') + metric('Complete') + '</div>' +
-            '<div class="bar"></div></div>' +
-            '<div class="section-card-foot"><div class="avatar-stack">' +
-            '<span class="avatar skeleton"></span><span class="avatar skeleton"></span><span class="avatar skeleton"></span></div>' +
-            '<span class="skeleton skeleton-btn" style="width:120px"></span></div></article>';
-    }
-
     function skeletonGate(gate) {
         return '<article class="gate" aria-hidden="true"><div class="gate-body">' +
             '<div class="gate-top">' + skeletonPill(64) + skeletonPill(56) + '</div>' +
@@ -974,9 +919,8 @@
     /* The same parts as a real device row: glyph, name, the device id
        (which wraps), and the "This device" badge. */
     function skeletonDevice() {
-        return '<div class="device-row" aria-hidden="true"><span class="stat-glyph skeleton"></span>' +
-            '<div class="device-text"><p class="device-name">' + sk('macOS computer') + '</p>' +
-            '<p class="device-meta cell-mail">' + sk('abc123 [macOS Computer]') + '</p></div>' +
+        return '<div class="device-row" aria-hidden="true"><span class="skeleton" style="width:16px;height:16px"></span>' +
+            '<div class="device-text"><p class="device-name">' + sk('macOS computer') + '</p></div>' +
             skeletonPill(84) + '</div>';
     }
 
@@ -998,17 +942,12 @@
             return out;
         };
 
-        fill('#pipeline-strip', ['OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game']
-            .map(function (key) { return skeletonStep(STAGE_META[key].label); }).join(''));
-        fill('#live-tbody', skeletonRows(4, 3));
-        fill('#gate-summary', GATES.map(skeletonGateRow).join(''));
-        fill('#section-health', times(4, skeletonHealth));
-        fill('#sections-grid', times(3, skeletonSectionCard));
+        fill('#live-tbody', skeletonRows(4, 4));
+        fill('#sections-tbody', skeletonRows(6, 4));
         fill('#gates-grid', GATES.map(skeletonGate).join(''));
         fill('#student-tbody', skeletonRows(5, 6));
         fill('#faculty-tbody', skeletonRows(4, 4));
-        fill('#admin-tbody', skeletonRows(4, 2));
-        fill('#audit-tbody', skeletonRows(4, 4));
+        fill('#admin-tbody', skeletonRows(2, 2));
         fill('#admin-device-list', skeletonDevice());
     }
 
@@ -1016,6 +955,9 @@
        a screen reader has to be told it is there. */
     function initScrollRegions() {
         $$('.table-wrap').forEach(function (wrap) {
+            /* Page tables are labelled in the markup; dialogs' tables take
+               their dialog's or card's title. */
+            if (wrap.hasAttribute('aria-label') && wrap.getAttribute('role') === 'region') { return; }
             var host = wrap.closest('.card, .modal');
             var title = host && $('.card-title, .modal-title', host);
             wrap.setAttribute('role', 'region');
@@ -1064,7 +1006,7 @@
 
         /* The results table answers "who has a stored result"; only an admin
            gets rows back from it. Just the email column: the scores
-           themselves are fetched by the drawer and the export. */
+           themselves are fetched by the participant profile. */
         function readProfiles(columns) {
             return sb.from('profiles').select(columns).neq('role', 'admin').limit(2000);
         }
@@ -1100,10 +1042,7 @@
         state.cohort = res.data || [];
         await loadStageTimes();
         state.cohortLoaded = true;
-        renderKpis();
-        renderPipeline();
         renderLiveSessions();
-        renderSectionHealth();
         renderSections();
         renderGateAccess();
     }
@@ -1128,13 +1067,18 @@
 
         if (res.error) {
             if (qbMissingTable(res.error)) { state.stageTimes = null; }
-            else { console.error('[PIA] stage times could not be read:', res.error); }
+            else {
+                /* Keep the last good read on screen and say it is not fresh. */
+                state.stageTimesStale = true;
+                console.error('[PIA] stage times could not be read:', res.error);
+            }
             return;
         }
 
         var byEmail = {};
         (res.data || []).forEach(function (row) { byEmail[String(row.student_email || '').toLowerCase()] = row; });
         state.stageTimes = byEmail;
+        state.stageTimesStale = false;
     }
 
     async function loadSections() {
@@ -1145,14 +1089,33 @@
         state.sectionsLoaded = true;
         fillSectionSelects();
         renderSections();
-        renderSectionHealth();
-        renderKpis();        /* the KPI footer quotes the section count */
         $('#nav-count-sections').textContent = state.sections.length;
     }
 
-    /* Server-side filtering, paging and counting — the same query shape the
-       original dashboard used. */
+    /* Group and stage filters shared by the roster query and the tab counts,
+       so a count always describes the same rows the tab would show. */
+    function applyGroupFilter(query) {
+        var g = state.filters.group;
+        if (g === 'experimental') { return query.in('group_type', ['assigned', 'non-assigned', 'neutral']); }
+        if (g === 'assigned' || g === 'non-assigned' || g === 'neutral' || g === 'control') {
+            return query.eq('group_type', g);
+        }
+        return query;
+    }
+
+    function applyStageFilter(query, stage) {
+        if (stage === null || stage === undefined || stage === '') { return query; }
+        if (stage === 'Active Game') { return query.eq('is_in_game', true); }
+        return query.eq('current_stage', stage).eq('is_in_game', false);
+    }
+
+    /* Server-side filtering, paging and counting. A newer request supersedes
+       an older one: a slow answer for a previous filter is dropped, so the
+       table can never show rows that do not match the controls. */
+    var rosterTicket = 0;
+
     async function loadRoster() {
+        var ticket = ++rosterTicket;
         var tbody = $('#student-tbody');
         if (!state.rosterPage.length) {
             tbody.innerHTML = skeletonRows(5, 6);
@@ -1166,70 +1129,72 @@
         if (term) {
             query = query.or('full_name.ilike.%' + term + '%,email.ilike.%' + term + '%');
         }
-
-        if (state.filters.stage !== null) {
-            if (state.filters.stage === 'Active Game') {
-                query = query.eq('is_in_game', true);
-            } else {
-                query = query.eq('current_stage', state.filters.stage).eq('is_in_game', false);
-            }
-        } else if (state.filters.group === 'experimental') {
-            if (state.filters.sub === 'all') {
-                query = query.in('group_type', ['assigned', 'non-assigned', 'neutral']);
-            } else {
-                query = query.eq('group_type', state.filters.sub);
-            }
-        } else if (state.filters.group === 'control') {
-            query = query.eq('group_type', 'control');
-        }
+        query = applyStageFilter(applyGroupFilter(query), state.filters.stage);
 
         var start = (state.page - 1) * PAGE_SIZE;
         query = query.range(start, start + PAGE_SIZE - 1).order('full_name', { ascending: true });
 
         var res = await query;
+        if (ticket !== rosterTicket) { return; }
         state.loading.roster = false;
 
         if (res.error) {
             /* Placeholders (or stale rows) become a message with a retry: an
                empty table would read as "no students". */
             tbody.innerHTML = '<tr><td colspan="5"><div class="state-block region-error">' +
-                '<span class="state-glyph">' + icon('alert', 'icon-lg') + '</span>' +
-                '<p class="state-title">Couldn’t load the roster</p>' +
+                '<p class="state-title">Couldn’t load the students</p>' +
                 '<p class="state-desc">' + esc(friendlyDbError(res.error, 'Unknown database error.')) + '</p>' +
-                '<button class="btn btn-secondary" type="button" data-retry="roster">Try again</button>' +
+                '<button class="btn btn-secondary btn-sm" type="button" data-retry="roster">Try again</button>' +
                 '</div></td></tr>';
-            $('#pager-info').textContent = 'Could not load the roster.';
-            toastErr('Roster failed to load', friendlyDbError(res.error, 'Unknown database error.'));
+            $('#student-empty').classList.add('is-hidden');
+            $('#pager-info').textContent = 'Could not load the students.';
+            $('#page-prev').disabled = true;
+            $('#page-next').disabled = true;
+            return;
+        }
+
+        var total = res.count || 0;
+        var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        /* The filter shrank the result below this page: clamp and read again. */
+        if (total > 0 && state.page > pages) {
+            state.page = pages;
+            loadRoster();
             return;
         }
 
         state.rosterPage = res.data || [];
-        state.totalStudents = res.count || 0;
-        $('#nav-count-students').textContent = state.totalStudents;
+        state.totalStudents = total;
         renderRoster();
     }
 
-    /* Four head-only counts. 'email' is selected because 'id' does not exist
-       on profiles — with head:true the column is never read, it only has to
-       exist. */
+    /* Head-only counts over the whole table (honouring the group filter, never
+       the page or the search), so each tab's number is what it would list. 'email'
+       is selected because 'id' does not exist on profiles — with head:true the
+       column is never read, it only has to exist. A count that fails is shown as
+       "—", never as 0. */
+    var counterTicket = 0;
+    var COUNTER_KEYS = ['all', 'OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game'];
+
     async function loadStageCounters() {
-        var base = function () {
-            return sb.from('profiles').select('email', { count: 'exact', head: true }).neq('role', 'admin');
+        var ticket = ++counterTicket;
+        var base = function (stage) {
+            var q = sb.from('profiles').select('email', { count: 'exact', head: true }).neq('role', 'admin');
+            return applyStageFilter(applyGroupFilter(q), stage === 'all' ? null : stage);
         };
 
         try {
-            var results = await Promise.all([
-                base().eq('current_stage', 'OCEAN').eq('is_in_game', false),
-                base().eq('current_stage', 'Character Selection').eq('is_in_game', false),
-                base().eq('current_stage', 'Tutoring Dashboard').eq('is_in_game', false),
-                base().eq('is_in_game', true)
-            ]);
+            var results = await Promise.all(COUNTER_KEYS.map(function (key) { return base(key); }));
+            if (ticket !== counterTicket) { return; }
 
-            var keys = ['OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game'];
+            var failed = null;
             results.forEach(function (res, index) {
-                var node = $('[data-stage-count="' + keys[index] + '"]');
-                if (node) { node.textContent = res.count || 0; }
+                var node = $('[data-stage-count="' + COUNTER_KEYS[index] + '"]');
+                if (res.error) { failed = res.error; }
+                if (node) { node.textContent = res.error ? '—' : (res.count || 0); }
             });
+            if (failed) { throw failed; }
+            var allCount = results[0].count || 0;
+            $('#nav-count-students').textContent = allCount;
         } catch (err) {
             console.error('Stage counters failed:', err);
             Loading.fail('stages', err);
@@ -1242,7 +1207,8 @@
 
         state.faculty = res.data || [];
         $('#nav-count-faculty').textContent = state.faculty.length;
-        renderFaculty('');
+        renderFaculty($('#faculty-search') ? $('#faculty-search').value : '');
+        renderSections();     /* the professor column reads this */
     }
 
     /* settings holds one row per stage flag: stage_ocean / stage_char / stage_dash.
@@ -1272,7 +1238,6 @@
         state.overrides = overrides.error ? null : (overrides.data || []);
 
         renderGates();
-        renderGateSummary();
     }
 
     function fillSectionSelects() {
@@ -1287,7 +1252,7 @@
         });
     }
 
-    /* ======================================= 5. OVERVIEW RENDERERS ====== */
+    /* ================================ 5. PRESENCE AND LIVE SESSIONS ===== */
 
     /* Completed = a stored result in ocean_submissions AND not sent back for
        a retake. A retake clears is_ocean_done but keeps the old result in
@@ -1299,51 +1264,17 @@
             !!(state.resultEmails && state.resultEmails[String(s.email || '').toLowerCase()]);
     }
 
-    function renderKpis() {
-        var cohort = state.cohort;
-        var total = cohort.length;
-        var oceanDone = cohort.filter(hasCurrentResult).length;
-        var online = cohort.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
-        var inactive = cohort.filter(function (s) { return (s.status || '') !== 'active'; }).length;
-
-        $('#kpi-enrolled').textContent = total;
-        $('#kpi-online').textContent = online;
-        $('#kpi-ocean').textContent = pct(oceanDone, total) + '%';
-        $('#kpi-ocean-bar').style.width = pct(oceanDone, total) + '%';
-        $('#kpi-inactive').textContent = inactive;
-    }
-
     function stageOf(profile) {
         if (profile.is_in_game) { return 'Active Game'; }
         return profile.current_stage || null;
     }
 
-    function renderPipeline() {
-        var total = state.cohort.length;
-        var order = ['OCEAN', 'Character Selection', 'Tutoring Dashboard', 'Active Game'];
-
-        $('#pipeline-strip').innerHTML = order.map(function (key) {
-            var count = state.cohort.filter(function (s) { return stageOf(s) === key; }).length;
-            var share = pct(count, total);
-            return '' +
-                '<div class="funnel-step">' +
-                '<div>' +
-                '<p class="funnel-num">' + count + '</p>' +
-                '<p class="funnel-name">' + esc(STAGE_META[key].label) + '</p>' +
-                '</div>' +
-                '<div class="funnel-foot">' +
-                '<div class="bar"><div class="bar-fill ' + STAGE_META[key].fill +
-                '" style="width:' + share + '%"></div></div>' +
-                '<p class="funnel-meta">' + share + '% of ' + total + ' participants</p>' +
-                '</div>' +
-                '</div>';
-        }).join('');
-    }
-
-    /* Presence is derived from the same field the rest of the app treats as
-       "signed in somewhere": a non-empty active_devices array, maintained
-       server-side by claim_device / release_device. A profile fetched without
-       that column returns null rather than a misleading "offline". */
+    /* "Signed in somewhere": a non-empty active_devices array, maintained
+       server-side by claim_device / release_device. It says a login holds a
+       device slot, NOT that the student is looking at a page right now, so it
+       is only ever labelled "Signed in" / "Signed out" and is never used for
+       Live Sessions or section status. A profile fetched without that column
+       returns null rather than a misleading "signed out". */
     function isOnline(profile) {
         if (!profile || !Object.prototype.hasOwnProperty.call(profile, 'active_devices')) {
             return null;
@@ -1356,7 +1287,7 @@
         var dot = (online === null) ? '' :
             '<span class="avatar-dot' + (online ? ' is-online' : '') +
             '" data-presence="' + esc(profile.email) + '"' +
-            ' title="' + (online ? 'Online' : 'Offline') + '"></span>';
+            ' title="' + (online ? 'Signed in' : 'Signed out') + '"></span>';
 
         return '<span class="avatar-wrap">' +
             '<span class="avatar">' + esc(initialsOf(profile.full_name, profile.email)) + '</span>' +
@@ -1368,20 +1299,19 @@
             '<div class="cell-user">' +
             avatarMarkup(profile) +
             '<span class="cell-user-text">' +
-            '<span class="cell-name" title="' + esc(profile.full_name || '(no name)') + '">' +
-            esc(profile.full_name || '(no name)') + '</span>' +
-            '<span class="cell-mail" title="' + esc(profile.email) + '">' + esc(profile.email) + '</span>' +
+            '<span class="cell-name">' + esc(profile.full_name || '(no name)') + '</span>' +
+            '<span class="cell-mail">' + esc(profile.email) + '</span>' +
             '</span>' +
             '</div>';
     }
 
     /* Patches every dot for one email in place. Called from the realtime
-       handler so a student going online flips the indicator immediately,
+       handler so a student signing in flips the indicator immediately,
        without waiting for — or triggering — a table re-render. */
     function applyPresence(email, online) {
         $$('[data-presence="' + (email || '').replace(/"/g, '\\"') + '"]').forEach(function (dot) {
             dot.classList.toggle('is-online', !!online);
-            dot.title = online ? 'Online' : 'Offline';
+            dot.title = online ? 'Signed in' : 'Signed out';
         });
     }
 
@@ -1389,190 +1319,293 @@
        stages — 'Waiting Room' most of all. Every lookup falls back to the raw
        string rather than assuming STAGE_META has an entry. */
     function stageLabel(stageKey) {
-        if (!stageKey) { return 'Idle'; }
+        if (!stageKey) { return '—'; }
         return STAGE_META[stageKey] ? STAGE_META[stageKey].label : stageKey;
     }
 
     function stageBadge(stageKey) {
-        if (!stageKey || !STAGE_META[stageKey]) {
-            return '<span class="badge">' + esc(stageKey || 'Idle') + '</span>';
-        }
-        return '<span class="badge ' + STAGE_META[stageKey].badge + '">' +
-            esc(STAGE_META[stageKey].label) + '</span>';
+        if (!stageKey) { return '<span class="muted">—</span>'; }
+        return '<span class="badge">' + esc(stageLabel(stageKey)) + '</span>';
     }
 
-    /* Whole seconds as "4m 20s" / "1h 5m". */
-    function formatSeconds(total) {
+    /* Whole seconds as hh:mm:ss (hours may exceed two digits). */
+    function formatClock(total) {
         var n = Math.max(0, Math.floor(Number(total) || 0));
         var h = Math.floor(n / 3600);
         var m = Math.floor((n % 3600) / 60);
-        if (h > 0) { return h + 'h ' + m + 'm'; }
-        if (m > 0) { return m + 'm ' + (n % 60) + 's'; }
-        return n + 's';
+        var sec = n % 60;
+        function two(v) { return v < 10 ? '0' + v : String(v); }
+        return two(h) + ':' + two(m) + ':' + two(sec);
     }
 
-    /* Only students whose page has checked in during the last minute: the
-       heartbeat (function.js 1C-5b) stops when a tab is hidden, closed or
-       offline, so this list is who is working right now, not who once was.
-       Active time is the counted time for the stage they are in. */
+    /* ---- Connection state -------------------------------------------------
+       The only presence signal an administrator can read is the stage
+       heartbeat: a student's stage page (OCEAN, Character Selection,
+       Tutoring Dashboard) calls record_heartbeat every 30 seconds while the
+       tab is visible, and the server stamps the time itself
+       (student_stage_time.last_heartbeat_timestamp). So:
+
+         Connected  the last check-in is within LIVE_WINDOW_MS (two missed
+                    beats of slack).
+         Offline    no check-in inside the window: tab hidden or closed,
+                    connection lost, or the stage finished.
+
+       There is NO interaction signal here. The page's own idle timer (sign out
+       after inactivity) is client-side only and is never reported, so
+       "Active" and "Idle/Away" cannot be told apart and are not shown.
+       A student on the waiting room or another page beats touch_presence,
+       which only teachers can read, so they appear Offline here.
+       The window is compared with the administrator's own clock; a badly set
+       clock shifts every row the same way. Expiry of the window says the
+       check-ins stopped, not when the connection was lost. */
+    var LIVE_PAGE_SIZE = 10;
+    var live = { filter: 'all', page: 1, readAt: 0, rows: [], tickId: null, expiry: Infinity, stopped: true };
+
+    function connectionOf(time, now) {
+        if (!time || !STAGE_TIME_FIELD[time.heartbeat_stage]) { return null; }   // never checked in
+        var beat = new Date(time.last_heartbeat_timestamp).getTime();
+        if (!isFinite(beat)) { return null; }
+        return (now - beat) <= LIVE_WINDOW_MS ? 'connected' : 'offline';
+    }
+
+    /* One row per student with recorded stage activity. */
+    function buildLiveRows() {
+        var times = state.stageTimes || {};
+        var now = Date.now();
+        var rows = [];
+        live.expiry = Infinity;
+        state.cohort.forEach(function (s) {
+            var time = times[String(s.email || '').toLowerCase()];
+            var conn = connectionOf(time, now);
+            if (!conn) { return; }
+            var stage = time.heartbeat_stage;
+            if (conn === 'connected') {
+                live.expiry = Math.min(live.expiry, new Date(time.last_heartbeat_timestamp).getTime() + LIVE_WINDOW_MS);
+            }
+            rows.push({ student: s, stage: stage, conn: conn, seconds: Number(time[STAGE_TIME_FIELD[stage]]) || 0 });
+        });
+        rows.sort(function (a, b) {
+            if (a.conn !== b.conn) { return a.conn === 'connected' ? -1 : 1; }
+            return String(a.student.full_name || a.student.email).localeCompare(String(b.student.full_name || b.student.email));
+        });
+        live.rows = rows;
+        live.readAt = now;
+        if (live.tickId !== null && !live.stopped) { scheduleLiveTick(); }
+    }
+
+    function presenceMarkup(conn) {
+        return '<span class="presence"><span class="dot ' + (conn === 'connected' ? 'dot-on' : 'dot-off') +
+            '" aria-hidden="true"></span>' + (conn === 'connected' ? 'Connected' : 'Offline') + '</span>';
+    }
+
     function renderLiveSessions() {
         var tbody = $('#live-tbody');
+        if (!tbody) { return; }
+        var foot = $('#live-foot');
 
-        function message(glyph, title, text) {
-            tbody.innerHTML = '<tr><td colspan="4"><div class="state-block" style="min-height:180px">' +
-                '<span class="state-glyph">' + icon(glyph, 'icon-lg') + '</span>' +
+        function message(title, text) {
+            tbody.innerHTML = '<tr><td colspan="4"><div class="state-block">' +
                 '<p class="state-title">' + esc(title) + '</p>' +
                 (text ? '<p class="state-desc">' + esc(text) + '</p>' : '') +
                 '</div></td></tr>';
+            $('#live-pager-info').textContent = '—';
+            $('#live-prev').disabled = true;
+            $('#live-next').disabled = true;
+            ['all', 'connected', 'offline'].forEach(function (k) {
+                var n = $('[data-live-count="' + k + '"]'); if (n) { n.textContent = '—'; }
+            });
         }
 
         if (state.stageTimes === null) {
-            message('clock', 'Active time is not set up yet',
-                'Apply supabase/migrations/20260929_0035_stage_time_tracking.sql, then refresh.');
+            message('Active time is not available',
+                'The stage-time table is not set up on this database. Apply supabase/migrations/20260929_0035_stage_time_tracking.sql, then refresh.');
+            return;
+        }
+        if (!state.cohortLoaded || state.stageTimes === undefined) {
+            tbody.innerHTML = skeletonRows(4, 6);
             return;
         }
 
-        var times = state.stageTimes || {};
-        var cutoff = Date.now() - LIVE_WINDOW_MS;
-        var rows = state.cohort.map(function (s) {
-            return { student: s, time: times[String(s.email || '').toLowerCase()] };
-        }).filter(function (r) {
-            return r.time && STAGE_TIME_FIELD[r.time.heartbeat_stage] &&
-                new Date(r.time.last_heartbeat_timestamp).getTime() >= cutoff;
-        }).sort(function (a, b) {
-            return String(a.student.full_name || a.student.email).localeCompare(String(b.student.full_name || b.student.email));
-        }).slice(0, 10);
+        buildLiveRows();
+        var counts = {
+            all: live.rows.length,
+            connected: live.rows.filter(function (r) { return r.conn === 'connected'; }).length,
+            offline: live.rows.filter(function (r) { return r.conn === 'offline'; }).length
+        };
+        Object.keys(counts).forEach(function (k) {
+            var n = $('[data-live-count="' + k + '"]'); if (n) { n.textContent = counts[k]; }
+        });
 
-        if (!rows.length) {
-            message('clock', 'No students active right now');
+        var shown = live.rows.filter(function (r) { return live.filter === 'all' || r.conn === live.filter; });
+        var pages = Math.max(1, Math.ceil(shown.length / LIVE_PAGE_SIZE));
+        live.page = Math.min(Math.max(1, live.page), pages);       /* clamp after any change */
+
+        if (!shown.length) {
+            message(live.rows.length ? 'No students match this filter' : 'No student activity recorded yet',
+                live.rows.length ? '' : 'Students appear here after their stage page first checks in.');
+            ['all', 'connected', 'offline'].forEach(function (k) {
+                var n = $('[data-live-count="' + k + '"]'); if (n) { n.textContent = counts[k]; }
+            });
             return;
         }
 
-        tbody.innerHTML = rows.map(function (r) {
-            var stage = r.time.heartbeat_stage;
+        var start = (live.page - 1) * LIVE_PAGE_SIZE;
+        tbody.innerHTML = shown.slice(start, start + LIVE_PAGE_SIZE).map(function (r) {
+            var s = r.student;
+            return '' +
+                '<tr data-live-row="' + esc(s.email) + '">' +
+                '<td><div class="cell-user"><span class="avatar" aria-hidden="true">' + esc(initialsOf(s.full_name, s.email)) + '</span>' +
+                '<span class="cell-user-text"><span class="cell-name">' + esc(s.full_name || '(no name)') + '</span>' +
+                presenceMarkup(r.conn) + '</span></div></td>' +
+                '<td>' + esc(s.section || '—') + '</td>' +
+                '<td>' + stageBadge(r.stage) + '</td>' +
+                '<td class="duration-cell col-w-time" data-live-clock="' + r.seconds + '" data-live-conn="' + r.conn + '">' +
+                esc(formatClock(r.seconds)) + '</td>' +
+                '</tr>';
+        }).join('');
+
+        var from = start + 1, to = Math.min(start + LIVE_PAGE_SIZE, shown.length);
+        $('#live-pager-info').textContent = 'Showing ' + from + '–' + to + ' of ' + shown.length +
+            (pages > 1 ? ' · page ' + live.page + ' of ' + pages : '');
+        $('#live-prev').disabled = live.page <= 1;
+        $('#live-next').disabled = live.page >= pages;
+
+        foot.textContent = (state.stageTimesStale
+            ? 'Could not refresh just now; showing the last data read. '
+            : '') +
+            'Connected means this student’s stage page checked in within the last minute. Active time is counted by the server and stops when check-ins stop.';
+    }
+
+    /* Connected clocks advance between reads, measured from the clock rather
+       than counted (so a throttled tab cannot drift); Offline clocks never
+       change. One interval for the whole page. */
+    function tickLiveClocks() {
+        live.tickId = null;
+        if (!document.hidden) {
+            var panel = $('#view-live');
+            if (panel && !panel.classList.contains('is-hidden')) {
+                var now = Date.now();
+                if (now > live.expiry) { renderLiveSessions(); }       /* a row just lost its window */
+                var elapsed = Math.floor((now - live.readAt) / 1000);
+                $$('[data-live-conn="connected"]').forEach(function (cell) {
+                    cell.textContent = formatClock(Number(cell.getAttribute('data-live-clock')) + elapsed);
+                });
+            }
+        }
+        scheduleLiveTick();
+    }
+
+    /* One timer at a time, aimed at the next whole second after the last read,
+       so the clocks change on the second and a late timer cannot pile up. */
+    function scheduleLiveTick() {
+        if (live.stopped) { return; }
+        clearTimeout(live.tickId);
+        var wait = 1000 - ((Date.now() - live.readAt) % 1000) + 5;
+        live.tickId = setTimeout(tickLiveClocks, wait);
+    }
+
+    function initLive() {
+        $$('[data-live-filter]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                live.filter = btn.getAttribute('data-live-filter');
+                live.page = 1;
+                $$('[data-live-filter]').forEach(function (b) {
+                    var on = b === btn;
+                    b.classList.toggle('is-active', on);
+                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                });
+                renderLiveSessions();
+            });
+        });
+        $('#live-prev').addEventListener('click', function () { live.page--; renderLiveSessions(); });
+        $('#live-next').addEventListener('click', function () { live.page++; renderLiveSessions(); });
+    }
+
+    /* The list is re-read every 20 seconds, on its own: a heartbeat is not a
+       profiles change, so nothing else here would notice one. Stopped when
+       the page goes away. */
+    var liveRefreshId = null;
+
+    function refreshStageTimes() {
+        if (document.hidden || !state.cohortLoaded) { return; }
+        loadStageTimes().then(function () {
+            renderLiveSessions();
+            renderSections();
+        }).catch(function () { /* the next tick tries again */ });
+    }
+
+    function startLiveSessionsTimer() {
+        if (liveRefreshId !== null) { return; }
+        liveRefreshId = setInterval(refreshStageTimes, 20000);
+        live.stopped = false;
+        scheduleLiveTick();
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) { refreshStageTimes(); }
+        });
+        window.addEventListener('pagehide', function () {
+            clearInterval(liveRefreshId); clearTimeout(live.tickId);
+            liveRefreshId = null; live.tickId = null; live.stopped = true;
+        });
+    }
+
+    /* ================================================ 6. CLASS SECTIONS === */
+
+    /* A section is Online while at least one of its students is Connected by
+       the same heartbeat rule Live Sessions uses; otherwise Offline. There is
+       no third state: an "idle" student is not modelled anywhere. With the
+       stage-time data unavailable the status is unknown and shown as "—",
+       never as Offline. */
+    function sectionStatus(members) {
+        if (!state.stageTimes) { return null; }
+        var now = Date.now();
+        var connected = members.filter(function (s) {
+            return connectionOf(state.stageTimes[String(s.email || '').toLowerCase()], now) === 'connected';
+        }).length;
+        return { online: connected > 0, connected: connected };
+    }
+
+    function renderSections() {
+        var tbody = $('#sections-tbody');
+        if (!tbody) { return; }
+
+        if (!state.sectionsLoaded || !state.cohortLoaded) {
+            tbody.innerHTML = skeletonRows(6, 4);
+            return;
+        }
+
+        if (!state.sections.length) {
+            tbody.innerHTML = '<tr><td colspan="6"><div class="state-block">' +
+                '<p class="state-title">No sections yet</p></div></td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = state.sections.map(function (section) {
+            var members = state.cohort.filter(function (s) { return s.section === section.name; });
+            var done = members.filter(hasCurrentResult).length;
+            var status = sectionStatus(members);
+            var statusCell = status === null
+                ? '<span class="muted" title="Connection data is not available">—</span>'
+                : '<span class="presence"><span class="dot ' + (status.online ? 'dot-on' : 'dot-off') +
+                  '" aria-hidden="true"></span>' + (status.online ? 'Online' : 'Offline') + '</span>';
+            var prof = state.faculty.filter(function (f) { return f.assigned_section === section.name; })[0];
+
             return '' +
                 '<tr>' +
-                '<td>' + userCell(r.student) + '</td>' +
-                '<td class="muted">' + esc(r.student.section || '—') + '</td>' +
-                '<td>' + stageBadge(stage) + '</td>' +
-                '<td class="duration-cell tnum">' + esc(formatSeconds(r.time[STAGE_TIME_FIELD[stage]])) + '</td>' +
+                '<td><span class="cell-name">' + esc(section.name) + '</span></td>' +
+                '<td>' + (prof ? esc(prof.name) : '<span class="muted">—</span>') + '</td>' +
+                '<td class="col-right mono">' + members.length + '</td>' +
+                '<td class="col-right mono">' + done + (members.length ? ' · ' + pct(done, members.length) + '%' : '') + '</td>' +
+                '<td>' + statusCell + '</td>' +
+                '<td class="col-right"><button type="button" class="btn btn-secondary btn-sm" data-section-open="' +
+                esc(section.name) + '" aria-label="View roster for section ' + esc(section.name) + '">View</button></td>' +
                 '</tr>';
         }).join('');
     }
 
-    /* The list is re-read every 20 seconds, on its own: a heartbeat is not a
-       profiles change, so nothing else here would notice one. */
-    function startLiveSessionsTimer() {
-        setInterval(function () {
-            if (document.hidden || !state.cohortLoaded) { return; }
-            loadStageTimes().then(renderLiveSessions).catch(function () { /* the next tick tries again */ });
-        }, 20000);
-    }
-
-    function renderGateSummary() {
-        $('#gate-summary').innerHTML = GATES.map(function (gate) {
-            var access = gateAccess(gate);
-            var status = gateStatus(gate);
-            var meta = gate.stage;
-            if (access && access.sections.length) {
-                meta += ' · ' + access.sections.map(function (o) { return o.section; }).join(', ');
-            }
-            return '' +
-                '<div class="device-row">' +
-                '<span class="dot ' + (status.tone ? 'dot-live' : 'dot-off') + '"></span>' +
-                '<div class="device-text">' +
-                '<p class="device-name">' + esc(gate.title) + '</p>' +
-                '<p class="device-meta">' + esc(meta) + '</p>' +
-                '</div>' +
-                '<span class="badge ' + status.tone + '">' + esc(status.text) + '</span>' +
-                '</div>';
-        }).join('');
-    }
-
-    /* One tile per section. Sections and the cohort load separately; until
-       both are in, every section would read "0%", which means "not loaded
-       yet" rather than "no progress", so the placeholders stay. */
-    function renderSectionHealth() {
-        var container = $('#section-health');
-        if (!state.sectionsLoaded || !state.cohortLoaded) { return; }
-
-        if (!state.sections.length) {
-            container.innerHTML = '<p class="state-desc health-empty">No sections yet</p>';
-            return;
-        }
-
-        container.innerHTML = state.sections.map(function (section) {
-            var members = state.cohort.filter(function (s) { return s.section === section.name; });
-            var done = members.filter(hasCurrentResult).length;
-            var share = pct(done, members.length);
-            return '' +
-                '<div class="health-tile">' +
-                '<div class="health-top">' +
-                '<span class="health-name" title="' + esc(section.name) + '">' + esc(section.name) + '</span>' +
-                '<span class="health-val tnum">' + share + '%</span>' +
-                '</div>' +
-                '<div class="bar"><div class="bar-fill" style="width:' + share + '%"></div></div>' +
-                '<p class="health-meta">' +
-                (members.length ? done + ' of ' + members.length + ' done' : 'No students') + '</p>' +
-                '</div>';
-        }).join('');
-    }
-
-    /* ==================================================== 6. SECTIONS === */
-
-    function renderSections() {
-        var grid = $('#sections-grid');
-
-        if (!state.sections.length) {
-            grid.innerHTML = '<div class="card"><div class="state-block">' +
-                '<span class="state-glyph">' + icon('layers', 'icon-lg') + '</span>' +
-                '<p class="state-title">No sections yet</p>' +
-                '</div></div>';
-            return;
-        }
-
-        grid.innerHTML = state.sections.map(function (section) {
-            var members = state.cohort.filter(function (s) { return s.section === section.name; });
-            var online = members.filter(function (s) { return (s.active_devices || []).length > 0; }).length;
-            var done = members.filter(hasCurrentResult).length;
-
-            var stack = members.slice(0, 4).map(function (s) {
-                return '<span class="avatar">' + esc(initialsOf(s.full_name, s.email)) + '</span>';
-            }).join('');
-            var more = members.length > 4
-                ? '<span class="avatar avatar-more">+' + (members.length - 4) + '</span>' : '';
-
-            return '' +
-                '<article class="section-card">' +
-                '<div class="section-card-body">' +
-                '<div class="section-card-top">' +
-                '<div>' +
-                '<h3 class="section-name">' + esc(section.name) + '</h3>' +
-                '<p class="section-prof">' + esc(professorFor(section.name)) + '</p>' +
-                '</div>' +
-                '<span class="badge ' + (online ? 'badge-accent' : '') + '">' +
-                '<span class="dot ' + (online ? 'dot-live' : 'dot-off') + '"></span>' +
-                (online ? online + ' online' : 'Idle') + '</span>' +
-                '</div>' +
-                '<div class="section-metrics">' +
-                '<div><p class="metric-label">Students</p><p class="metric-value tnum">' + members.length + '</p></div>' +
-                '<div><p class="metric-label">OCEAN</p><p class="metric-value tnum">' + done + '</p></div>' +
-                '<div><p class="metric-label">Complete</p><p class="metric-value tnum">' + pct(done, members.length) + '%</p></div>' +
-                '</div>' +
-                '<div class="bar"><div class="bar-fill" style="width:' + pct(done, members.length) + '%"></div></div>' +
-                '</div>' +
-                '<div class="section-card-foot">' +
-                '<div class="avatar-stack">' + stack + more + '</div>' +
-                '<button class="btn btn-secondary btn-sm" data-section-open="' + esc(section.name) + '">' +
-                'View roster ' + icon('chev-right') + '</button>' +
-                '</div>' +
-                '</article>';
-        }).join('');
-
-        $$('[data-section-open]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                openSectionDetails(btn.getAttribute('data-section-open'));
-            });
+    function initSectionsTable() {
+        $('#sections-tbody').addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-section-open]');
+            if (btn) { openSectionDetails(btn.getAttribute('data-section-open'), btn); }
         });
     }
 
@@ -1581,12 +1614,12 @@
         return match ? match.name : 'No professor assigned';
     }
 
-    async function openSectionDetails(sectionName) {
+    async function openSectionDetails(sectionName, trigger) {
         state.activeSection = sectionName;
         $('#section-details-title').textContent = 'Section ' + sectionName;
         $('#section-details-sub').textContent = 'Loading enrolled students…';
         $('#section-students-tbody').innerHTML = skeletonRows(5, 4);
-        openModal('modal-section-details');
+        openModal('modal-section-details', trigger);
 
         var res = await sb.from('profiles')
             .select('role, full_name, email, group_type, status, pre_test_score, post_test_score')
@@ -1628,7 +1661,7 @@
         }).join('');
     }
 
-    /* ============================================== 7. STUDENT ROSTER === */
+    /* ============================================== 7. ALL STUDENTS ===== */
 
     /* Whether the student has activated their account, in words that say so.
        "Inactive" read as a fault; this is registration state: a registered
@@ -1637,28 +1670,14 @@
     function activationBadge(s) {
         var activated = (s.status || '') === 'active';
         return '<span class="badge ' + (activated ? 'badge-accent' : '') + '">' +
-            '<span class="dot ' + (activated ? 'dot-live' : 'dot-off') + '"></span>' +
             (activated ? 'Activated' : 'Pending') + '</span>';
     }
 
-    var ROSTER_HEADS = {
-        default:
-            '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Stage</th><th>Status</th></tr>',
-        'Active Game':
-            '<tr><th>Student</th><th>Condition</th><th>Problem</th><th>Difficulty</th><th>Hints</th>' +
-            '<th>Streak</th><th>Duration</th></tr>',
-        stage:
-            '<tr><th>Student</th><th>Section</th><th>Condition</th><th>Activity</th><th>Duration</th></tr>'
-    };
-
-    /* A row has no buttons: it opens the participant panel, whose Actions
-       list holds Edit details, Delete and the rest. Deleting destroys
-       collected responses, so it stays one deliberate step away in there.
-       With no buttons left the row takes focus itself (see initRoster). */
+    /* The whole row opens the participant profile; there are no buttons in
+       it. With none left, the row takes focus itself (see initRoster). */
     function rosterRow(s, cells) {
-        var started = s.stage_started_at || '';
         return '<tr class="is-clickable" tabindex="0" data-student="' + esc(s.email) + '"' +
-            ' data-started-at="' + esc(started) + '" aria-label="Open profile: ' + esc(s.full_name || s.email) + '">' +
+            ' aria-label="Open profile: ' + esc(s.full_name || s.email) + '">' +
             '<td>' + userCell(s) + '</td>' + cells + '</tr>';
     }
 
@@ -1668,45 +1687,22 @@
         return '<td><span class="badge ' + condition.badge + '">' + esc(condition.short) + '</span></td>';
     }
 
+    function filtersActive() {
+        return !!(state.filters.stage || state.filters.group !== 'all' || state.filters.search.trim());
+    }
+
     function renderRoster() {
         var tbody = $('#student-tbody');
         var empty = $('#student-empty');
-        var thead = $('#roster-thead');
-        var drill = state.filters.stage;
 
-        thead.innerHTML = drill === 'Active Game' ? ROSTER_HEADS['Active Game']
-            : (drill ? ROSTER_HEADS.stage : ROSTER_HEADS.default);
-
-        empty.classList.toggle('is-hidden', state.rosterPage.length !== 0);
+        var none = state.rosterPage.length === 0;
+        empty.classList.toggle('is-hidden', !none);
+        $('#reset-filters').classList.toggle('is-hidden', !filtersActive());
+        $('#student-empty .state-title').textContent = filtersActive() ? 'No matching students' : 'No students yet';
 
         tbody.innerHTML = state.rosterPage.map(function (s) {
-            var started = s.stage_started_at || '';
-
-            if (drill === 'Active Game') {
-                return rosterRow(s,
-                    conditionCell(s) +
-                    '<td class="tnum muted">Question ' + toInt(s.current_problem, 1) + '</td>' +
-                    '<td><span class="badge badge">' + esc(s.current_difficulty || 'Normal') + '</span></td>' +
-                    '<td class="tnum muted">' + toInt(s.hints_used, 0) + '</td>' +
-                    '<td class="tnum muted">' + toInt(s.consecutive_correct, 0) + '</td>' +
-                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>');
-            }
-
-            if (drill) {
-                var activity = 'Reading instructions';
-                if (drill === 'OCEAN') { activity = 'Answering item ' + toInt(s.ocean_current_item, 1) + '/50'; }
-                if (drill === 'Character Selection') { activity = 'Browsing personas'; }
-                if (drill === 'Tutoring Dashboard') { activity = 'Browsing dashboard'; }
-
-                return rosterRow(s,
-                    '<td class="muted">' + esc(s.section || '—') + '</td>' +
-                    conditionCell(s) +
-                    '<td><span class="badge badge-accent">' + esc(activity) + '</span></td>' +
-                    '<td class="duration-cell" data-duration>' + esc(formatDuration(started)) + '</td>');
-            }
-
             return rosterRow(s,
-                '<td class="muted">' + esc(s.section || '—') + '</td>' +
+                '<td>' + esc(s.section || '—') + '</td>' +
                 conditionCell(s) +
                 '<td>' + stageBadge(stageOf(s)) + '</td>' +
                 '<td>' + activationBadge(s) + '</td>');
@@ -1716,10 +1712,20 @@
         var from = state.totalStudents ? (state.page - 1) * PAGE_SIZE + 1 : 0;
         var to = Math.min(state.page * PAGE_SIZE, state.totalStudents);
 
-        $('#pager-info').textContent = 'Showing ' + from + '–' + to + ' of ' + state.totalStudents +
-            (pages > 1 ? '  ·  page ' + state.page + ' of ' + pages : '');
+        $('#pager-info').textContent = state.totalStudents
+            ? 'Showing ' + from + '–' + to + ' of ' + state.totalStudents + (pages > 1 ? ' · page ' + state.page + ' of ' + pages : '')
+            : 'No students to show';
         $('#page-prev').disabled = state.page <= 1;
         $('#page-next').disabled = state.page >= pages;
+    }
+
+    function setStageTab(key) {
+        state.filters.stage = key || null;
+        $$('[data-stage-filter]').forEach(function (tab) {
+            var on = (tab.getAttribute('data-stage-filter') || '') === (key || '');
+            tab.classList.toggle('is-active', on);
+            tab.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
     }
 
     function initRoster() {
@@ -1729,68 +1735,29 @@
             loadRoster();
         }, 300));
 
-        $$('[data-group-filter]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                $$('[data-group-filter]').forEach(function (b) { b.classList.remove('is-active'); });
-                btn.classList.add('is-active');
-
-                state.filters.group = btn.getAttribute('data-group-filter');
-                state.filters.sub = 'all';
-                $$('[data-sub-filter]').forEach(function (b) {
-                    b.classList.toggle('is-active', b.getAttribute('data-sub-filter') === 'all');
-                });
-                $('#subgroup-segment').classList.toggle('is-hidden', state.filters.group !== 'experimental');
-
-                state.page = 1;
-                loadRoster();
-            });
+        $('#group-filter').addEventListener('change', function (event) {
+            state.filters.group = event.target.value;
+            state.page = 1;
+            loadRoster();
+            loadStageCounters();       /* the counts follow the group */
         });
 
-        $$('[data-sub-filter]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                $$('[data-sub-filter]').forEach(function (b) { b.classList.remove('is-active'); });
-                btn.classList.add('is-active');
-                state.filters.sub = btn.getAttribute('data-sub-filter');
-                state.page = 1;
-                loadRoster();
-            });
-        });
-
-        /* The four tiles are the stage filter, and they toggle: pressing the
-           lit one clears it and returns the full roster. There is no separate
-           "clear filter" button. */
-        $$('[data-stage-filter]').forEach(function (tile) {
-            tile.addEventListener('click', function () {
-                var key = tile.getAttribute('data-stage-filter');
-                var isSame = state.filters.stage === key;
-                state.filters.stage = isSame ? null : key;
-
-                $$('[data-stage-filter]').forEach(function (t) {
-                    var on = !isSame && t === tile;
-                    t.classList.toggle('is-active', on);
-                    t.setAttribute('aria-pressed', on ? 'true' : 'false');
-                });
-
-                applyDrilldownChrome();
+        $$('[data-stage-filter]').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                setStageTab(tab.getAttribute('data-stage-filter'));
                 state.page = 1;
                 loadRoster();
             });
         });
 
         $('#reset-filters').addEventListener('click', function () {
-            state.filters = { group: 'all', sub: 'all', stage: null, search: '' };
+            state.filters = { group: 'all', stage: null, search: '' };
             $('#student-search').value = '';
-            $$('[data-group-filter]').forEach(function (b) {
-                b.classList.toggle('is-active', b.getAttribute('data-group-filter') === 'all');
-            });
-            $$('[data-stage-filter]').forEach(function (t) {
-                t.classList.remove('is-active');
-                t.setAttribute('aria-pressed', 'false');
-            });
-            $('#subgroup-segment').classList.add('is-hidden');
-            applyDrilldownChrome();
+            $('#group-filter').value = 'all';
+            setStageTab('');
             state.page = 1;
             loadRoster();
+            loadStageCounters();
         });
 
         $('#page-prev').addEventListener('click', function () {
@@ -1805,7 +1772,7 @@
         /* One delegated listener covers every row. */
         $('#student-tbody').addEventListener('click', function (event) {
             var row = event.target.closest('[data-student]');
-            if (row) { openStudentDrawer(row.getAttribute('data-student')); }
+            if (row) { openStudentDrawer(row.getAttribute('data-student'), row); }
         });
 
         $('#student-tbody').addEventListener('keydown', function (event) {
@@ -1813,26 +1780,11 @@
             var row = event.target.closest('[data-student]');
             if (!row || event.target !== row) { return; }
             event.preventDefault();
-            openStudentDrawer(row.getAttribute('data-student'));
+            openStudentDrawer(row.getAttribute('data-student'), row);
         });
     }
 
-    function applyDrilldownChrome() {
-        var drill = state.filters.stage;
-        $('#roster-filter-bar').classList.toggle('is-hidden', !!drill);
-        $('#roster-title').textContent = drill ? stageLabel(drill) + ' — live view' : 'All students';
-    }
-
-    /* Ticks every second so live durations stay honest without a refetch. */
-    setInterval(function () {
-        $$('tr[data-started-at]').forEach(function (row) {
-            var startedAt = row.getAttribute('data-started-at');
-            var cell = row.querySelector('[data-duration]');
-            if (cell && startedAt) { cell.textContent = formatDuration(startedAt); }
-        });
-    }, 1000);
-
-    /* ========================== 8. STUDENT DRAWER AND ACTIONS =========== */
+    /* ===================== 8. PARTICIPANT PROFILE AND ACTIONS =========== */
 
     function findStudent(email) {
         return state.rosterPage.filter(function (s) { return s.email === email; })[0] ||
@@ -1843,7 +1795,7 @@
         return value === true ? 'Received' : value === false ? 'Not received' : 'Not recorded';
     }
 
-    function openStudentDrawer(email) {
+    function openStudentDrawer(email, trigger) {
         var s = findStudent(email);
         if (!s) { return; }
 
@@ -1858,7 +1810,7 @@
             drawerDot.classList.toggle('is-hidden', drawerOnline === null);
             drawerDot.classList.toggle('is-online', drawerOnline === true);
             drawerDot.setAttribute('data-presence', s.email);
-            drawerDot.title = drawerOnline ? 'Online' : 'Offline';
+            drawerDot.title = drawerOnline ? 'Signed in' : 'Signed out';
         }
         $('#drawer-student-name').textContent = s.full_name || '(no name)';
         $('#drawer-email').textContent = s.email;
@@ -1866,11 +1818,8 @@
         $('#drawer-condition').className = 'badge ' + (condition.badge || '');
         $('#drawer-section').textContent = s.section || '—';
         $('#drawer-stage').textContent = stageLabel(stageOf(s));
-        $('#drawer-devices').textContent = (s.active_devices || []).length + ' of ' + toInt(s.max_devices, 1);
-        $('#drawer-status').textContent = (drawerOnline ? 'Online' : 'Offline') +
-            ' · ' + ((s.status || '') === 'active' ? 'Activated' : 'Not activated') +
+        $('#drawer-status').textContent = ((s.status || '') === 'active' ? 'Activated' : 'Not activated') +
             (s.must_change_password === true ? ' · Must change temporary password' : '');
-        $('#drawer-consent').textContent = consentLabel(s.parental_consent);
         $('#drawer-assent').textContent = consentLabel(s.student_assent);
         ['pre', 'post'].forEach(function (test) {
             var parts = scoreParts(s, test);
@@ -1879,14 +1828,14 @@
         });
 
         renderTraits(s);
-        openModal('drawer-student');
+        openModal('drawer-student', trigger);
     }
 
     /* ---- Assessment results (BFPT) ------------------------------------
        Results live ONLY in ocean_submissions. Its one RLS policy admits an
        admin with a current session (migration 0018); a student or teacher
        asking the same question gets zero rows. profiles carries no score for
-       anyone, so the drawer and the CSV export fetch results from here
+       anyone, so the participant profile fetches results from here
        rather than reading them off the roster row. */
     var BFPT = window.PIA_BFPT || null;
     var BFPT_COLUMNS = 'email, responses, ocean_e, ocean_a, ocean_c, ocean_n, ocean_o,' +
@@ -1968,12 +1917,6 @@
             (rows.length > 1 ? ' · latest of ' + rows.length + ' attempts' : '') +
             ' · scored with the BFPT sheet';
 
-        /* Scored as the sheet is written, N runs opposite to its own prose
-           definition. Said beside the number, where it is read. */
-        var nNote = '<p class="bfpt-note"><b>How N is scored:</b> exactly as the BFPT sheet specifies. ' +
-            'Its N formula adds “Am relaxed most of the time” and “Seldom feel blue” and subtracts the ' +
-            'eight stress items, so a higher N here reflects calmer answers.</p>';
-
         var answers;
         if (Array.isArray(r.responses) && r.responses.length === 50) {
             answers = '<details class="bfpt-answers"><summary>All 50 answers</summary><ol class="bfpt-answer-list">' +
@@ -1992,7 +1935,7 @@
                 'answer storage and was carried over from the old profile record.</p>';
         }
 
-        box.innerHTML = scores + '<p class="bfpt-meta">' + meta + '</p>' + nNote + answers;
+        box.innerHTML = scores + '<p class="bfpt-meta">' + meta + '</p>' + answers;
     }
 
     function initDrawerActions() {
@@ -2002,9 +1945,7 @@
                 if (!s) { return; }
                 var action = btn.getAttribute('data-student-action');
 
-                if (action === 'activate') { sendActivationEmail(s.email, btn); }
-                else if (action === 'edit') { closeModal('drawer-student'); openEditStudent(s.email); }
-                else if (action === 'devices') { openDeviceManager(s.email); }
+                if (action === 'edit') { closeModal('drawer-student'); openEditStudent(s.email); }
                 else if (action === 'retake-ocean') { allowRetakeOcean(s.email); }
                 else if (action === 'retake-character') { allowRetakeCharacter(s.email); }
                 else if (action === 'reset-password') { closeModal('drawer-student'); openResetPassword(s.email); }
@@ -2013,35 +1954,10 @@
         });
     }
 
-    /* ---- Activation and password-reset email ---- */
-
-    async function sendActivationEmail(email, sourceBtn) {
-        var ok = await confirmAction({
-            title: 'Send activation email',
-            heading: 'Email ' + email + '?',
-            message: 'The student receives a one-time link where they set their own password. ' +
-                'Their account becomes active once they use it.',
-            confirmLabel: 'Send email',
-            tone: 'accent'
-        });
-        if (!ok) { return; }
-
-        var release = setBusy(sourceBtn, 'Sending…');
-        var res = await sb.auth.signInWithOtp({
-            email: email,
-            options: { shouldCreateUser: false, emailRedirectTo: activationRedirect() }
-        });
-        release();
-
-        if (res.error) {
-            toastErr('Activation email failed', res.error.message);
-            return;
-        }
-        toastOk('Activation email sent', 'Delivered to ' + email + '.');
-    }
+    /* ---- Password-reset email ---- */
 
     /* The preferred route: the owner sets their own password through the
-       emailed link or code, and no password is ever known to the admin.
+       emailed link, and no password is ever known to the admin.
        opts.confirmed skips the confirm step when the caller is already a
        deliberate choice — the Reset password dialog. */
     async function sendPasswordReset(email, sourceBtn, opts) {
@@ -2065,7 +1981,7 @@
             toastErr('Reset email failed', res.error.message);
             return;
         }
-        toastOk('Reset email sent', email + ' can now set a new password.');
+        toastOk('Reset email requested', 'The service accepted the request for ' + email + '. Delivery is not confirmed here.');
     }
 
     /* ---- Temporary password (admin override) ------------------------------
@@ -2533,83 +2449,6 @@
         }
     }
 
-    /* ---- Student device manager ---- */
-
-    async function openDeviceManager(email) {
-        state.managingEmail = email;
-        $('#devices-subject').textContent = email;
-        $('#student-device-list').innerHTML =
-            '<div class="device-row"><span class="skeleton skeleton-avatar"></span>' +
-            '<div class="device-text"><span class="skeleton skeleton-line" style="width:140px"></span>' +
-            '<span class="skeleton skeleton-line" style="width:200px"></span></div></div>';
-        openModal('modal-devices');
-
-        var res = await sb.from('profiles').select('active_devices').eq('email', email).maybeSingle();
-
-        if (res.error) {
-            $('#student-device-list').innerHTML = '';
-            toastErr('Could not read devices', friendlyDbError(res.error, 'Unknown database error.'));
-            return;
-        }
-
-        renderStudentDevices((res.data && res.data.active_devices) || []);
-    }
-
-    function renderStudentDevices(devices) {
-        var container = $('#student-device-list');
-        $('#revoke-all-btn').disabled = !devices.length;
-
-        if (!devices.length) {
-            container.innerHTML = '<div class="state-block" style="min-height:160px">' +
-                '<span class="state-glyph">' + icon('monitor', 'icon-lg') + '</span>' +
-                '<p class="state-title">No active devices</p></div>';
-            return;
-        }
-
-        container.innerHTML = devices.map(function (deviceId) {
-            var info = describeDevice(deviceId);
-            return '' +
-                '<div class="device-row">' +
-                '<span class="stat-glyph">' + icon(info.glyph, 'icon-sm') + '</span>' +
-                '<div class="device-text">' +
-                '<p class="device-name">' + esc(info.label) + '</p>' +
-                '<p class="device-meta cell-mail">' + esc(deviceId) + '</p>' +
-                '</div>' +
-                '</div>';
-        }).join('');
-    }
-
-    /* Revoking one row only edited an array; the student's access token stayed
-       valid until it expired on its own. admin_revoke_sessions is the only
-       call that actually ends their access, so the control says what it does:
-       it signs them out everywhere. */
-    async function revokeAllStudentSessions() {
-        var email = state.managingEmail;
-        if (!email) { return; }
-
-        var ok = await confirmAction({
-            title: 'Sign out all devices',
-            heading: 'Sign ' + email + ' out everywhere?',
-            message: 'Every session for this account ends immediately and they will have to ' +
-                'log in again. Any unsaved answer in progress may be lost.',
-            confirmLabel: 'Sign out everywhere'
-        });
-        if (!ok) { return; }
-
-        var release = setBusy($('#revoke-all-btn'), 'Revoking…');
-        var res = await sb.rpc('admin_revoke_sessions', { p_email: email });
-        release();
-
-        if (res.error) {
-            toastErr('Revoke failed', res.error.message);
-            return;
-        }
-
-        renderStudentDevices([]);
-        toastOk('Sessions revoked', email + ' was signed out of all devices.');
-        refreshAll();
-    }
-
     /* ================================================== 9. FACULTY ====== */
 
     function renderFaculty(term) {
@@ -2635,7 +2474,6 @@
                 '<td class="muted">' + esc(f.department || '—') + '</td>' +
                 '<td><span class="badge">' + esc(f.assigned_section || 'Unassigned') + '</span></td>' +
                 '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
-                '<span class="dot ' + (active ? 'dot-live' : 'dot-off') + '"></span>' +
                 (active ? 'Active' : 'Inactive') + '</span></td>' +
                 '</tr>';
         }).join('');
@@ -2648,7 +2486,7 @@
 
         $('#faculty-tbody').addEventListener('click', function (event) {
             var row = event.target.closest('[data-faculty]');
-            if (row) { openFacultyProfile(row.getAttribute('data-faculty')); }
+            if (row) { openFacultyProfile(row.getAttribute('data-faculty'), row); }
         });
 
         $('#faculty-tbody').addEventListener('keydown', function (event) {
@@ -2656,7 +2494,11 @@
             var row = event.target.closest('[data-faculty]');
             if (!row || event.target !== row) { return; }
             event.preventDefault();
-            openFacultyProfile(row.getAttribute('data-faculty'));
+            openFacultyProfile(row.getAttribute('data-faculty'), row);
+        });
+
+        $('#faculty-reset').addEventListener('click', function () {
+            if (state.activeFaculty) { resetFacultyPassword(state.activeFaculty.email, this); }
         });
 
         $('#faculty-signout').addEventListener('click', function () {
@@ -2671,7 +2513,43 @@
         });
     }
 
-    function openFacultyProfile(email) {
+    function setFacultyStatus(text, tone) {
+        var node = $('#faculty-status-msg');
+        node.textContent = text;
+        node.className = 'form-status' + (tone ? ' is-' + tone : '');
+    }
+
+    /* The secure email-link route only: Supabase emails the professor a reset
+       link and they choose their own password. No password is set or shown
+       here, and nothing is said to have happened until the service answers. */
+    async function resetFacultyPassword(email, sourceBtn) {
+        var ok = await confirmAction({
+            title: 'Reset password',
+            heading: 'Send a reset link to ' + email + '?',
+            message: 'They will choose their own new password through the emailed link. ' +
+                'No password is set or revealed here.',
+            confirmLabel: 'Send reset email',
+            tone: 'accent'
+        });
+        if (!ok) { return; }
+
+        var release = setBusy(sourceBtn, 'Sending…');
+        setFacultyStatus('Sending the reset email…', '');
+        var res;
+        try { res = await sb.auth.resetPasswordForEmail(email, { redirectTo: activationRedirect() }); }
+        catch (err) { res = { error: { message: (err && err.message) || 'The request did not complete.' } }; }
+        release();
+
+        /* The modal may have moved on to another professor meanwhile. */
+        if (!state.activeFaculty || state.activeFaculty.email !== email) { return; }
+        if (res.error) {
+            setFacultyStatus('The reset email was not sent: ' + authFailureText(res.error, ''), 'error');
+            return;
+        }
+        setFacultyStatus('The service accepted the request. ' + email + ' can use the link in the email to choose a new password.', 'ok');
+    }
+
+    function openFacultyProfile(email, trigger) {
         var f = state.faculty.filter(function (row) { return row.email === email; })[0];
         if (!f) { return; }
 
@@ -2682,8 +2560,9 @@
         $('#faculty-section').textContent = f.assigned_section || 'Unassigned';
         $('#faculty-status').textContent = (f.status || '') === 'active' ? 'Active' : 'Inactive';
         $('#faculty-devices').textContent = '…';
+        setFacultyStatus('', '');
 
-        openModal('modal-faculty');
+        openModal('modal-faculty', trigger);
         loadFacultyDevices(f.email);
     }
 
@@ -2834,6 +2713,31 @@
        revoke). After a successful Grant or Revoke every tick is cleared, so a
        second press cannot repeat the action on the same sections. */
 
+    /* What the SERVER lets each research group enter, read from the stage rule
+       in migration 0005 (pia_can_enter_stage): OCEAN until it is submitted;
+       Character Selection only for the free-choice group (non-assigned) until
+       a tutor is chosen; the Tutoring Dashboard for everyone with OCEAN done,
+       except a free-choice student who has not chosen yet. Nothing on this
+       page edits it, and a stage closed to a section stays closed whatever a
+       group's rule says. */
+    var GROUP_POLICY = [
+        { label: 'Control', ocean: 'Available', char: 'Locked', dash: 'Available' },
+        { label: 'Experimental · Assigned', ocean: 'Available', char: 'Locked', dash: 'Available' },
+        { label: 'Experimental · Free choice', ocean: 'Available', char: 'Available', dash: 'Available after choosing a tutor' },
+        { label: 'Experimental · Neutral', ocean: 'Available', char: 'Locked', dash: 'Available' }
+    ];
+
+    function renderPolicy() {
+        var cell = function (text) {
+            return '<td><span class="' + (text === 'Locked' ? 'policy-no' : 'policy-yes') + '">' + esc(text) + '</span></td>';
+        };
+        $('#policy-tbody').innerHTML = GROUP_POLICY.map(function (g) {
+            return '<tr><th scope="row" class="policy-group">' + esc(g.label) + '</th>' +
+                cell(g.ocean) + cell(g.char) + cell(g.dash) + '</tr>';
+        }).join('');
+        $('#policy-foot').textContent = 'Shown from the server’s stage rule. This page cannot change which stages a group can enter; it opens or closes a stage for whole sections below.';
+    }
+
     var GATE_ACCESS_TIP = 'Granting moves a section’s eligible students in right away. Grant a section ' +
         'again to let in students who finished the previous stage later. Revoke access ends access for ' +
         'the ticked sections only; nothing already submitted is affected.';
@@ -2929,7 +2833,7 @@
             return head() + '<span class="skeleton-text gate-access-skeleton" aria-hidden="true"></span>';
         }
         if (!state.sections.length) {
-            return head() + '<p class="gate-access-note">No sections yet. Create one under Sections.</p>';
+            return head() + '<p class="gate-access-note">No sections yet. Create one under Class Sections.</p>';
         }
 
         var selected = state.gateSelected[gate.key];
@@ -3009,7 +2913,6 @@
             paintGateStatus(gate);
             paintGateFoot(gate);
         });
-        if ($('#gate-summary')) { renderGateSummary(); }
     }
 
     function initGates() {
@@ -3251,6 +3154,7 @@
 
             $('#change-password-form').reset();
             setPasswordsShown(false);
+            closeModal('modal-change-password');
 
             if (others && others.error) {
                 toastOk('Password updated', 'Your other devices could not be signed out. Revoke them under Active sessions.');
@@ -3449,15 +3353,13 @@
             var info = describeDevice(deviceId);
             var isCurrent = (deviceId === currentId);
             return '' +
-                '<div class="device-row">' +
-                '<span class="stat-glyph">' + icon(info.glyph, 'icon-sm') + '</span>' +
-                '<div class="device-text">' +
-                '<p class="device-name">' + esc(info.label) + '</p>' +
-                '<p class="device-meta cell-mail">' + esc(deviceId) + '</p>' +
-                '</div>' +
+                '<div class="device-row" data-device="' + esc(deviceId) + '">' +
+                '<span class="device-glyph">' + icon(info.glyph, 'icon-sm') + '</span>' +
+                '<div class="device-text"><p class="device-name">' + esc(info.label) + '</p></div>' +
                 (isCurrent
                     ? '<span class="badge badge-accent">This device</span>'
-                    : '<button class="btn btn-danger-soft btn-sm" data-revoke-admin="' + esc(deviceId) + '">Revoke</button>') +
+                    : '<button class="btn btn-danger-soft btn-sm" data-revoke-admin="' + esc(deviceId) +
+                      '" aria-label="Revoke ' + esc(info.label) + '">Revoke</button>') +
                 '</div>';
         }).join('');
 
@@ -3603,14 +3505,67 @@
         if (storedId === deviceId) { await signOut(); }
     }
 
-    /* executeForceLogout (function.js) releases the device slot, signs out
-       globally so refresh tokens die on the server, then clears storage. */
+    /* Sign out ends the session on the server, then leaves.
+
+       Order matters and nothing is claimed early:
+         1. the device slot is released (best effort; a failure here must not
+            keep someone signed in);
+         2. a global sign-out ends every session and deletes the refresh
+            tokens. If the server refuses it, the console stays where it is and
+            says so (the menu item can be used again). This device is never
+            left half signed out;
+         3. only then is local storage cleared (the device id is kept: it
+            belongs to the machine) and the browser sent to the front door.
+       function.js's executeForceLogout is NOT used here: it swallows a failed
+       sign-out and navigates anyway, which would leave a live refresh token
+       behind while the page claimed otherwise. */
+    var signingOut = false;
+
     async function signOut() {
-        if (typeof executeForceLogout === 'function') {
-            await executeForceLogout();
+        if (signingOut) { return; }
+        signingOut = true;
+
+        var status = $('#signout-status');
+        var item = $('#user-signout');
+        if (item) { item.disabled = true; }
+        if (status) { status.textContent = 'Signing out…'; }
+
+        /* Tell the session watchers this sign-out is deliberate. */
+        try { sessionStorage.setItem('is_signing_out', 'true'); } catch (err) { /* ignore */ }
+        if (typeof piaUserSigningOut !== 'undefined') { piaUserSigningOut = true; }
+
+        var deviceId = null;
+        try { deviceId = localStorage.getItem('pia_device_id'); } catch (err) { /* ignore */ }
+
+        if (deviceId) {
+            try { await sb.rpc('release_device', { p_device_id: deviceId }); }
+            catch (err) { console.error('Device release failed:', err); }
+        }
+
+        var result;
+        try { result = await sb.auth.signOut({ scope: 'global' }); }
+        catch (err) { result = { error: err }; }
+
+        if (result && result.error) {
+            signingOut = false;
+            try { sessionStorage.removeItem('is_signing_out'); } catch (err) { /* ignore */ }
+            if (typeof piaUserSigningOut !== 'undefined') { piaUserSigningOut = false; }
+            if (item) { item.disabled = false; }
+            var message = 'Sign-out failed: ' + ((result.error && result.error.message) || 'the server did not answer') +
+                '. You are still signed in. Try again.';
+            if (status) { status.textContent = message; }
+            showGlobalError(message);
             return;
         }
-        await sb.auth.signOut({ scope: 'global' });
+
+        try {
+            var theme = localStorage.getItem('pia_theme');
+            localStorage.clear();
+            sessionStorage.clear();
+            if (deviceId) { localStorage.setItem('pia_device_id', deviceId); }
+            if (theme) { localStorage.setItem('pia_theme', theme); }   /* a display choice, not a credential */
+        } catch (err) { /* storage blocked: the token is already revoked */ }
+
         window.location.replace('../../index.html');
     }
 
@@ -3625,83 +3580,6 @@
        would keep a "Remove faculty" button that deletes their whole account,
        admin access included, and a participant's row is research data. */
 
-    /* ---- Security log (migration 0031) ----
-       Written only by the database; this page reads the latest 50, and only
-       when the dialog is opened -- nobody needs it on every page load. */
-    var AUDIT_ACTIONS = {
-        'account.created': 'Account created',
-        'account.deleted': 'Account deleted',
-        'role.changed': 'Role changed',
-        'device_limit.changed': 'Device limit changed',
-        'email.changed': 'Email changed',
-        'devices.removed': 'Devices removed',
-        'sessions.revoked': 'Signed out everywhere'
-    };
-
-    function auditDetail(row) {
-        var d = row.detail || {};
-        if (row.action === 'role.changed' || row.action === 'device_limit.changed' || row.action === 'email.changed') {
-            return (d.from == null ? '—' : d.from) + ' → ' + (d.to == null ? '—' : d.to);
-        }
-        if (row.action === 'devices.removed') {
-            var n = Array.isArray(d.devices) ? d.devices.length : 0;
-            return n + (n === 1 ? ' device' : ' devices');
-        }
-        if (row.action === 'account.created' || row.action === 'account.deleted') { return d.role || ''; }
-        return '';
-    }
-
-    function auditMessage(title, text, glyph) {
-        return '<tr><td colspan="4"><div class="state-block" style="min-height:180px">' +
-            '<span class="state-glyph">' + icon(glyph || 'shield', 'icon-lg') + '</span>' +
-            '<p class="state-title">' + esc(title) + '</p>' +
-            (text ? '<p class="state-desc">' + esc(text) + '</p>' : '') + '</div></td></tr>';
-    }
-
-    async function loadAudit() {
-        var res = await sb.from('security_audit_log')
-            .select('at, actor_email, actor_role, action, target_email, detail')
-            .order('at', { ascending: false })
-            .limit(50);
-
-        if (res.error) {
-            /* Not a failure of this page: the log does not exist until 0031
-               is applied. Say so instead of showing an error. */
-            if (res.error.code === '42P01' || res.error.code === 'PGRST205' ||
-                /does not exist|could not find the table/i.test(res.error.message || '')) {
-                $('#audit-tbody').innerHTML = auditMessage('No security log yet',
-                    'Apply supabase/migrations/20260929_0031_admin_boundaries_and_audit.sql, then refresh.', 'info');
-                return;
-            }
-            throw res.error;
-        }
-
-        var rows = res.data || [];
-        if (!rows.length) {
-            $('#audit-tbody').innerHTML = auditMessage('Nothing recorded yet', '');
-            return;
-        }
-
-        $('#audit-tbody').innerHTML = rows.map(function (r) {
-            var detail = auditDetail(r);
-            var by = r.actor_email
-                ? '<span class="cell-mail" title="' + esc(r.actor_email) + '">' + esc(r.actor_email) + '</span>'
-                : '<span class="badge">Project owner</span>';
-            return '<tr>' +
-                '<td class="muted tnum">' + esc(formatStamp(r.at)) + '</td>' +
-                '<td><span class="cell-name">' + esc(AUDIT_ACTIONS[r.action] || r.action) + '</span>' +
-                (detail ? '<span class="cell-mail" title="' + esc(detail) + '">' + esc(detail) + '</span>' : '') + '</td>' +
-                '<td><span class="cell-mail" title="' + esc(r.target_email || '') + '">' + esc(r.target_email || '—') + '</span></td>' +
-                '<td>' + by + '</td>' +
-                '</tr>';
-        }).join('');
-    }
-
-    function openAuditLog(event) {
-        openModal('modal-audit', event && event.currentTarget);
-        loadAudit().catch(function (err) { console.error('Security log failed to load:', err); });
-    }
-
     async function loadAdmins() {
         var res = await sb.from('profiles')
             .select('full_name, email, status, max_devices, active_devices')
@@ -3713,35 +3591,32 @@
         renderAdmins();
     }
 
+    /* Two columns: who, and a status that says only what is known. An account
+       whose link has not been used yet is "Awaiting activation"; otherwise the
+       only signal available for an administrator is whether a login holds a
+       device slot (claim_device / release_device), so it reads "Signed in" or
+       "Signed out". There is no heartbeat or interaction signal for
+       administrators, so nothing here says Active, Idle or Connected. */
     function renderAdmins() {
         $('#admin-tbody').innerHTML = state.admins.map(function (a) {
-            /* Only a new account is 'inactive' until its link is used; admins
-               added by hand before this form may have no status at all. */
             var pending = (a.status || '') === 'inactive';
+            var signedIn = (a.active_devices || []).length > 0;
             var isYou = a.email === state.adminEmail;
-            return '' +
-                '<tr>' +
-                '<td>' + userCell(a) + '</td>' +
-                '<td><span class="badge ' + (pending ? '' : 'badge-accent') + '">' +
-                '<span class="dot ' + (pending ? 'dot-off' : 'dot-live') + '"></span>' +
-                (pending ? 'Awaiting activation' : 'Active') + '</span>' +
-                (isYou ? ' <span class="badge">You</span>' : '') + '</td>' +
-                '<td class="tnum muted">' + (function (n) { return n + (n === 1 ? ' device' : ' devices'); })((a.active_devices || []).length) + '</td>' +
-                '<td class="col-right"><span class="row-actions">' +
-                /* No remove, revoke or edit for another administrator: the
-                   database refuses them (migration 0031), so the console does
-                   not offer them. The one-time link only emails THEM. */
-                (isYou ? '' :
-                    '<button class="btn-icon" title="Email them a one-time link to set their password" ' +
-                    'aria-label="Email ' + esc(a.email) + ' a one-time sign-in link" ' +
-                    'data-admin-act="link" data-email="' + esc(a.email) + '">' + icon('send', 'icon-sm') + '</button>' +
-                    '<span class="btn-icon admin-protected" role="img" tabindex="0" ' +
-                    'title="Protected: only the project owner can remove or change another administrator" ' +
-                    'aria-label="Protected account: only the project owner can remove or change it">' +
-                    icon('shield', 'icon-sm') + '</span>') +
-                '</span></td>' +
+            var status = pending
+                ? '<span class="badge">Awaiting activation</span>'
+                : '<span class="presence"><span class="dot ' + (signedIn ? 'dot-on' : 'dot-off') +
+                  '" aria-hidden="true"></span>' + (signedIn ? 'Signed in' : 'Signed out') + '</span>';
+            return '<tr>' +
+                '<td><div class="cell-user"><span class="avatar" aria-hidden="true">' + esc(initialsOf(a.full_name, a.email)) + '</span>' +
+                '<span class="cell-user-text"><span class="cell-name">' + esc(a.full_name || '(no name)') +
+                (isYou ? ' <span class="muted">(you)</span>' : '') + '</span>' +
+                '<span class="cell-mail">' + esc(a.email) + '</span></span></div></td>' +
+                '<td>' + status + '</td>' +
                 '</tr>';
         }).join('');
+        if (!state.admins.length) {
+            $('#admin-tbody').innerHTML = '<tr><td colspan="2"><div class="state-block"><p class="state-title">No administrators found</p></div></td></tr>';
+        }
     }
 
     function sendAdminLinkEmail(email) {
@@ -3751,27 +3626,6 @@
         });
     }
 
-    async function resendAdminLink(email, sourceBtn) {
-        var ok = await confirmAction({
-            title: 'Send sign-in link',
-            heading: 'Email ' + email + ' a one-time link?',
-            message: 'It opens a page where they choose a new password. Their current password ' +
-                'stops working once they save the new one.',
-            confirmLabel: 'Send link',
-            tone: 'accent'
-        });
-        if (!ok) { return; }
-
-        var release = setBusy(sourceBtn, '…');
-        var res = await sendAdminLinkEmail(email);
-        release();
-
-        if (res.error) {
-            toastErr('Link not sent', res.error.message);
-            return;
-        }
-        toastOk('Link sent', 'Delivered to ' + email + '.');
-    }
 
     /* There is no "remove administrator" here any more. Since migration 0031
        the database refuses it for any signed-in user: one compromised
@@ -3854,7 +3708,7 @@
             if (mail.error) {
                 showNotice('Administrator created, email not sent',
                     email + ' is set up, but the link could not be sent: ' + mail.error.message +
-                    '\n\nUse the send-link button next to their name under Administrators to try again.',
+                    '\n\nThey can ask for a new link themselves with Activate account on the sign-in page.',
                     'danger');
             } else {
                 toastOk('Administrator added', email + ' will get a link to choose their password.');
@@ -4137,12 +3991,6 @@
                         applyPresence(payload.new.email, (payload.new.active_devices || []).length > 0);
                     }
 
-                    /* Keep an open device manager in sync with the same row. */
-                    if (state.managingEmail && payload.new && payload.new.email === state.managingEmail) {
-                        if (Array.isArray(payload.new.active_devices)) { renderStudentDevices(payload.new.active_devices); }
-                        else { console.warn('[PIA device] realtime update had no active_devices; list left as is', payload.new.email); }
-                    }
-
                     /* And the admin's own device list. */
                     if (state.adminEmail && payload.new && payload.new.email === state.adminEmail) {
                         /* A payload that lacks the column is not an empty list:
@@ -4165,76 +4013,6 @@
                 })
                 .subscribe();
         });
-    }
-
-    /* ================================================ 14. CSV EXPORT ==== */
-
-    function toCsvValue(value) {
-        var text = value == null ? '' : String(value);
-        return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
-    }
-
-    /* Exports the cohort summary already in memory, joined to each student's
-       CURRENT assessment result (their newest submission) and its 50 item
-       answers — the raw data for scale reliability and item analysis. The
-       results are fetched fresh from ocean_submissions, the only place they
-       exist, so this is the one export that needs a round trip. */
-    async function exportCohortCsv() {
-        if (!state.cohort.length) {
-            toastErr('Nothing to export', 'The cohort has not loaded yet.');
-            return;
-        }
-
-        var res = await fetchResults(null);
-        if (res.error) {
-            toastErr('Export failed', friendlyDbError(res.error, 'Could not read the assessment results.'));
-            return;
-        }
-
-        var latest = {};
-        var attempts = {};
-        (res.data || []).forEach(function (row) {
-            var key = String(row.email || '').toLowerCase();
-            attempts[key] = (attempts[key] || 0) + 1;
-            if (!latest[key]) { latest[key] = row; }   // rows arrive newest first
-        });
-
-        var base = ['full_name', 'email', 'section', 'group_type', 'status',
-            'current_stage', 'is_in_game', 'pre_test_score', 'post_test_score', 'is_ocean_done',
-            'parental_consent', 'student_assent',
-            'pre_test_raw_score', 'pre_test_max_score', 'post_test_raw_score', 'post_test_max_score'];
-        var scores = ['ocean_e', 'ocean_a', 'ocean_c', 'ocean_n', 'ocean_o'];
-        var items = [];
-        for (var i = 1; i <= 50; i++) { items.push('item_' + (i < 10 ? '0' : '') + i); }
-
-        var headers = base.concat(scores, ['ocean_submitted_at', 'ocean_attempts', 'ocean_scoring_key'], items);
-
-        var lines = [headers.join(',')];
-        state.cohort.forEach(function (row) {
-            var key = String(row.email || '').toLowerCase();
-            var result = latest[key] || {};
-            var answers = Array.isArray(result.responses) ? result.responses : [];
-            var values = base.map(function (k) { return row[k]; })
-                .concat(scores.map(function (k) { return result[k]; }))
-                .concat([result.submitted_at, attempts[key] || 0, result.scoring_key])
-                .concat(items.map(function (_, idx) { return answers[idx]; }));
-            lines.push(values.map(toCsvValue).join(','));
-        });
-
-        var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-        var url = URL.createObjectURL(blob);
-        var link = document.createElement('a');
-        var stamp = new Date().toISOString().slice(0, 10);
-
-        link.href = url;
-        link.download = 'pia-cohort-' + stamp + '.csv';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-
-        toastOk('Export ready', state.cohort.length + ' rows written to pia-cohort-' + stamp +
-            '.csv, with each student’s current assessment result.');
     }
 
     /* ========================================= 16. MATH TASK BANK ====== */
@@ -5367,6 +5145,36 @@
         renderQbAll();
     }
 
+    /* ---- Command palette data (admin-shell.js asks for these) ----
+       Students are searched on the server, ten at most, and a newer keystroke
+       aborts the older request; the shell drops any late answer. */
+    async function searchStudentsRemote(term, signal) {
+        var t = sanitizeFilterTerm(term).toLowerCase();
+        if (!t) { return []; }
+        var query = sb.from('profiles').select('full_name, email, section').neq('role', 'admin')
+            .or('full_name.ilike.%' + t + '%,email.ilike.%' + t + '%')
+            .order('full_name', { ascending: true }).limit(6);
+        if (signal && typeof query.abortSignal === 'function') { query = query.abortSignal(signal); }
+        var res = await query;
+        if (res.error) { throw res.error; }
+        return res.data || [];
+    }
+
+    /* The profile panel reads the roster page or the cohort; a student found by
+       search may be in neither, so fetch the full row first. */
+    async function openStudentByEmail(email) {
+        if (!findStudent(email)) {
+            var res = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
+            if (res.error || !res.data) {
+                toastErr('Could not open the profile', friendlyDbError(res.error, 'That student was not found.'));
+                return;
+            }
+            state.cohort.push(res.data);
+        }
+        switchView('students');
+        openStudentDrawer(email);
+    }
+
     /* ============================================ 15. BOOT SEQUENCE ===== */
 
     /* Every read the dashboard needs, in parallel. A failure here shows the
@@ -5386,14 +5194,13 @@
     loadStageCounters = tracked('stages', loadStageCounters);
     loadFaculty = tracked('faculty', loadFaculty);
     loadAdmins = tracked('admins', loadAdmins);
-    loadAudit = tracked('audit', loadAudit);
     loadSettings = tracked('settings', loadSettings);
     loadAdminDevices = tracked('admindevices', loadAdminDevices);
     loadMathTask = tracked('mathtask', loadMathTask);
 
     RETRY = {
         cohort: loadCohort, sections: loadSections, roster: loadRoster, stages: loadStageCounters,
-        faculty: loadFaculty, admins: loadAdmins, audit: loadAudit, settings: loadSettings,
+        faculty: loadFaculty, admins: loadAdmins, settings: loadSettings,
         admindevices: loadAdminDevices, mathtask: loadMathTask
     };
 
@@ -5434,23 +5241,11 @@
 
         state.adminName = name;
 
-        var hour = new Date().getHours();
-        var greeting = 'Good evening';
-        if (hour < 12) { greeting = 'Good morning'; }
-        else if (hour < 18) { greeting = 'Good afternoon'; }
-
         $('#admin-name').textContent = name;
         $('#admin-email').textContent = email;
         $('#profile-name').textContent = name;
         $('#profile-email').textContent = email;
         $('#admin-initials').textContent = initialsOf(name, email);
-        /* "Dr. Reyes" greeted as "Good morning, Dr." read as a typo. An
-           honorific keeps the surname with it; otherwise the first name. */
-        var parts = name.split(/\s+/);
-        var short = /^(dr|prof|mr|mrs|ms|mx|sir|ma'?am|engr|atty)\.?$/i.test(parts[0]) && parts[1]
-            ? parts[0] + ' ' + parts[parts.length - 1]
-            : parts[0];
-        $('#overview-greeting').textContent = greeting + ', ' + short;
     }
 
     function initForms() {
@@ -5471,14 +5266,7 @@
         });
         $('#add-professor-form').addEventListener('submit', handleRegisterProfessor);
         $('#add-admin-form').addEventListener('submit', handleAddAdmin);
-        $('#admin-tbody').addEventListener('click', function (event) {
-            var btn = event.target.closest('[data-admin-act]');
-            if (!btn) { return; }
-            var email = btn.getAttribute('data-email');
-            if (btn.getAttribute('data-admin-act') === 'link') { resendAdminLink(email, btn); }
-        });
         initChangePassword();
-        $('#audit-open').addEventListener('click', openAuditLog);
 
         $('#new-section-form').addEventListener('submit', async function (event) {
             event.preventDefault();
@@ -5516,8 +5304,6 @@
         ['pre', 'post'].forEach(function (test) {
             $('#scores-max-' + test).addEventListener('input', function () { repaintScores(test); });
         });
-        $('#revoke-all-btn').addEventListener('click', revokeAllStudentSessions);
-        $('#signout-confirm').addEventListener('click', signOut);
         $('#device-limit-signout').addEventListener('click', signOut);
 
         $('#section-scores-btn').addEventListener('click', function () {
@@ -5526,8 +5312,6 @@
             setTimeout(function () { openScoresModal(section); }, 200);
         });
 
-        $('#export-overview').addEventListener('click', exportCohortCsv);
-        $('#export-roster').addEventListener('click', exportCohortCsv);
     }
 
     async function boot() {
@@ -5598,14 +5382,26 @@
 
         /* --- Phase 2: UI. Wire the shell before data arrives so the skeletons
            are interactive. --- */
-        PIAShell.initRail({ hasOpenModal: function () { return openLayers.length > 0; } });
+        PIAAdminShell.init({
+            go: switchView,
+            openModal: openModal,
+            openStudent: openStudentByEmail,
+            openSection: function (name) { switchView('sections'); openSectionDetails(name); },
+            getSections: function () { return state.sections; },
+            searchStudents: searchStudentsRemote,
+            signOut: signOut,
+            isModalOpen: function () { return openLayers.length > 0; }
+        });
         initRouter();
         initModals();
         initInfoTips();
         initRoster();
+        initLive();
+        initSectionsTable();
         initDrawerActions();
         initFaculty();
         initGates();
+        renderPolicy();
         initForms();
         initMathTask();
         initRetry();
@@ -5620,7 +5416,6 @@
         /* --- Phase 3: DATA. A failure here shows the banner and keeps the
            verified admin on the page. --- */
         await refreshAll();
-        applyDrilldownChrome();
         loadMathTask();
 
         setupRealtime();
