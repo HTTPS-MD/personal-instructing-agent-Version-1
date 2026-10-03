@@ -16,6 +16,7 @@ Read-only inspection: `supabase/INSPECT_neutral_and_control.sql`
 |---|---|
 | `pia_can_enter_stage` | Control is refused `Tutoring Dashboard`. Every other group is evaluated exactly as in 0005. `set_student_stage`, the stage-time heartbeat (0035) and the student route guards all read this one function. |
 | `submit_ocean_results` | Redefined from the 0018 text with one change: a Control student's next stage is `Waiting Room` (always permitted) instead of `Tutoring Dashboard`. Scoring, validation, storage and grants are unchanged. |
+| Trigger `trg_pia_control_stage_guard` | No writer, a `SECURITY DEFINER` admin RPC included, can move a Control student into Character Selection or the Tutoring Dashboard: the write is kept at the student's current stage (with `stage_started_at` and `is_in_game`). It does not raise, so a section grant still completes for the section's other students. A Control student already in the dashboard is not moved. |
 | Trigger `trg_pia_no_new_neutral_group` | Refuses to insert a profile as `neutral` or to change an existing row **to** `neutral`. A row that is already `neutral` can still be edited (name, section, stage, scores) and can be moved out of neutral. |
 | Profiles | **No row is updated.** The migration snapshots every profile at its start and its postflight aborts (rolling everything back) if any row differs at the end. |
 | Not touched | `question_bank`, `settings`, `stage_overrides`, other RPCs, RLS, consent/assent rules. |
@@ -54,8 +55,28 @@ The new rule locks them out from their next navigation or stage write, but nothi
 
 `function.js` adds `isControlGroup` and the dashboard prerequisite excludes Control. After OCEAN a Control student goes to the thank-you screen, which has no Continue button and says "Your answers have been saved. That is everything for now." The waiting room, the dashboard URL and the Character Selection URL all send a Control student there.
 
+## Tutor persona assignment (Admin)
+
+Research group (`profiles.group_type`) and tutor (`profiles.selected_character`) are separate fields in the console.
+
+- **Register participant** and **Edit participant** show a "Tutor persona" select **only for Assigned students**: Not assigned yet, PIA Open, PIA Structure, PIA Dynamic, PIA Empath, PIA Stable, **PIA Neutral**. It defaults to Not assigned yet. Nothing is chosen for anyone.
+- Saving writes `selected_character` **only when the admin changed it** in that dialog (to a listed key, or null for "Not assigned yet"). An unrelated edit never sends it. A key that is not in the list is refused before any write.
+- Changing a student's group never clears or rewrites the tutor. A non-Assigned student who already holds a tutor sees it read-only with the note "changing the group does not clear this". Be aware of the consequence: a Free choice student who already has a tutor skips Character Selection (existing rule), so look before moving an Assigned student with a tutor to Free choice.
+- A failed save keeps the dialog open, says "The tutor was not saved: ..." on the field and in a toast, and can be retried.
+- The participant profile shows the tutor (or "Not assigned yet" / "Not chosen yet"). "Allow character re-selection" now appears only for Free choice students, because for an Assigned student it would clear the tutor an admin assigned.
+- Server side nothing new is required: admins can already write `selected_character` and the stage rule already treats an Assigned student as dashboard-eligible with or without a tutor. The database does not restrict the value to the six keys; the console does.
+- Student route (tested): Assigned + `pia-neutral` goes to the dashboard and sees "PIA · your tutor"; Character Selection and the waiting room send them to the dashboard; Assigned with no tutor yet is not sent to Character Selection and is not given one; a Free choice student who picked PIA Neutral reaches the dashboard, one who has not picked goes to Character Selection.
+
+## Finding: can an Admin grant bypass the Control OCEAN-only rule?
+
+**Verified against the live database: NO. I cannot reach it.** This session has no database credentials, and I did not use the public client key for it. So the actual definition of `admin_grant_stage__inner` was **not read**. What can be said:
+
+- **From the repository:** the function is not defined in any migration (it was created outside the files; 0033 only wraps it, 0014 only rewrites its message strings). Those strings show it has its own eligibility checks (OCEAN not completed; "Group is not non-assigned" for Character Selection), i.e. hard-coded rules, not necessarily a call to `pia_can_enter_stage`. The console's own comment says it "resets the correct prerequisite flag per stage". Nothing in the repository shows a Control check for the Tutoring Dashboard.
+- **Therefore it must be assumed that a section grant to the Tutoring Dashboard could move a Control student in** until the definition proves otherwise. I modelled that on the scratch database with a stand-in function that has no group check: before 0038 the grant moved a Control student into the dashboard; after 0038 the same grant left them at their stage.
+- **Local migration adjustment made:** `trg_pia_control_stage_guard` (see the table above). It enforces the rule at the row, so the answer does not depend on the unknown function. Limitation: the grant's returned "granted" list may still name the Control student although their stage did not change, so the console's "granted" count can overstate. A proper fix (filter and report them as skipped) needs the real function body.
+- **To close this out:** run `supabase/INSPECT_neutral_and_control.sql` (read-only); query 7 lists every function that writes `current_stage` with `calls_stage_rule` / `checks_control`, query 8 prints the full text of `admin_grant_stage__inner` and `admin_grant_stage`, query 9 lists the triggers on `profiles`. Send queries 7 and 8 back; I will then adjust the function or the report.
+
 ## Not done and why
 
-- **No admin control assigns a persona to Assigned students.** The repository has none today (assigned students show a generic monogram when no persona is set; an admin can already write `selected_character` directly, which the write guard allows). I did not add a persona picker because that decides research assignment behaviour; say if you want it.
-- **`admin_grant_stage__inner` is not in the repository.** Whether a section grant defers to `pia_can_enter_stage` cannot be confirmed here; the migration prints a REVIEW notice if the live function does not call it, and the inspection script reports it.
+- The tutor assignment is not restricted to the six keys in the database (a CHECK constraint could collide with unknown live values); the console restricts it.
 - Nothing was run against the live database. See the checklist for what was tested locally.

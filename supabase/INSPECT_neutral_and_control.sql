@@ -63,17 +63,39 @@ select conname, pg_get_constraintdef(oid) as definition
  where conrelid = 'public.profiles'::regclass and contype = 'c'
    and pg_get_constraintdef(oid) ilike '%group_type%';
 
--- 7. The two functions 0038 replaces / depends on, and the one it cannot see.
-select p.proname, p.oid::regprocedure as signature,
-       pg_get_functiondef(p.oid) ~ 'pia_can_enter_stage' as calls_stage_rule,
-       pg_get_functiondef(p.oid) ~* 'group_type'         as mentions_group_type
-  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
- where n.nspname = 'public'
-   and p.proname in ('pia_can_enter_stage', 'submit_ocean_results', 'set_student_stage',
+-- 7. EVERY function that writes profiles.current_stage, and whether it defers to
+--    the stage rule or checks the group. A function with updates_stage = true,
+--    calls_stage_rule = false and checks_control = false is a path that can put
+--    a Control student into the Tutoring Dashboard (0038's trigger
+--    trg_pia_control_stage_guard blocks it regardless; this tells you which).
+with f as (
+  select p.oid, p.proname, p.prosecdef,
+         case when p.prokind = 'f' then pg_get_functiondef(p.oid) end as def
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'
+)
+select f.oid::regprocedure                       as signature,
+       f.prosecdef                               as security_definer,
+       f.def ~* 'current_stage\s*='              as updates_stage,
+       f.def ~ 'pia_can_enter_stage'             as calls_stage_rule,
+       f.def ~* 'group_type'                     as mentions_group_type,
+       f.def ~* 'control'                        as checks_control
+  from f
+ where f.def ~* 'current_stage\s*='
+    or f.proname in ('pia_can_enter_stage', 'submit_ocean_results', 'set_student_stage',
                      'admin_grant_stage', 'admin_grant_stage__inner', 'admin_revoke_stage')
- order by p.proname;
--- If admin_grant_stage__inner is listed with calls_stage_rule = false, read its
--- definition (select pg_get_functiondef('public.admin_grant_stage__inner'::regproc)
--- if it is not overloaded) before applying 0038.
+ order by f.proname;
+
+-- 8. THE definition of admin_grant_stage__inner, in full (the file the
+--    repository does not have). Send this text back.
+select p.oid::regprocedure as signature, pg_get_functiondef(p.oid) as definition
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname in ('admin_grant_stage__inner', 'admin_grant_stage');
+
+-- 9. Triggers on profiles (to see anything already acting on current_stage).
+select tgname, pg_get_triggerdef(oid) as definition
+  from pg_trigger
+ where tgrelid = 'public.profiles'::regclass and not tgisinternal
+ order by tgname;
 
 rollback;

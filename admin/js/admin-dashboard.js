@@ -981,7 +981,7 @@
        is_ocean_done is still pulled, because a retake clears it while the
        old result stays in the table — see hasCurrentResult(). */
     var COHORT_COLUMNS = 'full_name, email, section, group_type, status, current_stage, is_in_game,' +
-        ' stage_started_at, active_devices, is_ocean_done, pre_test_score, post_test_score';
+        ' stage_started_at, active_devices, is_ocean_done, pre_test_score, post_test_score, selected_character';
 
     /* Added by migrations 0033 and 0034. Until they run the columns do not
        exist, and naming a missing column fails the whole read -- so the
@@ -1854,6 +1854,10 @@
         $('#drawer-condition').className = 'badge ' + (condition.badge || '');
         $('#drawer-section').textContent = s.section || '—';
         $('#drawer-stage').textContent = stageLabel(stageOf(s));
+        $('#drawer-tutor').textContent = tutorLabel(s);
+        /* Clearing a tutor to re-pick only makes sense where the student picks one. */
+        var reselect = $('[data-student-action="retake-character"]');
+        if (reselect) { reselect.classList.toggle('is-hidden', s.group_type !== 'non-assigned'); }
         $('#drawer-status').textContent = ((s.status || '') === 'active' ? 'Activated' : 'Not activated') +
             (s.must_change_password === true ? ' · Must change temporary password' : '');
         $('#drawer-assent').textContent = consentLabel(s.student_assent);
@@ -2216,6 +2220,85 @@
         refreshAll();
     }
 
+    /* ---- Tutor persona (profiles.selected_character) ----------------------
+       A separate field from the research group (profiles.group_type). An
+       Assigned student is given a tutor by an admin; a Free choice student
+       picks their own in Character Selection; Control has none. Nothing here
+       assigns anyone automatically, and a group change never touches the
+       tutor. 'pia-neutral' is a tutor like the others, not a group. The keys
+       and names are the ones in student/html/character-selection.html. */
+    var TUTORS = [
+        { key: 'pia-open', name: 'PIA Open' },
+        { key: 'pia-conscientious', name: 'PIA Structure' },
+        { key: 'pia-extravert', name: 'PIA Dynamic' },
+        { key: 'pia-agreeable', name: 'PIA Empath' },
+        { key: 'pia-calm', name: 'PIA Stable' },
+        { key: 'pia-neutral', name: 'PIA Neutral' }
+    ];
+
+    function tutorName(key) {
+        var t = TUTORS.filter(function (x) { return x.key === key; })[0];
+        return t ? t.name : (key || '');
+    }
+
+    function fillTutorSelect(select) {
+        select.innerHTML = '';
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = 'Not assigned yet';
+        select.appendChild(none);
+        TUTORS.forEach(function (t) {
+            var opt = document.createElement('option');
+            opt.value = t.key;
+            opt.textContent = t.name;
+            select.appendChild(opt);
+        });
+    }
+
+    /* What the drawer says about the tutor, by group. */
+    function tutorLabel(s) {
+        if (s.selected_character) { return tutorName(s.selected_character); }
+        if (s.group_type === 'assigned') { return 'Not assigned yet'; }
+        if (s.group_type === 'non-assigned') { return 'Not chosen yet'; }
+        return '—';
+    }
+
+    /* Shows the tutor field for the group currently ticked. In Edit, a student
+       who has a tutor but is no longer Assigned still sees it, read-only, so
+       the admin can see that changing the group does not clear it. */
+    function syncTutorField(prefix) {
+        var group = ($('input[name="' + prefix + '-condition"]:checked') || {}).value;
+        var select = $('#' + prefix + '-tutor');
+        var held = select.getAttribute('data-initial') || '';
+        var assigned = group === 'assigned';
+        $('#' + prefix + '-tutor-field').hidden = !(assigned || held);
+        select.disabled = !assigned;
+        $('#' + prefix + '-tutor-hint').textContent = assigned
+            ? 'Separate from the research group. Leave as "Not assigned yet" to decide later; saving does not choose one for you.'
+            : 'Kept as it is. Only Assigned students are given a tutor here; changing the group does not clear this.';
+    }
+
+    function initTutorFields() {
+        ['rs', 'es'].forEach(function (prefix) {
+            fillTutorSelect($('#' + prefix + '-tutor'));
+            $$('input[name="' + prefix + '-condition"]').forEach(function (radio) {
+                radio.addEventListener('change', function () { syncTutorField(prefix); });
+            });
+            syncTutorField(prefix);
+        });
+        $('#register-student-form').addEventListener('reset', function () {
+            setTimeout(function () { $('#rs-tutor').value = ''; syncTutorField('rs'); }, 0);
+        });
+    }
+
+    /* '' = none; otherwise a known key, or an error message. */
+    function readTutor(prefix) {
+        var select = $('#' + prefix + '-tutor');
+        var value = select.value;
+        if (value && !TUTORS.some(function (t) { return t.key === value; })) { return { ok: false }; }
+        return { ok: true, value: value };
+    }
+
     /* ---- Register student ---- */
 
     async function handleRegisterStudent(event) {
@@ -2239,6 +2322,11 @@
            refuses the row without both as well (migration 0037). */
         valid = setFieldError('rs-consent', $('#rs-consent').checked ? '' : 'Parental consent must be recorded first.') && valid;
         valid = setFieldError('rs-assent', $('#rs-assent').checked ? '' : 'Student assent must be recorded first.') && valid;
+        var tutor = { ok: true, value: '' };
+        if (groupType === 'assigned') {
+            tutor = readTutor('rs');
+            valid = setFieldError('rs-tutor', tutor.ok ? '' : 'Choose one of the listed tutors.') && valid;
+        }
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2280,7 +2368,7 @@
                 return;
             }
 
-            var insertRes = await sb.from('profiles').insert([{
+            var newRow = {
                 full_name: fullName,
                 email: email,
                 section: section,
@@ -2290,7 +2378,10 @@
                 max_devices: 1,   /* one device per student; enforced by the database (0027, 0037) */
                 status: 'inactive',
                 role: 'student'
-            }]);
+            };
+            /* Only an explicit choice for an Assigned student is stored. */
+            if (groupType === 'assigned' && tutor.value) { newRow.selected_character = tutor.value; }
+            var insertRes = await sb.from('profiles').insert([newRow]);
 
             if (insertRes.error) {
                 /* The auth user succeeded but the profile row failed. Say so
@@ -2361,6 +2452,20 @@
         $('#es-neutral-choice').hidden = s.group_type !== 'neutral';
         var radio = $('input[name="es-condition"][value="' + (s.group_type || '') + '"]');
         if (radio) { radio.checked = true; }
+
+        /* The tutor is its own field. An unrecognised stored value is kept
+           visible rather than blanked, so saving cannot erase it by accident. */
+        var tutorSelect = $('#es-tutor');
+        fillTutorSelect(tutorSelect);
+        if (s.selected_character && !TUTORS.some(function (t) { return t.key === s.selected_character; })) {
+            var odd = document.createElement('option');
+            odd.value = s.selected_character;
+            odd.textContent = s.selected_character + ' (not in the tutor list)';
+            tutorSelect.appendChild(odd);
+        }
+        tutorSelect.value = s.selected_character || '';
+        tutorSelect.setAttribute('data-initial', s.selected_character || '');
+        syncTutorField('es');
 
         openModal('modal-edit-student');
     }
@@ -2437,6 +2542,13 @@
                 valid = false;
             }
         });
+        var tutorSel = $('#es-tutor');
+        var tutorInitial = tutorSel.getAttribute('data-initial') || '';
+        var tutorChosen = tutorSel.value;
+        var tutorKnown = !tutorChosen || tutorChosen === tutorInitial || TUTORS.some(function (t) { return t.key === tutorChosen; });
+        if (groupType === 'assigned') {
+            valid = setFieldError('es-tutor', tutorKnown ? '' : 'Choose one of the listed tutors.') && valid;
+        }
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2457,6 +2569,11 @@
             /* A legacy neutral student who is left as neutral is not re-sent:
                their assignment is not touched by an unrelated edit. */
             if (groupType !== 'neutral') { payload.group_type = groupType; }
+            /* The tutor is written only when an Assigned student's tutor was
+               actually changed in this dialog; otherwise it is left alone. */
+            if (groupType === 'assigned' && tutorChosen !== tutorInitial) {
+                payload.selected_character = tutorChosen || null;
+            }
             /* Only a test whose fields changed is sent, and only its raw data:
                the database calculates the transmuted score. Untouched fields
                leave a score entered before 0034 as it was. */
@@ -2476,9 +2593,11 @@
             var updateRes = await sb.from('profiles').update(payload).eq('email', originalEmail);
 
             if (updateRes.error) {
-                toastErr('Update failed', isMissingColumn(updateRes.error)
+                var updateMsg = isMissingColumn(updateRes.error)
                     ? MIGRATION_MISSING
-                    : friendlyDbError(updateRes.error, 'Could not update the profile.'));
+                    : friendlyDbError(updateRes.error, 'Could not update the profile.');
+                toastErr('Update failed', updateMsg);
+                if ('selected_character' in payload) { setFieldError('es-tutor', 'The tutor was not saved: ' + updateMsg); }
                 return;
             }
 
@@ -4178,6 +4297,7 @@
             sendPasswordReset(state.resetEmail, $('#reset-pw-email'), { confirmed: true });
         });
 
+        initTutorFields();
         $('#register-student-form').addEventListener('submit', handleRegisterStudent);
         $('#edit-student-form').addEventListener('submit', handleUpdateStudent);
         $$('#edit-student-form [data-score-test]').forEach(function (input) {

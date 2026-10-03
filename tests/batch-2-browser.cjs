@@ -538,6 +538,36 @@ function fixture() {
     await p.waitForURL(/assessment-complete\.html/);
     await p.context().close();
   });
+  await check('assigned + pia-neutral: the student goes straight to the dashboard, sees PIA as their tutor, never Character Selection', async () => {
+    const asg = { is_ocean_done: true, group_type: 'Assigned', selected_character: 'pia-neutral' };
+    let p = await pageFor('/student/html/student-dashboard.html', { account: 'asg-neutral', initial: { stageOpen: true, profile: asg } });
+    await p.waitForSelector('#agent-name-start'); await p.waitForTimeout(400);
+    assert.match(p.url(), /student-dashboard\.html/);
+    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'PIA · your tutor');
+    await p.context().close();
+    p = await pageFor('/student/html/character-selection.html', { account: 'asg-char', initial: { stageOpen: true, profile: asg } });
+    await p.waitForURL(/student-dashboard\.html/);
+    await p.context().close();
+    p = await pageFor('/student/html/waiting-room.html', { account: 'asg-wait', initial: { stageOpen: true, profile: asg } });
+    await p.waitForURL(/student-dashboard\.html/);
+    await p.context().close();
+  });
+  await check('assigned without a tutor yet is not auto-assigned or sent to Character Selection', async () => {
+    const asg = { is_ocean_done: true, group_type: 'Assigned', selected_character: null };
+    const p = await pageFor('/student/html/character-selection.html', { account: 'asg-none', initial: { stageOpen: true, profile: asg } });
+    await p.waitForURL(/student-dashboard\.html/);
+    await p.waitForSelector('#agent-name-start'); await p.waitForTimeout(300);
+    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'PIA · your tutor');   /* the generic label, not a persona name */
+    await p.context().close();
+  });
+  await check('free choice who picked PIA Neutral reaches the dashboard; one who has not picked is sent to Character Selection', async () => {
+    let p = await pageFor('/student/html/waiting-room.html', { account: 'fc-picked', initial: { stageOpen: true, profile: { is_ocean_done: true, group_type: 'Non-Assigned', selected_character: 'pia-neutral' } } });
+    await p.waitForURL(/student-dashboard\.html/);
+    await p.context().close();
+    p = await pageFor('/student/html/waiting-room.html', { account: 'fc-unpicked', initial: { stageOpen: true, profile: { is_ocean_done: true, group_type: 'Non-Assigned', selected_character: null } } });
+    await p.waitForURL(/character-selection\.html/);
+    await p.context().close();
+  });
   await check('control (OCEAN only): before OCEAN they are still routed to the questionnaire', async () => {
     const p = await pageFor('/student/html/waiting-room.html', { account: 'ctl-pre', initial: { stageOpen: true, profile: { is_ocean_done: false, group_type: 'Control' } } });
     await p.waitForURL(/ocean-test\.html/);

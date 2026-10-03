@@ -709,6 +709,8 @@ html[data-surface="admin"] .modal-text { max-width: none; }
 }
 .overlay.is-open .palette { transform: none; opacity: 1; }
 .palette-input-row { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+.field-hint { font-size: var(--fs-xs); margin: 0; }
+.field[hidden] { display: none !important; }
 .status-na { position: relative; }   /* anchors the visually hidden text inside the cell */
 .choice[hidden] { display: none !important; }
 .palette-input::placeholder { color: var(--text-muted); opacity: 1; }
@@ -800,3 +802,4 @@ html[data-surface="admin"] .palette-input:focus-visible { box-shadow: none; back
 @media (prefers-reduced-motion: reduce) {
     .sidebar, .overlay, .modal, .palette, .nav-chevron, .scrim { transition: none !important; }
 }
+.choice-grid + .field { margin-top: 12px; }

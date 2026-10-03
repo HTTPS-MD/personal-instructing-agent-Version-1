@@ -37,7 +37,7 @@ function makeData(overrides = {}) {
       full_name: `Student ${n}`, email: `student${n}@example.test`, role: 'student',
       section: i <= 8 ? 'Earth' : i <= 16 ? 'Jupiter' : (i <= 22 ? 'Mars' : null),
       group_type: groups[i % 4], status: i % 8 === 0 ? 'inactive' : 'active',
-      current_stage: stage, is_in_game: game, stage_started_at: null,
+      current_stage: stage, is_in_game: game, stage_started_at: null, selected_character: null,
       active_devices: [3, 6, 9, 10, 18].includes(i) ? ['abc [Windows PC]'] : [], max_devices: 1,   /* signed in: 3,6 (connected), 9,10 (stale beat), 18 (never beat: waiting room) */
       is_ocean_done: i > 5, pre_test_score: null, post_test_score: null,
       parental_consent: true, student_assent: true, must_change_password: false
@@ -111,6 +111,7 @@ function fixture() {
       const wait = f.delay[name] || 0;
       if (wait) await new Promise(r => setTimeout(r, wait));
       if (b.signal && b.signal.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+      if (b.write && f.failWrite && f.failWrite[name]) return { data: null, error: Object.assign({ message: 'fixture write failure' }, f.failWrite[name]), count: null };
       if (f.fail[name]) return { data: null, error: Object.assign({ message: 'fixture failure' }, f.fail[name]), count: null };
       if (b.write) return { data: null, error: null };
       let rows = rowsFor(name).filter(r => b.filters.every(fn => fn(r)));
@@ -638,7 +639,8 @@ function fixture() {
     const p = await open('students'); await waitStudents(p);
     const vals = await p.locator('#modal-register-student input[name="rs-condition"]').evaluateAll(els => els.map(e => e.value));
     assert.deepEqual(vals, ['assigned', 'non-assigned', 'control']);
-    assert.equal(/Neutral/i.test(await p.locator('#modal-register-student').evaluate(e => e.textContent)), false);
+    assert.equal(/Neutral/i.test((await p.locator('#modal-register-student label.choice').allInnerTexts()).join(' ')), false, 'no Neutral condition');
+    assert.equal(await p.locator('#rs-tutor option[value="pia-neutral"]').count(), 1, 'PIA Neutral is a tutor choice');
     await p.context().close();
   });
   await check('conditions: a legacy Neutral student keeps the value on an unrelated edit; nobody else is offered it', async () => {
@@ -675,6 +677,150 @@ function fixture() {
     await p.waitForSelector('#policy-tbody tr');
     const ctl = await p.locator('#policy-tbody tr').first().locator('td').allInnerTexts();
     assert.deepEqual(ctl.map(t => t.trim()), ['Available', 'Locked', 'Locked']);
+    await p.context().close();
+  });
+
+  /* ================= TUTOR ASSIGNMENT FOR ASSIGNED STUDENTS ================= */
+  const TUTOR_KEYS = ['', 'pia-open', 'pia-conscientious', 'pia-extravert', 'pia-agreeable', 'pia-calm', 'pia-neutral'];
+  async function openEdit(p, email) {
+    await p.locator(`#student-tbody tr[data-student="${email}"]`).focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#drawer-student.is-open');
+    await p.locator('[data-student-action="edit"]').click();
+    await p.waitForSelector('#modal-edit-student.is-open');
+  }
+  const lastUpdate = async p => (await calls(p)).filter(c => c.table === 'profiles' && c.write === 'update').pop();
+  await check('tutor: Register offers the tutor choice only for Assigned, including PIA Neutral; nothing is auto-assigned', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await p.locator('#view-students [data-modal-open="modal-register-student"]').click();
+    await p.waitForSelector('#modal-register-student.is-open');
+    assert.equal(await p.locator('#rs-tutor-field').isVisible(), true, 'Assigned is the default condition');
+    const opts = await p.locator('#rs-tutor option').evaluateAll(o => o.map(x => [x.value, x.textContent]));
+    assert.deepEqual(opts.map(o => o[0]), TUTOR_KEYS);
+    assert.deepEqual(opts.find(o => o[0] === 'pia-neutral'), ['pia-neutral', 'PIA Neutral']);
+    assert.equal(await p.locator('#rs-tutor').inputValue(), '', 'defaults to Not assigned yet');
+    await p.locator('input[name="rs-condition"][value="non-assigned"]').evaluate(e => e.click());
+    assert.equal(await p.locator('#rs-tutor-field').isVisible(), false);
+    await p.locator('input[name="rs-condition"][value="control"]').evaluate(e => e.click());
+    assert.equal(await p.locator('#rs-tutor-field').isVisible(), false);
+    await p.locator('input[name="rs-condition"][value="assigned"]').evaluate(e => e.click());
+    assert.equal(await p.locator('#rs-tutor-field').isVisible(), true);
+    await p.context().close();
+  });
+  await check('tutor: registering an Assigned student stores group_type and selected_character as separate fields', async () => {
+    for (const [tutor, expectKey] of [['pia-neutral', true], ['', false]]) {
+      const p = await open('students'); await waitStudents(p);
+      await p.locator('#view-students [data-modal-open="modal-register-student"]').click();
+      await p.waitForSelector('#modal-register-student.is-open');
+      await p.locator('#rs-first').fill('Tess'); await p.locator('#rs-last').fill('Tutor');
+      await p.locator('#rs-email').fill(`tess${expectKey ? 1 : 2}@example.test`);
+      await p.locator('#rs-consent').evaluate(e => e.click()); await p.locator('#rs-assent').evaluate(e => e.click());
+      if (tutor) await p.locator('#rs-tutor').selectOption(tutor);
+      await p.evaluate(() => { window.fixture.calls.length = 0; });
+      await p.locator('#rs-submit').click();
+      await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'insert'));
+      const ins = (await calls(p)).find(c => c.table === 'profiles' && c.write === 'insert').values[0];
+      assert.equal(ins.group_type, 'assigned');
+      assert.equal(Object.prototype.hasOwnProperty.call(ins, 'selected_character'), expectKey, JSON.stringify(ins));
+      if (expectKey) assert.equal(ins.selected_character, 'pia-neutral');
+      await p.context().close();
+    }
+  });
+  await check('tutor: Edit assigns PIA Neutral to an Assigned student; research group and tutor are separate fields', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEdit(p, 'student04@example.test');            // fixture group "assigned", no tutor yet
+    assert.equal(await p.locator('#es-tutor-field').isVisible(), true);
+    assert.equal(await p.locator('#es-tutor').inputValue(), '');
+    assert.equal(await p.locator('input[name="es-condition"][value="assigned"]').isChecked(), true);
+    await p.locator('#es-tutor').selectOption('pia-neutral');
+    await p.locator('#es-tutor').scrollIntoViewIfNeeded();
+    await shot(p, 'edit-tutor-dark-1280');
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'update'));
+    const u = await lastUpdate(p);
+    assert.equal(u.values.selected_character, 'pia-neutral');
+    assert.equal(u.values.group_type, 'assigned');
+    await p.context().close();
+  });
+  await check('tutor: an unrelated edit never sends or changes the tutor; "Not assigned yet" clears only when chosen', async () => {
+    const d = makeData(); d.profiles.find(r => r.email === 'student04@example.test').selected_character = 'pia-calm';
+    const p = await open('students', { data: d }); await waitStudents(p);
+    await openEdit(p, 'student04@example.test');
+    assert.equal(await p.locator('#es-tutor').inputValue(), 'pia-calm');
+    await p.locator('#es-first').fill('Renamed');
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'update'));
+    assert.equal(Object.prototype.hasOwnProperty.call((await lastUpdate(p)).values, 'selected_character'), false);
+    await p.context().close();
+    const q = await open('students', { data: d }); await waitStudents(q);
+    await openEdit(q, 'student04@example.test');
+    await q.locator('#es-tutor').selectOption('');
+    await q.evaluate(() => { window.fixture.calls.length = 0; });
+    await q.locator('#es-submit').click();
+    await q.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'update'));
+    assert.equal((await lastUpdate(q)).values.selected_character, null);
+    await q.context().close();
+  });
+  await check('tutor: changing the group never clears or rewrites the tutor; non-Assigned students are shown it read-only', async () => {
+    const d = makeData(); d.profiles.find(r => r.email === 'student04@example.test').selected_character = 'pia-neutral';
+    const p = await open('students', { data: d }); await waitStudents(p);
+    await openEdit(p, 'student04@example.test');
+    await p.locator('input[name="es-condition"][value="non-assigned"]').evaluate(e => e.click());
+    assert.equal(await p.locator('#es-tutor-field').isVisible(), true, 'a held tutor stays visible');
+    assert.equal(await p.locator('#es-tutor').isDisabled(), true);
+    assert.match(await p.locator('#es-tutor-hint').innerText(), /changing the group does not clear/i);
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'update'));
+    const u = await lastUpdate(p);
+    assert.equal(u.values.group_type, 'non-assigned');
+    assert.equal(Object.prototype.hasOwnProperty.call(u.values, 'selected_character'), false);
+    await p.context().close();
+    const q = await open('students'); await waitStudents(q);
+    await openEdit(q, 'student05@example.test');           // free choice, no tutor held
+    assert.equal(await q.locator('#es-tutor-field').isVisible(), false);
+    await q.context().close();
+  });
+  await check('tutor: a failed save says so on the field and in a toast, keeps the dialog open, and writes nothing else', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEdit(p, 'student04@example.test');
+    await p.locator('#es-tutor').selectOption('pia-neutral');
+    await p.evaluate(() => { window.fixture.failWrite = { profiles: { code: '42501', message: 'permission denied for table profiles' } }; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => /not saved/i.test(document.querySelector('[data-msg-for="es-tutor"]').textContent));
+    assert.equal(await p.locator('#modal-edit-student.is-open').count(), 1, 'dialog stays open');
+    assert.match(await p.locator('[data-msg-for="es-tutor"]').innerText(), /The tutor was not saved/);
+    assert.equal(await p.locator('#es-submit').isEnabled(), true, 'can retry');
+    await p.evaluate(() => { window.fixture.failWrite = {}; window.fixture.calls.length = 0; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => !document.querySelector('#modal-edit-student.is-open'));
+    assert.equal((await lastUpdate(p)).values.selected_character, 'pia-neutral');
+    await p.context().close();
+  });
+  await check('tutor: a tampered tutor value is refused before any write', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEdit(p, 'student04@example.test');
+    await p.evaluate(() => { const o = document.createElement('option'); o.value = 'pia-evil'; o.textContent = 'x'; document.querySelector('#es-tutor').appendChild(o); document.querySelector('#es-tutor').value = 'pia-evil'; window.fixture.calls.length = 0; });
+    await p.locator('#es-submit').click();
+    await p.waitForFunction(() => /listed tutors/i.test(document.querySelector('[data-msg-for="es-tutor"]').textContent));
+    assert.equal((await calls(p)).filter(c => c.write === 'update').length, 0);
+    await p.context().close();
+  });
+  await check('tutor: the profile shows the tutor and hides re-selection except for Free choice students', async () => {
+    const d = makeData(); d.profiles.find(r => r.email === 'student04@example.test').selected_character = 'pia-neutral';
+    const p = await open('students', { data: d }); await waitStudents(p);
+    const show = async email => { await p.locator(`#student-tbody tr[data-student="${email}"]`).focus(); await p.keyboard.press('Enter'); await p.waitForSelector('#drawer-student.is-open'); };
+    await show('student04@example.test');
+    assert.equal((await p.locator('#drawer-tutor').innerText()).trim(), 'PIA Neutral');
+    assert.equal(await p.locator('[data-student-action="retake-character"]').isVisible(), false);
+    await p.keyboard.press('Escape'); await p.waitForFunction(() => !document.querySelector('#drawer-student.is-open'));
+    await show('student01@example.test');                       // fixture group "non-assigned"
+    assert.equal((await p.locator('#drawer-tutor').innerText()).trim(), 'Not chosen yet');
+    assert.equal(await p.locator('[data-student-action="retake-character"]').isVisible(), true);
+    await p.keyboard.press('Escape'); await p.waitForFunction(() => !document.querySelector('#drawer-student.is-open'));
+    await show('student08@example.test');                       // fixture group "assigned", no tutor
+    assert.equal((await p.locator('#drawer-tutor').innerText()).trim(), 'Not assigned yet');
     await p.context().close();
   });
 

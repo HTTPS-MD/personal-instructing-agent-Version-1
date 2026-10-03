@@ -24,6 +24,18 @@
 --   3. A trigger that refuses to ASSIGN group_type 'neutral' to a new row or
 --      to change an existing row TO neutral.
 --
+--   4. A row-level guard, trg_pia_control_stage_guard: no writer at all, a
+--      SECURITY DEFINER admin RPC included, can move a Control student INTO
+--      'Character Selection' or 'Tutoring Dashboard'. The body of
+--      admin_grant_stage__inner is not in this repository (it was created
+--      outside the migration files), so whether a section grant defers to
+--      pia_can_enter_stage could not be established from source; this guard
+--      makes the answer irrelevant. The write is kept at the student's
+--      current stage (stage_started_at and is_in_game too) instead of
+--      raising, so a section grant still completes for the section's other
+--      students. Limitation: such a grant's "granted" list may still name the
+--      Control student; the stage did not change.
+
 -- WHAT THIS MIGRATION DELIBERATELY DOES NOT DO
 --   * It does NOT update any profile. Existing group_type = 'neutral' rows keep
 --     their group, section, stage, persona and scores. They keep behaving as
@@ -220,6 +232,38 @@ create trigger trg_pia_no_new_neutral_group
 
 
 -- ---------------------------------------------------------------------------
+-- PART 4 -- no writer can move a Control student into a closed-to-Control stage
+-- ---------------------------------------------------------------------------
+create or replace function public.pia_control_stage_guard()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if lower(trim(coalesce(new.group_type, ''))) = 'control'
+     and new.current_stage in ('Character Selection', 'Tutoring Dashboard')
+     and (tg_op = 'INSERT' or new.current_stage is distinct from old.current_stage) then
+    if tg_op = 'INSERT' then
+      new.current_stage := 'Waiting Room';
+    else
+      -- Keep the student where they are. A Control student already in the
+      -- dashboard before this migration is not moved by it either.
+      new.current_stage    := old.current_stage;
+      new.stage_started_at := old.stage_started_at;
+      new.is_in_game       := old.is_in_game;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_pia_control_stage_guard on public.profiles;
+create trigger trg_pia_control_stage_guard
+  before insert or update of current_stage on public.profiles
+  for each row execute function public.pia_control_stage_guard();
+
+
+-- ---------------------------------------------------------------------------
 -- POSTFLIGHT
 -- ---------------------------------------------------------------------------
 do $$
@@ -296,6 +340,26 @@ begin
       select count(*) into v_n from public.profiles
        where email = 'probe-assigned@pia-0038.test' and group_type = 'assigned';
       if v_n <> 1 then v_fail := v_fail || 'a legacy neutral row could not leave neutral; '; end if;
+
+      -- The Control stage guard, through a plain update (no RPC needed).
+      insert into public.profiles (email, full_name, role, section, group_type, current_stage, parental_consent, student_assent)
+      values ('probe-control@pia-0038.test', 'Probe', 'student', 'X', 'control', 'Tutoring Dashboard', true, true);
+      select count(*) into v_n from public.profiles
+       where email = 'probe-control@pia-0038.test' and current_stage = 'Waiting Room';
+      if v_n <> 1 then v_fail := v_fail || 'a Control student was inserted straight into the dashboard; '; end if;
+      update public.profiles set current_stage = 'Tutoring Dashboard' where email = 'probe-control@pia-0038.test';
+      update public.profiles set current_stage = 'Character Selection' where email = 'probe-control@pia-0038.test';
+      select count(*) into v_n from public.profiles
+       where email = 'probe-control@pia-0038.test' and current_stage = 'Waiting Room';
+      if v_n <> 1 then v_fail := v_fail || 'a Control student could be moved into the dashboard / character selection; '; end if;
+      update public.profiles set current_stage = 'OCEAN' where email = 'probe-control@pia-0038.test';
+      select count(*) into v_n from public.profiles
+       where email = 'probe-control@pia-0038.test' and current_stage = 'OCEAN';
+      if v_n <> 1 then v_fail := v_fail || 'a Control student could not be moved to OCEAN; '; end if;
+      update public.profiles set current_stage = 'Tutoring Dashboard' where email = 'probe-assigned@pia-0038.test';
+      select count(*) into v_n from public.profiles
+       where email = 'probe-assigned@pia-0038.test' and current_stage = 'Tutoring Dashboard';
+      if v_n <> 1 then v_fail := v_fail || 'the Control guard blocked an Assigned student; '; end if;
 
       raise exception 'rehearsal done' using errcode = 'P0002';
     exception when sqlstate 'P0002' then null;

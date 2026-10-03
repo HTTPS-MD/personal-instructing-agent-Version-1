@@ -551,6 +551,16 @@
                                 <span class="choice-title">CTRL · Traditional</span>
                             </label>
                         </div>
+                        <!-- Tutor persona: a separate field from the research group above. Offered
+                             for Assigned students; the options are filled from the same list the
+                             student's Character Selection uses. -->
+                        <div class="field" id="rs-tutor-field" hidden>
+                            <label class="label" for="rs-tutor">Tutor persona</label>
+                            <select class="select" id="rs-tutor" aria-describedby="rs-tutor-hint"></select>
+                            <p class="field-hint muted" id="rs-tutor-hint"></p>
+                            <p class="field-msg" data-msg-for="rs-tutor"></p>
+                        </div>
+
                     </div>
 
                     <!-- The pre-test score is entered later, in Edit participant or
@@ -667,6 +677,16 @@
                                 <span class="choice-title">CTRL · Traditional</span>
                             </label>
                         </div>
+                        <!-- Tutor persona: a separate field from the research group above. Offered
+                             for Assigned students; the options are filled from the same list the
+                             student's Character Selection uses. -->
+                        <div class="field" id="es-tutor-field" hidden>
+                            <label class="label" for="es-tutor">Tutor persona</label>
+                            <select class="select" id="es-tutor" aria-describedby="es-tutor-hint"></select>
+                            <p class="field-hint muted" id="es-tutor-hint"></p>
+                            <p class="field-msg" data-msg-for="es-tutor"></p>
+                        </div>
+
                     </div>
 
                     <!-- Raw score + highest possible score per test. The transmuted
@@ -1179,6 +1199,10 @@
                     <div class="kv">
                         <p class="kv-label">Current stage</p>
                         <p class="kv-value" id="drawer-stage">—</p>
+                    </div>
+                    <div class="kv">
+                        <p class="kv-label">Tutor persona</p>
+                        <p class="kv-value" id="drawer-tutor">—</p>
                     </div>
                     <div class="kv">
                         <p class="kv-label">Account status</p>
