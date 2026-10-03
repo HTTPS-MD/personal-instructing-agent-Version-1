@@ -851,7 +851,7 @@ function fixture() {
     await p.screenshot({ path: path.join(out, 'redesign-password-errors-320.png') });
     await p.context().close();
   });
-  await check('redesign: Character Selection uses the same tutor art as the game (pia-calm pending)', async () => {
+  await check('redesign: Character Selection uses the same tutor art as the game (all six)', async () => {
     let p = await pageFor('/student/html/character-selection.html', { account: 'char-art', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
     await p.waitForSelector('.persona-card');
     await p.waitForFunction(() => [...document.querySelectorAll('.persona-card img')].slice(0, 5).every(img => img.complete && img.naturalWidth > 0));
@@ -861,12 +861,11 @@ function fixture() {
       loaded: (card.querySelector('img')?.naturalWidth || 0) > 0,
       fallback: card.querySelector('.persona-thumb').hasAttribute('data-mono')
     })));
-    /* Tutor art is one set: the game's sprites (tutors/<key>/...). pia-calm is the exception until the owner
-       decides which artwork it uses (the game's "Neuroticism" sprite or the existing blue-haired Anchor). */
+    /* Tutor art is one set: the game's sprites (tutors/<key>/...), for all six keys. */
     const keys = ['pia-open', 'pia-conscientious', 'pia-extravert', 'pia-agreeable', 'pia-calm'];
     art.slice(0, 5).forEach((item, index) => {
       assert.equal(item.key, keys[index]);
-      assert.match(item.src, index === 4 ? /cast\/char-5\.webp$/ : new RegExp(`tutors/${item.key}/default\\.webp$`));
+      assert.match(item.src, new RegExp(`tutors/${item.key}/default\\.webp$`));
       assert.equal(item.loaded, true, item.key + ' art missing');
       assert.equal(item.fallback, false, item.key + ' fell back to monogram');
     });

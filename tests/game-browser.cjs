@@ -132,20 +132,46 @@ const DASH = '/student/html/student-dashboard.html';
     });
   }
 
-  await check('art consistency: the Character Selection card art for each key is the very file the game shows (pia-calm excluded, pending)', async () => {
+  await check('art consistency: the Character Selection card art for each key is the very file the game shows (all six, pia-calm and Neutral included)', async () => {
     const sel = await open('/student/html/character-selection.html', { profile: { group_type: 'Non-Assigned', selected_character: null } });
     await sel.waitForSelector('.persona-card');
     const cards = await sel.locator('.persona-card').evaluateAll(c => c.map(x => [x.dataset.character, x.querySelector('img').getAttribute('src')]));
     await sel.screenshot({ path: path.join(out, 'character-selection.png') });
     await sel.context().close();
     for (const [key, src] of cards) {
-      if (key === 'pia-calm') continue;
       const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: key } });
       await start(p);
       const game = await p.locator('#agent-img').getAttribute('src');
       assert.equal(game.replace(/^\.\.\/\.\.\//, ''), src.replace(/^\.\.\/\.\.\//, '').replace('approval', key === 'pia-neutral' ? 'approval' : 'default'), key);
       await p.context().close();
     }
+  });
+
+  await check('ML stays disconnected: no request leaves the loopback server and no ML code or endpoint exists in the student JS', async () => {
+    const p = await open(DASH); await start(p);
+    await submit(p, '9'); await submit(p, '8'); await p.locator('#hint-btn').click(); await p.waitForTimeout(400);
+    assert.deepEqual(leaked.filter(u => /workers\.dev|cloudflare|pia-ml/i.test(u)), []);
+    for (const f of ['student/js/student-dashboard.js', 'student/js/tutor-personas.js', 'student/html/student-dashboard.html']) {
+      const src = fs.readFileSync(path.join(root, f), 'utf8');
+      assert.equal(/workers\.dev|pia-ml-api|\/predict|marcstephen|fetch\(|XMLHttpRequest|sendBeacon|PROFILE_CONFIG/.test(src), false, f);
+    }
+    assert.equal(await p.evaluate(() => /^(struggling|average|outstanding)$/.test('average') && document.documentElement.outerHTML.includes('ML TEST')), false);
+    await p.context().close();
+  });
+  await check('stage time: heartbeat runs for Tutoring Dashboard; expiry and Try again never call finalize_stage_time; sign-out clears is_in_game without finalizing', async () => {
+    const p = await open(DASH, { limit: 600 }); await start(p);
+    await p.evaluate(() => window.__mockExpireNow()); await submit(p, '9');
+    await p.waitForSelector('#modal-time.is-open'); await p.locator('#time-retry').click();
+    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'));
+    let calls = await p.evaluate(() => window.__calls);
+    assert.ok(calls.some(c => c.m === 'rpc' && c.name === 'record_heartbeat' && c.args.p_stage === 'Tutoring Dashboard'), 'heartbeat for the dashboard');
+    assert.equal(calls.some(c => c.m === 'rpc' && c.name === 'finalize_stage_time'), false, 'no finalize at expiry / Try again');
+    await p.evaluate(() => { window.executeForceLogout = async () => {}; });   // keep the page alive so the calls can be read
+    await p.locator('#signout-btn').click(); await p.waitForSelector('#modal-confirm.is-open'); await p.locator('#confirm-accept').click(); await p.waitForTimeout(500);
+    calls = await p.evaluate(() => window.__calls);
+    assert.ok(calls.some(c => c.m === 'update' && c.table === 'profiles' && c.keys.length === 1 && c.keys[0] === 'is_in_game'));
+    assert.equal(calls.some(c => c.m === 'rpc' && c.name === 'finalize_stage_time'), false);
+    await p.context().close();
   });
 
   /* ---------------- removed elements ---------------- */

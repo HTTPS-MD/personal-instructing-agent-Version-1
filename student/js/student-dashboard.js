@@ -65,7 +65,7 @@
         'pia-conscientious': 'Cara · your organised tutor',
         'pia-extravert': 'Theo · your energetic tutor',
         'pia-agreeable': 'Amy · your patient tutor',
-        'pia-calm': 'Kai · your steady tutor',
+        'pia-calm': 'Kai · your careful tutor',
         'pia-neutral': 'PIA · your tutor'
     };
 
@@ -1162,6 +1162,14 @@
             confirmLabel: 'Sign out'
         });
         if (!ok) { return; }
+
+        /* Nothing ends a session in this game, so this is the one place the
+           "in a tutoring session" flag is cleared. It is display-only (the
+           admin's Active session view). Deliberately NOT finalizeStageTime():
+           that freezes tutoring_time for good, and the student will be back. */
+        if (state.inSession && state.email) {
+            try { await sb.from('profiles').update({ is_in_game: false }).eq('email', state.email); } catch (e) { /* signing out anyway */ }
+        }
 
         if (typeof executeForceLogout === 'function') { await executeForceLogout(); }
         else { await sb.auth.signOut({ scope: 'global' }); window.location.replace('../../index.html'); }
