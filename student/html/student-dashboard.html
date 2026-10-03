@@ -88,8 +88,8 @@
                         <p class="learn-kicker">YOUR SESSION</p>
                         <h1 class="start-hello" id="start-hello">Welcome back!</h1>
                         <p class="start-lede" id="start-lede">
-                            Today you'll solve percentage word problems with your tutor. Take your time — there's
-                            no timer, and you can ask for a hint whenever you're stuck.
+                            Today you'll solve percentage word problems with your tutor, one step at a time. Take your time — there's
+                            no timer, and hints are there when you're stuck.
                         </p>
 
                         <dl class="facts start-facts">
@@ -98,8 +98,8 @@
                                 <dd class="fact-value" id="fact-target">10</dd>
                             </div>
                             <div class="fact">
-                                <dt class="fact-label">Tries per problem</dt>
-                                <dd class="fact-value">2</dd>
+                                <dt class="fact-label">Steps per problem</dt>
+                                <dd class="fact-value">2–3</dd>
                             </div>
                             <div class="fact">
                                 <dt class="fact-label">Already answered</dt>
@@ -124,10 +124,26 @@
             </section>
 
             <!-- ========================================== SESSION SCREEN -->
-            <section class="learn-shell screen" id="screen-session">
-                <div class="session-wrap">
-                    <div>
-                        <!-- Progress -->
+            <section class="learn-shell screen" id="screen-session" aria-label="Your tutoring session">
+                <div class="game">
+
+                    <!-- The tutor: the one saved on the student's profile. -->
+                    <aside class="tutor" aria-label="Your tutor">
+                        <div class="tutor-bubble" id="tutor-bubble">
+                            <p class="tutor-speech" id="agent-speech" role="status" aria-live="polite">Let's get started. Read the problem carefully.</p>
+                        </div>
+                        <div class="tutor-figure">
+                            <img id="agent-img" src="../../assets/images/tutors/pia-neutral/approval.webp" alt="Your tutor"
+                                width="220" height="431">
+                        </div>
+                        <p class="tutor-name" id="agent-name">Your tutor</p>
+                        <button class="btn btn-secondary btn-hint" id="hint-btn" type="button" aria-describedby="hint-tier-label">
+                            <span id="hint-btn-label">Request hint</span>
+                            <span class="hint-tier" id="hint-tier-label"></span>
+                        </button>
+                    </aside>
+
+                    <div class="work">
                         <div class="progress-card">
                             <div class="progress-top">
                                 <span class="progress-label">Your progress</span>
@@ -135,66 +151,32 @@
                             </div>
                             <div class="bar"><div class="bar-fill" id="progress-fill" style="width:0%"></div></div>
                             <div class="progress-stats">
-                                <span class="pstat"><b id="stat-correct">0</b> correct</span>
+                                <span class="pstat"><b id="stat-correct">0</b> clean</span>
                                 <span class="pstat"><b id="stat-streak">0</b> in a row</span>
                                 <span class="pstat"><b id="stat-level">1</b> topic</span>
                             </div>
                         </div>
 
-                        <!-- The work -->
                         <div class="problem-card">
                             <p class="problem-kicker" id="problem-kicker">Problem 1</p>
-                            <!-- A word problem, set as a sentence. Its box holds four lines, so a
-                                 short problem and a long one leave the answer row in place. -->
-                            <p class="problem-expression problem-statement" id="problem-expression">—</p>
-                            <p class="problem-instruction" id="problem-instruction">Type your answer as a number. The % sign is optional.</p>
-
-                            <form id="answer-form" novalidate>
-                                <div class="answer-row">
-                                    <input class="answer-input" type="text" id="answer-input"
-                                        inputmode="decimal" autocomplete="off" autocapitalize="off" maxlength="60"
-                                        spellcheck="false" placeholder="Your answer" aria-label="Your answer"
-                                        aria-describedby="problem-expression problem-instruction">
-                                    <button class="btn btn-primary btn-answer" type="submit" id="submit-btn">Check</button>
-                                </div>
-                            </form>
-
-                            <!-- Reserved: never empty of space, only of text. -->
-                            <div class="answer-meta">
-                                <span id="attempts-note">You have 2 tries</span>
-                                <span id="hints-note"></span>
-                            </div>
-
-                            <p class="feedback" id="feedback" role="status" aria-live="polite">
-                                <svg class="icon"><use href="#i-info"></use></svg>
-                                <span id="feedback-text"></span>
-                            </p>
-
-                            <!-- The button sits ABOVE the hints it produces. Ordered the
-                                 other way round, each new hint pushed the button down the
-                                 screen — the one control the student is reaching for. Now
-                                 nothing moves; the card simply grows at the bottom. -->
-                            <div class="hint-actions">
-                                <button class="btn btn-secondary btn-hint" id="hint-btn">
-                                    <span id="hint-btn-label">Give me a hint</span>
-                                </button>
-                            </div>
-
-                            <!-- Hints arrive here, step by step: Concept, Setup, Worked calculation.
-                                 Announced as they appear. -->
-                            <div class="hint-zone" id="hint-zone" aria-live="polite"></div>
+                            <p class="problem-statement" id="problem-expression">—</p>
+                            <div class="steps" id="steps"></div>
                         </div>
                     </div>
 
-                    <!-- Agent -->
-                    <aside class="agent-panel">
-                        <div class="agent-portrait">
-                            <img id="agent-img" src="../../assets/images/cast/char-1.webp" alt="Your tutor"
-                                width="104" height="104">
-                        </div>
-                        <p class="agent-name" id="agent-name">Your tutor</p>
-                        <p class="agent-speech" id="agent-speech">Let's get started. Read the problem carefully.</p>
+                    <aside class="trail" aria-label="Your work so far">
+                        <section class="trail-block" aria-labelledby="solved-title">
+                            <h2 class="trail-title" id="solved-title">Solved questions</h2>
+                            <ol class="solved-list" id="solved-list"></ol>
+                            <p class="trail-empty" id="solved-empty">Nothing solved yet.</p>
+                        </section>
+                        <section class="trail-block" aria-labelledby="errors-title">
+                            <h2 class="trail-title" id="errors-title">Error log</h2>
+                            <ul class="error-list" id="error-list"></ul>
+                            <p class="trail-empty" id="error-empty">No mistakes yet.</p>
+                        </section>
                     </aside>
+
                 </div>
             </section>
 
@@ -207,7 +189,7 @@
 
                     <dl class="facts summary-grid">
                         <div class="summary-tile">
-                            <dt class="summary-label">Correct</dt>
+                            <dt class="summary-label">No mistakes</dt>
                             <dd class="summary-value" id="summary-correct">0 / 0</dd>
                         </div>
                         <div class="summary-tile">
@@ -246,6 +228,32 @@
         </div>
     </div>
 
+    <!-- ============================================ MODAL · TOPIC OFFER ----
+         The tutor offers to move up or back a topic. The student answers; Escape
+         and the backdrop do not, because the server is waiting for the answer. -->
+    <div class="overlay" id="modal-offer" role="dialog" aria-modal="true"
+        aria-labelledby="offer-title" aria-describedby="offer-text" data-static>
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <p class="tutorial-step" id="offer-kicker">Topic</p>
+                    <h2 class="modal-title" id="offer-title">A choice for you</h2>
+                </div>
+            </header>
+            <div class="modal-body offer-body">
+                <img class="offer-figure" id="offer-img" src="" alt="" width="96" height="188">
+                <div>
+                    <p class="modal-text" id="offer-text"></p>
+                    <p class="offer-destination" id="offer-destination"></p>
+                </div>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" id="offer-stay" type="button">Stay on this topic</button>
+                <button class="btn btn-primary" id="offer-accept" type="button">Accept</button>
+            </footer>
+        </div>
+    </div>
+
     <!-- ============================================== MODAL · TUTORIAL ----
          Opens by itself once per account (student-tutorial.js) and on demand
          from the Tutorial button. Skip is always visible; Escape also skips. -->
@@ -272,6 +280,7 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script src="../../assets/js/function.js"></script>
+    <script src="../js/tutor-personas.js"></script>
     <script src="../js/student-dashboard.js"></script>
     <script src="../js/student-tutorial.js"></script>
 </body>

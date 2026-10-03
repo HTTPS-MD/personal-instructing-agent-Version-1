@@ -436,7 +436,7 @@ function fixture() {
     await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape');
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
     assert.equal(await p.locator('#hint-btn svg, #submit-btn svg').count(), 0);
-    assert.deepEqual(await iconsOf(p), ['#i-help', '#i-info']);      // tutorial control + feedback status icon
+    assert.deepEqual(await iconsOf(p), ['#i-help']);                 // tutorial control only: the step game has no status icons
     assert.equal(await p.locator('.progress-card').count() + await p.locator('.problem-card').count(), 2);
     await p.screenshot({ path: path.join(out, 'audit-dash-session-375.png') });
     await p.evaluate(() => { document.querySelector('#screen-session').classList.remove('is-active'); document.querySelector('#screen-summary').classList.add('is-active'); });
@@ -557,7 +557,10 @@ function fixture() {
     const p = await pageFor('/student/html/character-selection.html', { account: 'asg-none', initial: { stageOpen: true, profile: asg } });
     await p.waitForURL(/student-dashboard\.html/);
     await p.waitForSelector('#agent-name-start'); await p.waitForTimeout(300);
-    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'PIA · your tutor');   /* the generic label, not a persona name */
+    /* Step game (0039): no tutor is shown or chosen, and the session cannot start until an admin assigns one. */
+    assert.match(await p.locator('#global-error-message').innerText(), /not been assigned/i);
+    assert.equal(await p.locator('#start-btn').isDisabled(), true);
+    assert.equal(await p.evaluate(() => (document.querySelector('#agent-img-start').getAttribute('src') || '').includes('/tutors/')), false);
     await p.context().close();
   });
   await check('free choice who picked PIA Neutral reaches the dashboard; one who has not picked is sent to Character Selection', async () => {
@@ -828,8 +831,11 @@ function fixture() {
     await p.locator('#tutorial-skip').click();
     await p.waitForSelector('#modal-tutorial.is-mounted', { state: 'detached' });
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
-    const order = await p.evaluate(() => ['.progress-card', '.problem-card', '.agent-panel'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
-    assert.ok(order[0] < order[1] && order[1] < order[2], 'problem must precede tutor panel on phone');
+    // The step game puts a COMPACT tutor row above the work on a phone (feedback sits beside the input, the hint beside the tutor).
+    const geo = await p.evaluate(() => ({ tutor: document.querySelector('.tutor').getBoundingClientRect().height, problemTop: document.querySelector('.problem-card').getBoundingClientRect().top + scrollY, trailTop: document.querySelector('.trail').getBoundingClientRect().top + scrollY, problemBottom: document.querySelector('.problem-card').getBoundingClientRect().bottom + scrollY }));
+    assert.ok(geo.tutor <= 260, 'tutor must stay a compact row on a phone');
+    assert.ok(geo.problemTop < 640, 'the problem must start within the first screen on a phone');
+    assert.ok(geo.problemBottom <= geo.trailTop, 'the trail (solved questions, error log) comes after the work');
     await p.screenshot({ path: path.join(out, 'redesign-dashboard-work-375.png') });
     await p.evaluate(() => { document.querySelector('#screen-session').classList.remove('is-active'); document.querySelector('#screen-summary').classList.add('is-active'); });
     assert.equal(await p.locator('#signout-btn:visible').count(), 1);
@@ -874,7 +880,8 @@ function fixture() {
     await p.context().close();
     p = await pageFor(dash, { account: 'dash-neutral', initial: { profile: { selected_character: 'pia-neutral' } } });
     await p.waitForSelector('#start-btn');
-    assert.equal(await p.locator('.agent-card .agent-portrait').getAttribute('data-mono'), 'PIA');
+    /* Step game: PIA Neutral now has real art (Personas/Neutral), so the monogram placeholder is no longer used. */
+    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /tutors\/pia-neutral\/approval\.webp$/);
     await p.context().close();
   });
   await check('no request left the loopback server', async () => { assert.deepEqual(leaked.filter(u => /supabase\.co/.test(u)), []); });
