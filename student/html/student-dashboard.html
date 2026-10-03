@@ -88,18 +88,18 @@
                         <p class="learn-kicker">YOUR SESSION</p>
                         <h1 class="start-hello" id="start-hello">Welcome back!</h1>
                         <p class="start-lede" id="start-lede">
-                            Today you'll solve percentage word problems with your tutor. Take your time — there's
-                            no timer, and you can ask for a hint whenever you're stuck.
+                            Today you'll solve percentage word problems with your tutor, one step at a time. Work through
+                            as many as you can before the time limit, and use hints when you're stuck.
                         </p>
 
                         <dl class="facts start-facts">
                             <div class="fact">
-                                <dt class="fact-label">Problems this session</dt>
-                                <dd class="fact-value" id="fact-target">10</dd>
+                                <dt class="fact-label">Session time limit</dt>
+                                <dd class="fact-value" id="fact-limit">10 mins</dd>
                             </div>
                             <div class="fact">
-                                <dt class="fact-label">Tries per problem</dt>
-                                <dd class="fact-value">2</dd>
+                                <dt class="fact-label">Steps per problem</dt>
+                                <dd class="fact-value">2–3</dd>
                             </div>
                             <div class="fact">
                                 <dt class="fact-label">Already answered</dt>
@@ -114,7 +114,7 @@
 
                     <aside class="agent-card">
                         <div class="agent-portrait">
-                            <img id="agent-img-start" src="../../assets/images/cast/char-1.webp" alt="Your tutor"
+                            <img id="agent-img-start" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Your tutor"
                                 width="128" height="128">
                         </div>
                         <p class="agent-name" id="agent-name-start">Your tutor</p>
@@ -124,105 +124,63 @@
             </section>
 
             <!-- ========================================== SESSION SCREEN -->
-            <section class="learn-shell screen" id="screen-session">
-                <div class="session-wrap">
-                    <div>
-                        <!-- Progress -->
+            <section class="learn-shell screen" id="screen-session" aria-label="Your tutoring session">
+                <div class="game">
+
+                    <!-- The tutor: the one saved on the student's profile. -->
+                    <aside class="tutor" aria-label="Your tutor">
+                        <div class="tutor-bubble" id="tutor-bubble">
+                            <p class="tutor-speech" id="agent-speech" role="status" aria-live="polite">Let's get started. Read the problem carefully.</p>
+                        </div>
+                        <div class="tutor-figure">
+                            <img id="agent-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Your tutor"
+                                width="220" height="431">
+                        </div>
+                        <p class="tutor-name" id="agent-name">Your tutor</p>
+                        <button class="btn btn-secondary btn-hint" id="hint-btn" type="button" aria-describedby="hint-tier-label">
+                            <span id="hint-btn-label">Request hint</span>
+                            <span class="hint-tier" id="hint-tier-label"></span>
+                        </button>
+                    </aside>
+
+                    <div class="work">
                         <div class="progress-card">
                             <div class="progress-top">
-                                <span class="progress-label">Your progress</span>
-                                <span class="progress-count" id="progress-count">0 / 10</span>
+                                <span class="progress-label" id="time-label">Time left</span>
+                                <span class="time-left" id="time-left" aria-labelledby="time-label" role="timer" aria-live="off">--:--</span>
                             </div>
-                            <div class="bar"><div class="bar-fill" id="progress-fill" style="width:0%"></div></div>
                             <div class="progress-stats">
-                                <span class="pstat"><b id="stat-correct">0</b> correct</span>
+                                <span class="pstat"><b id="stat-solved">0</b> solved</span>
+                                <span class="pstat"><b id="stat-correct">0</b> clean</span>
                                 <span class="pstat"><b id="stat-streak">0</b> in a row</span>
                                 <span class="pstat"><b id="stat-level">1</b> topic</span>
                             </div>
+                            <p class="sr-only" id="time-announce" role="status" aria-live="polite"></p>
                         </div>
 
-                        <!-- The work -->
                         <div class="problem-card">
                             <p class="problem-kicker" id="problem-kicker">Problem 1</p>
-                            <!-- A word problem, set as a sentence. Its box holds four lines, so a
-                                 short problem and a long one leave the answer row in place. -->
-                            <p class="problem-expression problem-statement" id="problem-expression">—</p>
-                            <p class="problem-instruction" id="problem-instruction">Type your answer as a number. The % sign is optional.</p>
-
-                            <form id="answer-form" novalidate>
-                                <div class="answer-row">
-                                    <input class="answer-input" type="text" id="answer-input"
-                                        inputmode="decimal" autocomplete="off" autocapitalize="off" maxlength="60"
-                                        spellcheck="false" placeholder="Your answer" aria-label="Your answer"
-                                        aria-describedby="problem-expression problem-instruction">
-                                    <button class="btn btn-primary btn-answer" type="submit" id="submit-btn">Check</button>
-                                </div>
-                            </form>
-
-                            <!-- Reserved: never empty of space, only of text. -->
-                            <div class="answer-meta">
-                                <span id="attempts-note">You have 2 tries</span>
-                                <span id="hints-note"></span>
-                            </div>
-
-                            <p class="feedback" id="feedback" role="status" aria-live="polite">
-                                <svg class="icon"><use href="#i-info"></use></svg>
-                                <span id="feedback-text"></span>
-                            </p>
-
-                            <!-- The button sits ABOVE the hints it produces. Ordered the
-                                 other way round, each new hint pushed the button down the
-                                 screen — the one control the student is reaching for. Now
-                                 nothing moves; the card simply grows at the bottom. -->
-                            <div class="hint-actions">
-                                <button class="btn btn-secondary btn-hint" id="hint-btn">
-                                    <span id="hint-btn-label">Give me a hint</span>
-                                </button>
-                            </div>
-
-                            <!-- Hints arrive here, step by step: Concept, Setup, Worked calculation.
-                                 Announced as they appear. -->
-                            <div class="hint-zone" id="hint-zone" aria-live="polite"></div>
+                            <p class="problem-statement" id="problem-expression">—</p>
+                            <div class="steps" id="steps"></div>
                         </div>
                     </div>
 
-                    <!-- Agent -->
-                    <aside class="agent-panel">
-                        <div class="agent-portrait">
-                            <img id="agent-img" src="../../assets/images/cast/char-1.webp" alt="Your tutor"
-                                width="104" height="104">
-                        </div>
-                        <p class="agent-name" id="agent-name">Your tutor</p>
-                        <p class="agent-speech" id="agent-speech">Let's get started. Read the problem carefully.</p>
+                    <aside class="trail" aria-label="Your work so far">
+                        <section class="trail-block" aria-labelledby="solved-title">
+                            <h2 class="trail-title" id="solved-title">Solved questions</h2>
+                            <ol class="solved-list" id="solved-list"></ol>
+                            <p class="trail-empty" id="solved-empty">Nothing solved yet.</p>
+                        </section>
+                        <section class="trail-block" aria-labelledby="errors-title">
+                            <h2 class="trail-title" id="errors-title">Error log</h2>
+                            <ul class="error-list" id="error-list"></ul>
+                            <p class="trail-empty" id="error-empty">No mistakes yet.</p>
+                        </section>
                     </aside>
+
                 </div>
             </section>
 
-            <!-- ========================================== SUMMARY SCREEN -->
-            <section class="learn-shell screen" id="screen-summary">
-                <div class="summary-card">
-                    <p class="learn-kicker">SESSION COMPLETE</p>
-                    <h2 class="summary-title">Session complete</h2>
-                    <p class="summary-lede" id="summary-lede">Nice work getting all the way through.</p>
-
-                    <dl class="facts summary-grid">
-                        <div class="summary-tile">
-                            <dt class="summary-label">Correct</dt>
-                            <dd class="summary-value" id="summary-correct">0 / 0</dd>
-                        </div>
-                        <div class="summary-tile">
-                            <dt class="summary-label">Accuracy</dt>
-                            <dd class="summary-value" id="summary-accuracy">0%</dd>
-                        </div>
-                        <div class="summary-tile">
-                            <dt class="summary-label">Reached</dt>
-                            <dd class="summary-value" id="summary-level">Level 1</dd>
-                        </div>
-                    </dl>
-
-                    <p class="summary-note">You're done for now. Sign out from the top bar before someone else uses this device.</p>
-                </div>
-            </section>
         </main>
     </div>
 
@@ -242,6 +200,59 @@
             <footer class="modal-foot">
                 <button class="btn btn-secondary" data-modal-close id="confirm-cancel">Go back</button>
                 <button class="btn btn-danger" id="confirm-accept">Sign out</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================ MODAL · TIME LIMIT ----
+         The game's "Time limit reached" dialog. Not dismissible: the only way on
+         is Try again, which restarts the open problem with a fresh limit. -->
+    <div class="overlay" id="modal-time" role="alertdialog" aria-modal="true"
+        aria-labelledby="time-title" aria-describedby="time-sub" data-static>
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <p class="tutorial-step">Session</p>
+                    <h2 class="modal-title" id="time-title">Time limit reached</h2>
+                    <p class="modal-sub" id="time-sub">The session time limit has been reached.</p>
+                </div>
+            </header>
+            <div class="modal-body">
+                <dl class="time-facts">
+                    <div><dt>Time limit</dt><dd id="time-limit">--</dd></div>
+                    <div><dt>Time started</dt><dd id="time-started">--:--:--</dd></div>
+                    <div><dt>Time finished</dt><dd id="time-finished">--:--:--</dd></div>
+                    <div><dt>Time spent</dt><dd id="time-spent">0 secs</dd></div>
+                </dl>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-primary" id="time-retry" type="button">Try again</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================ MODAL · TOPIC OFFER ----
+         The tutor offers to move up or back a topic. The student answers; Escape
+         and the backdrop do not, because the server is waiting for the answer. -->
+    <div class="overlay" id="modal-offer" role="dialog" aria-modal="true"
+        aria-labelledby="offer-title" aria-describedby="offer-text" data-static>
+        <div class="modal modal-md">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <p class="tutorial-step" id="offer-kicker">Topic</p>
+                    <h2 class="modal-title" id="offer-title">A choice for you</h2>
+                </div>
+            </header>
+            <div class="modal-body offer-body">
+                <img class="offer-figure" id="offer-img" src="" alt="" width="96" height="188">
+                <div>
+                    <p class="modal-text" id="offer-text"></p>
+                    <p class="offer-destination" id="offer-destination"></p>
+                </div>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" id="offer-stay" type="button">Stay on this topic</button>
+                <button class="btn btn-primary" id="offer-accept" type="button">Accept</button>
             </footer>
         </div>
     </div>
@@ -272,6 +283,7 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script src="../../assets/js/function.js"></script>
+    <script src="../js/tutor-personas.js"></script>
     <script src="../js/student-dashboard.js"></script>
     <script src="../js/student-tutorial.js"></script>
 </body>

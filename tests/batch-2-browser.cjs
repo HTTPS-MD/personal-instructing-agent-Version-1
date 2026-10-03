@@ -431,22 +431,15 @@ function fixture() {
       await p.context().close();
     });
   }
-  await check('audit: dashboard session + summary + sign-out dialog (no trophy/bulb/hero; status icon kept)', async () => {
+  await check('audit: dashboard session + sign-out dialog (no trophy/bulb/hero; no status icons)', async () => {
     const p = await pageFor(dash, { width: 375, account: 'dash-audit2' });
     await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape');
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
     assert.equal(await p.locator('#hint-btn svg, #submit-btn svg').count(), 0);
-    assert.deepEqual(await iconsOf(p), ['#i-help', '#i-info']);      // tutorial control + feedback status icon
+    assert.deepEqual(await iconsOf(p), ['#i-help']);                 // tutorial control only: the step game has no status icons
     assert.equal(await p.locator('.progress-card').count() + await p.locator('.problem-card').count(), 2);
     await p.screenshot({ path: path.join(out, 'audit-dash-session-375.png') });
-    await p.evaluate(() => { document.querySelector('#screen-session').classList.remove('is-active'); document.querySelector('#screen-summary').classList.add('is-active'); });
-    assert.equal(await p.locator('.summary-glyph, #screen-summary svg.icon-lg, #summary-signout svg').count(), 0);
-    assert.equal(await p.locator('dl.summary-grid dt').count(), 3);
-    assert.equal(await p.locator('#screen-summary .summary-title').isVisible(), true);
-    assert.equal(await p.locator('#summary-signout').count(), 0);
     assert.equal(await p.locator('#signout-btn').isVisible(), true);
-    assert.ok(isFlat(await flat(p, '.summary-card')));
-    await p.screenshot({ path: path.join(out, 'audit-dash-summary-375.png') });
     await p.locator('#signout-btn').click();
     await p.waitForSelector('#modal-confirm.is-open');
     assert.equal(await p.locator('#modal-confirm .modal-hero, #modal-confirm .modal-hero-glyph').count(), 0);
@@ -557,7 +550,10 @@ function fixture() {
     const p = await pageFor('/student/html/character-selection.html', { account: 'asg-none', initial: { stageOpen: true, profile: asg } });
     await p.waitForURL(/student-dashboard\.html/);
     await p.waitForSelector('#agent-name-start'); await p.waitForTimeout(300);
-    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'PIA · your tutor');   /* the generic label, not a persona name */
+    /* Step game (0039): no tutor is shown or chosen, and the session cannot start until an admin assigns one. */
+    assert.match(await p.locator('#global-error-message').innerText(), /not been assigned/i);
+    assert.equal(await p.locator('#start-btn').isDisabled(), true);
+    assert.equal(await p.evaluate(() => (document.querySelector('#agent-img-start').getAttribute('src') || '').includes('/tutors/')), false);
     await p.context().close();
   });
   await check('free choice who picked PIA Neutral reaches the dashboard; one who has not picked is sent to Character Selection', async () => {
@@ -828,10 +824,12 @@ function fixture() {
     await p.locator('#tutorial-skip').click();
     await p.waitForSelector('#modal-tutorial.is-mounted', { state: 'detached' });
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
-    const order = await p.evaluate(() => ['.progress-card', '.problem-card', '.agent-panel'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
-    assert.ok(order[0] < order[1] && order[1] < order[2], 'problem must precede tutor panel on phone');
+    // The step game puts a COMPACT tutor row above the work on a phone (feedback sits beside the input, the hint beside the tutor).
+    const geo = await p.evaluate(() => ({ tutor: document.querySelector('.tutor').getBoundingClientRect().height, problemTop: document.querySelector('.problem-card').getBoundingClientRect().top + scrollY, trailTop: document.querySelector('.trail').getBoundingClientRect().top + scrollY, problemBottom: document.querySelector('.problem-card').getBoundingClientRect().bottom + scrollY }));
+    assert.ok(geo.tutor <= 260, 'tutor must stay a compact row on a phone');
+    assert.ok(geo.problemTop < 640, 'the problem must start within the first screen on a phone');
+    assert.ok(geo.problemBottom <= geo.trailTop, 'the trail (solved questions, error log) comes after the work');
     await p.screenshot({ path: path.join(out, 'redesign-dashboard-work-375.png') });
-    await p.evaluate(() => { document.querySelector('#screen-session').classList.remove('is-active'); document.querySelector('#screen-summary').classList.add('is-active'); });
     assert.equal(await p.locator('#signout-btn:visible').count(), 1);
     assert.equal(await p.locator('#summary-signout').count(), 0);
     await p.locator('#signout-btn').click();
@@ -853,28 +851,32 @@ function fixture() {
     await p.screenshot({ path: path.join(out, 'redesign-password-errors-320.png') });
     await p.context().close();
   });
-  await check('redesign: student tutor art matches the five landing-page characters', async () => {
+  await check('redesign: Character Selection uses the same tutor art as the game (all six)', async () => {
     let p = await pageFor('/student/html/character-selection.html', { account: 'char-art', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
     await p.waitForSelector('.persona-card');
     await p.waitForFunction(() => [...document.querySelectorAll('.persona-card img')].slice(0, 5).every(img => img.complete && img.naturalWidth > 0));
-    await p.waitForFunction(() => document.querySelectorAll('.persona-thumb[data-mono]').length >= 1);
     const art = await p.locator('.persona-card').evaluateAll(cards => cards.map(card => ({
       key: card.dataset.character,
       src: card.querySelector('img')?.getAttribute('src') || '',
       loaded: (card.querySelector('img')?.naturalWidth || 0) > 0,
       fallback: card.querySelector('.persona-thumb').hasAttribute('data-mono')
     })));
+    /* Tutor art is one set: the game's sprites (tutors/<key>/...), for all six keys. */
+    const keys = ['pia-open', 'pia-conscientious', 'pia-extravert', 'pia-agreeable', 'pia-calm'];
     art.slice(0, 5).forEach((item, index) => {
-      assert.match(item.src, new RegExp(`cast/char-${index + 1}\\.webp$`));
+      assert.equal(item.key, keys[index]);
+      assert.match(item.src, new RegExp(`tutors/${item.key}/default\\.webp$`));
       assert.equal(item.loaded, true, item.key + ' art missing');
       assert.equal(item.fallback, false, item.key + ' fell back to monogram');
     });
-    assert.equal(art[5].fallback, true, 'Neutral intentionally uses its text placeholder');
+    assert.match(art[5].src, /tutors\/pia-neutral\/approval\.webp$/);
+    assert.equal(art[5].loaded, true); assert.equal(art[5].fallback, false, 'Neutral now has real art');
     await p.screenshot({ path: path.join(out, 'redesign-cast-1280.png') });
     await p.context().close();
     p = await pageFor(dash, { account: 'dash-neutral', initial: { profile: { selected_character: 'pia-neutral' } } });
     await p.waitForSelector('#start-btn');
-    assert.equal(await p.locator('.agent-card .agent-portrait').getAttribute('data-mono'), 'PIA');
+    /* Step game: PIA Neutral now has real art (Personas/Neutral), so the monogram placeholder is no longer used. */
+    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /tutors\/pia-neutral\/approval\.webp$/);
     await p.context().close();
   });
   await check('no request left the loopback server', async () => { assert.deepEqual(leaked.filter(u => /supabase\.co/.test(u)), []); });

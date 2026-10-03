@@ -1,28 +1,45 @@
 /**
  * ============================================================================
- * PIA SYSTEM — STUDENT WORKSPACE
+ * PIA SYSTEM — STUDENT WORKSPACE (the tutoring game)
  * ============================================================================
- * The Grade 7 tutoring surface. Merges what were two v1 pages (the dashboard
- * hub and the tutoring game) into one page with three screens, which matches
- * how function.js already routes: STUDENT_STAGES.dash.url points here.
+ * The Grade 7 tutoring surface: a start screen, the step-by-step game, and a
+ * time-limit dialog. One page, because function.js routes STUDENT_STAGES.dash here.
+ *
+ * WHO GETS HERE. Only an experimental group with a saved tutor: assigned and
+ * neutral students have the tutor their admin set; free-choice students have
+ * the one they chose in Character Selection. Control never does. That is
+ * decided by enforceStudentStage('dash') in the browser and, again, by
+ * pia_game_email() in every game call on the server (migration 0038). This
+ * file never reads a group, a tutor or a result from the URL or from
+ * localStorage: the tutor on screen is profiles.selected_character.
  *
  * RESEARCH INTEGRITY — two rules this file must never break:
  *
  *   1. ocean_* is never selected. The Big Five breakdown must not reach the
- *      student's browser at all, not merely be hidden with CSS. A student who
- *      learns they scored low on Conscientiousness may behave differently for
- *      the rest of the study, contaminating the measure the thesis depends on.
+ *      student's browser at all, not merely be hidden with CSS.
  *
  *   2. The browser never asserts performance, and never holds an answer.
- *      The questions are the Percentages bank (question_bank, migration
- *      0029): serve_next_question() picks one and sends only its statement;
- *      check_question_answer() says right or wrong; consume_question_hint()
- *      gives and counts each hint; record_question_result() decides smooth /
- *      struggling and the topic; reveal_question_solution() shows the answer
- *      only once the question is closed. This file sends what the student
- *      typed and renders what the server replies. It never sends
- *      "correct: true", never computes a classification, and never picks a
- *      question.
+ *      serve_next_step_question() picks a question and sends its statement;
+ *      check_step_answer() compares what the student typed and says what
+ *      happened (wrong / working accepted / step done); consume_step_hint()
+ *      gives and counts each hint; finish_step_question() records the
+ *      question and decides whether to OFFER a topic change;
+ *      respond_topic_offer() applies the student's answer. This file sends
+ *      what the student typed and renders what the server replies. It never
+ *      sends "correct: true", never evaluates an answer, never picks a
+ *      question and never decides a topic.
+ *
+ * TIME. The attached game's rule: one session time limit (app_config.time_limit
+ * minutes), one continuous deadline, no pause between questions or topics. The
+ * SERVER owns the deadline (game_windows); this file only draws it. When it
+ * passes, the server refuses answers and hints, the page shows the "Time limit
+ * reached" dialog, and "Try again" restarts the open problem with a fresh limit
+ * (restart_after_expiry). The countdown sits in the progress card, not in a top
+ * strip, and its milestones and the expiry are announced to screen readers.
+ *
+ * TUTOR WORDING. The words the tutor says come from tutor-personas.js and are
+ * cosmetic. Their "learning profile" is fixed at 'average'; the attached
+ * game's external ML service is deliberately not called (decision pending).
  * ==========================================================================*/
 (function () {
     'use strict';
@@ -38,22 +55,51 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    /* Kept in step with the server-side replay. */
-    var SESSION_TARGET = 10;
-    var MAX_ATTEMPTS = 2;
+    /* The tutor's wording profile. The attached game raised or lowered it from
+       an external ML service; that service is not connected, so the game's own
+       default is used. */
+    var LEARNING_PROFILE = 'average';
 
-    var CHARACTER_IMAGES = {
-        'pia-open': '../../assets/images/cast/char-1.webp',
-        'pia-conscientious': '../../assets/images/cast/char-2.webp',
-        'pia-extravert': '../../assets/images/cast/char-3.webp',
-        'pia-agreeable': '../../assets/images/cast/char-4.webp',
-        'pia-calm': '../../assets/images/cast/char-5.webp'
+    var TUTOR_NAMES = {
+        'pia-open': 'Ava · your curious tutor',
+        'pia-conscientious': 'Cara · your organised tutor',
+        'pia-extravert': 'Theo · your energetic tutor',
+        'pia-agreeable': 'Amy · your patient tutor',
+        'pia-calm': 'Kai · your careful tutor',
+        'pia-neutral': 'PIA · your tutor'
     };
 
-    var CHARACTER_MONOGRAMS = {
-        'pia-open': 'OP', 'pia-conscientious': 'ST', 'pia-extravert': 'DY',
-        'pia-agreeable': 'EM', 'pia-calm': 'ST', 'pia-neutral': 'PIA'
+    /* The three study topics. The server numbers them 1-3 (question_bank's
+       EASY / MEDIUM / HARD); these are only the words on screen. */
+    var TOPICS = {
+        1: { short: 'Finding a percentage', name: 'Topic 1 - Finding Percentage' },
+        2: { short: 'Percentage increase', name: 'Topic 2 - Percentage Increase' },
+        3: { short: 'Percentage decrease', name: 'Topic 3 - Percentage Decrease' }
     };
+
+    function topicOf(n) { return TOPICS[n] || TOPICS[1]; }
+
+    /* What the confirm box asks for once correct working has been accepted. */
+    var CONFIRM = {
+        decimal: {
+            label: 'Converted decimal', prompt: 'Now write the converted decimal.',
+            placeholder: 'e.g. 0.8', button: 'Submit conversion',
+            error: 'Enter the converted decimal value only.'
+        },
+        percentage: {
+            label: 'Final percentage', prompt: 'Now write the final percentage.',
+            placeholder: 'e.g. 20 or 20%', button: 'Submit conversion',
+            error: 'Enter the final percentage as a number, with or without the % sign.'
+        },
+        number: {
+            label: 'Final answer', prompt: 'Now write the final answer.',
+            placeholder: 'Enter final value', button: 'Submit final answer',
+            error: 'Enter the final numeric answer only, not the calculation.'
+        }
+    };
+
+    var FAST_CORRECT_MS = 12000;      /* wording only: picks a "that was quick" line */
+    var STREAK_FOR_PRAISE = 3;
 
     /* Display state only. Every number that matters is re-read from the
        server; these exist so the screen has something to paint between
@@ -63,22 +109,29 @@
         email: null,
         sessionId: null,
         topic: 1,
-        problem: null,       /* { id, number, question, questionTopic, locked } */
-        problemNumber: 1,
+        problem: null,       /* see applyQuestion() */
         answered: 0,
-        correct: 0,
+        clean: 0,            /* questions finished without a wrong answer */
         streak: 0,
-        hintsTotal: 0,
-        hintsUsed: 0,
-        hintsLeft: 0,
         hintsUsedTotal: 0,
-        lastHintStep: null,
-        attemptsUsed: 0,
+        solved: [],          /* this visit only: { number, topic, question, steps } */
+        errors: [],          /* this visit only: the student's own wrong entries */
+        stepWrong: 0,        /* wording only */
+        correctRun: 0,       /* wording only */
+        stepStartedAt: 0,    /* wording only; never sent anywhere */
         submitting: false,
-        recording: false,
         hinting: false,
-        awaitingNext: false,
+        finishing: false,
+        offering: false,
+        pendingOffer: null,
+        starting: false,
         bankEmpty: false,
+        clock: null,         /* { limit, base, at, expired, started, finished } from the server */
+        clockTimer: null,
+        announced: {},
+        expired: false,
+        expiring: false,
+        restarting: false,
         finished: false,
         inSession: false,   /* a lesson has been started and not yet ended (see PIA_HAS_ACTIVE_WORK) */
         ended: false        /* another device took the account (function.js 1C-6) */
@@ -180,7 +233,7 @@
     function initModals() {
         $$('.overlay').forEach(function (overlay) {
             overlay.addEventListener('mousedown', function (e) {
-                if (e.target === overlay) { closeModal(overlay); }
+                if (e.target === overlay && !overlay.hasAttribute('data-static')) { closeModal(overlay); }
             });
             $$('[data-modal-close]', overlay).forEach(function (btn) {
                 btn.addEventListener('click', function () { closeModal(overlay); });
@@ -191,7 +244,12 @@
             if (!openLayers.length) { return; }
             var top = openLayers[openLayers.length - 1];
 
-            if (event.key === 'Escape') { event.preventDefault(); closeModal(top); return; }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                /* A pending choice (the topic offer) is answered, not dismissed. */
+                if (!top.hasAttribute('data-static')) { closeModal(top); }
+                return;
+            }
             if (event.key !== 'Tab') { return; }
 
             var nodes = $$(FOCUSABLE, top).filter(function (n) { return n.offsetParent !== null; });
@@ -276,207 +334,324 @@
         };
     }
 
-    /* ============================================ 3. AGENT ============= */
+    /* ============================================ 3. TUTOR ============= */
+
+    var tutor = null;          /* PIA_TUTORS[selected_character] */
+    var tutorKey = null;
+
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) { node.className = className; }
+        if (text != null) { node.textContent = text; }
+        return node;
+    }
+
+    /* The attached game never lets a tutor line contain a long dash. */
+    function clean(text) {
+        return String(text == null ? '' : text).replace(/\s*[—–]\s*/g, ', ');
+    }
+
+    /* Shuffle bag: every line is used once before any repeats, and a new
+       round never opens with the line that closed the last one. */
+    var bags = {};
+
+    function pickLine(bucket, lines) {
+        var pool = [];
+        (Array.isArray(lines) ? lines : []).forEach(function (l) {
+            var t = String(l || '').trim();
+            if (t && pool.indexOf(t) === -1) { pool.push(t); }
+        });
+        if (!pool.length) { return ''; }
+        if (pool.length === 1) { return pool[0]; }
+
+        var sig = pool.join('␞');
+        var bag = bags[bucket];
+        if (!bag || bag.sig !== sig || !bag.left.length) {
+            var left = pool.slice();
+            for (var i = left.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = left[i]; left[i] = left[j]; left[j] = tmp;
+            }
+            if (bag && bag.last && left[0] === bag.last) {
+                var swap = left.findIndex(function (l, n) { return n > 0 && l !== bag.last; });
+                if (swap > 0) { var t2 = left[0]; left[0] = left[swap]; left[swap] = t2; }
+            }
+            bag = bags[bucket] = { sig: sig, left: left, last: bag ? bag.last : '' };
+        }
+        bag.last = bag.left.shift();
+        return bag.last;
+    }
+
+    function wording() {
+        if (!tutor) { return null; }
+        return tutor.profiles[LEARNING_PROFILE] || tutor.profiles.average;
+    }
+
+    function line(type) {
+        var bank = wording();
+        return bank ? pickLine('say:' + tutorKey + ':' + type, bank[type]) : '';
+    }
+
+    function reaction(type, fallbackType) {
+        var bank = wording();
+        var list = bank && bank.reactions && bank.reactions[type];
+        if (Array.isArray(list) && list.length) { return pickLine('react:' + tutorKey + ':' + type, list); }
+        return fallbackType ? line(fallbackType) : '';
+    }
 
     function setSpeech(text) {
         var node = $('#agent-speech');
-        if (node) { node.textContent = text; }
+        if (node) { node.textContent = clean(text); }
     }
 
+    /* Each expression is decoded before it replaces the last, so the figure
+       never blinks empty between two moods. */
+    var preloaded = {};
+    var moodToken = 0;
+
+    function setMood(mood) {
+        if (!tutor) { return; }
+        var key = tutor.images[mood] ? mood : 'default';
+        var src = tutor.images[key];
+        var img = $('#agent-img');
+        if (!img || !src || img.getAttribute('src') === src) { return; }
+
+        var token = ++moodToken;
+        var pre = preloaded[key];
+        var ready = pre && pre.decode ? pre.decode().catch(function () {}) : Promise.resolve();
+        ready.then(function () {
+            if (token === moodToken) { img.setAttribute('src', src); }
+        });
+    }
+
+    /* A line with a face to go with it: happy, sad or thinking. */
+    function speak(text, mood) {
+        if (text) { setSpeech(text); }
+        setMood(mood || 'default');
+    }
+
+    /* Returns false when the saved tutor is not one this game knows. The page
+       then refuses to start: a tutor is never picked for the student. */
     function applyCharacter(key) {
-        var src = CHARACTER_IMAGES[key];
+        var found = window.PIA_TUTORS && window.PIA_TUTORS[key];
+        if (!found) { return false; }
+
+        tutor = found;
+        tutorKey = key;
+
+        /* Load every expression now, so a mood change never flashes. */
+        preloaded = {};
+        Object.keys(tutor.images).forEach(function (m) { var p = new Image(); p.src = tutor.images[m]; preloaded[m] = p; });
+
+        var label = TUTOR_NAMES[key] || 'PIA · your tutor';
+        var first = label.split(' · ')[0];
+        ['#agent-name', '#agent-name-start'].forEach(function (sel) {
+            var node = $(sel); if (node) { node.textContent = label; }
+        });
         ['#agent-img', '#agent-img-start'].forEach(function (sel) {
             var img = $(sel);
             if (!img) { return; }
-            var portrait = img.closest('.agent-portrait');
-            if (portrait) portrait.removeAttribute('data-mono');
-            if (!src) {
-                img.removeAttribute('src');
-                if (portrait) portrait.setAttribute('data-mono', CHARACTER_MONOGRAMS[key] || 'PIA');
-                return;
-            }
-            img.addEventListener('error', function () {
-                if (portrait) portrait.setAttribute('data-mono', CHARACTER_MONOGRAMS[key] || 'PIA');
-            }, { once: true });
-            img.src = src;
+            img.setAttribute('src', tutor.images['default']);
+            img.setAttribute('alt', 'Your tutor, ' + first);
         });
-
-        /* The persona name is shown; the trait scores behind it are not. */
-        var label = ({
-            'pia-open': 'Ava · your curious tutor',
-            'pia-conscientious': 'Cara · your organised tutor',
-            'pia-extravert': 'Theo · your energetic tutor',
-            'pia-agreeable': 'Amy · your patient tutor',
-            'pia-calm': 'Kai · your steady tutor',
-            'pia-neutral': 'PIA · your tutor'
-        })[key] || 'PIA · your tutor';
-
-        ['#agent-name', '#agent-name-start'].forEach(function (sel) {
-            var node = $(sel);
-            if (node) { node.textContent = label; }
-        });
+        return true;
     }
 
-    /* ============================================ 4. FEEDBACK ========== */
-
-    /* The feedback row and the attempt note keep their space at all times, so
-       showing a verdict cannot push the input or the hint button downward. */
-    function setFeedback(text, tone) {
-        var row = $('#feedback');
-        var glyph = $('use', row);
-
-        $('#feedback-text').textContent = text || '';
-        row.classList.toggle('is-correct', tone === 'correct');
-        row.classList.toggle('is-wrong', tone === 'wrong');
-        row.classList.toggle('is-neutral', tone === 'neutral');
-
-        if (glyph) {
-            glyph.setAttribute('href',
-                tone === 'correct' ? '#i-check' : (tone === 'wrong' ? '#i-alert' : '#i-info'));
-        }
-    }
-
-    function clearFeedback() { setFeedback('', null); }
-
-    /* The three study topics. The server numbers them 1-3 (question_bank's
-       EASY / MEDIUM / HARD); these are only the words on screen. */
-    var TOPICS = {
-        1: { short: 'Finding %', title: 'finding a percentage' },
-        2: { short: '% Increase', title: 'percentage increase' },
-        3: { short: '% Decrease', title: 'percentage decrease' }
-    };
-
-    function topicOf(n) { return TOPICS[n] || TOPICS[1]; }
+    /* ============================================ 4. PROGRESS ========== */
 
     function paintProgress() {
-        var done = Math.min(state.answered, SESSION_TARGET);
-        $('#progress-count').textContent = done + ' / ' + SESSION_TARGET;
-        $('#progress-fill').style.width = Math.round((done / SESSION_TARGET) * 100) + '%';
-        $('#stat-correct').textContent = state.correct;
+        $('#stat-solved').textContent = state.answered;
+        $('#stat-correct').textContent = state.clean;
         $('#stat-streak').textContent = state.streak;
         $('#stat-level').textContent = state.topic;
     }
 
-    function paintAttempts() {
-        var left = Math.max(0, MAX_ATTEMPTS - state.attemptsUsed);
-        $('#attempts-note').textContent = left === MAX_ATTEMPTS
-            ? 'You have ' + MAX_ATTEMPTS + ' tries'
-            : (left === 1 ? '1 try left' : (left === 0 ? 'No tries left' : left + ' tries left'));
-    }
-
     function problemOpen() { return !!state.problem && !state.problem.locked; }
 
+    /* The hint button keeps its place from the first paint; it is only
+       invisible until the server says two wrong answers have unlocked it. */
     function paintHintButton() {
         var btn = $('#hint-btn');
-        var label = $('#hint-btn-label');
-        var note = $('#hints-note');
+        var open = problemOpen() && state.problem.hintUnlocked;
+        btn.classList.toggle('is-away', !open);
+        btn.disabled = !open || state.hinting;
 
-        if (problemOpen() && state.hintsLeft > 0) {
-            btn.disabled = false;
-            label.textContent = state.hintsUsed > 0 ? 'Next hint' : 'Give me a hint';
-            note.textContent = state.hintsLeft + (state.hintsLeft === 1 ? ' hint' : ' hints') + ' left';
-        } else {
-            btn.disabled = true;
-            label.textContent = state.hintsTotal > 0 ? 'No more hints' : 'No hints for this one';
-            note.textContent = '';
-            suggestHint(false);
-        }
+        var tier = state.problem && state.problem.hint;
+        $('#hint-tier-label').textContent = tier ? '(Tier ' + tier.tier + '/' + tier.total + ')' : '';
     }
 
-    /* ---- 4.1 Hint offers ----
-       When the student struggles -- a wrong first try, or a minute with no
-       progress -- the tutor OFFERS the next hint and the button lights up.
-       The hint itself is only taken when the student taps it: hints_used is
-       a measure in the study, and a hint pushed onto a student who did not
-       ask would inflate it. */
-    var HINT_OFFER_IDLE_MS = 60 * 1000;
-    var hintOfferTimer = null;
+    /* ---- 4.1 The trail: solved questions and the error log ---- */
 
-    function suggestHint(on) { $('#hint-btn').classList.toggle('is-suggested', !!on); }
-
-    function offerHint(reason) {
-        if (!problemOpen() || state.hintsLeft <= 0) { return; }
-        var first = state.hintsUsed === 0;
-        if (reason === 'wrong') {
-            setSpeech(first
-                ? 'Not quite. Want a nudge? Tap “Give me a hint” — the first one explains the idea.'
-                : 'Close. The next hint builds on the last one — tap “Next hint” if you want it.');
-        } else {
-            setSpeech(first
-                ? 'Take your time. If you are not sure where to start, a hint can show you.'
-                : 'Still thinking? The next hint takes you one step further.');
-        }
-        suggestHint(true);
-    }
-
-    function armHintOffer() {
-        clearTimeout(hintOfferTimer);
-        if (!problemOpen() || state.hintsLeft <= 0) { return; }
-        hintOfferTimer = setTimeout(function () { offerHint('idle'); }, HINT_OFFER_IDLE_MS);
-    }
-
-    /* ---- 4.2 Hints and the worked solution on screen ----
-       Built with textContent: hint text is authored in the admin console and
-       is never treated as markup. */
-    function stripStepPrefix(text) {
-        return String(text || '').replace(/^\s*step\s*\d+\s*[:.\-–—]\s*/i, '');
-    }
-
-    function appendHint(h) {
-        if (!h || !h.text) { return; }
-        var zone = $('#hint-zone');
-        var step = h.step == null ? null : Number(h.step);
-
-        /* Each step's prompt appears once, with its first hint. */
-        if (step !== null && step !== state.lastHintStep) {
-            var head = document.createElement('p');
-            head.className = 'hint-step';
-            var label = document.createElement('span');
-            label.className = 'hint-step-label';
-            label.textContent = 'Step ' + step + (Number(h.steps_total) > 1 ? ' of ' + h.steps_total : '');
-            head.appendChild(label);
-            if (h.step_prompt) {
-                var prompt = document.createElement('span');
-                prompt.className = 'hint-step-prompt';
-                prompt.textContent = stripStepPrefix(h.step_prompt);
-                head.appendChild(prompt);
-            }
-            zone.appendChild(head);
-            state.lastHintStep = step;
-        }
-
-        var line = document.createElement('p');
-        line.className = 'hint-line hint-tier-' + (Number(h.tier) || 1);
-        var tag = document.createElement('b');
-        tag.textContent = (h.tier_label || 'Hint') + ':';
-        line.appendChild(tag);
-        line.appendChild(document.createTextNode(' ' + h.text));
-        zone.appendChild(line);
-    }
-
-    function showWorkedSolution(steps) {
-        var rows = (steps || []).filter(function (s) { return s && (s.prompt || s.answer || s.worked); });
-        if (!rows.length) { return; }
-
-        var box = document.createElement('div');
-        box.className = 'worked';
-        var title = document.createElement('p');
-        title.className = 'worked-title';
-        title.textContent = 'How to solve it';
-        box.appendChild(title);
-
-        var list = document.createElement('ol');
-        list.className = 'worked-steps';
-        rows.forEach(function (s) {
-            var li = document.createElement('li');
-            li.appendChild(document.createTextNode(stripStepPrefix(s.prompt) + (s.prompt ? ' ' : '')));
-            var result = document.createElement('b');
-            result.textContent = s.worked || s.answer || '';
-            li.appendChild(result);
-            list.appendChild(li);
+    function paintSolved() {
+        var list = $('#solved-list');
+        list.textContent = '';
+        state.solved.forEach(function (q) {
+            var item = el('li', 'solved-item');
+            var details = el('details', 'solved-details');
+            var summary = el('summary', 'solved-summary', 'Problem ' + q.number + ' · ' + topicOf(q.topic).short);
+            details.appendChild(summary);
+            details.appendChild(el('p', 'solved-question', q.question));
+            var steps = el('ol', 'solved-steps');
+            q.steps.forEach(function (s) {
+                steps.appendChild(el('li', null, s.label + ': ' + (s.confirmed || s.text)));
+            });
+            details.appendChild(steps);
+            item.appendChild(details);
+            list.appendChild(item);
         });
-        box.appendChild(list);
-        $('#hint-zone').appendChild(box);
+        $('#solved-empty').hidden = state.solved.length > 0;
+    }
+
+    function paintErrors() {
+        var list = $('#error-list');
+        list.textContent = '';
+        state.errors.slice(-30).forEach(function (e) { list.appendChild(el('li', null, e)); });
+        $('#error-empty').hidden = state.errors.length > 0;
+        list.scrollTop = list.scrollHeight;
+    }
+
+    /* ============================================ 4b. THE CLOCK ======== */
+
+    /* The deadline lives on the server. Every reply that carries a `clock`
+       re-bases this display; between replies it counts down on the browser's
+       monotonic clock, so changing the computer's clock changes nothing the
+       server enforces. */
+    function fmtClock(sec) {
+        sec = Math.max(0, Math.round(sec));
+        var m = Math.floor(sec / 60), r = sec % 60;
+        return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+    }
+
+    function fmtLimit(sec) {
+        var m = Math.floor(sec / 60), r = sec % 60;
+        if (m > 0) { return r > 0 ? m + 'm ' + r + 's' : m + (m > 1 ? ' mins' : ' min'); }
+        return r + ' secs';
+    }
+
+    function fmtTime(iso) {
+        var d = new Date(iso);
+        return isNaN(d) ? '--:--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function fmtSpent(a, b) {
+        var sec = Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+        var m = Math.floor(sec / 60), r = sec % 60;
+        return (m ? m + (m > 1 ? ' mins ' : ' min ') : '') + r + (r === 1 ? ' sec' : ' secs');
+    }
+
+    function secondsLeft() {
+        var c = state.clock;
+        if (!c) { return null; }
+        if (c.expired) { return 0; }
+        return Math.max(0, c.base - (performance.now() - c.at) / 1000);
+    }
+
+    function syncClock(c) {
+        if (!c) { return; }
+        var newWindow = !state.clock || state.clock.window !== c.window;
+        state.clock = {
+            window: c.window, limit: Number(c.limit_seconds) || 600, base: Number(c.remaining_seconds) || 0,
+            at: performance.now(), expired: c.expired === true, started: c.started_at, finished: c.finished_at
+        };
+        if (newWindow) { state.announced = {}; }
+        paintClock();
+        if (!state.clockTimer) { state.clockTimer = setInterval(tickClock, 250); }
+        if (state.clock.expired && state.inSession) { expire(); }
+    }
+
+    function paintClock() {
+        var left = secondsLeft();
+        if (left === null) { return; }
+        var node = $('#time-left');
+        node.textContent = fmtClock(left);
+        node.classList.toggle('is-low', left <= 30);
+    }
+
+    /* Said once each, politely, so a screen-reader user is told without a
+       countdown being read every second. */
+    var MILESTONES = [[300, 'About 5 minutes left.'], [60, 'About 1 minute left.'], [30, '30 seconds left.']];
+
+    function tickClock() {
+        var left = secondsLeft();
+        if (left === null || state.expired || !state.inSession) { return; }
+        paintClock();
+        MILESTONES.forEach(function (m) {
+            if (left <= m[0] && left > 0 && state.clock.limit > m[0] && !state.announced[m[0]]) {
+                state.announced[m[0]] = true;
+                $('#time-announce').textContent = m[1];
+            }
+        });
+        if (left <= 0 && !state.expiring) { confirmExpiry(); }
+    }
+
+    /* The page thinks time is up. Only the server's word counts: ask it. */
+    async function confirmExpiry() {
+        state.expiring = true;
+        var res = await sb.rpc('serve_next_step_question', { p_session_id: state.sessionId });
+        state.expiring = false;
+        if (res.error || !res.data || !res.data.clock) { return; }
+        syncClock(res.data.clock);
+    }
+
+    function lockForExpiry() {
+        var input = $('#step-input'), submit = $('#step-submit');
+        if (input) { input.disabled = true; }
+        if (submit) { submit.disabled = true; }
+        $('#hint-btn').disabled = true;
+    }
+
+    function expire() {
+        if (state.expired) { return; }
+        state.expired = true;
+        paintClock();
+        lockForExpiry();
+        speak('Time is up! Let me show your session summary.', 'sad');
+        $('#time-announce').textContent = 'Time limit reached.';
+
+        var c = state.clock;
+        $('#time-limit').textContent = fmtLimit(c.limit);
+        $('#time-started').textContent = fmtTime(c.started);
+        $('#time-finished').textContent = fmtTime(c.finished);
+        $('#time-spent').textContent = fmtSpent(c.started, c.finished);
+        openModal('modal-time');
+    }
+
+    /* The game's "Try Again": the open problem is reloaded from step 1 with a
+       fresh limit; topic and topic progress are kept. */
+    async function tryAgain() {
+        if (state.restarting) { return; }
+        state.restarting = true;
+        var release = setBusy($('#time-retry'), 'Restarting…');
+
+        var res = await sb.rpc('restart_after_expiry', { p_session_id: state.sessionId });
+        release();
+        state.restarting = false;
+
+        if (res.error || !res.data) {
+            console.error('Could not restart:', res.error && res.error.message);
+            toast('Could not restart', 'Please try again.', 'danger');
+            return;
+        }
+
+        state.expired = false;
+        closeModal('modal-time');
+        state.problem = null;
+        state.stepWrong = 0;
+        state.stepStartedAt = Date.now();
+        syncClock(res.data.clock);
+        if (res.data.pending_offer) { return showOffer(res.data.pending_offer); }
+        if (res.data.done) { return noQuestions(); }
+        applyQuestion(res.data);
+        renderProblem();
+        speak(line('greet') || 'Let’s try again. Read the problem carefully.', 'default');
+    }
+
+    function noQuestions() {
+        state.bankEmpty = true;
+        $('#problem-kicker').textContent = 'No problems yet';
+        $('#problem-expression').textContent = 'No configured questions are available. Please ask your teacher to check the question bank.';
+        $('#steps').textContent = '';
+        speak(null, 'default');
     }
 
     /* ============================================ 5. SESSION =========== */
@@ -500,111 +675,218 @@
     function applySession(d) {
         state.sessionId = d.session_id;
         state.answered = Number(d.problems_answered) || 0;
-        state.correct = Number(d.correct_count) || 0;
+        state.clean = Number(d.correct_count) || 0;
         state.topic = Number(d.topic) || 1;
         state.streak = Number(d.consecutive_correct) || 0;
     }
 
-    /* The SERVER picks the question (serve_next_question): the student's
-       topic, questions they have seen least, then at random. Only the problem
-       statement and hints already taken come back -- never an answer. A
-       question still open comes back unchanged, so reloading cannot swap it. */
-    async function nextProblem() {
-        if (state.ended || state.finished) { return; }
-        clearTimeout(hintOfferTimer);
+    /* The question as the server describes it. Nothing in here is a key: the
+       steps the student has already finished carry their own entries. */
+    function applyQuestion(d) {
+        var prev = state.problem;
+        var sameQuestion = prev && prev.id === d.problem_id;
+        state.problem = {
+            id: d.problem_id,
+            number: Number(d.problem_number) || (state.answered + 1),
+            question: String(d.question || ''),
+            topic: Number(d.topic) || state.topic,
+            questionTopic: Number(d.question_topic) || Number(d.topic) || 1,
+            stepsTotal: Number(d.steps_total) || 0,
+            labels: Array.isArray(d.step_labels) ? d.step_labels : [],
+            stepIndex: Number(d.current_step) || 0,
+            stage: d.stage === 'confirm' ? 'confirm' : 'work',
+            confirmKind: CONFIRM[d.confirm_kind] ? d.confirm_kind : 'number',
+            workText: d.work_text || '',
+            doneSteps: Array.isArray(d.done_steps) ? d.done_steps : [],
+            hintUnlocked: d.hint_unlocked === true,
+            hintTier: Number(d.hint_tier) || 0,
+            locked: d.locked === true,
+            hint: sameQuestion ? prev.hint : null
+        };
+        state.topic = state.problem.topic;
+    }
 
-        var res = await sb.rpc('serve_next_question', { p_session_id: state.sessionId });
+    /* The SERVER picks the question (serve_next_step_question): the student's
+       topic, questions they have seen least, then at random. A question still
+       open comes back as it was left, so reloading cannot swap it or undo a
+       step; an unanswered topic offer comes back instead of a question. */
+    async function nextProblem() {
+        if (state.ended) { return; }
+
+        var res = await sb.rpc('serve_next_step_question', { p_session_id: state.sessionId });
 
         if (res.error || !res.data) {
             console.error('Could not load the next question:', res.error && res.error.message);
-            setFeedback('Could not reach the server. Trying again…', 'wrong');
+            speak('I could not reach the server. Trying again…', 'default');
             setTimeout(nextProblem, 4000);
             return;
         }
 
         var d = res.data;
-        if (d.done) {
-            state.bankEmpty = d.reason === 'bank_empty';
-            return endSession();
+        syncClock(d.clock);
+        if (d.done) { return noQuestions(); }
+        if (d.pending_offer) {
+            return showOffer(d.pending_offer);
         }
 
-        state.problem = {
-            id: d.problem_id,
-            number: Number(d.problem_number) || (state.answered + 1),
-            question: String(d.question || ''),
-            questionTopic: Number(d.question_topic) || Number(d.topic) || 1,
-            locked: d.locked === true
-        };
-        state.problemNumber = state.problem.number;
-        state.topic = Number(d.topic) || state.topic;
-        state.attemptsUsed = Number(d.attempts_used) || 0;
-        state.hintsTotal = Number(d.hints_total) || 0;
-        state.hintsUsed = Number(d.hints_used) || 0;
-        state.hintsLeft = Number(d.hints_left) || 0;
-        state.lastHintStep = null;
-
-        renderProblem(Array.isArray(d.hints) ? d.hints : []);
+        applyQuestion(d);
+        state.stepWrong = 0;
+        state.stepStartedAt = Date.now();
+        renderProblem();
         syncProgress();
+        if (state.expired) { lockForExpiry(); }
 
-        /* Answered on an earlier visit but never recorded: finish it now. */
+        /* Finished on an earlier visit but never recorded: record it now. */
         if (state.problem.locked) { finishProblem(); }
     }
 
-    function renderProblem(hintsTaken) {
-        $('#problem-kicker').textContent = 'Problem ' + state.problemNumber + ' · ' +
-            topicOf(state.problem.questionTopic).short;
-        $('#problem-expression').textContent = state.problem.question;
-        $('#problem-instruction').textContent = 'Type your answer as a number. The % sign is optional.';
-
-        var input = $('#answer-input');
-        input.value = '';
-        input.disabled = state.problem.locked;
-        setAnswerButton('check');
-
-        $('#hint-zone').textContent = '';
-        hintsTaken.forEach(appendHint);
-
-        clearFeedback();
-        suggestHint(false);
-        paintAttempts();
-        paintHintButton();
+    function renderProblem() {
+        var p = state.problem;
+        $('#problem-kicker').textContent = 'Problem ' + p.number + ' · ' + topicOf(p.questionTopic).short;
+        $('#problem-expression').textContent = p.question;
+        renderSteps(true);
         paintProgress();
+        paintHintButton();
+    }
 
-        if (!state.problem.locked) {
-            input.focus({ preventScroll: true });
-            armHintOffer();
+    /* ============================================ 6. STEPS ============= */
+
+    /* Every finished step stays on screen, in order; the step being worked on
+       sits directly below the last one. Built with textContent throughout:
+       what the student typed is never treated as markup. */
+    function renderSteps(focus) {
+        var p = state.problem;
+        var box = $('#steps');
+        box.textContent = '';
+
+        for (var i = 0; i <= p.stepIndex && i < p.stepsTotal; i++) {
+            box.appendChild(buildStep(i, p));
+        }
+
+        if (focus && problemOpen()) {
+            var input = $('#step-input');
+            if (input) {
+                input.focus({ preventScroll: true });
+                var card = input.closest('.step');
+                if (card && card.scrollIntoView) {
+                    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            }
         }
     }
 
-    /* ============================================ 6. ANSWERING ========= */
+    function buildStep(i, p) {
+        var done = i < p.stepIndex || p.locked;
+        var label = p.labels[i] || ('Step ' + (i + 1));
+        var card = el('section', 'step ' + (done ? 'is-done' : 'is-active'));
+        card.setAttribute('aria-label', 'Step ' + (i + 1) + ': ' + label);
 
-    /* The answer button doubles as "Next problem" after a missed question,
-       so the worked solution can be read at the student's own pace. Its
-       min-width fits both labels, so the swap moves nothing. */
-    function setAnswerButton(mode) {
-        var btn = $('#submit-btn');
-        state.awaitingNext = mode === 'next';
-        btn.textContent = mode === 'next' ? 'Next problem' : 'Check';
-        btn.disabled = mode === 'check' ? !problemOpen() : false;
+        var head = el('header', 'step-head');
+        head.appendChild(el('span', 'step-count', done ? 'Completed' : 'Step ' + (i + 1) + ' of ' + p.stepsTotal));
+        head.appendChild(el('h3', 'step-title', 'Step ' + (i + 1) + ': ' + label));
+        card.appendChild(head);
+
+        if (done) {
+            var entry = p.doneSteps[i] || {};
+            card.appendChild(el('p', 'step-label', 'Your step solution'));
+            card.appendChild(el('output', 'step-value', entry.text || ''));
+            if (entry.confirmed) {
+                var conf = CONFIRM[kindOfLabel(label, p.questionTopic)];
+                card.appendChild(el('p', 'step-label', conf.label));
+                card.appendChild(el('output', 'step-value', entry.confirmed));
+            }
+            return card;
+        }
+
+        var confirming = p.stage === 'confirm';
+        var conf2 = CONFIRM[p.confirmKind];
+
+        if (confirming) {
+            card.appendChild(el('p', 'step-label', 'Your step solution'));
+            card.appendChild(el('output', 'step-value', p.workText));
+            card.appendChild(el('p', 'step-note', 'Correct calculation.'));
+        }
+
+        var form = el('form', 'step-form');
+        form.noValidate = true;
+        form.addEventListener('submit', onStepSubmit);
+
+        var labelEl = el('label', 'step-label', confirming ? conf2.prompt : 'Your step solution');
+        labelEl.setAttribute('for', 'step-input');
+        form.appendChild(labelEl);
+
+        var row = el('div', 'step-row');
+        var input = el('input', 'step-input');
+        input.id = 'step-input';
+        input.type = 'text';
+        input.setAttribute('inputmode', 'text');
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('autocapitalize', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.setAttribute('maxlength', '60');
+        input.setAttribute('placeholder', confirming ? conf2.placeholder : 'Enter answer');
+        input.setAttribute('aria-describedby', 'step-feedback');
+        row.appendChild(input);
+
+        var submit = el('button', 'btn btn-primary btn-step', confirming ? conf2.button : 'Submit step');
+        submit.type = 'submit';
+        submit.id = 'step-submit';
+        row.appendChild(submit);
+        form.appendChild(row);
+
+        /* Always present, with its height already reserved. */
+        var feedback = el('p', 'step-feedback', '');
+        feedback.id = 'step-feedback';
+        feedback.setAttribute('role', 'status');
+        feedback.setAttribute('aria-live', 'polite');
+        form.appendChild(feedback);
+
+        var hint = el('p', 'step-hint');
+        hint.id = 'step-hint';
+        hint.hidden = true;
+        form.appendChild(hint);
+        card.appendChild(form);
+
+        if (p.hint && p.hint.step === i + 1) { showStepHint(hint, p.hint); }
+        return card;
     }
 
-    async function handleSubmit(event) {
+    /* The label alone says which box a finished step used. */
+    function kindOfLabel(label, topic) {
+        if (label !== 'Conversion') { return 'number'; }
+        return topic === 1 ? 'decimal' : 'percentage';
+    }
+
+    function showStepHint(node, h) {
+        node.hidden = false;
+        node.textContent = '';
+        node.appendChild(el('b', null, 'Hint (tier ' + h.tier + ' of ' + h.total + '): '));
+        node.appendChild(document.createTextNode(h.text));
+    }
+
+    function setStepFeedback(text, tone) {
+        var node = $('#step-feedback');
+        if (!node) { return; }
+        node.textContent = text || '';
+        node.classList.toggle('is-wrong', tone === 'wrong');
+        node.classList.toggle('is-neutral', tone === 'neutral');
+    }
+
+    function onStepSubmit(event) {
         event.preventDefault();
+        submitStep();
+    }
 
-        if (state.awaitingNext) {
-            setAnswerButton('check');
-            $('#submit-btn').disabled = true;
-            advance();
-            return;
-        }
+    async function submitStep() {
         if (state.submitting || !problemOpen()) { return; }
 
-        var input = $('#answer-input');
+        var input = $('#step-input');
+        if (!input) { return; }
         var raw = input.value.trim();
 
-        if (!/\d/.test(raw)) {
-            setFeedback('Type your answer as a number, like 25 or 25%.', 'neutral');
-            input.select();
+        if (!raw) {
+            setStepFeedback('Type your answer first.', 'neutral');
+            input.focus();
             return;
         }
 
@@ -612,266 +894,265 @@
            keydown, which is what actually stops Enter-spam. */
         state.submitting = true;
         input.disabled = true;
-        clearTimeout(hintOfferTimer);
-        var release = setBusy($('#submit-btn'), 'Checking…');
+        var release = setBusy($('#step-submit'), 'Checking…');
 
-        var result;
+        var res;
         try {
-            result = await checkAnswer(raw);
+            res = await sb.rpc('check_step_answer', {
+                p_session_id: state.sessionId,
+                p_problem_id: state.problem.id,
+                p_submitted: raw
+            });
         } catch (err) {
-            console.error('Answer submission failed:', err);
-            result = { error: true };
-        } finally {
-            state.submitting = false;
-            release();
+            res = { error: err };
         }
 
-        /* Network trouble fails closed: not counted correct, and the attempt
-           is not spent either. */
-        if (result.error) {
-            input.disabled = false;
-            setFeedback('Could not reach the server. Please try again.', 'wrong');
-            input.select();
-            armHintOffer();
-            return;
-        }
+        state.submitting = false;
+        release();
 
-        state.attemptsUsed = result.attemptsUsed;
-        paintAttempts();
-
-        if (result.correct || result.locked) {
-            state.problem.locked = true;
-            return finishProblem();
-        }
-
-        input.disabled = false;
-        setFeedback('Not quite yet — have another go.', 'wrong');
-        offerHint('wrong');
-        input.select();
-        armHintOffer();
-    }
-
-    /* check_question_answer() compares on the server and says right or
-       wrong. The key never leaves the database. */
-    async function checkAnswer(raw) {
-        var res = await sb.rpc('check_question_answer', {
-            p_session_id: state.sessionId,
-            p_problem_id: state.problem.id,
-            p_submitted: raw
-        });
-        if (res.error || !res.data) {
+        /* Network trouble fails closed: nothing is counted either way. */
+        if (res.error || !res.data || !res.data.state) {
             console.error('Answer check failed:', res.error && res.error.message);
-            return { error: true };
-        }
-        return {
-            correct: res.data.correct === true,
-            attemptsUsed: Number(res.data.attempts_used) || 0,
-            attemptsLeft: Number(res.data.attempts_left) || 0,
-            locked: res.data.locked === true,
-            error: false
-        };
-    }
-
-    function lockInput() {
-        $('#answer-input').disabled = true;
-        $('#submit-btn').disabled = true;
-        $('#hint-btn').disabled = true;
-    }
-
-    function topicSpeech(change, from, to) {
-        if (change === 'up') {
-            return 'You have mastered ' + topicOf(from).title + '! Next up: ' + topicOf(to).title + '.';
-        }
-        if (change === 'down') {
-            return 'Let’s go back to ' + topicOf(to).title + ' for a little while — it will make the next part easier.';
-        }
-        return null;
-    }
-
-    /* The question is closed (solved, or both tries used). The server
-       records it -- time, hints, tries, smooth/struggling, and the topic
-       rules -- and the page only shows what it says. */
-    async function finishProblem() {
-        if (state.recording || state.ended) { return; }
-        state.recording = true;
-        clearTimeout(hintOfferTimer);
-        suggestHint(false);
-        lockInput();
-
-        var recorded = await sb.rpc('record_question_result', {
-            p_session_id: state.sessionId,
-            p_problem_id: state.problem.id
-        });
-        state.recording = false;
-
-        if (recorded.error || !recorded.data) {
-            console.error('Failed to record result:', recorded.error && recorded.error.message);
-            setFeedback('Saving your answer… one moment.', 'neutral');
-            setTimeout(finishProblem, 3000);
+            input.disabled = false;
+            setStepFeedback('Could not reach the server. Please try again.', 'wrong');
+            input.select();
             return;
         }
 
-        var r = recorded.data;
-        var correct = r.is_correct === true;
-        var from = Number(r.topic_before) || state.topic;
-        var to = Number(r.topic) || state.topic;
+        onStepResult(res.data, raw, input);
+    }
 
-        state.answered = Number(r.problems_answered) || (state.answered + 1);
-        if (correct) { state.correct++; }
-        state.streak = Number(r.streak) || 0;
-        state.topic = to;
-        paintProgress();
+    function onStepResult(d, raw, input) {
+        var p = state.problem;
+        var stepNo = p.stepIndex + 1;
+        var wasConfirming = p.stage === 'confirm';
+        var kind = p.confirmKind;
+        var outcome = d.outcome;
+
+        syncClock(d.clock);
+        applyQuestion(d.state);
+        input.disabled = false;
+
+        if (outcome === 'time_expired') { renderSteps(false); lockForExpiry(); return; }
+
+        if (outcome === 'locked') {
+            renderSteps(false);
+            paintHintButton();
+            if (state.problem.locked) { finishProblem(); }
+            return;
+        }
+
+        if (outcome === 'wrong' || outcome === 'format_error') {
+            state.stepWrong++;
+            state.correctRun = 0;
+
+            if (outcome === 'format_error') {
+                setStepFeedback(CONFIRM[kind].error, 'wrong');
+                speak(reaction('finalFormatError', 'wrong'), 'sad');
+                state.errors.push('Problem ' + p.number + ' · Step ' + stepNo + ': Final-answer error on "' + raw + '"');
+            } else {
+                setStepFeedback('Incorrect answer. Try again.', 'wrong');
+                speak(reaction(Number(d.state.wrong_streak) >= 2 ? 'wrongRepeated' : 'wrongFirst', 'wrong'), 'sad');
+                state.errors.push('Problem ' + p.number + ' · Step ' + stepNo + ': Error on "' + raw + '"');
+            }
+            paintErrors();
+            paintHintButton();
+            input.select();
+            return;
+        }
+
+        if (outcome === 'needs_final') {
+            /* Right value, but working or the wrong shape: the box changes. */
+            state.correctRun++;
+            state.problem.hint = null;
+            speak((reaction('correctWorkNeedsFinal', 'correct') + ' ' + CONFIRM[state.problem.confirmKind].prompt).trim(), 'happy');
+            renderSteps(true);
+            paintHintButton();
+            return;
+        }
+
+        /* step_done / question_done */
+        state.correctRun++;
+        state.problem.hint = null;
+        var kindOfReaction = state.stepWrong > 0 ? 'correctAfterStruggle'
+            : (!wasConfirming && Date.now() - state.stepStartedAt <= FAST_CORRECT_MS) ? 'fastCorrect'
+            : (state.correctRun >= STREAK_FOR_PRAISE) ? 'correctStreak'
+            : 'correctFirstTry';
+        speak(reaction(kindOfReaction, 'correct'), 'happy');
+
+        state.stepWrong = 0;
+        state.stepStartedAt = Date.now();
+        renderSteps(outcome !== 'question_done');
         paintHintButton();
-        syncProgress();
 
-        if (r.topic_change === 'up') {
-            toast('Topic ' + to + ' unlocked', 'Next: ' + topicOf(to).title + '.', 'accent');
-        } else if (r.topic_change === 'down') {
-            toast('Back to topic ' + to, 'A little more practice on ' + topicOf(to).title + '.', 'accent');
+        if (outcome === 'question_done') {
+            var q = state.problem;
+            state.solved.push({
+                number: q.number,
+                topic: q.questionTopic,
+                question: q.question,
+                steps: q.doneSteps.map(function (s, n) {
+                    return { label: q.labels[n] || ('Step ' + (n + 1)), text: s.text, confirmed: s.confirmed };
+                })
+            });
+            paintSolved();
+            setTimeout(finishProblem, 900);
         }
-
-        if (correct) {
-            var smooth = r.classification === 'smooth';
-            setFeedback(smooth ? 'Correct — and quickly too!' : 'Correct. Nice work.', 'correct');
-            setSpeech(topicSpeech(r.topic_change, from, to) ||
-                (smooth ? 'That was sharp. Let’s keep going.' : 'Well done. Let’s keep going.'));
-            setTimeout(advance, r.topic_change ? 2400 : 1400);
-            return;
-        }
-
-        /* Only now, with the question closed, may the answer be shown. */
-        var sol = await sb.rpc('reveal_question_solution', {
-            p_session_id: state.sessionId,
-            p_problem_id: state.problem.id
-        });
-        var answer = sol.data && sol.data.final_answer;
-        setFeedback(answer ? 'The answer was ' + answer : 'That’s alright — let’s move on.', 'neutral');
-        if (sol.data) { showWorkedSolution(sol.data.steps); }
-        setSpeech(topicSpeech(r.topic_change, from, to) ||
-            'No problem at all. Read how it works, then carry on when you are ready.');
-
-        setAnswerButton('next');
-        $('#submit-btn').focus({ preventScroll: true });
-    }
-
-    function advance() {
-        if (state.ended) { return; }
-        if (state.answered >= SESSION_TARGET) { endSession(); }
-        else { nextProblem(); }
     }
 
     /* ============================================ 7. HINTS ============= */
 
-    /* consume_question_hint() returns the next hint -- Concept, Setup, then
-       Worked calculation, step by step -- and counts it. A hint read any
-       other way would not raise hints_used, which would quietly inflate the
-       'smooth' rate, the number the study measures. */
+    /* consume_step_hint() returns the next hint for the current step -- tier 1,
+       2, 3, then the last tier again -- and counts it. The server refuses until
+       two wrong answers have unlocked the button. */
     async function handleHint() {
         var btn = $('#hint-btn');
         if (btn.disabled || !problemOpen() || state.hinting) { return; }
         state.hinting = true;
         btn.disabled = true;
-        suggestHint(false);
 
-        var res = await sb.rpc('consume_question_hint', {
+        var res = await sb.rpc('consume_step_hint', {
             p_session_id: state.sessionId,
             p_problem_id: state.problem.id
         });
         state.hinting = false;
 
-        if (res.error || !res.data) {
+        if (res.error || !res.data || !res.data.state) {
             paintHintButton();
-            setFeedback('Could not load a hint. Please try again.', 'wrong');
+            setStepFeedback('Could not load a hint. Please try again.', 'wrong');
             return;
         }
 
         var d = res.data;
+        syncClock(d.clock);
+        var keep = state.problem.hint;
+        applyQuestion(d.state);
+        state.problem.hint = keep;
+
         if (d.hint) {
-            appendHint(d.hint);
+            state.problem.hint = { text: d.hint.text, tier: d.hint.tier, total: d.hint.tiers_total, step: d.hint.step };
             state.hintsUsedTotal++;
+            speak((reaction('hintRequested', 'hint') + ' ' + d.hint.text).trim(), 'thinking');
+
+            var node = $('#step-hint');
+            if (node) { showStepHint(node, state.problem.hint); }
+            syncProgress();
         }
-        state.hintsUsed = Number(d.hints_used) || state.hintsUsed;
-        state.hintsLeft = Number(d.hints_left) || 0;
-        if (d.locked) { state.problem.locked = true; }
         paintHintButton();
 
-        var tier = d.hint ? Number(d.hint.tier) : 0;
-        setSpeech(tier === 1 ? 'Here’s the idea behind this step. Try it from there.'
-            : tier === 2 ? 'Here’s how to set it up. Can you finish the calculation?'
-            : tier === 3 ? 'Here’s the worked calculation. Use it for the next part.'
-            : 'That was the last hint for this one. You can do it!');
-
-        armHintOffer();
-        syncProgress();
+        var input = $('#step-input');
+        if (input) { input.focus({ preventScroll: true }); }
     }
 
-    /* ============================================ 8. SYNC + END ======== */
+    /* ============================================ 8. FINISH + OFFERS === */
+
+    /* The question is finished. The server records it -- time, hints, errors,
+       smooth/struggling -- and says whether to OFFER a topic change. */
+    async function finishProblem() {
+        if (state.finishing || state.ended) { return; }
+        state.finishing = true;
+
+        var res = await sb.rpc('finish_step_question', {
+            p_session_id: state.sessionId,
+            p_problem_id: state.problem.id
+        });
+        state.finishing = false;
+
+        if (res.error || !res.data) {
+            console.error('Failed to record result:', res.error && res.error.message);
+            speak('Saving your work… one moment.', 'default');
+            setTimeout(finishProblem, 3000);
+            return;
+        }
+
+        var r = res.data;
+        state.answered = Number(r.problems_answered) || (state.answered + 1);
+        if (r.is_correct === true) { state.clean++; }
+        state.streak = Number(r.streak) || 0;
+        paintProgress();
+        syncProgress();
+
+        if (r.offer) {
+            r.offer.problem_id = r.offer.problem_id || state.problem.id;
+            return showOffer(r.offer);
+        }
+        nextProblem();
+    }
+
+    /* The tutor offers to move up or back a topic. Only the student's answer
+       moves them; the server holds the offer until it has one. */
+    function showOffer(offer) {
+        var up = offer.type === 'up';
+        var target = Number(offer.target_topic) || state.topic;
+        var text = clean(pickLine('adapt:' + tutorKey + ':' + offer.type,
+            tutor.adaptive[up ? 'upgrade' : 'downgrade']).replace(/\{topic\}/g, topicOf(target).name));
+
+        $('#offer-kicker').textContent = up ? 'Ready for more' : 'A little review';
+        $('#offer-text').textContent = text;
+        $('#offer-destination').textContent = (up ? 'Available progression: ' : 'Recommended review: ') + topicOf(target).name;
+        $('#offer-accept').textContent = up ? 'Move up' : 'Review it';
+
+        var img = $('#offer-img');
+        img.setAttribute('src', tutor.images[up ? 'happy' : 'default'] || tutor.images['default']);
+        img.setAttribute('alt', '');
+
+        speak(null, up ? 'happy' : 'default');
+        state.pendingOffer = offer;
+        state.offering = false;
+        openModal('modal-offer');
+    }
+
+    async function answerOffer(accept) {
+        if (state.offering || !state.pendingOffer) { return; }
+        state.offering = true;
+        var buttons = [$('#offer-accept'), $('#offer-stay')];
+        buttons.forEach(function (b) { b.disabled = true; });
+
+        var res = await sb.rpc('respond_topic_offer', {
+            p_session_id: state.sessionId,
+            p_problem_id: state.pendingOffer.problem_id || (state.problem && state.problem.id),
+            p_accept: accept
+        });
+
+        buttons.forEach(function (b) { b.disabled = false; });
+        state.offering = false;
+
+        if (res.error || !res.data) {
+            console.error('Could not save the choice:', res.error && res.error.message);
+            toast('Could not save your choice', 'Please try again.', 'danger');
+            return;
+        }
+
+        state.topic = Number(res.data.topic) || state.topic;
+        state.pendingOffer = null;
+        closeModal('modal-offer');
+        paintProgress();
+        syncProgress();
+        nextProblem();
+    }
+
+    /* ============================================ 9. SYNC + END ======== */
 
     /* Feeds the admin console's live view. Display fields only — nothing the
        research data is derived from. */
     async function syncProgress() {
         if (!state.email || state.ended) { return; }
+        var p = state.problem;
         await sb.from('profiles').update({
-            current_problem: state.problemNumber,
+            current_problem: p ? p.number : state.answered + 1,
             current_difficulty: 'Topic ' + state.topic + ' · ' + topicOf(state.topic).short,
             hints_used: state.hintsUsedTotal,
             consecutive_correct: state.streak
         }).eq('email', state.email);
     }
 
-    async function endSession() {
-        if (state.finished) { return; }
-        state.finished = true;
-
-        showScreen('summary');
-
-        /* The summary comes from the server view, so the number the student
-           sees and the number in the research data are the same number. */
-        var summary = null;
-        if (state.sessionId) {
-            var res = await sb.from('v_tutoring_session_summary')
-                .select('problems_answered, correct_count, final_level')
-                .eq('session_id', state.sessionId).maybeSingle();
-            summary = res.data;
-        }
-
-        var answered = summary ? Number(summary.problems_answered) || 0 : state.answered;
-        var correct = summary ? Number(summary.correct_count) || 0 : state.correct;
-        /* The topic is the one record_question_result() last returned. The
-           view's final_level is not used: it was defined outside this repo
-           and may still replay the algebra rules. */
-        var topic = state.topic;
-        var accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-
-        $('#summary-correct').textContent = correct + ' / ' + answered;
-        $('#summary-accuracy').textContent = accuracy + '%';
-        $('#summary-level').textContent = 'Topic ' + topic;
-        $('#summary-lede').textContent = state.bankEmpty && answered < SESSION_TARGET
-            ? 'That’s every question available for now. Your teacher will add more.'
-            : (accuracy >= 70
-                ? 'Strong session — you worked through the harder ones too.'
-                : 'Good effort. Every one of these gets easier with practice.');
-
-        await sb.from('profiles').update({
-            is_in_game: false,
-            current_difficulty: 'Topic ' + topic + ' · ' + topicOf(topic).short
-        }).eq('email', state.email);
-
-        if (state.sessionId) {
-            await sb.rpc('end_game_session', { p_session_id: state.sessionId });
-        }
-
-        /* The final payload: locks the seconds spent on this stage. */
-        await finalizeStageTime('Tutoring Dashboard');
-    }
-
-    /* ============================================ 9. SIGN OUT ========== */
+    /* ============================================ 10. SIGN OUT ========= */
 
     /* On a shared lab PC an open session means the next student's answers
        land in this student's row. executeForceLogout() releases the device
        slot, signs out globally and clears storage. */
     async function signOut() {
-        var mid = state.sessionId && !state.finished;
+        var mid = !!state.sessionId;
         var ok = await confirmAction({
             title: 'Sign out',
             heading: mid ? 'Leave this session?' : 'Sign out?',
@@ -882,11 +1163,19 @@
         });
         if (!ok) { return; }
 
+        /* Nothing ends a session in this game, so this is the one place the
+           "in a tutoring session" flag is cleared. It is display-only (the
+           admin's Active session view). Deliberately NOT finalizeStageTime():
+           that freezes tutoring_time for good, and the student will be back. */
+        if (state.inSession && state.email) {
+            try { await sb.from('profiles').update({ is_in_game: false }).eq('email', state.email); } catch (e) { /* signing out anyway */ }
+        }
+
         if (typeof executeForceLogout === 'function') { await executeForceLogout(); }
         else { await sb.auth.signOut({ scope: 'global' }); window.location.replace('../../index.html'); }
     }
 
-    /* ============================================ 10. BOOT ============= */
+    /* ============================================ 11. BOOT ============= */
 
     async function boot() {
         if (typeof sb === 'undefined' || !sb) {
@@ -895,9 +1184,10 @@
             return;
         }
 
-        /* The full gate: real session, prerequisite chain (OCEAN done,
-           character chosen if the condition needs one), and the stage flag
-           with the admin's per-student override. Redirects on failure. */
+        /* The full gate: real session, prerequisite chain (OCEAN done, an
+           experimental group, a saved tutor), and the stage flag with the
+           admin's per-student override. Redirects on failure -- Control and
+           a direct URL included. */
         setBootText('Checking your session…');
         var profile = await enforceStudentStage('dash');
         if (!profile) { return; }
@@ -907,7 +1197,7 @@
 
         /* A stage closed mid-lesson lets the student finish it (function.js
            1C-5c); time in the stage is counted while the tab is visible. */
-        window.PIA_HAS_ACTIVE_WORK = function () { return state.inSession && !state.finished; };
+        window.PIA_HAS_ACTIVE_WORK = function () { return state.inSession; };
 
         /* Tell the admin view where this student is. If the stage was closed
            in the meantime the server says so, and we follow it. */
@@ -918,8 +1208,8 @@
         }
         startStageHeartbeat('Tutoring Dashboard');
 
-        /* Deliberately narrow: full_name and selected_character only. ocean_*
-           must not enter this page — see the header note. */
+        /* Deliberately narrow: full_name, selected_character and section only.
+           ocean_* must not enter this page — see the header note. */
         var me = await sb.from('profiles')
             .select('full_name, selected_character, section')
             .eq('email', state.email).maybeSingle();
@@ -932,34 +1222,49 @@
         $('#who-initials').textContent = firstName.slice(0, 2).toUpperCase();
         $('#start-hello').textContent = 'Welcome back, ' + firstName + '!';
 
-        applyCharacter(me.data && me.data.selected_character);
-
         initModals();
-        $('#answer-form').addEventListener('submit', handleSubmit);
         $('#hint-btn').addEventListener('click', handleHint);
         $('#signout-btn').addEventListener('click', signOut);
         $('#start-btn').addEventListener('click', handleStart);
-        /* Typing is progress: the "stuck?" offer waits while they work. */
-        $('#answer-input').addEventListener('input', armHintOffer);
+        $('#offer-accept').addEventListener('click', function () { answerOffer(true); });
+        $('#offer-stay').addEventListener('click', function () { answerOffer(false); });
+        $('#time-retry').addEventListener('click', tryAgain);
+        paintSolved();
+        paintErrors();
+        paintHintButton();
+
+        /* The tutor is the one on the profile and nothing else. If it is not
+           one this game knows, nothing starts and no other is chosen. */
+        if (!applyCharacter(me.data && me.data.selected_character)) {
+            $('#start-btn').disabled = true;
+            showGlobalError(me.data && me.data.selected_character
+                ? 'Your tutor could not be loaded. Please tell your teacher.'
+                : 'Your tutor has not been assigned yet. Please tell your teacher.');
+            reveal();
+            return;
+        }
 
         /* Show any progress already recorded, so a resumed session is obvious
            before the student presses anything. The session this returns is
            the one Start uses -- asking twice used to open a second one. */
         var peek = await sb.rpc('resume_or_start_game_session');
-        if (peek.data && peek.data.session_id) {
+        if (peek.error) {
+            $('#start-btn').disabled = true;
+            showGlobalError('Your session could not be loaded. Please refresh the page.');
+        } else if (peek.data && peek.data.session_id) {
             applySession(peek.data);
 
             $('#fact-progress').textContent = state.answered;
-            $('#fact-target').textContent = SESSION_TARGET;
+            $('#fact-limit').textContent = fmtLimit(Number(peek.data.time_limit_seconds) || 600);
 
-            var where = 'You are on topic ' + state.topic + ': ' + topicOf(state.topic).title + '.';
+            var where = 'You are on topic ' + state.topic + ': ' + topicOf(state.topic).short.toLowerCase() + '.';
             if (peek.data.resumed) {
                 $('#start-btn-label').textContent = 'Continue my session';
                 $('#start-lede').textContent = (state.answered > 0
-                    ? 'You already answered ' + state.answered + ' of ' + SESSION_TARGET + '. '
+                    ? 'You already answered ' + state.answered + ' questions. '
                     : '') + where + ' Pick up right where you left off.';
             } else if (state.topic > 1) {
-                $('#start-lede').textContent = where + ' Take your time — there’s no timer, and you can ask ' +
+                $('#start-lede').textContent = where + ' The session has a time limit, and you can ask ' +
                     'for a hint whenever you’re stuck.';
             }
         }
@@ -1002,7 +1307,7 @@
         release();
         state.inSession = true;
         showScreen('session');
-        setSpeech('Let’s begin. Read the problem carefully, then work it out step by step.');
+        speak(line('greet') || 'Let’s begin. Read the problem carefully, then work it out step by step.', 'default');
         await nextProblem();
     }
 

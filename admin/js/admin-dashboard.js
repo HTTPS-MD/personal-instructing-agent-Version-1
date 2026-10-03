@@ -2413,7 +2413,7 @@
         { key: 'pia-conscientious', name: 'PIA Structure' },
         { key: 'pia-extravert', name: 'PIA Dynamic' },
         { key: 'pia-agreeable', name: 'PIA Empath' },
-        { key: 'pia-calm', name: 'PIA Stable' },
+        { key: 'pia-calm', name: 'PIA Careful' },
         { key: 'pia-neutral', name: 'PIA Neutral' }
     ];
 

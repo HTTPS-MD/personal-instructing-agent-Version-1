@@ -1,0 +1,51 @@
+# Step-by-step game: rules kept, and decisions still open
+
+Status: local only. Migration `20261003_0039_step_based_game.sql` is NOT applied to any live database.
+
+## Rules of the attached game, and where each lives now
+
+| Attached game (pia-test-main/index.html) | Now |
+|---|---|
+| One session time limit, `app_config.time_limit` minutes, fallback 600 s; one continuous deadline across questions and topics | `game_windows` (server). `app_config.time_limit` added by 0039 (default 10). Shown as "Time left" in the progress card. |
+| At expiry inputs are disabled, the tutor says "Time is up!", a "Time limit reached" dialog shows limit / started / finished / spent | Server refuses answers and hints (`time_expired`). Same dialog (alert dialog, not dismissible), plus polite screen-reader announcements at 5 min, 1 min, 30 s and at expiry. |
+| "Try Again" reloads the current problem (steps restart, errors and hints zeroed) with a new time limit; topic progress kept | `restart_after_expiry()`. Each expired window is logged. |
+| No question-count ending; every question once, shuffled, then again; never the same one twice in a row | No ending. Fewest-seen-this-session first; repeats get their own problem id. |
+| 2 steps (Topic 1) / 3 steps (Topics 2-3); working accepted then a final value; hint button after 2 wrong; 3 tiers per step | Unchanged from the first draft. |
+| Upgrade after `min_questions` with accuracy >= mastery; downgrade after `max_errors` non-accurate in a row; student accepts or refuses | Unchanged. |
+| Session row logged PASSED when errors < max errors (score 100, else 50) | `step_states.passed` / `score`. |
+
+Deliberate differences (flag if you disagree):
+- The deadline is wall-clock on the server, so a reload or sign-out gives no extra time. The game kept its timer in the page and a reload restarted everything; resume is a requirement here.
+- Topic and topic progress persist per student across visits (the game restarted at Topic 1 on every load).
+- The game's end-of-session summary screen is gone: the game has no ending. `finalizeStageTime` is no longer called by the page, because nothing ends the stage; heartbeat time tracking continues. Confirm that is acceptable for the stage-time research data.
+- `^` is not accepted in working; questions without steps are skipped (no browser-side guessing).
+
+## External ML service: deliberately NOT connected (decision: review separately before the real study)
+
+This is a deliberate difference from the attached game. The page makes no request to the Cloudflare endpoint, sends no performance or timing data outside the system, and keeps the game's default "average" tutor wording. `tests/game-browser.cjs` asserts that no request to `workers.dev` is made and that the student JS contains no ML endpoint, `fetch`, `sendBeacon` or ML config.
+
+What the attached game did (for the later review):
+- Endpoint: `POST https://pia-ml-api.marcstephen444.workers.dev/predict` (a Cloudflare Worker on an individual's account).
+- Sent after every answer or hint once two answers exist (5 s timeout), as JSON: seven numbers over the last 8 answer events: `recent_accuracy`, `average_attempts`, `hint_rate`, `average_response_time` (correct answers only), `correct_response_efficiency`, `consecutive_correct`, `consecutive_wrong`, plus `learn: false`.
+- Not sent: name, email, student id, session id, question text, answers, tutor, group, OCEAN. The third party still sees the browser's IP address and request timing.
+- Returned: `profile` (`struggling` | `average` | `outstanding`) and `confidence`. The wording profile moves at most one level per prediction (immediately at confidence >= 0.95).
+- Effect: only the tutor's wording bank. Not questions, grading, hints, topics or the time limit.
+
+## Tutor artwork: one set, the attached game's sprites
+
+`pia-calm` is the attached game's Neuroticism character (the worried black-haired boy, "Cautious Mentor" wording). Character Selection, the landing cast, the landing tutor stage and the game all show the sprite from `assets/images/tutors/<key>/` for all six keys, Neutral included. The landing uses `assets/images/cast/<key>.webp`, the same sprite padded onto a 600x840 transparent canvas to fit its fixed 3:4 frames (no pixel is edited or recoloured). The old `cast/char-N.webp` files are now unused and can be deleted.
+Labels that contradicted the character were replaced: "PIA Stable / Stress-free / steady / Anchor / Calm & steady" are now "PIA Careful / Cautious / careful / Cautious / Checks every step" (Character Selection, landing, the game's name line, and the Admin tutor dropdown's display text). Internal keys (`pia-calm` etc.) and Admin assignments are unchanged.
+
+## Stage-time tracking: what it measures (checked, nothing changed in the database)
+
+Checked on a scratch PostgreSQL with migration 0035 (`supabase/scratch/stage_time_check.sql`):
+- `record_heartbeat('Tutoring Dashboard')` IS cumulative across repeated visits: 30 s credited per 30 s ping, a gap over 45 s credits nothing and restarts the clock (away time is not counted), and a second visit adds to the same `tutoring_time`.
+- `finalize_stage_time` permanently locks `tutoring_time`; after it, later sessions add nothing. The game page therefore never calls it: not at expiry, not at Try again, not at sign-out (verified by test). Nothing else in the repository calls it for the dashboard.
+
+Ways the research report could still mislabel the number:
+1. `tutoring_time` is "seconds the Tutoring Dashboard tab was visible", counted from page load. It includes the start screen, the tutorial, the topic-offer dialog and the time-limit dialog, so it is not time spent answering.
+2. The game's time limit is wall-clock on the server (a hidden tab still burns it), while the heartbeat pauses when the tab is hidden. The two totals will not match, and neither is "play time".
+3. `profiles.is_in_game` was cleared only when a session ended; this game has no end, so it would stay true forever. Fixed in the page for sign-out only (display flag). Closing the tab or the 15-minute idle sign-out still leave it true, so the admin's "Active session" can be stale.
+4. Because nothing finalizes the stage, `tutoring_time` keeps growing on any later dashboard visit.
+
+Proposed fixes (NOT implemented; need your decision): (a) report play time from `game_windows` (sum of each window's started_at to ended_at/deadline) and per-question `time_taken_ms`, and label `tutoring_time` "time on the dashboard page"; (b) add a read-only report view with those columns; (c) have the admin "Active session" require a heartbeat in the last ~90 s as well as `is_in_game`; (d) decide whether an admin action should lock `tutoring_time` when the study ends.

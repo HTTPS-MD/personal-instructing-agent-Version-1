@@ -28,13 +28,13 @@
 
     var STEPS = [
         { title: 'Welcome to your tutoring session',
-          text: 'You will solve percentage word problems with your tutor. There is no timer, so take your time.' },
-        { title: 'Type your answer',
-          text: 'Read the problem, type your answer as a number, then press Check. The % sign is optional.' },
-        { title: 'You get two tries',
-          text: 'Each problem gives you 2 tries. If your first answer is not right, read the problem again and try once more.' },
+          text: 'You will solve percentage word problems with your tutor, one step at a time. The session has a time limit, shown as Time left, so keep an eye on it.' },
+        { title: 'Work one step at a time',
+          text: 'Each problem has a few steps. Type the answer for the step you are on, then press Submit step. The next step appears when you get it right.' },
+        { title: 'Show your working, then the value',
+          text: 'You can type a calculation like 0.3 x 60. If it is right, you will be asked to type the final value by itself to finish the step.' },
         { title: 'Hints are there to help',
-          text: 'Stuck? Press Give me a hint. Hints arrive one step at a time, so you can stop as soon as you know what to do.' }
+          text: 'After two wrong answers on a step, the hint button appears. Each press gives a bit more help, so you can stop as soon as you know what to do.' }
     ];
 
     var sb = null;
