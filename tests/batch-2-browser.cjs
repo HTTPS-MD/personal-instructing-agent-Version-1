@@ -437,7 +437,7 @@ function fixture() {
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
     assert.equal(await p.locator('#hint-btn svg, #submit-btn svg').count(), 0);
     assert.deepEqual(await iconsOf(p), ['#i-help']);                 // tutorial control only: the step game has no status icons
-    assert.equal(await p.locator('.progress-card').count() + await p.locator('.problem-card').count(), 2);
+    assert.equal(await p.locator('.left-sidebar').count() + await p.locator('.center-panel').count() + await p.locator('.right-sidebar').count(), 3);   // the original game's three areas
     await p.screenshot({ path: path.join(out, 'audit-dash-session-375.png') });
     assert.equal(await p.locator('#signout-btn').isVisible(), true);
     await p.locator('#signout-btn').click();
@@ -824,11 +824,10 @@ function fixture() {
     await p.locator('#tutorial-skip').click();
     await p.waitForSelector('#modal-tutorial.is-mounted', { state: 'detached' });
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
-    // The step game puts a COMPACT tutor row above the work on a phone (feedback sits beside the input, the hint beside the tutor).
-    const geo = await p.evaluate(() => ({ tutor: document.querySelector('.tutor').getBoundingClientRect().height, problemTop: document.querySelector('.problem-card').getBoundingClientRect().top + scrollY, trailTop: document.querySelector('.trail').getBoundingClientRect().top + scrollY, problemBottom: document.querySelector('.problem-card').getBoundingClientRect().bottom + scrollY }));
-    assert.ok(geo.tutor <= 260, 'tutor must stay a compact row on a phone');
-    assert.ok(geo.problemTop < 640, 'the problem must start within the first screen on a phone');
-    assert.ok(geo.problemBottom <= geo.trailTop, 'the trail (solved questions, error log) comes after the work');
+    // The original game arrangement stacks on a phone: tutor, then the workspace, then the notebook.
+    const geo = await p.evaluate(() => ['.left-sidebar', '.center-panel', '.right-sidebar'].map(sel => { const r = document.querySelector(sel).getBoundingClientRect(); return [r.top + scrollY, r.bottom + scrollY]; }));
+    assert.ok(geo[0][1] <= geo[1][0] + 2 && geo[1][1] <= geo[2][0] + 2, 'tutor, workspace, notebook in order');
+    assert.ok(geo[0][1] - geo[0][0] <= 560, 'the tutor block is a bounded height on a phone');
     await p.screenshot({ path: path.join(out, 'redesign-dashboard-work-375.png') });
     assert.equal(await p.locator('#signout-btn:visible').count(), 1);
     assert.equal(await p.locator('#summary-signout').count(), 0);

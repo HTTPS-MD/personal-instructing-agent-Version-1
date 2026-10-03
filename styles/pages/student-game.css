@@ -1,0 +1,721 @@
+/* ============================================================================
+   PIA SYSTEM — THE TUTORING GAME (student-dashboard.html, #screen-session)
+   REQUIRES styles/global.css.
+
+   This is the ORIGINAL layout of the attached PIA game (pia-test-main), kept as
+   it was: the tutor and classroom video on the left, the chalkboard problem and
+   its worksheet step strips in the centre, the ruled notebook with Solved
+   Questions and the Error Log on the right, and the game's own dialogs. Only the
+   skin changed, to the PIA landing page: its ink / paper / violet / volt colours,
+   Space Grotesk / Inter / JetBrains Mono, hard square edges with a solid violet
+   offset, and both its themes. The tutor artwork is never filtered or recoloured.
+
+   Nothing moves while the student works: the tutor's bubble, the hint button's
+   slot, each step's footer and the clock all keep their space from first paint,
+   and the centre and right panes scroll inside a frame of fixed height.
+   ==========================================================================*/
+
+.sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* --------------------------------------------------------------- 1. FRAME */
+.game-screen { width: 100%; padding: 0 var(--sp-4); }
+
+body.is-playing .learn-main { padding: var(--sp-3) 0 var(--sp-4); }
+
+.game-frame {
+    --g-edge: var(--text);
+    --g-offset: var(--pop);
+    --g-sidebar: clamp(280px, 28vw, 380px);
+    --g-right: 236px;
+
+    /* A definite height, so the workspace and the notebook scroll inside the
+       frame and the page itself never grows or jumps. */
+    height: calc(100dvh - 68px - var(--sp-3) - var(--sp-4) - 9px);   /* refined by fitGameFrame() */
+    min-height: 560px;
+    display: grid;
+    grid-template-columns: var(--g-sidebar) minmax(0, 1fr) var(--g-right);
+    grid-template-rows: minmax(0, 1fr);
+    background: var(--bg-surface);
+    border: 3px solid var(--g-edge);
+    box-shadow: 6px 6px 0 var(--g-offset);
+    overflow: hidden;
+}
+
+/* ------------------------------------------------------- 2. TUTOR SIDEBAR */
+.video-mentor-sidebar {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--palette-ink) url("../../assets/images/hero-classroom-poster.jpg") center / cover no-repeat;
+    border-right: 3px solid var(--g-edge);
+}
+/* The still gets the same dimming as the film. */
+.video-mentor-sidebar::before {
+    content: ''; position: absolute; inset: 0; z-index: 0; background: rgba(14, 11, 22, 0.42); pointer-events: none;
+}
+
+/* The classroom, dimmed, behind the tutor (the landing page's own hero film). */
+.mentor-bg-video {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    filter: brightness(0.58) saturate(0.82) contrast(1.08);
+    pointer-events: none;
+}
+
+/* The halftone dots the landing page lays over its photographs. */
+.mentor-video-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image: radial-gradient(circle, rgba(244, 241, 234, 0.12) 1.1px, transparent 1.3px);
+    background-size: 6px 6px;
+}
+
+.video-copy-layer,
+.video-hint-layer { position: relative; z-index: 3; }
+
+.video-copy-layer {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 14px 0;
+}
+
+/* The speech bubble. Its height is reserved for about six lines: the tutor
+   changes what it says after every answer, and a bubble that resized would
+   push the tutor around. */
+.prompt-box {
+    position: relative;
+    flex: none;
+    width: 100%;
+    height: 9.25rem;
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--palette-paper);
+    color: var(--palette-ink);
+    border: 3px solid var(--palette-ink);
+    box-shadow: 6px 6px 0 var(--pop);
+    text-align: center;
+    overflow-y: auto;
+}
+
+.tutor-speech {
+    margin: 0;
+    max-height: 100%;
+    font-family: var(--font-body);
+    font-size: clamp(0.95rem, 1.25vw, 1.05rem);
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+/* The tail pointing at the tutor (ink outline, paper fill), as in the game. */
+.prompt-box::before,
+.prompt-box::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    border-style: solid;
+    border-color: var(--palette-ink) transparent;
+}
+.prompt-box::before { bottom: -18px; margin-left: -14px; border-width: 18px 14px 0; }
+.prompt-box::after {
+    bottom: -11px; margin-left: -9px; border-width: 13px 9px 0;
+    border-color: var(--palette-paper) transparent;
+}
+.prompt-box.speaking { animation: bubblePop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+.mentor-agent-stage {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 4px 10px 0;
+}
+
+/* The original artwork: scaled to fit, never recoloured. The shadow is a plain
+   drop shadow behind the cut-out, not a filter on the colours. */
+.mentor-overlay-avatar {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(90%, 300px);
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.45));
+    animation: floatAvatar 3s ease-in-out infinite;
+}
+.mentor-overlay-avatar.talking { animation: avatarTalk 0.4s ease-in-out infinite alternate; }
+
+.video-hint-layer {
+    flex: none;
+    width: 100%;
+    padding: 16px 14px 14px;
+    background: linear-gradient(180deg, transparent 0%, rgba(14, 11, 22, 0.58) 34%, rgba(14, 11, 22, 0.88) 100%);
+}
+
+/* Request Hint: its slot is always there; it is only invisible until the server
+   unlocks it (and while a solved question is being reviewed). */
+.hint-btn {
+    width: 100%;
+    min-height: 52px;
+    padding: 11px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--volt);
+    color: var(--on-volt);
+    border: 3px solid var(--palette-ink);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--palette-ink);
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+.hint-btn::before {
+    content: '?';
+    width: 24px; height: 24px;
+    display: grid; place-items: center;
+    background: var(--palette-ink);
+    color: var(--volt);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+}
+.hint-btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--palette-ink); }
+.hint-btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--palette-ink); }
+.hint-btn.is-away { visibility: hidden; }
+.hint-btn:focus-visible { outline: 3px solid var(--palette-paper); outline-offset: 3px; }
+.hint-tier { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; }
+
+/* ------------------------------------------------------- 3. THE WORKSPACE */
+/* Graph paper with the game's floating maths symbols, in the landing's neutrals. */
+.center-panel {
+    min-width: 0;
+    min-height: 0;
+    padding: 16px 22px 20px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background-color: var(--bg-main);
+    background-image:
+        url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='360'%20height='360'%3E%3Cg%20font-family='Arial%2CArial%2Csans-serif'%20font-weight='900'%20fill='%238a869b'%20fill-opacity='0.14'%3E%3Ctext%20x='30'%20y='80'%20font-size='56'%20transform='rotate%28-12%2030%2080%29'%3E%2B%3C/text%3E%3Ctext%20x='250'%20y='60'%20font-size='60'%20transform='rotate%2810%20250%2060%29'%3E%E2%88%92%3C/text%3E%3Ctext%20x='150'%20y='170'%20font-size='64'%20transform='rotate%2818%20150%20170%29'%3E%C3%97%3C/text%3E%3Ctext%20x='40'%20y='260'%20font-size='56'%20transform='rotate%28-8%2040%20260%29'%3E%C3%B7%3C/text%3E%3Ctext%20x='280'%20y='200'%20font-size='60'%20transform='rotate%28-14%20280%20200%29'%3E=%3C/text%3E%3Ctext%20x='200'%20y='320'%20font-size='52'%20transform='rotate%2812%20200%20320%29'%3E%25%3C/text%3E%3Ctext%20x='110'%20y='40'%20font-size='48'%20transform='rotate%28-6%20110%2040%29'%3E%CF%80%3C/text%3E%3Ctext%20x='320'%20y='330'%20font-size='52'%20transform='rotate%288%20320%20330%29'%3E%E2%88%9A%3C/text%3E%3Ctext%20x='20'%20y='170'%20font-size='44'%20transform='rotate%2814%2020%20170%29'%3E%3F%3C/text%3E%3Ctext%20x='300'%20y='120'%20font-size='44'%20transform='rotate%28-10%20300%20120%29'%3E%E2%88%91%3C/text%3E%3C/g%3E%3C/svg%3E"),
+        linear-gradient(var(--line-soft) 2px, transparent 2px),
+        linear-gradient(90deg, var(--line-soft) 2px, transparent 2px),
+        linear-gradient(var(--stripe) 1px, transparent 1px),
+        linear-gradient(90deg, var(--stripe) 1px, transparent 1px);
+    background-size: 360px 360px, 140px 140px, 140px 140px, 28px 28px, 28px 28px;
+    background-attachment: local;
+}
+
+/* The chalkboard: the landing's ink, framed in violet. Chalk and eraser on the ledge. */
+.problem-header-block {
+    position: relative;
+    flex: none;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto 30px;
+    padding: 12px 34px 24px;
+    text-align: center;
+    color: var(--palette-paper);
+    background:
+        radial-gradient(ellipse at 18% 12%, rgba(244, 241, 234, 0.10), transparent 55%),
+        radial-gradient(ellipse at 88% 90%, rgba(162, 89, 255, 0.14), transparent 50%),
+        #17122a;
+    border: 3px solid var(--g-edge);
+    box-shadow:
+        inset 0 0 0 7px var(--accent),
+        inset 0 0 0 10px var(--palette-ink),
+        6px 6px 0 var(--g-offset);
+}
+.problem-header-block::before,
+.problem-header-block::after {
+    content: '';
+    position: absolute;
+    border: 2.5px solid var(--palette-ink);
+}
+.problem-header-block::before {
+    left: 40px; bottom: -17px; width: 54px; height: 15px;
+    background: linear-gradient(to bottom, var(--volt) 0 55%, #3d3a5c 55%);
+    transform: rotate(3deg);
+}
+.problem-header-block::after {
+    right: 44px; bottom: -15px; width: 56px; height: 11px;
+    background: var(--palette-paper);
+    transform: rotate(-5deg);
+}
+
+/* The session clock, in the chalkboard's top corner (the game's timer badge, moved in). */
+.time-badge {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 10px;
+    min-height: 1.9rem;
+    padding: 6px 12px 0 0;
+    font-family: var(--font-mono);
+}
+.time-badge-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #c9c5d6; }
+.time-left { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--volt); }
+.time-left.is-low { color: var(--status-coral-dark); }
+
+.problem-label {
+    display: inline-block;
+    margin: 4px 0 8px;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--volt);
+    text-decoration: underline wavy rgba(212, 255, 58, 0.65);
+    text-underline-offset: 6px;
+}
+
+/* A problem is a sentence: the board keeps the height of three lines, so a short
+   and a long one leave the first step where it was. */
+.problem-statement {
+    min-height: calc(3 * 1.35em);
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2.1vw, 1.8rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    color: var(--palette-paper);
+    overflow-wrap: anywhere;
+}
+
+.steps-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+/* Worksheet strips with a ruler down the left edge. */
+.step-card {
+    position: relative;
+    padding: 14px 16px 16px 46px;
+    background: var(--bg-surface);
+    border: 3px solid var(--g-edge);
+    box-shadow: 5px 5px 0 var(--g-offset);
+    overflow: hidden;
+    animation: popIn 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.step-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 28px;
+    background-color: var(--accent);
+    background-image:
+        repeating-linear-gradient(to bottom, transparent 0 38px, var(--palette-ink) 38px 40px),
+        repeating-linear-gradient(to bottom, transparent 0 6px, var(--palette-ink) 6px 8px);
+    background-size: 20px 100%, 11px 100%;
+    background-position: right top, right top;
+    background-repeat: no-repeat;
+    border-right: 3px solid var(--g-edge);
+}
+.step-card.correct { background: var(--correct-soft); }
+.step-card.correct::before { background-color: var(--volt); }
+.step-card.correct::after {
+    content: '\2713';
+    position: absolute;
+    right: 12px; top: 10px;
+    width: 34px; height: 34px;
+    display: grid; place-items: center;
+    background: var(--volt);
+    color: var(--on-volt);
+    border: 3px solid var(--palette-ink);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    transform: rotate(10deg);
+}
+
+.step-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; padding-right: 44px; }
+.step-number-badge {
+    padding: 3px 12px;
+    background: var(--volt);
+    color: var(--on-volt);
+    border: 2.5px solid var(--palette-ink);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+    transform: rotate(-2.5deg);
+    box-shadow: 2px 2px 0 var(--palette-ink);
+}
+.step-title { margin: 0; font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+
+.solution-label { margin-bottom: 6px; font-size: 0.88rem; font-weight: 600; color: var(--text-muted); }
+.solution-input-row { display: flex; gap: 10px; }
+.solution-input {
+    flex: 1;
+    min-width: 0;
+    height: 54px;
+    padding: 0 16px;
+    background: var(--bg-field);
+    color: var(--text);
+    border: 3px solid var(--g-edge);
+    font-family: var(--font-mono);
+    font-size: 1.25rem;
+    font-weight: 700;
+    outline: none;
+    transition: background-color 0.15s, box-shadow 0.15s;
+}
+.solution-input::placeholder { color: var(--text-faint); font-family: var(--font-body); font-weight: 500; font-size: 1rem; }
+.solution-input:focus { background: var(--accent-soft); box-shadow: 4px 4px 0 var(--g-offset); }
+.solution-input:disabled { background: var(--correct-soft); color: var(--text); border-color: var(--accent); box-shadow: none; cursor: not-allowed; }
+
+/* Verdict and button share one row whose height is reserved. */
+.step-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; min-height: 52px; margin-top: 12px; }
+.feedback-msg { min-height: 1.4em; font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
+.feedback-msg.correct { color: var(--accent-text, var(--accent)); animation: popIn 0.3s ease-out; }
+.feedback-msg.wrong { color: var(--danger); }
+.feedback-msg.wrong.shake { animation: shakeX 0.4s ease-in-out; }
+.feedback-msg.neutral { color: var(--text-muted); }
+.step-card > .feedback-msg.correct { margin-top: 10px; }
+
+.conversion-confirmation { margin-top: 12px; padding-top: 12px; border-top: 3px dotted var(--line); }
+.conversion-confirmation .solution-label { color: var(--accent-text, var(--accent)); }
+
+.btn-check-step {
+    flex: 0 0 auto;
+    margin-left: auto;
+    min-width: 11rem;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: var(--on-accent);
+    border: 3px solid var(--g-edge);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--g-edge);
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+.btn-check-step:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--g-edge); }
+.btn-check-step:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--g-edge); }
+.btn-check-step:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Reviewing a solved question: the board turns green-black, the work is read-only. */
+.center-panel.solved-preview-mode .problem-header-block {
+    background:
+        radial-gradient(ellipse at 18% 12%, rgba(244, 241, 234, 0.12), transparent 55%),
+        #123524;
+}
+.workspace-preview-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 4px 2px 2px; }
+.workspace-preview-heading { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; }
+.workspace-preview-back {
+    padding: 7px 13px;
+    background: var(--volt);
+    color: var(--on-volt);
+    border: 3px solid var(--palette-ink);
+    font-family: var(--font-body);
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--palette-ink);
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+.workspace-preview-back:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--palette-ink); }
+.workspace-preview-back:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--palette-ink); }
+.workspace-preview-step {
+    position: relative;
+    padding: 14px 16px 14px 46px;
+    background: var(--correct-soft);
+    border: 3px solid var(--g-edge);
+    box-shadow: 5px 5px 0 var(--g-offset);
+    overflow: hidden;
+    animation: popIn 0.28s ease-out;
+}
+.workspace-preview-step::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 28px;
+    background-color: var(--volt);
+    background-image:
+        repeating-linear-gradient(to bottom, transparent 0 38px, var(--palette-ink) 38px 40px),
+        repeating-linear-gradient(to bottom, transparent 0 6px, var(--palette-ink) 6px 8px);
+    background-size: 20px 100%, 11px 100%;
+    background-position: right top, right top;
+    background-repeat: no-repeat;
+    border-right: 3px solid var(--g-edge);
+}
+.workspace-preview-step-title { margin-bottom: 8px; font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; }
+.workspace-preview-answer-label { margin-bottom: 5px; font-size: 0.82rem; font-weight: 700; color: var(--text-muted); }
+.workspace-preview-answer {
+    min-height: 48px;
+    display: flex; align-items: center;
+    padding: 9px 13px;
+    background: var(--bg-surface);
+    border: 3px solid var(--accent);
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------- 4. THE NOTEBOOK (RIGHT) */
+.right-sidebar {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 10px 12px 12px;
+    background-color: var(--bg-surface);
+    background-image: repeating-linear-gradient(to bottom, transparent 0 26px, var(--line-soft) 26px 28px);
+    border-left: 3px solid var(--g-edge);
+}
+
+.q-history-box { display: flex; flex-direction: column; max-height: 46%; min-height: 0; }
+.q-history-header,
+.history-label {
+    display: inline-block;
+    align-self: flex-start;
+    margin-bottom: 10px;
+    padding: 4px 12px;
+    color: var(--palette-ink);
+    border: 2.5px solid var(--g-edge);
+    box-shadow: 3px 3px 0 var(--g-offset);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    transform: rotate(-1.5deg);
+}
+.q-history-header { background: var(--volt); }
+.history-label { background: var(--status-coral); margin-bottom: 0; }
+
+.q-history-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 6px 6px 2px; }
+.q-history-empty { padding: 12px 0; font-size: 0.8rem; font-weight: 600; text-align: center; color: var(--text-muted); }
+
+.q-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 9px 11px;
+    background: var(--bg-surface);
+    color: var(--text);
+    border: 2.5px solid var(--g-edge);
+    box-shadow: 3px 3px 0 var(--volt);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
+}
+.q-btn.active { background: var(--correct-soft); }
+.q-btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--volt); }
+.q-btn:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--volt); }
+.q-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.q-btn.previewing { background: var(--volt); color: var(--on-volt); box-shadow: 3px 3px 0 var(--g-edge); }
+.q-btn-equation { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+.history-section { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 6px 8px 2px; }
+.history-header { display: flex; align-items: center; margin-bottom: 14px; }
+
+/* Sticky notes with tape, as in the game; the last five. */
+.history-item {
+    position: relative;
+    margin-bottom: 14px;
+    padding: 8px 10px;
+    background: var(--retry-soft);
+    color: var(--text);
+    border: 2.5px solid var(--g-edge);
+    box-shadow: 3px 3px 0 var(--g-offset);
+    font-size: 0.85rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    animation: popIn 0.3s ease-out;
+}
+.history-item:nth-child(odd) { rotate: -1deg; }
+.history-item:nth-child(even) { rotate: 1.2deg; }
+.history-item::before {
+    content: '';
+    position: absolute;
+    top: -9px; left: 50%;
+    width: 38px; height: 13px;
+    background: rgba(212, 255, 58, 0.85);
+    border: 1.5px solid rgba(14, 11, 22, 0.35);
+    transform: translateX(-50%) rotate(-3deg);
+}
+#error-list:empty::after {
+    content: 'No slip-ups so far. Nice!';
+    display: block;
+    padding: 14px 8px;
+    background: var(--bg-surface);
+    border: 2.5px dashed var(--line);
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------- 5. DIALOGS */
+.game-card { text-align: center; }
+.mastery-card { max-width: 540px; padding: 18px 20px 20px; display: flex; flex-direction: column; align-items: center; }
+.time-card { max-width: 480px; padding: 26px 28px 28px; display: flex; flex-direction: column; align-items: center; }
+
+.time-modal-header { margin-bottom: 6px; font-family: var(--font-display); font-size: 2.1rem; font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; text-shadow: 2px 2px 0 var(--volt); }
+.time-modal-subtitle { margin-bottom: 18px; font-size: 1rem; font-weight: 600; color: var(--text-muted); }
+.time-stats-grid { width: 100%; margin: 0 0 20px; padding: 16px 18px; display: flex; flex-direction: column; gap: 11px; background: var(--bg-field); border: 3px dashed var(--line); }
+.time-stat-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.time-stat-label { font-weight: 600; color: var(--text-muted); }
+.time-stat-val { margin: 0; font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.time-modal-btn,
+.mastery-btn {
+    padding: 13px 12px;
+    color: var(--on-accent);
+    border: 3px solid var(--g-edge, var(--text));
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--text);
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+.time-modal-btn { width: 100%; background: var(--accent); }
+.time-modal-btn:hover:not(:disabled),
+.mastery-btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--text); }
+.time-modal-btn:active:not(:disabled),
+.mastery-btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--text); }
+.time-modal-btn:disabled, .mastery-btn:disabled { opacity: 0.6; cursor: wait; }
+
+.mastery-agent-container {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 16px 16px 12px;
+    background: var(--accent);
+    border: 3px solid var(--text);
+}
+.mastery-agent-container::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 62%;
+    width: 220%; aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    background: repeating-conic-gradient(rgba(244, 241, 234, 0.22) 0 9deg, transparent 9deg 18deg);
+    animation: spinRays 70s linear infinite;
+    pointer-events: none;
+}
+.mastery-agent-container > * { position: relative; }
+.mastery-speech-bubble {
+    width: 100%;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--palette-paper);
+    color: var(--palette-ink);
+    border: 3px solid var(--palette-ink);
+    box-shadow: 5px 5px 0 var(--palette-ink);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+.mastery-speech-bubble::before,
+.mastery-speech-bubble::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    border-style: solid;
+    border-color: var(--palette-ink) transparent;
+}
+.mastery-speech-bubble { position: relative; }
+.mastery-speech-bubble::before { bottom: -18px; margin-left: -14px; border-width: 18px 14px 0; }
+.mastery-speech-bubble::after { bottom: -11px; margin-left: -9px; border-width: 13px 9px 0; border-color: var(--palette-paper) transparent; }
+.mastery-avatar-img { width: 100%; max-width: 220px; height: 210px; object-fit: contain; object-position: center bottom; filter: drop-shadow(3px 4px 0 rgba(14, 11, 22, 0.35)); animation: floatAvatar 3s ease-in-out infinite; }
+
+.mastery-destination {
+    width: 100%;
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: var(--volt);
+    color: var(--on-volt);
+    border: 3px solid var(--text);
+    box-shadow: 3px 3px 0 var(--text);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+.mastery-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
+.btn-agree { background: var(--volt); color: var(--on-volt); }
+.btn-refuse { background: var(--status-coral); color: var(--palette-ink); }
+
+/* ------------------------------------------------------------ 6. MOTION */
+@keyframes popIn { 0% { opacity: 0; transform: translateY(16px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes shakeX { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+@keyframes bubblePop { 0% { transform: scale(0.94) rotate(-1deg); opacity: 0.85; } 55% { transform: scale(1.02) rotate(0.4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes floatAvatar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes avatarTalk { 0% { transform: translateY(0) scale(1) rotate(-1deg); } 100% { transform: translateY(-5px) scale(1.03) rotate(1deg); } }
+@keyframes spinRays { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .game-frame *, .game-frame *::before, .game-frame *::after,
+    .mastery-card *, .mastery-card *::before, .mastery-card *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------------------------------------------------------- 7. RESPONSIVE */
+@media (max-width: 1180px) {
+    .game-frame { --g-right: 200px; }
+}
+
+/* Phone and small tablet: the original stacks everything: tutor, workspace, notebook. */
+@media (max-width: 900px) {
+    body.is-playing .learn-main { display: block; padding: var(--sp-3) 0 var(--sp-6); }
+    .game-frame { display: block; height: auto; min-height: 0; grid-template-rows: none; }
+    .video-mentor-sidebar { height: 520px; border-right: 0; border-bottom: 3px solid var(--g-edge); }
+    .mentor-bg-video { object-position: center 48%; }
+    .prompt-box { height: 8rem; }
+    .center-panel { overflow: visible; padding: 14px 12px 22px; }
+    .right-sidebar { border-left: 0; border-top: 3px solid var(--g-edge); }
+    .q-history-box { max-height: none; }
+    .q-history-list, .history-section { overflow: visible; }
+    .problem-header-block { padding: 10px 22px 22px; }
+}
+
+@media (max-width: 480px) {
+    .game-screen { padding: 0 var(--sp-2); }
+    .prompt-box { height: 8.5rem; }
+    .video-mentor-sidebar { height: 540px; }
+    .solution-input-row { flex-direction: column; }
+    .step-footer { flex-wrap: wrap; }
+    .btn-check-step { width: 100%; margin-left: 0; }
+    .step-card { padding-left: 42px; }
+    .mastery-btn-grid { grid-template-columns: 1fr; }
+    .time-card, .mastery-card { padding-inline: 16px; }
+}
+
+@media (max-height: 720px) and (min-width: 901px) {
+    .prompt-box { height: 7.5rem; margin-bottom: 18px; padding: 9px 12px; }
+}

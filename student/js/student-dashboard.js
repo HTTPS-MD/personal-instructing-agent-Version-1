@@ -79,6 +79,10 @@
 
     function topicOf(n) { return TOPICS[n] || TOPICS[1]; }
 
+    /* The game's own wording above the problem. */
+    var TOPIC_TITLES = { 1: 'Topic 1: Finding Percentage', 2: 'Topic 2: Percentage Increase', 3: 'Topic 3: Percentage Decrease' };
+    function topicTitle(n) { return TOPIC_TITLES[n] || TOPIC_TITLES[1]; }
+
     /* What the confirm box asks for once correct working has been accepted. */
     var CONFIRM = {
         decimal: {
@@ -116,6 +120,7 @@
         hintsUsedTotal: 0,
         solved: [],          /* this visit only: { number, topic, question, steps } */
         errors: [],          /* this visit only: the student's own wrong entries */
+        preview: null,       /* index into solved[] while a solved question is being reviewed */
         stepWrong: 0,        /* wording only */
         correctRun: 0,       /* wording only */
         stepStartedAt: 0,    /* wording only; never sent anywhere */
@@ -144,11 +149,64 @@
 
     /* ============================================ 1. SCREENS =========== */
 
+    /* The game frame fills the space under whatever is above it (the header, and the
+       tutorial's replay note when it is showing), so its panes scroll inside it and
+       the page itself never does. Phones stack instead and need no fixed height. */
+    var fitQueued = false;
+    function fitGameFrame() {
+        var frame = $('.game-frame');
+        if (!frame || !document.body.classList.contains('is-playing')) { return; }
+        if (window.innerWidth <= 900) { frame.style.height = ''; return; }
+        frame.style.height = '';
+        var top = frame.getBoundingClientRect().top;
+        frame.style.height = Math.max(560, Math.floor(window.innerHeight - top - 22)) + 'px';
+    }
+    function queueFit() {
+        if (fitQueued) { return; }
+        fitQueued = true;
+        requestAnimationFrame(function () { fitQueued = false; fitGameFrame(); });
+    }
+    window.addEventListener('resize', queueFit);
+    if (window.ResizeObserver) { new ResizeObserver(queueFit).observe(document.body); }
+
     function showScreen(name) {
         $$('.screen').forEach(function (node) {
             node.classList.toggle('is-active', node.id === 'screen-' + name);
         });
+        /* The game fills the space under the header; the start screen scrolls. */
+        document.body.classList.toggle('is-playing', name === 'session');
+        queueFit();
         window.scrollTo({ top: 0, behavior: 'auto' });
+
+        /* The classroom video behind the tutor: only while the game is showing,
+           and never for people who ask for reduced motion (the poster stays). */
+        if (name === 'session') { startMentorVideo(); }
+    }
+
+    /* The classroom behind the tutor: the landing page's own hero film, added only
+       when the game starts and never for people who ask for reduced motion (they
+       keep the still, which is the CSS background). */
+    function startMentorVideo() {
+        var side = $('.video-mentor-sidebar');
+        if (!side || $('#mentor-video')) { return; }
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (calm) { return; }
+
+        var video = document.createElement('video');
+        video.id = 'mentor-video';
+        video.className = 'mentor-bg-video';
+        video.muted = true; video.loop = true; video.playsInline = true;
+        video.setAttribute('aria-hidden', 'true');
+        video.tabIndex = -1;
+        video.preload = 'metadata';
+        video.poster = '../../assets/images/hero-classroom-poster.jpg';
+        var src = document.createElement('source');
+        src.src = '../../assets/videos/hero-classroom-720.mp4';
+        src.type = 'video/mp4';
+        video.appendChild(src);
+        side.insertBefore(video, side.firstChild);
+        var p = video.play();
+        if (p && p.catch) { p.catch(function () {}); }
     }
 
     function setBootText(message) {
@@ -229,6 +287,11 @@
             }
         }, 160);
     }
+
+    /* The game closed a solved-question review with Escape. */
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && state.preview !== null && !openLayers.length) { closePreview(); }
+    });
 
     function initModals() {
         $$('.overlay').forEach(function (overlay) {
@@ -425,8 +488,21 @@
     }
 
     /* A line with a face to go with it: happy, sad or thinking. */
+    var talkTimer = null;
+
     function speak(text, mood) {
-        if (text) { setSpeech(text); }
+        if (text) {
+            setSpeech(text);
+            /* The game's little bubble pop and tutor bounce; CSS turns both off
+               for people who ask for reduced motion. */
+            var box = $('#status-msg'), img = $('#agent-img');
+            if (box) { box.classList.remove('speaking'); void box.offsetWidth; box.classList.add('speaking'); }
+            if (img) {
+                img.classList.add('talking');
+                clearTimeout(talkTimer);
+                talkTimer = setTimeout(function () { img.classList.remove('talking'); }, 1400);
+            }
+        }
         setMood(mood || 'default');
     }
 
@@ -459,20 +535,14 @@
 
     /* ============================================ 4. PROGRESS ========== */
 
-    function paintProgress() {
-        $('#stat-solved').textContent = state.answered;
-        $('#stat-correct').textContent = state.clean;
-        $('#stat-streak').textContent = state.streak;
-        $('#stat-level').textContent = state.topic;
-    }
-
-    function problemOpen() { return !!state.problem && !state.problem.locked; }
+    function problemOpen() { return !!state.problem && !state.problem.locked && state.preview === null; }
 
     /* The hint button keeps its place from the first paint; it is only
-       invisible until the server says two wrong answers have unlocked it. */
+       invisible until the server says two wrong answers have unlocked it (and
+       while a solved question is being reviewed). */
     function paintHintButton() {
         var btn = $('#hint-btn');
-        var open = problemOpen() && state.problem.hintUnlocked;
+        var open = !!state.problem && !state.problem.locked && state.problem.hintUnlocked && state.preview === null && !state.expired;
         btn.classList.toggle('is-away', !open);
         btn.disabled = !open || state.hinting;
 
@@ -480,34 +550,80 @@
         $('#hint-tier-label').textContent = tier ? '(Tier ' + tier.tier + '/' + tier.total + ')' : '';
     }
 
-    /* ---- 4.1 The trail: solved questions and the error log ---- */
+    /* ---- 4.1 Solved questions (click to review) and the error log ---- */
 
     function paintSolved() {
         var list = $('#solved-list');
         list.textContent = '';
-        state.solved.forEach(function (q) {
-            var item = el('li', 'solved-item');
-            var details = el('details', 'solved-details');
-            var summary = el('summary', 'solved-summary', 'Problem ' + q.number + ' · ' + topicOf(q.topic).short);
-            details.appendChild(summary);
-            details.appendChild(el('p', 'solved-question', q.question));
-            var steps = el('ol', 'solved-steps');
-            q.steps.forEach(function (s) {
-                steps.appendChild(el('li', null, s.label + ': ' + (s.confirmed || s.text)));
+        if (!state.solved.length) {
+            list.appendChild(el('div', 'q-history-empty', 'No solved questions yet'));
+            return;
+        }
+        state.solved.forEach(function (q, idx) {
+            var btn = el('div', 'q-btn active' + (state.preview === idx ? ' previewing' : ''));
+            btn.setAttribute('role', 'button');
+            btn.setAttribute('tabindex', '0');
+            btn.setAttribute('title', 'Click to preview this solved question');
+            btn.setAttribute('aria-label', 'Preview solved question: ' + q.question);
+            if (state.preview === idx) { btn.setAttribute('aria-pressed', 'true'); }
+            btn.appendChild(el('span', 'q-btn-equation', q.question));
+            btn.addEventListener('click', function () { openPreview(idx); });
+            btn.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPreview(idx); }
             });
-            details.appendChild(steps);
-            item.appendChild(details);
-            list.appendChild(item);
+            list.appendChild(btn);
         });
-        $('#solved-empty').hidden = state.solved.length > 0;
     }
 
+    /* The game kept the last five. */
     function paintErrors() {
         var list = $('#error-list');
         list.textContent = '';
-        state.errors.slice(-30).forEach(function (e) { list.appendChild(el('li', null, e)); });
-        $('#error-empty').hidden = state.errors.length > 0;
-        list.scrollTop = list.scrollHeight;
+        state.errors.slice(-5).forEach(function (e) { list.appendChild(el('div', 'history-item', e)); });
+    }
+
+    /* The game's solved-question preview: the workspace shows the student's own
+       work for that question, read-only, until they go back. */
+    function openPreview(idx) {
+        var q = state.solved[idx];
+        if (!q || state.expired) { return; }
+        state.preview = idx;
+        $('#center-panel').classList.add('solved-preview-mode');
+        $('#problem-kicker').textContent = 'Solved Review • ' + topicTitle(q.topic);
+        $('#problem-expression').textContent = q.question;
+
+        var box = $('#steps');
+        box.textContent = '';
+        var bar = el('div', 'workspace-preview-toolbar');
+        bar.appendChild(el('div', 'workspace-preview-heading', 'Your solved work'));
+        var back = el('button', 'workspace-preview-back', '← Back to current question');
+        back.type = 'button';
+        back.id = 'preview-back';
+        back.addEventListener('click', closePreview);
+        bar.appendChild(back);
+        box.appendChild(bar);
+
+        q.steps.forEach(function (st) {
+            var block = el('div', 'workspace-preview-step');
+            block.appendChild(el('div', 'workspace-preview-step-title', st.title));
+            block.appendChild(el('div', 'workspace-preview-answer-label', 'Your answer'));
+            block.appendChild(el('div', 'workspace-preview-answer', st.confirmed ? st.text + ' → ' + st.confirmed : st.text));
+            box.appendChild(block);
+        });
+
+        paintSolved();
+        paintHintButton();
+        back.focus({ preventScroll: true });
+        $('#center-panel').scrollTop = 0;
+    }
+
+    function closePreview() {
+        if (state.preview === null) { return; }
+        state.preview = null;
+        $('#center-panel').classList.remove('solved-preview-mode');
+        paintSolved();
+        if (state.problem) { renderProblem(); }
+        else if (state.bankEmpty) { noQuestions(); }
     }
 
     /* ============================================ 4b. THE CLOCK ======== */
@@ -602,6 +718,7 @@
 
     function expire() {
         if (state.expired) { return; }
+        closePreview();
         state.expired = true;
         paintClock();
         lockForExpiry();
@@ -742,10 +859,9 @@
 
     function renderProblem() {
         var p = state.problem;
-        $('#problem-kicker').textContent = 'Problem ' + p.number + ' · ' + topicOf(p.questionTopic).short;
+        $('#problem-kicker').textContent = topicTitle(p.questionTopic);
         $('#problem-expression').textContent = p.question;
         renderSteps(true);
-        paintProgress();
         paintHintButton();
     }
 
@@ -767,7 +883,7 @@
             var input = $('#step-input');
             if (input) {
                 input.focus({ preventScroll: true });
-                var card = input.closest('.step');
+                var card = input.closest('.step-card');
                 if (card && card.scrollIntoView) {
                     card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 }
@@ -775,25 +891,41 @@
         }
     }
 
+    /* One worksheet strip, as in the game: a ruler down the left edge, a
+       "Step n of N" pill, the step's name, the student's work, and a footer
+       with the verdict and the submit button. Finished steps stay, in order. */
+    function lockedInput(value) {
+        var input = el('input', 'solution-input');
+        input.type = 'text';
+        input.disabled = true;
+        input.value = value || '';
+        input.setAttribute('aria-label', 'Your accepted entry');
+        var row = el('div', 'solution-input-row');
+        row.appendChild(input);
+        return row;
+    }
+
     function buildStep(i, p) {
         var done = i < p.stepIndex || p.locked;
         var label = p.labels[i] || ('Step ' + (i + 1));
-        var card = el('section', 'step ' + (done ? 'is-done' : 'is-active'));
+        var card = el('section', 'step-card' + (done ? ' correct' : ''));
         card.setAttribute('aria-label', 'Step ' + (i + 1) + ': ' + label);
 
-        var head = el('header', 'step-head');
-        head.appendChild(el('span', 'step-count', done ? 'Completed' : 'Step ' + (i + 1) + ' of ' + p.stepsTotal));
+        var head = el('div', 'step-header');
+        head.appendChild(el('div', 'step-number-badge', done ? 'Completed' : 'Step ' + (i + 1) + ' of ' + p.stepsTotal));
         head.appendChild(el('h3', 'step-title', 'Step ' + (i + 1) + ': ' + label));
         card.appendChild(head);
 
         if (done) {
             var entry = p.doneSteps[i] || {};
-            card.appendChild(el('p', 'step-label', 'Your step solution'));
-            card.appendChild(el('output', 'step-value', entry.text || ''));
+            card.appendChild(el('div', 'solution-label', 'Your Step Solution'));
+            card.appendChild(lockedInput(entry.text));
             if (entry.confirmed) {
                 var conf = CONFIRM[kindOfLabel(label, p.questionTopic)];
-                card.appendChild(el('p', 'step-label', conf.label));
-                card.appendChild(el('output', 'step-value', entry.confirmed));
+                var again = el('div', 'conversion-confirmation');
+                again.appendChild(el('div', 'solution-label', conf.label));
+                again.appendChild(lockedInput(entry.confirmed));
+                card.appendChild(again);
             }
             return card;
         }
@@ -802,21 +934,21 @@
         var conf2 = CONFIRM[p.confirmKind];
 
         if (confirming) {
-            card.appendChild(el('p', 'step-label', 'Your step solution'));
-            card.appendChild(el('output', 'step-value', p.workText));
-            card.appendChild(el('p', 'step-note', 'Correct calculation.'));
+            card.appendChild(el('div', 'solution-label', 'Your Step Solution'));
+            card.appendChild(lockedInput(p.workText));
+            card.appendChild(el('div', 'feedback-msg correct', 'Correct calculation.'));
         }
 
-        var form = el('form', 'step-form');
+        var form = el('form', 'step-form' + (confirming ? ' conversion-confirmation' : ''));
         form.noValidate = true;
         form.addEventListener('submit', onStepSubmit);
 
-        var labelEl = el('label', 'step-label', confirming ? conf2.prompt : 'Your step solution');
+        var labelEl = el('label', 'solution-label', confirming ? conf2.prompt : 'Your Step Solution');
         labelEl.setAttribute('for', 'step-input');
         form.appendChild(labelEl);
 
-        var row = el('div', 'step-row');
-        var input = el('input', 'step-input');
+        var row = el('div', 'solution-input-row');
+        var input = el('input', 'solution-input');
         input.id = 'step-input';
         input.type = 'text';
         input.setAttribute('inputmode', 'text');
@@ -827,27 +959,22 @@
         input.setAttribute('placeholder', confirming ? conf2.placeholder : 'Enter answer');
         input.setAttribute('aria-describedby', 'step-feedback');
         row.appendChild(input);
-
-        var submit = el('button', 'btn btn-primary btn-step', confirming ? conf2.button : 'Submit step');
-        submit.type = 'submit';
-        submit.id = 'step-submit';
-        row.appendChild(submit);
         form.appendChild(row);
 
-        /* Always present, with its height already reserved. */
-        var feedback = el('p', 'step-feedback', '');
+        /* The verdict and the button share one footer row whose height is already
+           reserved, so a message arriving moves nothing. */
+        var footer = el('div', 'step-footer');
+        var feedback = el('div', 'feedback-msg', '');
         feedback.id = 'step-feedback';
         feedback.setAttribute('role', 'status');
         feedback.setAttribute('aria-live', 'polite');
-        form.appendChild(feedback);
-
-        var hint = el('p', 'step-hint');
-        hint.id = 'step-hint';
-        hint.hidden = true;
-        form.appendChild(hint);
+        footer.appendChild(feedback);
+        var submit = el('button', 'btn-check-step', confirming ? conf2.button : 'Submit Step');
+        submit.type = 'submit';
+        submit.id = 'step-submit';
+        footer.appendChild(submit);
+        form.appendChild(footer);
         card.appendChild(form);
-
-        if (p.hint && p.hint.step === i + 1) { showStepHint(hint, p.hint); }
         return card;
     }
 
@@ -857,19 +984,14 @@
         return topic === 1 ? 'decimal' : 'percentage';
     }
 
-    function showStepHint(node, h) {
-        node.hidden = false;
-        node.textContent = '';
-        node.appendChild(el('b', null, 'Hint (tier ' + h.tier + ' of ' + h.total + '): '));
-        node.appendChild(document.createTextNode(h.text));
-    }
-
     function setStepFeedback(text, tone) {
         var node = $('#step-feedback');
         if (!node) { return; }
         node.textContent = text || '';
-        node.classList.toggle('is-wrong', tone === 'wrong');
-        node.classList.toggle('is-neutral', tone === 'neutral');
+        node.classList.toggle('wrong', tone === 'wrong');
+        node.classList.toggle('correct', tone === 'correct');
+        node.classList.toggle('neutral', tone === 'neutral');
+        if (tone === 'wrong') { node.classList.remove('shake'); void node.offsetWidth; node.classList.add('shake'); }
     }
 
     function onStepSubmit(event) {
@@ -949,11 +1071,11 @@
             if (outcome === 'format_error') {
                 setStepFeedback(CONFIRM[kind].error, 'wrong');
                 speak(reaction('finalFormatError', 'wrong'), 'sad');
-                state.errors.push('Problem ' + p.number + ' · Step ' + stepNo + ': Final-answer error on "' + raw + '"');
+                state.errors.push('Step ' + stepNo + ': Final-answer error on "' + raw + '"');
             } else {
                 setStepFeedback('Incorrect answer. Try again.', 'wrong');
                 speak(reaction(Number(d.state.wrong_streak) >= 2 ? 'wrongRepeated' : 'wrongFirst', 'wrong'), 'sad');
-                state.errors.push('Problem ' + p.number + ' · Step ' + stepNo + ': Error on "' + raw + '"');
+                state.errors.push('Step ' + stepNo + ': Error on "' + raw + '"');
             }
             paintErrors();
             paintHintButton();
@@ -992,7 +1114,7 @@
                 topic: q.questionTopic,
                 question: q.question,
                 steps: q.doneSteps.map(function (s, n) {
-                    return { label: q.labels[n] || ('Step ' + (n + 1)), text: s.text, confirmed: s.confirmed };
+                    return { title: 'Step ' + (n + 1) + ': ' + (q.labels[n] || ('Step ' + (n + 1))), text: s.text, confirmed: s.confirmed };
                 })
             });
             paintSolved();
@@ -1034,8 +1156,6 @@
             state.hintsUsedTotal++;
             speak((reaction('hintRequested', 'hint') + ' ' + d.hint.text).trim(), 'thinking');
 
-            var node = $('#step-hint');
-            if (node) { showStepHint(node, state.problem.hint); }
             syncProgress();
         }
         paintHintButton();
@@ -1069,7 +1189,6 @@
         state.answered = Number(r.problems_answered) || (state.answered + 1);
         if (r.is_correct === true) { state.clean++; }
         state.streak = Number(r.streak) || 0;
-        paintProgress();
         syncProgress();
 
         if (r.offer) {
@@ -1087,10 +1206,9 @@
         var text = clean(pickLine('adapt:' + tutorKey + ':' + offer.type,
             tutor.adaptive[up ? 'upgrade' : 'downgrade']).replace(/\{topic\}/g, topicOf(target).name));
 
-        $('#offer-kicker').textContent = up ? 'Ready for more' : 'A little review';
+        closePreview();
         $('#offer-text').textContent = text;
         $('#offer-destination').textContent = (up ? 'Available progression: ' : 'Recommended review: ') + topicOf(target).name;
-        $('#offer-accept').textContent = up ? 'Move up' : 'Review it';
 
         var img = $('#offer-img');
         img.setAttribute('src', tutor.images[up ? 'happy' : 'default'] || tutor.images['default']);
@@ -1126,7 +1244,6 @@
         state.topic = Number(res.data.topic) || state.topic;
         state.pendingOffer = null;
         closeModal('modal-offer');
-        paintProgress();
         syncProgress();
         nextProblem();
     }

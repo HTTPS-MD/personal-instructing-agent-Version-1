@@ -21,6 +21,7 @@
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/student-dashboard.css">
+    <link rel="stylesheet" href="../../styles/pages/student-game.css">
 </head>
 
 <body data-boot="pending">
@@ -124,63 +125,60 @@
             </section>
 
             <!-- ========================================== SESSION SCREEN -->
-            <section class="learn-shell screen" id="screen-session" aria-label="Your tutoring session">
-                <div class="game">
+            <!-- The original PIA game arrangement: tutor on the left, the problem
+                 workspace in the centre, solved questions and the error log on the
+                 right. The page chrome above it is the student header; the original
+                 game's own top strip, colour picker and character choice are gone. -->
+            <section class="screen game-screen" id="screen-session" aria-label="Your tutoring session">
+                <div class="app-container game-frame">
 
-                    <!-- The tutor: the one saved on the student's profile. -->
-                    <aside class="tutor" aria-label="Your tutor">
-                        <div class="tutor-bubble" id="tutor-bubble">
-                            <p class="tutor-speech" id="agent-speech" role="status" aria-live="polite">Let's get started. Read the problem carefully.</p>
-                        </div>
-                        <div class="tutor-figure">
-                            <img id="agent-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Your tutor"
-                                width="220" height="431">
-                        </div>
-                        <p class="tutor-name" id="agent-name">Your tutor</p>
-                        <button class="btn btn-secondary btn-hint" id="hint-btn" type="button" aria-describedby="hint-tier-label">
-                            <span id="hint-btn-label">Request hint</span>
-                            <span class="hint-tier" id="hint-tier-label"></span>
-                        </button>
-                    </aside>
+                    <div class="left-sidebar video-mentor-sidebar">
+                        <!-- The classroom film is added by student-dashboard.js when the game starts (never for reduced motion); the still is the CSS background. -->
+                        <div class="mentor-video-overlay" aria-hidden="true"></div>
 
-                    <div class="work">
-                        <div class="progress-card">
-                            <div class="progress-top">
-                                <span class="progress-label" id="time-label">Time left</span>
-                                <span class="time-left" id="time-left" aria-labelledby="time-label" role="timer" aria-live="off">--:--</span>
+                        <div class="avatar-container video-copy-layer">
+                            <div class="prompt-box" id="status-msg">
+                                <p class="tutor-speech" id="agent-speech" role="status" aria-live="polite">Let's get started. Read the problem carefully.</p>
                             </div>
-                            <div class="progress-stats">
-                                <span class="pstat"><b id="stat-solved">0</b> solved</span>
-                                <span class="pstat"><b id="stat-correct">0</b> clean</span>
-                                <span class="pstat"><b id="stat-streak">0</b> in a row</span>
-                                <span class="pstat"><b id="stat-level">1</b> topic</span>
+                            <div class="mentor-agent-stage">
+                                <img id="agent-img" class="avatar-img mentor-overlay-avatar" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Your tutor">
                             </div>
-                            <p class="sr-only" id="time-announce" role="status" aria-live="polite"></p>
                         </div>
 
-                        <div class="problem-card">
-                            <p class="problem-kicker" id="problem-kicker">Problem 1</p>
-                            <p class="problem-statement" id="problem-expression">—</p>
-                            <div class="steps" id="steps"></div>
+                        <div class="hint-container video-hint-layer">
+                            <button id="hint-btn" class="hint-btn" type="button">
+                                <span id="hint-btn-label">Request Hint</span>
+                                <span class="hint-tier" id="hint-tier-label"></span>
+                            </button>
                         </div>
                     </div>
 
-                    <aside class="trail" aria-label="Your work so far">
-                        <section class="trail-block" aria-labelledby="solved-title">
-                            <h2 class="trail-title" id="solved-title">Solved questions</h2>
-                            <ol class="solved-list" id="solved-list"></ol>
-                            <p class="trail-empty" id="solved-empty">Nothing solved yet.</p>
-                        </section>
-                        <section class="trail-block" aria-labelledby="errors-title">
-                            <h2 class="trail-title" id="errors-title">Error log</h2>
-                            <ul class="error-list" id="error-list"></ul>
-                            <p class="trail-empty" id="error-empty">No mistakes yet.</p>
-                        </section>
-                    </aside>
+                    <div class="center-panel" id="center-panel">
+                        <div class="problem-header-block">
+                            <div class="time-badge">
+                                <span class="time-badge-label" id="time-label">Time left</span>
+                                <span class="time-left" id="time-left" role="timer" aria-labelledby="time-label" aria-live="off">--:--</span>
+                            </div>
+                            <div class="problem-label" id="problem-kicker">Topic 1: Finding Percentage</div>
+                            <div class="problem-statement" id="problem-expression">Loading problem…</div>
+                            <p class="sr-only" id="time-announce" role="status" aria-live="polite"></p>
+                        </div>
+                        <div id="steps" class="steps-container"></div>
+                    </div>
+
+                    <div class="right-sidebar">
+                        <div class="q-history-box">
+                            <div class="q-history-header">Solved Questions</div>
+                            <div class="q-history-list" id="solved-list"></div>
+                        </div>
+                        <div class="history-section">
+                            <div class="history-header"><span class="history-label">Error Log</span></div>
+                            <div id="error-list" class="history-container"></div>
+                        </div>
+                    </div>
 
                 </div>
             </section>
-
         </main>
     </div>
 
@@ -205,55 +203,40 @@
     </div>
 
     <!-- ============================================ MODAL · TIME LIMIT ----
-         The game's "Time limit reached" dialog. Not dismissible: the only way on
-         is Try again, which restarts the open problem with a fresh limit. -->
+         The game's "Time Limit Reached!" card. Not dismissible: the only way on is
+         Try Again, which restarts the open problem with a fresh limit. -->
     <div class="overlay" id="modal-time" role="alertdialog" aria-modal="true"
         aria-labelledby="time-title" aria-describedby="time-sub" data-static>
-        <div class="modal modal-md">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <p class="tutorial-step">Session</p>
-                    <h2 class="modal-title" id="time-title">Time limit reached</h2>
-                    <p class="modal-sub" id="time-sub">The session time limit has been reached.</p>
-                </div>
-            </header>
-            <div class="modal-body">
-                <dl class="time-facts">
-                    <div><dt>Time limit</dt><dd id="time-limit">--</dd></div>
-                    <div><dt>Time started</dt><dd id="time-started">--:--:--</dd></div>
-                    <div><dt>Time finished</dt><dd id="time-finished">--:--:--</dd></div>
-                    <div><dt>Time spent</dt><dd id="time-spent">0 secs</dd></div>
-                </dl>
-            </div>
-            <footer class="modal-foot">
-                <button class="btn btn-primary" id="time-retry" type="button">Try again</button>
-            </footer>
+        <div class="modal modal-md game-card time-card">
+            <div class="time-modal-header" id="time-title">Time Limit Reached!</div>
+            <div class="time-modal-subtitle" id="time-sub">The session time limit has been reached.</div>
+            <dl class="time-stats-grid">
+                <div class="time-stat-row"><dt class="time-stat-label">Time Limit:</dt><dd class="time-stat-val" id="time-limit">--</dd></div>
+                <div class="time-stat-row"><dt class="time-stat-label">Time Started:</dt><dd class="time-stat-val" id="time-started">--:--:--</dd></div>
+                <div class="time-stat-row"><dt class="time-stat-label">Time Finished:</dt><dd class="time-stat-val" id="time-finished">--:--:--</dd></div>
+                <div class="time-stat-row"><dt class="time-stat-label">Time Spent:</dt><dd class="time-stat-val" id="time-spent">0 secs</dd></div>
+            </dl>
+            <button class="time-modal-btn" id="time-retry" type="button">Try Again</button>
         </div>
     </div>
 
     <!-- ============================================ MODAL · TOPIC OFFER ----
-         The tutor offers to move up or back a topic. The student answers; Escape
-         and the backdrop do not, because the server is waiting for the answer. -->
+         The game's mastery card: the tutor says it, the student answers Accept or
+         Refuse. Escape and the backdrop do not answer, because the server is
+         waiting for the answer. -->
     <div class="overlay" id="modal-offer" role="dialog" aria-modal="true"
         aria-labelledby="offer-title" aria-describedby="offer-text" data-static>
-        <div class="modal modal-md">
-            <header class="modal-head">
-                <div class="modal-head-text">
-                    <p class="tutorial-step" id="offer-kicker">Topic</p>
-                    <h2 class="modal-title" id="offer-title">A choice for you</h2>
-                </div>
-            </header>
-            <div class="modal-body offer-body">
-                <img class="offer-figure" id="offer-img" src="" alt="" width="96" height="188">
-                <div>
-                    <p class="modal-text" id="offer-text"></p>
-                    <p class="offer-destination" id="offer-destination"></p>
-                </div>
+        <div class="modal modal-md game-card mastery-card">
+            <h2 class="sr-only" id="offer-title">A choice for you</h2>
+            <div class="mastery-agent-container">
+                <div class="mastery-speech-bubble" id="offer-text"></div>
+                <img class="mastery-avatar-img" id="offer-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="">
             </div>
-            <footer class="modal-foot">
-                <button class="btn btn-secondary" id="offer-stay" type="button">Stay on this topic</button>
-                <button class="btn btn-primary" id="offer-accept" type="button">Accept</button>
-            </footer>
+            <div class="mastery-destination" id="offer-destination"></div>
+            <div class="mastery-btn-grid">
+                <button class="mastery-btn btn-refuse" id="offer-stay" type="button">Refuse</button>
+                <button class="mastery-btn btn-agree" id="offer-accept" type="button">Accept</button>
+            </div>
         </div>
     </div>
 
