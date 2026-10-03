@@ -185,16 +185,13 @@
                     </nav>
                 </div>
                 <div class="topbar-right">
-                    <!-- Search across students and sections; list-page fields still filter
-                         only their own tables. Results stay anchored to this field. -->
-                    <div class="header-search" id="palette">
-                        <input id="palette-input" type="search" role="combobox" autocomplete="off"
-                            aria-label="Search students or sections" aria-autocomplete="list"
-                            aria-expanded="false" aria-controls="palette-list"
-                            placeholder="Search students or sections">
-                        <div class="header-search-results" id="palette-list" role="listbox" aria-label="Search results" hidden></div>
-                        <p class="sr-only" id="palette-status" role="status" aria-live="polite"></p>
-                    </div>
+                    <button type="button" class="quickfind" id="palette-open" aria-haspopup="dialog"
+                        aria-controls="palette" aria-expanded="false"
+                        aria-label="Search students, sections, or commands" aria-keyshortcuts="Control+K Meta+K">
+                        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                        <span class="quickfind-label">Search...</span>
+                        <kbd class="quickfind-keys" id="quickfind-keys" aria-hidden="true">Ctrl K</kbd>
+                    </button>
                     <button type="button" class="btn-icon theme-toggle" id="theme-toggle" aria-label="Switch to light theme">
                         <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
                         <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
@@ -288,13 +285,13 @@
 
                         <div class="filter-row">
                             <div class="filter-field">
-                                <label class="filter-label" for="section-filter">Section</label>
+                                <label class="filter-label" id="section-filter-label">Section</label>
                                 <select class="input input-sm" id="section-filter">
                                     <option value="">All sections</option>
                                 </select>
                             </div>
                             <div class="filter-field">
-                                <label class="filter-label" for="group-filter">Research group</label>
+                                <label class="filter-label" id="group-filter-label">Research group</label>
                                 <select class="input input-sm" id="group-filter">
                                     <option value="all">All groups</option>
                                     <option value="experimental">Experimental</option>
@@ -383,22 +380,6 @@
                     <div class="page-head"><h1 class="page-title">Stage Controls</h1></div>
 
                     <div class="stack-lg">
-                        <!-- A reference for the study design. Nothing here changes access or
-                             any research assignment. -->
-                        <section class="panel" aria-labelledby="policy-title">
-                            <div class="panel-bar"><h2 class="panel-title" id="policy-title">Who can enter each stage</h2></div>
-                            <div class="table-wrap" tabindex="0" role="region" aria-label="Who can enter each stage">
-                                <table class="table policy-table">
-                                    <caption class="sr-only">Which stages each group can enter</caption>
-                                    <thead>
-                                        <tr><th scope="col">Group</th><th scope="col">OCEAN test</th><th scope="col">Character selection</th><th scope="col">Tutoring dashboard</th></tr>
-                                    </thead>
-                                    <tbody id="policy-tbody"></tbody>
-                                </table>
-                            </div>
-                            <p class="panel-foot muted" id="policy-foot"></p>
-                        </section>
-
                         <section aria-labelledby="gates-title">
                             <h2 class="panel-title section-title" id="gates-title">Open or close a stage by section</h2>
                             <div class="gates" id="gates-grid" data-region="settings"></div>
@@ -1295,6 +1276,24 @@
                     <button type="submit" class="btn btn-primary" id="cp-submit">Update</button>
                 </footer>
             </form>
+        </div>
+    </div>
+
+    <!-- Global search dialog: the right-hand search bar and Cmd/Ctrl+K open it. -->
+    <div class="overlay palette-overlay" id="palette" role="dialog" aria-modal="true" aria-label="Search">
+        <div class="palette">
+            <div class="palette-input-row">
+                <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                <input class="palette-input" id="palette-input" type="text" role="combobox"
+                    aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
+                    aria-label="Search students, sections, or commands"
+                    placeholder="Search students, sections, or commands..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="palette-body" id="palette-list" role="listbox" aria-label="Results"></div>
+            <p class="sr-only" id="palette-status" role="status" aria-live="polite"></p>
+            <div class="palette-foot">
+                <span><kbd>↑↓</kbd> navigate</span><span><kbd>Enter</kbd> select</span><span><kbd>Esc</kbd> close</span>
+            </div>
         </div>
     </div>
 

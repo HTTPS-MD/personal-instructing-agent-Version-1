@@ -206,10 +206,16 @@ function fixture() {
   const overflow = p => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   const visibleText = (p, sel) => p.locator(sel).evaluateAll(els => els.filter(e => e.getClientRects().length).map(e => e.innerText));
   const waitStudents = p => p.waitForFunction(() => document.querySelectorAll('#student-tbody tr[data-student]').length > 0);
+  const chooseFilter = async (p, id, value) => {
+    const index = await p.locator('#' + id + ' option').evaluateAll((els, v) => els.findIndex(e => e.value === v), value);
+    assert.ok(index >= 0, id + ': missing value ' + value);
+    await p.locator('#' + id + ' + .custom-select .custom-select-trigger').click();
+    await p.locator('#' + id + '-list .custom-select-option[data-index="' + index + '"]').click();
+  };
   const nav = p => p.evaluate(() => [...document.querySelectorAll('#sidebar .nav-item')].filter(e => e.getClientRects().length).map(e => e.innerText.replace(/\s+/g, ' ').trim().replace(/\s+(\d+|—)$/, '')));
 
   /* ================= SHELL, NAVIGATION, HEADER ================= */
-  await check('boot: failed dashboard script leaves a retry instead of an endless spinner', async () => {
+  await check('boot: failed dashboard script offers retry instead of an endless spinner', async () => {
     const context = await browser.newContext({ serviceWorkers: 'block' });
     await context.addInitScript(() => localStorage.setItem('pia_user_email', 'admin@example.test'));
     await context.route('**/*', r => {
@@ -226,7 +232,7 @@ function fixture() {
     await page.clock.fastForward(16000);
     assert.match(await page.locator('#boot-text').innerText(), /could not be verified/i);
     assert.equal(await page.locator('#boot-retry').isVisible(), true);
-    assert.equal(await page.locator('#app').isVisible(), false, 'unverified shell remains hidden');
+    assert.equal(await page.locator('#app').isVisible(), false);
     await context.close();
   });
   await check('shell: exact navigation order, no category headings, People collapsible', async () => {
@@ -256,7 +262,7 @@ function fixture() {
     await p.waitForFunction(() => document.querySelector('#view-controls:not(.is-hidden)'));
     await p.context().close();
   });
-  await check('header: route-derived breadcrumbs, direct search field, theme toggle at far right, borders only', async () => {
+  await check('header: route-derived breadcrumbs, labelled Quick find, theme toggle at far right, borders only', async () => {
     const p = await open('overview');
     const expected = { overview: 'Admin Overview', live: 'Admin Live Sessions', students: 'Admin People Students', faculty: 'Admin People Faculty', controls: 'Admin Stage Controls', mathtask: 'Admin Math Task', profile: 'Admin Profile', settings: 'Admin Settings' };
     for (const [route, crumbs] of Object.entries(expected)) {
@@ -268,11 +274,11 @@ function fixture() {
     const hdr = await p.locator('.topbar').evaluate(el => { const c = getComputedStyle(el); const b = el.getBoundingClientRect(); return { h: b.height, bw: c.borderBottomWidth, shadow: c.boxShadow }; });
     assert.ok(hdr.h >= 56 && hdr.h <= 64, 'header height ' + hdr.h);
     assert.equal(hdr.bw, '1px'); assert.equal(hdr.shadow, 'none');
-    assert.equal(await p.locator('#palette-input').getAttribute('aria-label'), 'Search students or sections');
-    assert.equal(await p.locator('#palette-input').getAttribute('aria-keyshortcuts'), null);
-    assert.equal(await p.locator('#palette-open').count(), 0, 'old command trigger removed');
-    const sb = await p.locator('#palette-input').boundingBox(), tb = await p.locator('#theme-toggle').boundingBox(), vp = p.viewportSize();
-    assert.ok(sb.x > vp.width / 2, 'search field sits with the controls on the right');
+    assert.match(await p.locator('#palette-open').innerText(), /Search\.\.\./);
+    assert.match(await p.locator('#palette-open').getAttribute('aria-label'), /Search students, sections, or commands/);
+    assert.equal(await p.locator('#palette-open svg').count(), 1, 'search icon is visible');
+    const sb = await p.locator('#palette-open').boundingBox(), tb = await p.locator('#theme-toggle').boundingBox(), vp = p.viewportSize();
+    assert.ok(sb.x > vp.width / 2, 'Quick find sits with the controls on the right, not centred');
     assert.ok(tb.x + tb.width >= vp.width - 24 && tb.x > sb.x, 'theme toggle is the far-right control');
     await p.context().close();
   });
@@ -489,7 +495,7 @@ function fixture() {
     assert.deepEqual(opts, ['All sections', 'Earth', 'Jupiter', 'Mars', 'Venus']);
     assert.match(await p.locator('#scope-line').innerText(), /^All sections · 23 students · OCEAN completed 0 of 23 \(0%\)$/);
     assert.equal(await p.locator('#section-scores-open').isVisible(), false);
-    await p.locator('#section-filter').selectOption('Earth');
+    await chooseFilter(p, 'section-filter', 'Earth');
     await p.waitForFunction(() => /Showing 1–8 of 8/.test(document.querySelector('#pager-info').textContent));
     assert.equal(await p.locator('#student-tbody tr[data-student]').count(), 8);
     assert.deepEqual(await p.locator('#student-tbody tr[data-student] td:nth-child(2)').allInnerTexts(), new Array(8).fill('Earth'));
@@ -523,11 +529,11 @@ function fixture() {
     const d = makeData();
     d.profiles.filter(r => r.role === 'student').forEach((r, i) => { r.section = 'Earth'; });
     const p = await open('students', { data: d }); await waitStudents(p);
-    await p.locator('#section-filter').selectOption('Earth');
+    await chooseFilter(p, 'section-filter', 'Earth');
     await p.waitForFunction(() => /Showing 1–10 of 23 · page 1 of 3/.test(document.querySelector('#pager-info').textContent));
     await p.locator('#page-next').click();
     await p.waitForFunction(() => /Showing 11–20/.test(document.querySelector('#pager-info').textContent));
-    await p.locator('#section-filter').selectOption('Jupiter');
+    await chooseFilter(p, 'section-filter', 'Jupiter');
     await p.waitForFunction(() => /No students to show/.test(document.querySelector('#pager-info').textContent) && document.querySelectorAll('#student-tbody tr[data-student]').length === 0);
     assert.match(await p.locator('#student-empty').innerText(), /No matching students/);
     assert.equal(await p.locator('#page-prev').isDisabled(), true, 'page resets and clamps on a section change');
@@ -553,6 +559,7 @@ function fixture() {
     let p = await open('sections'); await waitStudents(p);
     assert.equal(await p.locator('#view-students').isVisible(), true);
     assert.equal(await p.evaluate(() => location.hash), '#students');
+    await p.locator('#palette-open').click();
     await p.fill('#palette-input', 'mar');
     await p.waitForFunction(() => /Mars/.test(document.querySelector('#palette-list').textContent));
     await p.locator('#palette-list .palette-group:has(.palette-group-title:text("Sections")) .palette-option', { hasText: 'Mars' }).click();
@@ -565,7 +572,7 @@ function fixture() {
     const ctl = d.profiles.find(r => r.group_type === 'control' && r.role === 'student');
     ctl.is_in_game = true; ctl.current_stage = 'Tutoring Dashboard';
     const p = await open('students', { data: d }); await waitStudents(p);
-    await p.locator('#group-filter').selectOption('control');
+    await chooseFilter(p, 'group-filter', 'control');
     await p.locator('[data-stage-filter="Active Game"]').click();
     await p.waitForFunction(() => document.querySelector('#student-tbody tr[data-student]'));
     const row = p.locator(`#student-tbody tr[data-student="${ctl.email}"]`);
@@ -576,7 +583,7 @@ function fixture() {
     await shot(p, 'profile-control-note-dark-1280');
     assert.equal(await p.locator('#drawer-control-note').isVisible(), true);
     await p.keyboard.press('Escape'); await p.waitForFunction(() => !document.querySelector('#drawer-student.is-open'));
-    await p.locator('#group-filter').selectOption('assigned'); await p.waitForTimeout(400);
+    await chooseFilter(p, 'group-filter', 'assigned'); await p.waitForTimeout(400);
     const row2 = p.locator('#student-tbody tr[data-student]').first();
     await row2.focus(); await p.keyboard.press('Enter');
     await p.waitForSelector('#drawer-student.is-open');
@@ -615,13 +622,13 @@ function fixture() {
     assert.equal(await p.locator('#view-faculty .card, #view-faculty canvas, #view-faculty svg:not(.icon)').count(), 0, 'no filler cards or charts');
     await p.context().close();
   });
-  await check('search: Students and Faculty have scoped fields; header has one direct global field', async () => {
+  await check('search: Students and Faculty have one labelled search each; Quick find is the only global one', async () => {
     const p = await open('students'); await waitStudents(p);
     assert.equal((await p.locator('label[for="student-search"]').innerText()).trim(), 'Search');
     assert.equal(await p.locator('#view-students svg').count() >= 0, true);
     assert.equal(await p.locator('#view-students .search').count(), 0, 'no icon-only search affordance');
     assert.equal(await p.locator('.topbar-center').count(), 0, 'no centred icon in the top bar');
-    assert.equal(await p.locator('#palette-input').count(), 1);
+    assert.equal(await p.locator('#palette-open').count(), 1);
     await p.locator('#nav-people-toggle').click().catch(() => {});
     await p.evaluate(() => { location.hash = '#faculty'; });
     await p.waitForSelector('#view-faculty:not(.is-hidden)');
@@ -639,13 +646,50 @@ function fixture() {
     const style = await p.locator('#stage-tabs .tab.is-active').evaluate(el => getComputedStyle(el).boxShadow);
     assert.notEqual(style, 'none');                       // 1px underline
     assert.equal(await p.locator('#nav-count-students').innerText(), '23');
-    const lay = await p.evaluate(() => { const sec = document.querySelector('#section-filter').getBoundingClientRect(), g = document.querySelector('#group-filter').getBoundingClientRect(), s = document.querySelector('#student-search').getBoundingClientRect(), t = document.querySelector('#stage-tabs').getBoundingClientRect();
-      return { sameRow: Math.abs(g.top - s.top) < 4 && Math.abs(sec.top - g.top) < 4, below: t.bottom <= sec.top, groupW: g.width, secW: sec.width }; });
+    const lay = await p.evaluate(() => { const sec = document.querySelector('#section-filter + .custom-select').getBoundingClientRect(), g = document.querySelector('#group-filter + .custom-select').getBoundingClientRect(), s = document.querySelector('#student-search').getBoundingClientRect(), t = document.querySelector('#stage-tabs').getBoundingClientRect();
+      return { sameRow: Math.abs(g.bottom - s.bottom) < 8 && Math.abs(sec.bottom - g.bottom) < 8, below: t.bottom <= sec.top, groupW: g.width, secW: sec.width }; });
     assert.ok(lay.sameRow, 'section, group and search share one row: ' + JSON.stringify(lay));
     assert.ok(lay.below, 'the stage tabs sit above the filters: ' + JSON.stringify(lay));
     assert.ok(lay.groupW <= 200 && lay.secW <= 200, 'selects are not stretched: ' + JSON.stringify(lay));
-    assert.equal(await p.locator('label[for="section-filter"]').innerText(), 'Section');
+    assert.equal(await p.locator('#section-filter-label').innerText(), 'Section');
     await shot(p, 'students-dark-1280');
+    await p.context().close();
+  });
+  await check('student filters: themed lists mirror live options, keyboard selection filters and Escape restores focus', async () => {
+    const p = await open('students'); await waitStudents(p);
+    const section = p.locator('#section-filter + .custom-select .custom-select-trigger');
+    const group = p.locator('#group-filter + .custom-select .custom-select-trigger');
+    assert.equal(await p.locator('#section-filter').isVisible(), false, 'native OS select is hidden');
+    assert.equal(await section.getAttribute('role'), 'combobox');
+    await section.click();
+    assert.deepEqual(await p.locator('#section-filter-list .custom-select-option').allInnerTexts(), ['All sections', 'Earth', 'Jupiter', 'Mars', 'Venus']);
+    await p.keyboard.press('ArrowDown');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction(() => document.querySelector('#section-filter').value === 'Earth');
+    assert.equal(await section.innerText(), 'Earth');
+    const tableTop = await p.locator('#roster-thead').evaluate(el => el.getBoundingClientRect().top);
+    await group.click();
+    assert.equal(await p.locator('#group-filter-list').isVisible(), true);
+    assert.equal(await p.locator('#roster-thead').evaluate(el => el.getBoundingClientRect().top), tableTop, 'opening list does not shift rows');
+    assert.deepEqual(await p.locator('#group-filter-list .custom-select-option').allInnerTexts(), ['All groups', 'Experimental', 'Assigned', 'Free choice', 'Neutral (legacy)', 'Control']);
+    await shot(p, 'student-custom-group-list-dark-1280');
+    await p.keyboard.press('Escape');
+    assert.equal(await p.locator('#group-filter-list').isVisible(), false);
+    assert.equal(await p.evaluate(() => document.activeElement === document.querySelector('#group-filter + .custom-select .custom-select-trigger')), true);
+    await group.click();
+    await p.locator('#group-filter-list .custom-select-option', { hasText: 'Control' }).click();
+    await p.waitForFunction(() => document.querySelector('#group-filter').value === 'control');
+    assert.equal(await group.innerText(), 'Control');
+    await shot(p, 'student-custom-filters-dark-1280');
+    await p.context().close();
+  });
+  await check('student filters: open custom list stays inside a 375px viewport', async () => {
+    const p = await open('students', { width: 375, height: 720 }); await waitStudents(p);
+    await p.locator('#group-filter + .custom-select .custom-select-trigger').click();
+    const box = await p.locator('#group-filter-list').boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 375, JSON.stringify(box));
+    assert.ok(await overflow(p), 'no horizontal page overflow with list open');
+    await shot(p, 'student-custom-group-list-375');
     await p.context().close();
   });
   await check('all students: maximum 10 rows per page; Previous/Next disabled at boundaries; counts stay full-dataset', async () => {
@@ -681,7 +725,7 @@ function fixture() {
     await p.waitForFunction(() => /of 1\b/.test(document.querySelector('#pager-info').textContent));
     assert.equal(await p.locator('#student-tbody tr[data-student]').count(), 1);
     await p.fill('#student-search', '');
-    await p.selectOption('#group-filter', 'control');
+    await chooseFilter(p, 'group-filter', 'control');
     await p.waitForFunction(() => document.querySelector('[data-stage-count="all"]').textContent === '6' && /of 6\b/.test(document.querySelector('#pager-info').textContent));
     await p.context().close();
   });
@@ -712,7 +756,7 @@ function fixture() {
     const p = await open('students', { initial: { delay: {}, fail: {} } });
     await waitStudents(p);
     await p.evaluate(() => { window.fixture.fail = { profiles: { code: 'XX000', message: 'boom' } }; });
-    await p.selectOption('#group-filter', 'assigned');
+    await chooseFilter(p, 'group-filter', 'assigned');
     await p.waitForFunction(() => document.querySelector('[data-stage-count="OCEAN"]').textContent === '—');
     assert.equal(await p.locator('[data-stage-count="all"]').innerText(), '—');
     await p.context().close();
@@ -849,11 +893,11 @@ function fixture() {
     assert.deepEqual(vis, ['assigned', 'non-assigned', 'control']);
     await q.context().close();
   });
-  await check('conditions: Control policy row says OCEAN only and Neutral is explained as a persona', async () => {
+  await check('stage controls: reference policy table removed, stage actions retained', async () => {
     const p = await open('controls');
-    await p.waitForSelector('#policy-tbody tr');
-    const ctl = await p.locator('#policy-tbody tr').first().locator('td').allInnerTexts();
-    assert.deepEqual(ctl.map(t => t.trim()), ['Available', 'Locked', 'Locked']);
+    assert.equal(await p.locator('#policy-tbody').count(), 0);
+    await p.waitForSelector('#gates-grid .gate');
+    assert.equal(await p.locator('#gates-grid .gate').count(), 3);
     await p.context().close();
   });
 
@@ -1002,21 +1046,13 @@ function fixture() {
   });
 
   /* ================= STAGE CONTROLS ================= */
-  await check('stage controls: three stages with real ids, group availability table from the server rule, no bypass', async () => {
+  await check('stage controls: three stages with real ids and no policy reference table', async () => {
     const p = await open('controls');
     await p.waitForSelector('#gates-grid .gate');
     assert.equal(await p.locator('#gates-grid .gate').count(), 3);
     assert.deepEqual(await p.locator('#gates-grid .gate-title').allInnerTexts(), ['OCEAN personality test', 'Character selection', 'Tutoring dashboard']);
-    const rows = await p.locator('#policy-tbody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(c => c.innerText.trim())));
-    assert.deepEqual(rows, [
-      ['Control', 'Available', 'Locked', 'Locked'],
-      ['Experimental · Assigned', 'Available', 'Locked', 'Available'],
-      ['Experimental · Free choice', 'Available', 'Available', 'Available after choosing a tutor'],
-      ['Neutral (legacy records)', 'Available', 'Locked', 'Available']]);
-    assert.match(await p.locator('#policy-foot').innerText(), /Reference only; it does not change anything here/);
+    assert.equal(await p.locator('#view-controls .policy-table').count(), 0);
     assert.equal(/migration|server|supabase|\b0\d{3}\b/i.test(await p.locator('#view-controls').innerText()), false, 'no internal terms in Stage Controls');
-    assert.match(await p.locator('#policy-foot').innerText(), /Neutral is a tutor choice, not a group/);
-    assert.equal(await p.locator('#policy-tbody th').first().evaluate(e => getComputedStyle(e).textAlign), 'left');
     assert.equal(await p.locator('#view-controls').evaluate(el => /Manage gates|Open or close/.test(el.innerText)), true);   // renamed section copy only
     await shot(p, 'controls-dark-1280');
     await p.context().close();
@@ -1184,42 +1220,78 @@ function fixture() {
     await p.context().close();
   });
 
-  /* ================= DIRECT HEADER SEARCH ================= */
-  await check('header search: direct typing, no Cmd/Ctrl+K shortcut, Escape closes results', async () => {
+  /* ================= COMMAND PALETTE ================= */
+  await check('palette: Ctrl+K opens, placeholder exact, autofocus, suggestions, footer keycaps, Escape restores focus', async () => {
     const p = await open('overview');
-    const input = p.locator('#palette-input');
-    assert.equal(await input.getAttribute('placeholder'), 'Search students or sections');
-    assert.equal(await p.locator('#palette-list').isVisible(), false);
+    await p.locator('#palette-open').focus();
     await p.keyboard.press('Control+k');
-    assert.equal(await p.locator('#palette-list').isVisible(), false, 'shortcut does not open search');
-    await input.fill('ear');
-    await p.waitForFunction(() => /Earth/.test(document.querySelector('#palette-list').textContent));
-    assert.equal(await input.getAttribute('aria-expanded'), 'true');
-    assert.equal(await p.locator('#palette-list').isVisible(), true);
-    assert.equal(await p.locator('.palette-group-title').allInnerTexts().then(v => v.includes('Commands')), false);
+    await p.waitForSelector('#palette.is-open');
+    assert.equal(await p.getAttribute('#palette-input', 'placeholder'), 'Search students, sections, or commands...');
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'palette-input');
+    assert.equal(await p.locator('#palette-input').evaluate(e => getComputedStyle(e).outlineStyle), 'none');
+    assert.deepEqual(await p.locator('#palette-list .palette-option').allInnerTexts(), ['Register student', 'Manage sections', 'Go to Settings']);
+    assert.deepEqual((await p.locator('.palette-foot span').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').trim()), ['↑↓ navigate', 'Enter select', 'Esc close']);
+    const bg = await p.locator('.palette').evaluate(e => { const c = getComputedStyle(e); return { bg: c.backgroundColor, r: parseFloat(c.borderTopLeftRadius), bw: c.borderTopWidth, align: getComputedStyle(e).textAlign }; });
+    assert.notEqual(bg.bg, 'rgba(0, 0, 0, 0)'); assert.ok(bg.r >= 4 && bg.r <= 6); assert.equal(bg.bw, '1px'); assert.equal(bg.align, 'left');
+    const ov = await p.locator('#palette').evaluate(e => getComputedStyle(e).backdropFilter);
+    assert.match(ov, /blur/);
+    await shot(p, 'palette-empty-dark-1280');
     await p.keyboard.press('Escape');
-    assert.equal(await input.getAttribute('aria-expanded'), 'false');
-    assert.equal(await p.locator('#palette-list').isVisible(), false);
+    await p.waitForFunction(() => !document.querySelector('#palette.is-open'));
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'palette-open');
+    await p.keyboard.press('Meta+k');
+    await p.waitForSelector('#palette.is-open');
     await p.context().close();
   });
-  await check('header search: keyboard navigation selects a section; outside click closes without moving focus', async () => {
+  await check('palette: keyboard navigation, active option exposed, Enter runs the verified destination/action', async () => {
     const p = await open('overview');
+    await p.locator('#palette-open').click();
     const input = p.locator('#palette-input');
-    await input.fill('mar');
-    await p.waitForFunction(() => /Mars/.test(document.querySelector('#palette-list').textContent));
     assert.equal(await input.getAttribute('aria-activedescendant'), 'po-0');
+    await p.keyboard.press('ArrowDown'); await p.keyboard.press('ArrowDown');
+    assert.equal(await input.getAttribute('aria-activedescendant'), 'po-2');
+    assert.equal(await p.locator('#po-2').getAttribute('aria-selected'), 'true');
+    await p.keyboard.press('ArrowDown');
+    assert.equal(await input.getAttribute('aria-activedescendant'), 'po-0');
+    await p.keyboard.press('ArrowUp');
+    assert.equal(await input.getAttribute('aria-activedescendant'), 'po-2');
     await p.keyboard.press('Enter');
-    await p.waitForFunction(() => document.querySelector('#section-filter').value === 'Mars');
-    assert.equal(await p.locator('#palette-list').isVisible(), false);
-    await input.fill('ear');
-    await p.waitForFunction(() => /Earth/.test(document.querySelector('#palette-list').textContent));
-    await p.locator('#theme-toggle').click();
-    assert.equal(await p.locator('#palette-list').isVisible(), false);
-    assert.equal(await p.evaluate(() => document.activeElement.id), 'theme-toggle');
+    await p.waitForSelector('#view-settings:not(.is-hidden)');
+    assert.equal(await p.locator('#palette.is-open').count(), 0);
+    await p.locator('#palette-open').click();
+    await p.keyboard.press('Enter');                       // Register student
+    await p.waitForSelector('#modal-register-student.is-open');
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('#modal-register-student.is-open'));
+    await focusIs(p, el => el.id === 'palette-open');
     await p.context().close();
   });
-  await check('header search: student search is remote, stale responses are dropped, selection opens the profile', async () => {
+  await check('palette: groups (Students, Sections, Modules, Commands), no removed features, no-results message', async () => {
     const p = await open('overview');
+    await p.locator('#palette-open').click();
+    await p.fill('#palette-input', 'stu');
+    await p.waitForFunction(() => document.querySelectorAll('#palette-list .palette-group').length >= 3);
+    const groups = await p.locator('.palette-group-title').evaluateAll(els => els.map(e => e.textContent));
+    assert.ok(groups.includes('Students') && groups.includes('Modules') && groups.includes('Commands'), groups.join());
+    assert.equal(await p.locator('#palette-list .palette-option').count() > 3, true);
+    await p.fill('#palette-input', 'ear');
+    await p.waitForFunction(() => /Sections/i.test(document.querySelector('#palette-list').textContent));
+    assert.match(await p.locator('#palette-list .palette-group:has(.palette-group-title:text("Sections"))').innerText(), /Earth/);
+    for (const term of ['export', 'security', 'device', 'csv']) {
+      await p.fill('#palette-input', term);
+      await p.waitForTimeout(450);
+      assert.match(await p.locator('#palette-list').innerText(), /No results/, term);
+    }
+    await p.fill('#palette-input', 'zzzzqqq');
+    await p.waitForFunction(() => /No results for “zzzzqqq”/.test(document.querySelector('#palette-list').innerText));
+    assert.match(await p.locator('#palette-status').innerText(), /No results/);
+    await shot(p, 'palette-noresults-dark-1280');
+    await p.context().close();
+  });
+  await check('palette: student search is remote, stale responses are dropped, selection opens the profile', async () => {
+    const p = await open('overview');
+    await p.locator('#palette-open').click();
+    /* Slow answer for the first term, fast for the second: the late one must not win. */
     await p.evaluate(() => { window.fixture.delay.profiles = 900; });
     await p.fill('#palette-input', 'student 0');
     await p.waitForTimeout(260);
@@ -1235,14 +1307,13 @@ function fixture() {
     assert.equal(await p.locator('#drawer-student-name').innerText(), 'Student 07');
     await p.context().close();
   });
-  await check('header search: failure is distinct from no results and section links still work', async () => {
+  await check('palette: a failing student search says so (not "no results") and sections still work', async () => {
     const p = await open('overview');
+    await p.locator('#palette-open').click();
     await p.evaluate(() => { window.fixture.fail = { profiles: { code: 'XX000', message: 'down' } }; });
     await p.fill('#palette-input', 'earth');
     await p.waitForFunction(() => /could not be searched/.test(document.querySelector('#palette-list').innerText));
     assert.match(await p.locator('#palette-list').innerText(), /Earth/);
-    await p.fill('#palette-input', 'zzzzqqq');
-    await p.waitForFunction(() => /No results for “zzzzqqq”/.test(document.querySelector('#palette-list').innerText));
     await p.context().close();
   });
 
@@ -1312,7 +1383,7 @@ function fixture() {
         await p.waitForTimeout(120);
         assert.equal(await overflow(p), true, route + ' overflows at ' + w);
       }
-      for (const id of ['#palette-input', '#theme-toggle']) { const b = await p.locator(id).boundingBox(); assert.ok(b && b.x >= 0 && b.x + b.width <= w, id + JSON.stringify(b)); if (w <= 900) assert.ok(b.width >= 44 && b.height >= 44, id + ' touch size'); }
+      for (const id of ['#palette-open', '#theme-toggle']) { const b = await p.locator(id).boundingBox(); assert.ok(b && b.x >= 0 && b.x + b.width <= w, id + JSON.stringify(b)); if (w <= 900) assert.ok(b.width >= 44 && b.height >= 44, id + ' touch size'); }
       await p.evaluate(() => { location.hash = '#students'; }); await waitStudents(p);
       await shot(p, `students-${w}-${t}`);
       await p.context().close();
@@ -1433,11 +1504,11 @@ function fixture() {
         assert.deepEqual(r.inputs.filter(i => i.boundary < 3 || (i.placeholder !== null && i.placeholder < 4.5)), [], `${t}/${route} inputs`);
         await p.context().close();
       }
-      /* Search suggestions, user menu, a modal, the student drawer. */
+      /* Overlays: command palette, user menu, a modal, the student drawer. */
       const p = await open('students', { theme: t }); await waitStudents(p);
-      await p.fill('#palette-input', 'earth'); await p.waitForFunction(() => !document.querySelector('#palette-list').hidden); await p.waitForTimeout(300);
-      let r = await scanContrast(p); contrastReport[`${t}/search-results`] = { texts: r.texts, worstTextRatio: r.worst, inputs: r.inputs };
-      assert.deepEqual(r.bad, [], t + '/search results'); assert.deepEqual(r.inputs.filter(i => i.placeholder !== null && i.placeholder < 4.5), [], t + '/search placeholder');
+      await p.keyboard.press('Control+k'); await p.waitForSelector('#palette.is-open'); await p.waitForTimeout(300);
+      let r = await scanContrast(p); contrastReport[`${t}/palette`] = { texts: r.texts, worstTextRatio: r.worst, inputs: r.inputs };
+      assert.deepEqual(r.bad, [], t + '/palette'); assert.deepEqual(r.inputs.filter(i => i.placeholder !== null && i.placeholder < 4.5), [], t + '/palette placeholder');
       await p.keyboard.press('Escape'); await p.waitForTimeout(300);
       await p.locator('#user-menu-btn').click(); await p.waitForTimeout(200);
       r = await scanContrast(p); contrastReport[`${t}/user-menu`] = { texts: r.texts, worstTextRatio: r.worst };
@@ -1473,7 +1544,7 @@ function fixture() {
           const inView = el => { if (!el || !el.getClientRects().length) return false; const r = el.getBoundingClientRect(); return r.left >= -1 && r.right <= window.innerWidth + 1 && r.top >= -1 && r.bottom <= window.innerHeight + 1; };
           const mq = window.innerWidth <= 900;
           return { scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth,
-            palette: inView(document.querySelector('#palette-input')), theme: inView(document.querySelector('#theme-toggle')),
+            palette: inView(document.querySelector('#palette-open')), theme: inView(document.querySelector('#theme-toggle')),
             toggle: inView(document.querySelector('#mobile-nav-toggle')), drawerMode: getComputedStyle(document.querySelector('#sidebar')).visibility === 'hidden',
             title: !!document.querySelector('.page:not(.is-hidden) .page-title') && document.querySelector('.page:not(.is-hidden) .page-title').getBoundingClientRect().right <= window.innerWidth + 1, mq };
         });
@@ -1492,14 +1563,14 @@ function fixture() {
         await p.context().close();
       }
     });
-    await check(`${mode}: search results, user menu, modal and drawer stay inside the viewport and usable`, async () => {
+    await check(`${mode}: palette, user menu, modal and drawer stay inside the viewport and usable`, async () => {
       const vp = mode === 'browser-zoom-200' ? { width: 640, height: 450 } : { width: 1280, height: 900 };
       const p = await open('students', vp);
       if (mode === 'text-only-200') await p.addStyleTag({ content: 'html{font-size:200% !important}' });
       await waitStudents(p);
       const fits = sel => p.locator(sel).evaluate(e => { const r = e.getBoundingClientRect(); return r.left >= -1 && r.right <= window.innerWidth + 1 && r.top >= -1 && r.bottom <= window.innerHeight + 1; });
-      await p.fill('#palette-input', 'earth'); await p.waitForFunction(() => !document.querySelector('#palette-list').hidden); await p.waitForTimeout(300);
-      assert.ok(await fits('#palette-list'), 'search results inside viewport');
+      await p.keyboard.press('Control+k'); await p.waitForSelector('#palette.is-open'); await p.waitForTimeout(300);
+      assert.ok(await fits('#palette .palette'), 'palette inside viewport');
       assert.equal(await p.evaluate(() => document.activeElement.id), 'palette-input');
       await shot(p, `zoom200-${mode}-palette`);
       await p.keyboard.press('Escape'); await p.waitForTimeout(300);

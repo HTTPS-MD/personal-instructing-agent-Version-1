@@ -1271,6 +1271,7 @@
                 if (state.sectionsLoaded) { loadRoster(); loadStageCounters(); }
             }
             filter.value = keep;
+            refreshCustomSelect('section-filter');
         }
     }
 
@@ -1703,6 +1704,8 @@
         state.page = 1;
         var filter = $('#section-filter'); if (filter) { filter.value = state.filters.section; }
         $('#group-filter').value = 'all';
+        refreshCustomSelect('section-filter');
+        refreshCustomSelect('group-filter');
         $('#student-search').value = '';
         setStageTab('');
         renderScope();
@@ -1788,6 +1791,133 @@
         });
     }
 
+    /* The native selects remain the single source of filter values for the
+       roster. A themed listbox mirrors their options without opening an OS
+       menu; programmatic changes still update the same underlying controls. */
+    var customSelects = {};
+    function refreshCustomSelect(id) {
+        if (customSelects[id]) { customSelects[id].refresh(); }
+    }
+    function initCustomSelect(id) {
+        var select = $('#' + id);
+        var field = select.parentElement;
+        var box = document.createElement('div');
+        var trigger = document.createElement('button');
+        var list = document.createElement('div');
+        var active = 0;
+        var open = false;
+        box.className = 'custom-select';
+        trigger.type = 'button';
+        trigger.className = 'custom-select-trigger';
+        trigger.setAttribute('role', 'combobox');
+        trigger.setAttribute('aria-haspopup', 'listbox');
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-controls', id + '-list');
+        trigger.setAttribute('aria-labelledby', id + '-label ' + id + '-value');
+        list.className = 'custom-select-list';
+        list.id = id + '-list';
+        list.setAttribute('role', 'listbox');
+        list.setAttribute('aria-labelledby', id + '-label');
+        list.hidden = true;
+        box.appendChild(trigger);
+        box.appendChild(list);
+        field.appendChild(box);
+        select.hidden = true;
+        select.tabIndex = -1;
+        select.setAttribute('aria-hidden', 'true');
+
+        function options() { return Array.prototype.slice.call(select.options); }
+        function paint() {
+            Array.prototype.forEach.call(list.children, function (item, i) {
+                var chosen = i === select.selectedIndex;
+                item.classList.toggle('is-selected', chosen);
+                item.classList.toggle('is-active', i === active);
+                item.setAttribute('aria-selected', chosen ? 'true' : 'false');
+            });
+            if (open && list.children[active]) {
+                trigger.setAttribute('aria-activedescendant', list.children[active].id);
+                list.children[active].scrollIntoView({ block: 'nearest' });
+            } else { trigger.removeAttribute('aria-activedescendant'); }
+        }
+        function refresh() {
+            var opts = options();
+            var chosen = opts[select.selectedIndex] || opts[0];
+            trigger.innerHTML = '<span class="custom-select-value" id="' + id + '-value"></span><span class="custom-select-chevron" aria-hidden="true"></span>';
+            trigger.querySelector('.custom-select-value').textContent = chosen ? chosen.textContent.trim() : '';
+            list.replaceChildren();
+            opts.forEach(function (option, i) {
+                var item = document.createElement('div');
+                item.className = 'custom-select-option';
+                item.id = id + '-option-' + i;
+                item.setAttribute('role', 'option');
+                item.dataset.index = i;
+                var label = option.textContent.trim();
+                if (label.indexOf('· ') === 0) {
+                    item.classList.add('is-suboption');
+                    label = label.slice(2);
+                }
+                item.textContent = label;
+                list.appendChild(item);
+            });
+            active = Math.max(0, select.selectedIndex);
+            paint();
+        }
+        function close(restoreFocus) {
+            if (!open) { return; }
+            open = false;
+            list.hidden = true;
+            trigger.setAttribute('aria-expanded', 'false');
+            paint();
+            if (restoreFocus) { trigger.focus({ preventScroll: true }); }
+        }
+        function show() {
+            Object.keys(customSelects).forEach(function (key) { if (key !== id) { customSelects[key].close(); } });
+            refresh();
+            open = true;
+            list.hidden = false;
+            trigger.setAttribute('aria-expanded', 'true');
+            paint();
+        }
+        function choose(index) {
+            var option = options()[index];
+            if (!option || option.disabled) { return; }
+            select.value = option.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            refresh();
+            close(true);
+        }
+        trigger.addEventListener('click', function () { open ? close(false) : show(); });
+        trigger.addEventListener('keydown', function (event) {
+            var count = options().length;
+            if (event.key === 'Escape') { if (open) { event.preventDefault(); close(true); } return; }
+            if (event.key === 'Tab') { close(false); return; }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
+                event.preventDefault();
+                if (!open) { show(); }
+                if (event.key === 'Home') { active = 0; }
+                else if (event.key === 'End') { active = count - 1; }
+                else { active = (active + (event.key === 'ArrowDown' ? 1 : -1) + count) % count; }
+                paint();
+            } else if ((event.key === 'Enter' || event.key === ' ') && open) {
+                event.preventDefault(); choose(active);
+            }
+        });
+        list.addEventListener('click', function (event) {
+            var item = event.target.closest('[data-index]');
+            if (item) { choose(Number(item.dataset.index)); }
+        });
+        document.addEventListener('pointerdown', function (event) {
+            if (open && !box.contains(event.target)) { close(false); }
+        });
+        select.addEventListener('change', refresh);
+        customSelects[id] = { refresh: refresh, close: close };
+        refresh();
+    }
+    function initCustomSelects() {
+        initCustomSelect('section-filter');
+        initCustomSelect('group-filter');
+    }
+
     function initRoster() {
         $('#student-search').addEventListener('input', debounce(function (event) {
             state.filters.search = event.target.value;
@@ -1829,6 +1959,8 @@
             $('#student-search').value = '';
             $('#group-filter').value = 'all';
             $('#section-filter').value = '';
+            refreshCustomSelect('group-filter');
+            refreshCustomSelect('section-filter');
             setStageTab('');
             state.page = 1;
             renderScope();
@@ -2943,34 +3075,6 @@
        access then closes it for all of them (there is nothing per-section to
        revoke). After a successful Grant or Revoke every tick is cleared, so a
        second press cannot repeat the action on the same sections. */
-
-    /* What the SERVER lets each group enter, from pia_can_enter_stage as
-       replaced by migration 0038: OCEAN until it is submitted; Character
-       Selection only for the free-choice group (non-assigned) until a tutor is
-       chosen; the Tutoring Dashboard for everyone with OCEAN done except
-       Control (OCEAN only) and a free-choice student who has not chosen yet.
-       Neutral is a tutor persona, not a group: free-choice students can pick
-       it, assigned students can be given it. Records still carrying the old
-       "neutral" group behave as Assigned. Nothing on this page edits the rule,
-       and a stage closed to a section stays closed whatever a group's rule
-       says. */
-    var GROUP_POLICY = [
-        { label: 'Control', ocean: 'Available', char: 'Locked', dash: 'Locked' },
-        { label: 'Experimental · Assigned', ocean: 'Available', char: 'Locked', dash: 'Available' },
-        { label: 'Experimental · Free choice', ocean: 'Available', char: 'Available', dash: 'Available after choosing a tutor' },
-        { label: 'Neutral (legacy records)', ocean: 'Available', char: 'Locked', dash: 'Available' }
-    ];
-
-    function renderPolicy() {
-        var cell = function (text) {
-            return '<td><span class="' + (text === 'Locked' ? 'policy-no' : 'policy-yes') + '">' + esc(text) + '</span></td>';
-        };
-        $('#policy-tbody').innerHTML = GROUP_POLICY.map(function (g) {
-            return '<tr><th scope="row" class="policy-group">' + esc(g.label) + '</th>' +
-                cell(g.ocean) + cell(g.char) + cell(g.dash) + '</tr>';
-        }).join('');
-        $('#policy-foot').textContent = 'Reference only; it does not change anything here. Control takes the OCEAN test only. Neutral is a tutor choice, not a group.';
-    }
 
     var GATE_ACCESS_TIP = 'Granting moves a section’s eligible students in right away. Grant a section ' +
         'again to let in students who finished the previous stage later. Revoke access ends access for ' +
@@ -4498,13 +4602,13 @@
         initRouter();
         initModals();
         initInfoTips();
+        initCustomSelects();
         initRoster();
         initLive();
         initSectionsTable();
         initDrawerActions();
         initFaculty();
         initGates();
-        renderPolicy();
         initForms();
         initRetry();
         initScrollRegions();
