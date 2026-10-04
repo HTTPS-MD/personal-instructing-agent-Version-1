@@ -138,6 +138,11 @@
         bankEmpty: false,
         expired: false,
         expiring: false,
+        closed: false,       /* the admin's closing time has passed (server's word) */
+        startBlocked: false, /* the start button is off for a reason other than the closing time */
+        startLede: '',       /* the start text, kept while the closing message replaces it */
+        closeTimer: null,
+        checking: false,
         restarting: false,
         finished: false,
         inSession: false,   /* a lesson has been started and not yet ended (see PIA_HAS_ACTIVE_WORK) */
@@ -182,7 +187,10 @@
 
         /* The classroom video behind the tutor: only while the game is showing,
            and never for people who ask for reduced motion (the poster stays). */
-        if (name === 'session') { startMentorVideo(); }
+        if (name === 'session') {
+            startMentorVideo();
+            requestAnimationFrame(function () { requestAnimationFrame(function () { fitSpeech(); centerFigure(); }); });
+        }
     }
 
     /* The classroom behind the tutor: the landing page's own hero film, added only
@@ -464,6 +472,58 @@
         return fallbackType ? line(fallbackType) : '';
     }
 
+    /* The speech bubble never has a scroll bar: if the words do not fit its fixed height, they
+       shrink a little until they do. Runs whenever the text changes or the window is resized. */
+    function fitSpeech() {
+        var box = $('#status-msg'), node = $('#agent-speech');
+        if (!box || !node) { return; }
+        node.style.fontSize = '';
+        var size = parseFloat(getComputedStyle(node).fontSize) || 16;
+        var guard = 0;
+        while (node.scrollHeight > node.clientHeight + 1 && size > 10.5 && guard++ < 60) {
+            size -= 0.5;
+            node.style.fontSize = size + 'px';
+        }
+    }
+
+    /* Where the figure is inside each picture varies (the pictures are cropped differently), so the
+       figure is centred, not the picture: find the left and right edge of the opaque pixels once per
+       picture, and shift the picture by the difference. */
+    var figureBox = {};
+    function figureCentre(src, done) {
+        if (figureBox[src] !== undefined) { return done(figureBox[src]); }
+        var probe = new Image();
+        probe.onload = function () {
+            var c = 0.5;
+            try {
+                var w = 96, h = Math.max(1, Math.round(96 * probe.naturalHeight / probe.naturalWidth));
+                var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                var cx = cv.getContext('2d'); cx.drawImage(probe, 0, 0, w, h);
+                var data = cx.getImageData(0, 0, w, h).data, cols = new Array(w).fill(0);
+                for (var y = 0; y < h; y++) { for (var x = 0; x < w; x++) { if (data[(y * w + x) * 4 + 3] > 40) { cols[x]++; } } }
+                var min = -1, max = -1;
+                for (var i = 0; i < w; i++) { if (cols[i] > 1) { if (min < 0) { min = i; } max = i; } }
+                if (min >= 0) { c = (min + max + 1) / 2 / w; }
+            } catch (e) { c = 0.5; }
+            figureBox[src] = c;
+            done(c);
+        };
+        probe.onerror = function () { figureBox[src] = 0.5; done(0.5); };
+        probe.src = src;
+    }
+
+    function centerFigure() {
+        var img = $('#agent-img');
+        if (!img || !img.naturalWidth) { return; }
+        var src = img.currentSrc || img.src;
+        figureCentre(src, function (c) {
+            if ((img.currentSrc || img.src) !== src) { return; }
+            var boxW = img.clientWidth, boxH = img.clientHeight;
+            var w = Math.min(boxW, boxH * img.naturalWidth / img.naturalHeight);
+            img.style.setProperty('--figure-shift', Math.round(w * (0.5 - c)) + 'px');
+        });
+    }
+
     function setSpeech(text) {
         var node = $('#agent-speech');
         if (node) { node.textContent = clean(text); }
@@ -694,10 +754,76 @@
         if (state.expired) { return; }
         closePreview();
         state.expired = true;
+        state.closed = true;
         lockForExpiry();
         speak('Tutoring is closed for now. Thank you for your hard work!', 'default');
         $('#time-announce').textContent = 'Tutoring is closed.';
         openModal('modal-time');
+    }
+
+    /* ---- Live: the closing time reaches the page the moment it changes ---- */
+
+    /* tutoring_status says closed or not, and how long is left (never drawn: the student sees
+       no time). The page asks every few seconds and also at the exact moment, so the game
+       locks when the time comes and opens the moment the admin opens it. */
+    var POLL_MS = Number(window.PIA_TUTORING_POLL_MS) || 5000;
+
+    function paintStartClosed(closed) {
+        var btn = $('#start-btn'), lede = $('#start-lede');
+        if (closed) {
+            if (!state.startLede) { state.startLede = lede.textContent; }
+            btn.disabled = true;
+            lede.textContent = 'Tutoring is closed right now. Please wait for your teacher to open it again.';
+        } else if (state.startLede) {
+            lede.textContent = state.startLede;
+            state.startLede = '';
+            btn.disabled = state.startBlocked;
+        }
+    }
+
+    async function reopenSession() {
+        state.expired = false;
+        closeModal('modal-time');
+        $('#time-announce').textContent = '';
+        speak('Tutoring is open again. Let’s continue!', 'happy');
+        state.problem = null;
+        await nextProblem();
+    }
+
+    async function checkTutoring() {
+        if (state.checking || !sb) { return; }
+        state.checking = true;
+        var res = null;
+        try { res = await sb.rpc('tutoring_status'); } catch (e) { res = null; }
+        state.checking = false;
+        if (!res || res.error || !res.data) { return; }   /* no answer: nothing changes */
+
+        clearTimeout(state.closeTimer);
+        var left = Number(res.data.seconds_to_close);
+        if (res.data.seconds_to_close != null && isFinite(left) && left >= 0) {
+            state.closeTimer = setTimeout(checkTutoring, Math.min(left, 3600) * 1000 + 300);
+        }
+
+        var closed = res.data.closed === true;
+        if (closed === state.closed && (closed === state.expired || !state.inSession)) {
+            if (!state.inSession) { paintStartClosed(closed); }
+            return;
+        }
+        state.closed = closed;
+        if (closed) {
+            if (state.inSession) { expire(); } else { paintStartClosed(true); }
+        } else if (state.expired) {
+            await reopenSession();
+        } else {
+            paintStartClosed(false);
+        }
+    }
+
+    function watchTutoring() {
+        setInterval(checkTutoring, POLL_MS);
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) { checkTutoring(); }
+        });
     }
 
     function noQuestions() {
@@ -1296,6 +1422,22 @@
         $('#start-hello').textContent = 'Welcome back, ' + firstName + '!';
 
         initModals();
+
+        var speechNode = $('#agent-speech');
+        if (speechNode && window.MutationObserver) {
+            new MutationObserver(fitSpeech).observe(speechNode, { childList: true, characterData: true, subtree: true });
+        }
+        var agentImg = $('#agent-img');
+        if (agentImg) { agentImg.addEventListener('load', centerFigure); }
+        var stageNode = $('.mentor-agent-stage');
+        if (stageNode && window.ResizeObserver) {
+            new ResizeObserver(function () { centerFigure(); fitSpeech(); }).observe(stageNode);
+        }
+        var resizeTimer = null;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function () { fitSpeech(); centerFigure(); }, 120);
+        });
         $('#hint-btn').addEventListener('click', handleHint);
         $('#signout-btn').addEventListener('click', signOut);
         $('#start-btn').addEventListener('click', handleStart);
@@ -1309,7 +1451,7 @@
         /* The tutor is the one on the profile and nothing else. If it is not
            one this game knows, nothing starts and no other is chosen. */
         if (!applyCharacter(me.data && me.data.selected_character)) {
-            $('#start-btn').disabled = true;
+            $('#start-btn').disabled = true; state.startBlocked = true;
             showGlobalError(me.data && me.data.selected_character
                 ? 'Your tutor could not be loaded. Please tell your teacher.'
                 : 'Your tutor has not been assigned yet. Please tell your teacher.');
@@ -1322,7 +1464,7 @@
            the one Start uses -- asking twice used to open a second one. */
         var peek = await sb.rpc('resume_or_start_game_session');
         if (peek.error) {
-            $('#start-btn').disabled = true;
+            $('#start-btn').disabled = true; state.startBlocked = true;
             showGlobalError('Your session could not be loaded. Please refresh the page.');
         } else if (peek.data && peek.data.session_id) {
             applySession(peek.data);
@@ -1355,13 +1497,11 @@
             }
         }
 
-        /* Closed by the admin? Say so on the start screen; the server refuses everything
-           anyway. If this call is not available yet, the tutoring is treated as open. */
-        var status = await sb.rpc('tutoring_status');
-        if (status.data && status.data.closed === true) {
-            $('#start-btn').disabled = true;
-            $('#start-lede').textContent = 'Tutoring is closed right now. Please wait for your teacher to open it again.';
-        }
+        /* Closed by the admin? Say so on the start screen, and keep watching: it locks the
+           moment the closing time comes and opens the moment the admin opens it. If the call
+           is not available yet, the tutoring is treated as open. */
+        await checkTutoring();
+        watchTutoring();
 
         reveal();
 

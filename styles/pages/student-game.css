@@ -116,7 +116,9 @@ body.is-playing #pia-change-password { display: none; }
     border: 3px solid var(--palette-ink);
     box-shadow: 6px 6px 0 var(--pop);
     text-align: center;
-    overflow-y: auto;
+    /* The box itself never scrolls (its tail pokes outside it and used to make a bar appear
+       even for one short line). The words shrink to fit (fitSpeech); see .tutor-speech. */
+    overflow: hidden;
 }
 
 .tutor-speech {
@@ -127,7 +129,12 @@ body.is-playing #pia-change-password { display: none; }
     font-weight: 600;
     line-height: 1.4;
     overflow-wrap: anywhere;
+    /* Only an absurdly long line can still overflow; it scrolls with no bar drawn. */
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
+.tutor-speech::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 /* The tail pointing at the tutor (ink outline, paper fill), as in the game. */
 .prompt-box::before,
@@ -152,7 +159,7 @@ body.is-playing #pia-change-password { display: none; }
     display: flex;
     align-items: stretch;
     justify-content: center;
-    padding: 0 16px 6px 12px;
+    padding: 0 14px 6px;
 }
 
 /* Keep each transparent character fully visible as expressions change. */
@@ -167,6 +174,10 @@ body.is-playing #pia-change-password { display: none; }
     background: transparent;
     border: 0;
     box-shadow: none;
+    /* The figure itself, not the picture, sits in the middle of the panel: the page measures where the
+       figure is inside each picture and sets this offset (see centerFigure). */
+    position: relative;
+    left: var(--figure-shift, 0px);
 }
 .mentor-overlay-avatar.talking { animation: avatarTalk 0.4s ease-in-out infinite alternate; }
 

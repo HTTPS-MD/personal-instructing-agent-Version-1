@@ -54,10 +54,13 @@
   function bankq(id) { return BANK.filter(function (b) { return b.id === id; })[0]; }
   var rules = { mastery: 80, min: 3, max: 3 };
   /* The admin's closing time, reduced to what the page can learn: closed or not. A test flips it. */
-  function expired() { return localStorage.getItem('__mock_closed') === '1'; }
+  /* '__mock_closes_at' (epoch ms) behaves like the admin's closing time; '__mock_closed' is the same moment already past. */
+  function closesAt() { var v = Number(localStorage.getItem('__mock_closes_at')); return v > 0 ? v : null; }
+  function expired() { return localStorage.getItem('__mock_closed') === '1' || (closesAt() !== null && Date.now() >= closesAt()); }
   function clock() { return { window: 1, closed: expired(), expired: expired(), limit_seconds: 86400, remaining_seconds: 86400 }; }
   window.__mockExpireNow = function () { localStorage.setItem('__mock_closed', '1'); };
-  window.__mockReopen = function () { localStorage.removeItem('__mock_closed'); };
+  window.__mockReopen = function () { localStorage.removeItem('__mock_closed'); localStorage.removeItem('__mock_closes_at'); };
+  window.__mockCloseIn = function (ms) { localStorage.setItem('__mock_closes_at', String(Date.now() + ms)); };
   window.__mockWindow = function () { return { closed: expired() }; };
 
   var RPC = {
@@ -92,7 +95,7 @@
       if (expired()) return { data: { closed: true, restarted: false, clock: clock() } };
       var r0 = RPC.serve_next_step_question(); r0.data.restarted = false; return r0;
     },
-    tutoring_status: function () { var g = guard(); if (g) return g; return { data: { closed: expired() } }; },
+    tutoring_status: function () { var g = guard(); if (g) return g; var t = closesAt(); return { data: { closed: expired(), seconds_to_close: (!expired() && t !== null) ? Math.ceil((t - Date.now()) / 1000) : null } }; },
     check_step_answer: function (a) {
       var g = guard(); if (g) return g;
       var q = find(a.p_problem_id), st = S.states[a.p_problem_id], b = bankq(q.id), sub = String(a.p_submitted).trim().slice(0, 60);
@@ -197,6 +200,6 @@
   };
   window.__bank = BANK; window.__answerKeys = BANK.reduce(function (a, b) { return a.concat(b.steps.map(function (s) { return s.answer; })); }, []);
   window.__emitRealtime = function (name, payload) { (window.__realtime || []).filter(function (r) { return r.name.indexOf(name) === 0; }).forEach(function (r) { r.cb(payload); }); };
-  window.__mockReset = function () { localStorage.removeItem(K_STATE); localStorage.removeItem('__mock_closed'); };
+  window.__mockReset = function () { localStorage.removeItem(K_STATE); localStorage.removeItem('__mock_closed'); localStorage.removeItem('__mock_closes_at'); };
   window.supabase = { createClient: function () { return api; } };
 })();

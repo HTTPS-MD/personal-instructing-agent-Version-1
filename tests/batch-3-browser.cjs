@@ -170,7 +170,8 @@ function fixture() {
       }
       return { data: { ok: true }, error: null };
     },
-    channel: () => { const ch = { on() { return ch; }, subscribe() { return ch; } }; return ch; },
+    /* Keeps the realtime callbacks so a test can deliver another admin's save (window.__emitRealtime). */
+    channel: (name) => { const ch = { on(type, filter, cb) { (window.__rt = window.__rt || []).push({ name, filter, cb }); return ch; }, subscribe() { return ch; } }; return ch; },
     removeChannel() {}
   };
   window.supabase = { createClient: () => api };
@@ -403,6 +404,37 @@ function fixture() {
     await beforeGameMigration.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
     assert.equal(await beforeGameMigration.locator('#qb-closes-at').isEnabled(), false);
     await beforeGameMigration.context().close();
+  });
+
+  await check('math task: another admin\'s save (closing time, rules) reaches this screen at once; unsaved edits are kept and the admin is told', async () => {
+    const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, time_limit: 10, max_points: 10, game_closes_at: null }] }) });
+    await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    const emit = (table) => p.evaluate((tb) => (window.__rt || []).filter(r => r.filter && r.filter.table === tb).forEach(r => r.cb({ eventType: 'UPDATE' })), table);
+    assert.equal(await p.locator('#qb-closes-at').inputValue(), '', 'no closing time yet');
+    // another admin sets 1:00 AM Philippine time (17:00 UTC the day before)
+    await p.evaluate(() => { window.fixture.data.app_config[0].game_closes_at = '2031-10-05T17:00:00+00:00'; });
+    await emit('app_config');
+    await p.waitForFunction(() => document.querySelector('#qb-closes-at').value === '2031-10-06T01:00', null, { timeout: 4000 });
+    assert.match(await p.locator('body').innerText(), /Updated by another admin/);
+    // a mastery change by someone else arrives too
+    await p.evaluate(() => { window.fixture.data.app_config[0].easy_mastery = 65; });
+    await emit('app_config');
+    await p.waitForFunction(() => document.querySelector('#qb-mastery').value === '65', null, { timeout: 4000 });
+    // now THIS admin has an unsaved edit; the other admin saves again: the edit stays, with a warning
+    await p.locator('#qb-closes-at').fill('2031-12-25T20:00');
+    await p.evaluate(() => { window.fixture.data.app_config[0].game_closes_at = '2031-10-07T00:00:00+00:00'; });
+    await emit('app_config');
+    await p.waitForFunction(() => /Changed by another admin/.test(document.body.innerText), null, { timeout: 4000 });
+    assert.equal(await p.locator('#qb-closes-at').inputValue(), '2031-12-25T20:00', 'unsaved edit kept');
+    // our own save does not announce itself as someone else\'s
+    await p.locator('#qb-config-save').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
+    await p.evaluate(() => { window.fixture.data.app_config[0].game_closes_at = '2031-12-25T12:00:00+00:00'; });
+    const before = (await p.locator('body').innerText()).split('Updated by another admin').length;
+    await emit('app_config');
+    await p.waitForTimeout(600);
+    assert.equal((await p.locator('body').innerText()).split('Updated by another admin').length, before, 'no "updated by another admin" for our own save');
+    await p.context().close();
   });
 
   /* ================= LIVE SESSIONS ================= */

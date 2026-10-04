@@ -4361,6 +4361,17 @@
         refreshAll({ quiet: true });
     }
 
+    /* Another admin's save to the game rules, the closing time or the question bank reaches this
+       screen at once (realtime), with a slow poll as a safety net. Nothing here touches the
+       admin's own unsaved edits (loadMathTask keeps them and says so). */
+    function qbLiveRefresh() {
+        if (qb.status !== 'ready') { return; }
+        clearTimeout(qb.liveTimer);
+        qb.liveTimer = setTimeout(function () {
+            quietly(loadMathTask).catch(function (err) { console.error('Math task refresh failed:', err); });
+        }, 150);
+    }
+
     function setupRealtime() {
         if (typeof registerChannel !== 'function') {
             console.warn('registerChannel unavailable — realtime updates are off.');
@@ -4389,6 +4400,18 @@
                 })
                 .subscribe();
         });
+
+        registerChannel('admin-realtime-app-config', function (channel) {
+            return channel
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'app_config' }, qbLiveRefresh)
+                .subscribe();
+        });
+        registerChannel('admin-realtime-question-bank', function (channel) {
+            return channel
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'question_bank' }, qbLiveRefresh)
+                .subscribe();
+        });
+        setInterval(function () { if (!document.hidden) { qbLiveRefresh(); } }, 10000);
 
         /* Students listen to `settings`; the admin never did, so the three
            stage switches went stale whenever another admin or another tab
@@ -4486,6 +4509,8 @@
         rules: { EASY: qbDefaultRules(), MEDIUM: qbDefaultRules(), HARD: qbDefaultRules() },
         closesAt: '',            /* 'YYYY-MM-DDTHH:mm' in Philippine time; '' = no closing time */
         hasClosing: false,
+        configSeen: null,        /* what the server last said about the rules and closing time (to notice another admin's save) */
+        liveTimer: null,
         dirty: false,
         editingId: null,
         drafts: [],
@@ -4547,6 +4572,15 @@
     }
 
     /* A whole number in 1..500, or null. */
+    /* A short fingerprint of the rules and the closing time, so a refresh can tell whether ANOTHER
+       admin saved something (our own save records the new fingerprint first, so it stays silent). */
+    function qbConfigSig(closes, rules) {
+        return JSON.stringify([closes || '', QB_ORDER.map(function (t) {
+            var r = rules[t] || {};
+            return [toInt(r.mastery, 80), toInt(r.minQuestions, 3), toInt(r.maxErrors, 3)];
+        })]);
+    }
+
     /* The closing time is stored as a timestamp with time zone and always shown and
        entered in Philippine time (UTC+8, no daylight saving). */
     function qbPhLocal(iso) {
@@ -4635,18 +4669,30 @@
 
         /* A missing config row keeps the defaults; unsaved edits are never
            overwritten by a refresh. */
-        if (config && !config.error && config.data && !qb.dirty) {
+        if (config && !config.error && config.data) {
             var c = config.data;
+            var serverRules = {};
             QB_ORDER.forEach(function (topic) {
                 var key = topic.toLowerCase();
-                qb.rules[topic] = {
+                serverRules[topic] = {
                     mastery: toInt(c[key + '_mastery'], 80),
                     minQuestions: toInt(c[key + '_min_questions'], 3),
                     maxErrors: toInt(c[key + '_max_errors'], 3)
                 };
             });
-            qb.hasClosing = Object.prototype.hasOwnProperty.call(c, 'game_closes_at');
-            qb.closesAt = qb.hasClosing && c.game_closes_at ? qbPhLocal(c.game_closes_at) : '';
+            var serverHasClosing = Object.prototype.hasOwnProperty.call(c, 'game_closes_at');
+            var serverCloses = serverHasClosing && c.game_closes_at ? qbPhLocal(c.game_closes_at) : '';
+            var sig = qbConfigSig(serverCloses, serverRules);
+            var byOther = qb.configSeen !== null && qb.configSeen !== sig;
+            qb.configSeen = sig;
+            qb.hasClosing = serverHasClosing;
+            if (!qb.dirty) {
+                qb.rules = serverRules;
+                qb.closesAt = serverCloses;
+                if (byOther) { toastOk('Updated by another admin', 'The rules and the closing time on this screen now match what was just saved.'); }
+            } else if (byOther) {
+                toastErr('Changed by another admin', 'Your unsaved edits were kept. Saving will replace what the other admin just saved.');
+            }
         }
 
         qb.status = 'ready';
@@ -5468,6 +5514,7 @@
         }
 
         qb.dirty = false;
+        qb.configSeen = qbConfigSig(qb.closesAt, qb.rules);
         renderQbRules();
         toastOk('Rules saved', 'All three topics updated.');
     }

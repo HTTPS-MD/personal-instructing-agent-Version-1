@@ -34,10 +34,10 @@ const DASH = '/student/html/student-dashboard.html';
   const results = [];
   const leaked = [];
 
-  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, block = null, ctx } = {}) {
+  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, block = null, poll = null, ctx } = {}) {
     const context = ctx || await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', serviceWorkers: 'block' });
     if (!ctx) {
-      await context.addInitScript(([p, t, l]) => { if (!sessionStorage.getItem('__limit_set')) { localStorage.setItem('__mock_limit', String(l)); sessionStorage.setItem('__limit_set', '1'); } localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme, limit]);
+      await context.addInitScript(([p, t, l, pm]) => { if (pm) window.PIA_TUTORING_POLL_MS = pm; if (!sessionStorage.getItem('__limit_set')) { localStorage.setItem('__mock_limit', String(l)); sessionStorage.setItem('__limit_set', '1'); } localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme, limit, poll]);
       await context.route('**/*', route => {
         const u = route.request().url();
         if (u.startsWith(origin + '/')) { if (block && block.test(u)) return route.abort('failed'); return route.continue(); }
@@ -405,6 +405,96 @@ const DASH = '/student/html/student-dashboard.html';
     assert.equal(await p.locator('#step-input').isEnabled(), true);
     await solveCurrent(p);
     assert.equal(await p.locator('.step-card.correct').count(), 1);
+    await p.context().close();
+  });
+
+  /* ---------------- the tutor is centred in its panel; the speech bubble never scrolls ---------------- */
+  for (const w of [320, 375, 768, 1024, 1280]) {
+    await check(`tutor figure is centred in its panel and the bubble has no scroll bar (${w}px)`, async () => {
+      const p = await open(DASH, { width: w, height: w < 500 ? 740 : 800 });
+      await start(p);
+      await p.waitForFunction(() => { const i = document.querySelector('#agent-img'); return i && i.complete && i.naturalWidth > 1; });
+      const measure = () => p.evaluate(() => {
+        const img = document.querySelector('#agent-img'), panel = document.querySelector('.video-mentor-sidebar');
+        const r = img.getBoundingClientRect(), pr = panel.getBoundingClientRect();
+        // where the opaque figure really is inside the picture, measured independently of the page script
+        const cv = document.createElement('canvas'); const W = 96, H = Math.round(96 * img.naturalHeight / img.naturalWidth); cv.width = W; cv.height = H;
+        const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, W, H); const d = cx.getImageData(0, 0, W, H).data; const cols = new Array(W).fill(0);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 40) cols[x]++;
+        let min = -1, max = -1; for (let i = 0; i < W; i++) if (cols[i] > 1) { if (min < 0) min = i; max = i; }
+        const c = min < 0 ? 0.5 : (min + max + 1) / 2 / W;
+        const rw = Math.min(r.width, r.height * img.naturalWidth / img.naturalHeight);
+        const figureX = r.left + (r.width - rw) / 2 + c * rw;
+        return { off: Math.round(Math.abs(figureX - (pr.left + pr.width / 2))), panel: Math.round(pr.width) };
+      });
+      let m = await measure();
+      assert.ok(m.off <= 3, 'happy/default figure is ' + m.off + 'px off the panel centre');
+      await submit(p, '9'); await submit(p, '8');   // a different expression (a different picture)
+      await p.waitForTimeout(500);
+      m = await measure();
+      assert.ok(m.off <= 3, 'after a wrong answer the figure is ' + m.off + 'px off the panel centre');
+      await p.evaluate(() => { document.querySelector('#agent-speech').textContent = 'Nice work! Keep going.'; });
+      await p.waitForTimeout(300);
+      const normal = await p.evaluate(() => { const sp = document.querySelector('#agent-speech'); sp.style.fontSize = ''; return parseFloat(getComputedStyle(sp).fontSize); });
+      assert.ok(normal >= 13, 'a short line keeps a comfortable size, got ' + normal + 'px');
+      // a realistic long hint fits whole; an absurdly long line may scroll but never shows a bar
+      const bubble = () => p.evaluate(() => { const box = document.querySelector('#status-msg'), sp = document.querySelector('#agent-speech'); return { fits: sp.scrollHeight <= sp.clientHeight + 1, fs: getComputedStyle(sp).fontSize, boxBar: box.scrollHeight > box.clientHeight + 1 && getComputedStyle(box).overflowY !== 'hidden', hasBar: sp.offsetWidth - sp.clientWidth > 0, boxOverflow: getComputedStyle(box).overflowY }; });
+      await p.evaluate(() => { document.querySelector('#agent-speech').textContent = 'Let us slow down. Read the problem again, find the total, decide which operation it asks for, and check each small step before you move on.'; });
+      await p.waitForTimeout(400);
+      let b = await bubble();
+      assert.equal(b.fits, true, 'a realistic long hint fits the bubble ' + JSON.stringify(b));
+      assert.equal(b.boxOverflow, 'hidden', 'the bubble box never scrolls: ' + JSON.stringify(b));
+      assert.equal(b.hasBar, false, 'no scroll bar');
+      await p.evaluate(() => { document.querySelector('#agent-speech').textContent = 'Let us slow down and look at this one carefully together. First, read the whole problem again and find the number that tells you the total. Then decide which operation the problem is asking for, write the working the way you were taught, and check each small step before you move on to the next one and then the one after that as well.'; });
+      await p.waitForTimeout(400);
+      b = await bubble();
+      assert.equal(b.hasBar, false, 'even an absurdly long line draws no scroll bar');
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal overflow');
+      await p.screenshot({ path: path.join(out, `game-centred-${w}.png`) });
+      await p.context().close();
+    });
+  }
+
+  /* ---------------- live: the closing time reaches the page by itself ---------------- */
+  await check('live: the game locks the moment the admin closes it (no answer needed) and opens again the moment it is reopened, same question', async () => {
+    const p = await open(DASH, { poll: 600 });
+    await start(p);
+    const q = await p.locator('#problem-expression').innerText();
+    await submit(p, '9');
+    await p.evaluate(() => window.__mockExpireNow());
+    await p.waitForSelector('#modal-time.is-open', { timeout: 4000 });
+    assert.equal(await p.locator('#step-input').isDisabled(), true, 'inputs locked');
+    assert.equal(/\d/.test(await p.locator('#modal-time').innerText()), false, 'no time in the dialog');
+    await p.evaluate(() => window.__mockReopen());
+    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'), null, { timeout: 4000 });
+    await p.waitForFunction(() => { const i = document.querySelector('#step-input'); return i && !i.disabled; }, null, { timeout: 4000 });
+    assert.equal(await p.locator('#problem-expression').innerText(), q, 'the same question, not a restart');
+    assert.match(await p.locator('#agent-speech').innerText(), /open again/i);
+    await p.context().close();
+  });
+  await check('live: at the exact closing moment the game locks even when polling is slow', async () => {
+    const p = await open(DASH, { poll: 60000 });
+    await start(p);
+    await p.evaluate(() => window.__mockCloseIn(2500));
+    await p.evaluate(() => window.__mockReopen && 0);
+    await p.waitForTimeout(300);
+    // the page learns the time on its next status call; trigger one the way a returning tab does
+    await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await p.waitForSelector('#modal-time.is-open', { timeout: 6000 });
+    assert.equal(await p.locator('#step-submit').isDisabled(), true);
+    await p.context().close();
+  });
+  await check('live: the start screen follows the admin too (closed -> Start off, reopened -> Start on, closed again -> off)', async () => {
+    const p = await open(DASH, { poll: 600 });
+    await p.waitForSelector('#start-btn');
+    const lede = await p.locator('#start-lede').innerText();
+    await p.evaluate(() => window.__mockExpireNow());
+    await p.waitForFunction(() => document.querySelector('#start-btn').disabled && /closed/i.test(document.querySelector('#start-lede').textContent), null, { timeout: 4000 });
+    await p.evaluate(() => window.__mockReopen());
+    await p.waitForFunction(() => !document.querySelector('#start-btn').disabled, null, { timeout: 4000 });
+    assert.equal(await p.locator('#start-lede').innerText(), lede, 'the original text is back');
+    await p.evaluate(() => window.__mockExpireNow());
+    await p.waitForFunction(() => document.querySelector('#start-btn').disabled, null, { timeout: 4000 });
     await p.context().close();
   });
 
