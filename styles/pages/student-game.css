@@ -95,7 +95,11 @@ body.is-playing #pia-change-password { display: none; }
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 14px 14px 0;
+    /* The speech bubble and the tutor are one group, centred up and down in the panel and kept
+       close together (not one at the top and one at the bottom). */
+    justify-content: center;
+    padding: 14px 14px 10px;
+    container-type: size;
 }
 
 /* The speech bubble. Its height is reserved for about six lines: the tutor
@@ -105,8 +109,8 @@ body.is-playing #pia-change-password { display: none; }
     position: relative;
     flex: none;
     width: 100%;
-    height: 9.25rem;
-    margin: 0 0 20px;
+    height: var(--bubble-h, 9.25rem);
+    margin: 0 0 24px;
     padding: 12px 16px;
     display: flex;
     align-items: center;
@@ -153,11 +157,13 @@ body.is-playing #pia-change-password { display: none; }
 .prompt-box.speaking { animation: bubblePop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
 .mentor-agent-stage {
-    flex: 1 1 0;
+    /* Exactly as tall as the tutor's picture (never more than 30rem or what is left under the
+       bubble), so the bubble and the figure stay together and the group centres in the panel. */
+    flex: 0 1 auto;
     min-height: 0;
     width: 100%;
     display: flex;
-    align-items: stretch;
+    align-items: flex-end;
     justify-content: center;
     padding: 0 14px 6px;
 }
@@ -165,10 +171,10 @@ body.is-playing #pia-change-password { display: none; }
 /* Keep each transparent character fully visible as expressions change. */
 .mentor-overlay-avatar {
     display: block;
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
     max-width: 100%;
-    max-height: 100%;
+    max-height: min(30rem, calc(100cqh - var(--bubble-h, 9.25rem) - 24px - 16px - 14px));
     object-fit: contain;
     object-position: center bottom;
     background: transparent;
@@ -709,7 +715,7 @@ body.is-playing #pia-change-password { display: none; }
     .game-frame { display: block; height: auto; min-height: 0; grid-template-rows: none; }
     .video-mentor-sidebar { height: 520px; border-right: 0; border-bottom: 3px solid var(--g-edge); }
     .mentor-bg-video { object-position: center 48%; }
-    .prompt-box { height: 8rem; }
+    .prompt-box { --bubble-h: 8rem; }
     .center-panel { overflow: visible; padding: 14px 12px 22px; }
     .right-sidebar { border-left: 0; border-top: 3px solid var(--g-edge); }
     .q-history-box { max-height: none; }
@@ -719,7 +725,7 @@ body.is-playing #pia-change-password { display: none; }
 
 @media (max-width: 480px) {
     .game-screen { padding: 0 var(--sp-2); }
-    .prompt-box { height: 8.5rem; }
+    .prompt-box { --bubble-h: 8.5rem; }
     .video-mentor-sidebar { height: 540px; }
     .solution-input-row { flex-direction: column; }
     .step-footer { flex-wrap: wrap; }
@@ -730,5 +736,5 @@ body.is-playing #pia-change-password { display: none; }
 }
 
 @media (max-height: 720px) and (min-width: 901px) {
-    .prompt-box { height: 7.5rem; margin-bottom: 18px; padding: 9px 12px; }
+    .prompt-box { --bubble-h: 7.5rem; margin-bottom: 18px; padding: 9px 12px; }
 }

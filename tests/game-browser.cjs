@@ -455,6 +455,31 @@ const DASH = '/student/html/student-dashboard.html';
     });
   }
 
+  /* ---------------- the bubble and the tutor are one group, centred up and down, close together ---------------- */
+  for (const [w, h] of [[375, 740], [768, 900], [1024, 800], [1280, 800], [1920, 1000]]) {
+    await check(`tutor + speech bubble: close together and centred up and down in the panel (${w}x${h})`, async () => {
+      const p = await open(DASH, { width: w, height: h });
+      await start(p);
+      await p.waitForFunction(() => { const i = document.querySelector('#agent-img'); return i && i.complete && i.naturalWidth > 1; });
+      await p.waitForTimeout(500);
+      const m = await p.evaluate(() => {
+        const img = document.querySelector('#agent-img'), box = document.querySelector('#status-msg'), layer = document.querySelector('.video-copy-layer');
+        const cv = document.createElement('canvas'); const W = 96, H = Math.round(96 * img.naturalHeight / img.naturalWidth); cv.width = W; cv.height = H;
+        const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, W, H); const d = cx.getImageData(0, 0, W, H).data;
+        let top = -1, bottom = -1; for (let y = 0; y < H; y++) { let n = 0; for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 40) n++; if (n > 1) { if (top < 0) top = y; bottom = y; } }
+        const r = img.getBoundingClientRect(), s = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight);
+        const rh = img.naturalHeight * s, oy = r.top + (r.height - rh);      // object-position: center bottom
+        const figTop = oy + (top / H) * rh, figBottom = oy + ((bottom + 1) / H) * rh;
+        const b = box.getBoundingClientRect(), l = layer.getBoundingClientRect();
+        return { gap: Math.round(figTop - b.bottom), groupCentre: Math.round((b.top + figBottom) / 2), layerCentre: Math.round((l.top + l.bottom) / 2), above: Math.round(b.top - l.top), below: Math.round(l.bottom - figBottom) };
+      });
+      await p.screenshot({ path: path.join(out, `game-group-${w}.png`) });
+      assert.ok(m.gap >= 0 && m.gap <= 48, 'the bubble and the figure are close together: gap ' + m.gap + 'px ' + JSON.stringify(m));
+      assert.ok(Math.abs(m.groupCentre - m.layerCentre) <= 14 || (m.above >= 0 && m.below >= 0 && Math.abs(m.above - m.below) <= 28), 'the group is centred up and down ' + JSON.stringify(m));
+      await p.context().close();
+    });
+  }
+
   /* ---------------- live: the closing time reaches the page by itself ---------------- */
   await check('live: the game locks the moment the admin closes it (no answer needed) and opens again the moment it is reopened, same question', async () => {
     const p = await open(DASH, { poll: 600 });
