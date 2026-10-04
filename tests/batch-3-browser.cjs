@@ -362,6 +362,16 @@ function fixture() {
     await p.locator('#qb-steps .qb-step').nth(0).locator('[data-step="answer"]').fill('0.25');
     await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="prompt"]').fill('Multiply by 80');
     await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="answer"]').fill('20');
+    /* A hint that gives the answer away is refused; guidance is accepted. */
+    await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="hint3"]').fill('0.25 * 80 = 20');
+    await p.locator('#qb-edit-save').click();
+    assert.match(await p.locator('#qb-step-error').innerText(), /Step 2, Hint 3 gives the answer away/);
+    assert.equal((await calls(p)).filter(c => c.table === 'question_bank' && c.write).length, 0, 'nothing saved');
+    await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="hint3"]').fill('So the answer is 20.');
+    await p.locator('#qb-edit-save').click();
+    assert.match(await p.locator('#qb-step-error').innerText(), /Hint 3 gives the answer away/, 'the words "the answer is" are caught too');
+    await p.locator('#qb-steps .qb-step').nth(1).locator('[data-step="hint3"]').fill('Work out 0.25 times 80, then write the result as your final answer.');
+    await p.locator('#qb-steps .qb-step').nth(0).locator('[data-step="hint3"]').fill('Work out 25 divided by 100 and write it as a decimal.');
     await p.locator('#qb-edit-save').click();
     await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'question_bank' && c.write === 'insert'));
     const write = (await calls(p)).find(c => c.table === 'question_bank' && c.write === 'insert');

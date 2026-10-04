@@ -5041,6 +5041,26 @@
         });
     }
 
+    /* A hint guides; it never gives the answer. A number that is the step's answer (or the
+       question's final answer) written as a RESULT -- after "=", or after the words answer,
+       result, equals, gives, get -- gives it away. The server masks the same patterns for
+       questions saved earlier (migration 0047). */
+    var QB_RESULT_PATTERN = /((?:=|\b(?:answers?|results?|equals?|gives?|gets?)\b)\s*(?:is|are|:|=)?\s*)(-?\d[\d,]*(?:\.\d+)?)(\s*%?)/gi;
+    function qbNumberOf(text) {
+        var m = String(text == null ? '' : text).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+        return m ? Number(m[0]) : null;
+    }
+    function qbHintGivesAnswer(hint, answers) {
+        var nums = answers.map(qbNumberOf).filter(function (n) { return n !== null; });
+        var leaks = false;
+        String(hint || '').replace(QB_RESULT_PATTERN, function (full, lead, num) {
+            var v = Number(String(num).replace(/,/g, ''));
+            if (nums.some(function (n) { return Math.abs(n - v) < 1e-9; })) { leaks = true; }
+            return full;
+        });
+        return leaks;
+    }
+
     function qbReadSteps() {
         return $$('.qb-step', qbStepList()).map(function (li) {
             var s = {};
@@ -5105,6 +5125,23 @@
             if (valid) { target.focus(); }
             valid = false;
         } else { $('#qb-step-error').textContent = ''; }
+        if (valid) {
+            var finalForCheck = finalAnswer || steps[steps.length - 1].answer;
+            var stepFields = $$('.qb-step', qbStepList());
+            outer:
+            for (var si = 0; si < steps.length; si++) {
+                for (var hk = 1; hk <= 3; hk++) {
+                    if (qbHintGivesAnswer(steps[si]['hint' + hk], [steps[si].answer, finalForCheck])) {
+                        var hintField = $('[data-step="hint' + hk + '"]', stepFields[si]);
+                        hintField.setAttribute('aria-invalid', 'true');
+                        $('#qb-step-error').textContent = 'Step ' + (si + 1) + ', Hint ' + hk + ' gives the answer away. A hint should guide the student, for example "Subtract 900 from 1200", not show the result.';
+                        hintField.focus();
+                        valid = false;
+                        break outer;
+                    }
+                }
+            }
+        }
         if (!valid) {
             var bad = $('#qb-edit-form .is-invalid');
             if (bad) { bad.focus(); }
@@ -5185,11 +5222,11 @@
                         steps: [
                             { prompt: 'Step 1: Convert ' + pct + '% into a decimal.', answer: String(pct / 100),
                               hint1: 'Divide percentage by 100 to convert to decimal.',
-                              hint2: pct + ' / 100', hint3: pct + ' / 100 = ' + (pct / 100) },
+                              hint2: pct + ' / 100', hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.' },
                             { prompt: 'Step 2: Multiply decimal (' + (pct / 100) + ') by total students (' + total + ').',
                               answer: String(result),
                               hint1: 'Multiply decimal value by total number of students.',
-                              hint2: (pct / 100) + ' * ' + total, hint3: (pct / 100) + ' * ' + total + ' = ' + result }
+                              hint2: (pct / 100) + ' * ' + total, hint3: 'Work out ' + (pct / 100) + ' times ' + total + ', then write the result as your final answer.' }
                         ]
                     };
                 },
@@ -5205,11 +5242,11 @@
                         points: pts,
                         steps: [
                             { prompt: 'Step 1: Convert ' + pct + '% into decimal form.', answer: String(pct / 100),
-                              hint1: 'Divide the rate by 100.', hint2: pct + ' / 100', hint3: pct + ' / 100 = ' + (pct / 100) },
+                              hint1: 'Divide the rate by 100.', hint2: pct + ' / 100', hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.' },
                             { prompt: 'Step 2: Calculate discount amount by multiplying ' + price + ' by ' + (pct / 100) + '.',
                               answer: String(discount),
                               hint1: 'Multiply original price by percentage in decimal.',
-                              hint2: price + ' * ' + (pct / 100), hint3: price + ' * ' + (pct / 100) + ' = ' + discount }
+                              hint2: price + ' * ' + (pct / 100), hint3: 'Work out ' + price + ' times ' + (pct / 100) + ', then write the result as your final answer.' }
                         ]
                     };
                 }
@@ -5231,13 +5268,13 @@
                 steps: [
                     { prompt: 'Step 1: Calculate the amount of price increase (' + newPrice + ' - ' + orig + ').',
                       answer: String(inc), hint1: 'Subtract original price from new price.',
-                      hint2: newPrice + ' - ' + orig, hint3: newPrice + ' - ' + orig + ' = ' + inc },
+                      hint2: newPrice + ' - ' + orig, hint3: 'Subtract ' + orig + ' from ' + newPrice + ' to find the increase.' },
                     { prompt: 'Step 2: Divide increase (' + inc + ') by original price (' + orig + ').',
                       answer: String(inc / orig), hint1: 'Divide increase amount by original price.',
-                      hint2: inc + ' / ' + orig, hint3: inc + ' / ' + orig + ' = ' + (inc / orig) },
+                      hint2: inc + ' / ' + orig, hint3: 'Divide the increase by the original price, ' + orig + '.' },
                     { prompt: 'Step 3: Convert decimal (' + (inc / orig) + ') to percentage by multiplying by 100.',
                       answer: pctUp + '%', hint1: 'Multiply decimal by 100 and add % sign.',
-                      hint2: (inc / orig) + ' * 100', hint3: (inc / orig) + ' * 100 = ' + pctUp + '%' }
+                      hint2: (inc / orig) + ' * 100', hint3: 'Multiply by 100 and add the % sign.' }
                 ]
             };
         }
@@ -5256,13 +5293,13 @@
             steps: [
                 { prompt: 'Step 1: Calculate the amount of price decrease (' + base + ' - ' + sale + ').',
                   answer: String(dec), hint1: 'Subtract new sale price from original price.',
-                  hint2: base + ' - ' + sale, hint3: base + ' - ' + sale + ' = ' + dec },
+                  hint2: base + ' - ' + sale, hint3: 'Subtract ' + sale + ' from ' + base + ' to find the decrease.' },
                 { prompt: 'Step 2: Divide decrease (' + dec + ') by original price (' + base + ').',
                   answer: String(dec / base), hint1: 'Divide decrease amount by original price.',
-                  hint2: dec + ' / ' + base, hint3: dec + ' / ' + base + ' = ' + (dec / base) },
+                  hint2: dec + ' / ' + base, hint3: 'Divide the decrease by the original price, ' + base + '.' },
                 { prompt: 'Step 3: Convert decimal (' + (dec / base) + ') to percentage by multiplying by 100.',
                   answer: pctDown + '%', hint1: 'Multiply decimal by 100.',
-                  hint2: (dec / base) + ' * 100', hint3: (dec / base) + ' * 100 = ' + pctDown + '%' }
+                  hint2: (dec / base) + ' * 100', hint3: 'Multiply by 100 and add the % sign.' }
             ]
         };
     }

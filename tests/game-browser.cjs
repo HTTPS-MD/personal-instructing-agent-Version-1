@@ -408,6 +408,19 @@ const DASH = '/student/html/student-dashboard.html';
     await p.context().close();
   });
 
+  /* ---------------- no Change password inside the game ---------------- */
+  await check('Change password: offered on the start screen, gone while playing, back on the start screen after a refresh', async () => {
+    const p = await open(DASH);
+    await p.waitForSelector('#start-btn');
+    await p.waitForSelector('#pia-change-password', { state: 'visible', timeout: 8000 });
+    await start(p);
+    assert.equal(await p.locator('#pia-change-password').isVisible(), false, 'not shown inside the game');
+    assert.equal(await p.locator('#signout-btn').isVisible(), true, 'sign out is still there');
+    await p.reload();
+    await p.waitForSelector('#pia-change-password', { state: 'visible', timeout: 8000 });
+    await p.context().close();
+  });
+
   /* ---------------- a refresh keeps the trail (0046) ---------------- */
   await check('refresh: solved questions (with the student\'s working) and the error log come back from the server', async () => {
     const p = await open(DASH);

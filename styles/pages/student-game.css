@@ -24,6 +24,8 @@
 .game-screen { width: 100%; padding: 0 var(--sp-4); }
 
 body.is-playing .learn-main { padding: var(--sp-3) 0 var(--sp-4); }
+/* In the game itself the header offers no detour: Change password stays on the start screen. */
+body.is-playing #pia-change-password { display: none; }
 
 .game-frame {
     --g-edge: var(--text);
