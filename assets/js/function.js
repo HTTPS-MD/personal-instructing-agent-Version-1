@@ -534,7 +534,7 @@ function renderSignOutControl(profile) {
             own.parentNode.insertBefore(who, own);
         }
         if (!document.getElementById('pia-change-password') &&
-            !location.pathname.endsWith('/set-new-password.html')) {
+            !isOnPage('set-new-password.html')) {
             const link = document.createElement('a');
             link.id = 'pia-change-password';
             link.href = SET_NEW_PASSWORD_URL;
@@ -1383,6 +1383,17 @@ async function executeForceLogout() {
 // 3. STUDENT REAL-TIME STAGE SYNC
 // ==========================================
 
+// Is the student already ON this page? Cloudflare Pages serves clean URLs: the
+// address bar shows /student/html/student-dashboard, not ...student-dashboard.html
+// (the .html address is a 308 redirect to it). Comparing the raw path to a
+// filename that ends in .html never matched there, so the stage sync thought the
+// student was on another page and reloaded the dashboard -- which threw them out
+// of the game the moment it wrote its first progress update. Match both forms.
+function isOnPage(page) {
+    const bare = (value) => String(value).replace(/\.html$/, '');
+    return bare(window.location.pathname).endsWith('/' + bare(page));
+}
+
 // Ang mga page na TUMUTUGMA na sa bawat stage. Kung nandoon na ang estudyante,
 // walang gagawin.
 //
@@ -1401,7 +1412,7 @@ function setupStudentRealtimeStageSync() {
     // Changing a password is an intentional detour from the current stage.
     // Profile updates can arrive while this page loads (especially as OCEAN
     // answers are saved); stage sync must not send the student straight back.
-    if (window.location.pathname.endsWith('/set-new-password.html')) return;
+    if (isOnPage('set-new-password.html')) return;
 
     const userEmail = localStorage.getItem('pia_user_email');
     const userRole = localStorage.getItem('pia_user_role');
@@ -1435,8 +1446,7 @@ function setupStudentRealtimeStageSync() {
             // them finish what they started; see 1C-5c.
             if (stage === 'Waiting Room' && pageHasActiveWork()) { showStageClosedNotice(); return; }
 
-            const currentPath = window.location.pathname;
-            if (target.pages.some(page => currentPath.endsWith('/' + page))) return; // nandito na
+            if (target.pages.some(isOnPage)) return; // nandito na
 
             window.location.replace(target.url);
         })

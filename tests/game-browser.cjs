@@ -13,7 +13,10 @@ const out = process.env.PIA_TEST_OUTPUT || '/tmp/pia-game-evidence';
 fs.mkdirSync(out, { recursive: true });
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const server = createServer((req, res) => {
-  const file = path.resolve(root, '.' + decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
+  let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  /* Cloudflare Pages serves clean URLs: /x/y serves x/y.html (and x/y.html redirects to it). */
+  if (!path.extname(pathname) && fs.existsSync(path.resolve(root, '.' + pathname + '.html'))) pathname += '.html';
+  const file = path.resolve(root, '.' + pathname);
   if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
   fs.readFile(file, (error, data) => {
     if (error) { res.writeHead(404).end(); return; }
@@ -402,6 +405,32 @@ const DASH = '/student/html/student-dashboard.html';
     assert.equal(await p.locator('#step-input').isEnabled(), true);
     await solveCurrent(p);
     assert.equal(await p.locator('.step-card.correct').count(), 1);
+    await p.context().close();
+  });
+
+  /* ---------------- clean URLs (Cloudflare Pages) ---------------- */
+  await check('clean URL (no .html): a realtime profile update does not throw the student out of the game', async () => {
+    const p = await open('/student/html/student-dashboard');
+    assert.equal(new URL(p.url()).pathname, '/student/html/student-dashboard', 'opened without .html');
+    await start(p);
+    const before = p.url();
+    await p.evaluate(() => {
+      const ev = { new: { email: 'student@example.test', role: 'student', current_stage: 'Tutoring Dashboard', is_in_game: true } };
+      window.__emitRealtime('student-stage-sync', ev);
+    });
+    await p.waitForTimeout(800);
+    assert.equal(p.url(), before, 'the page was not reloaded');
+    assert.equal(await p.locator('#screen-session.is-active').count(), 1, 'still in the game');
+    assert.equal(await p.locator('#step-input').count(), 1);
+    await p.context().close();
+  });
+  await check('a real stage change still navigates (the fix only stops false "not here" reloads)', async () => {
+    const p = await open('/student/html/student-dashboard');
+    const urls = [];
+    p.on('framenavigated', f => { if (f === p.mainFrame()) urls.push(f.url()); });
+    await p.evaluate(() => window.__emitRealtime('student-stage-sync', { new: { email: 'student@example.test', role: 'student', current_stage: 'Waiting Room' } }));
+    await p.waitForTimeout(1200);
+    assert.ok(urls.some(u => /waiting-room/.test(u)), 'navigated to the waiting room: ' + urls.join(' '));
     await p.context().close();
   });
 

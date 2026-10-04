@@ -182,10 +182,15 @@
       if (r.error) return { data: null, error: r.error };
       return { data: r.data === undefined ? null : r.data, error: null };
     },
-    channel: function () { var ch = { on: function () { return ch; }, subscribe: function () { return ch; } }; return ch; },
+    /* Remembers the callbacks so a test can deliver a realtime event (window.__emitRealtime). */
+    channel: function (name) {
+      var ch = { on: function (type, filter, cb) { (window.__realtime = window.__realtime || []).push({ name: name, filter: filter, cb: cb }); return ch; }, subscribe: function () { return ch; } };
+      return ch;
+    },
     removeChannel: function () {}
   };
   window.__bank = BANK; window.__answerKeys = BANK.reduce(function (a, b) { return a.concat(b.steps.map(function (s) { return s.answer; })); }, []);
+  window.__emitRealtime = function (name, payload) { (window.__realtime || []).filter(function (r) { return r.name.indexOf(name) === 0; }).forEach(function (r) { r.cb(payload); }); };
   window.__mockReset = function () { localStorage.removeItem(K_STATE); };
   window.supabase = { createClient: function () { return api; } };
 })();
