@@ -154,6 +154,14 @@ function fixture() {
     rpc: async (name, args) => {
       f.calls.push({ method: 'rpc', name, args });
       if (name === 'jwt_is_current') return { data: true, error: null };
+      if (name === 'pia_admin_tutorial_report') {
+        if (f.fail[name]) return { data: null, error: f.fail[name] };
+        return { data: (f.data.tutorial_reports || {})[args.p_student_email] || {
+          summary: { sessions: 0, completed_questions: 0, clean_questions: 0,
+            best_topic: null, avg_speed_seconds: null, accuracy_percent: null,
+            score_sum: 0, errors: 0, hints: 0 }, history_total: 0, history: []
+        }, error: null };
+      }
       if (name === 'claim_device') {
         const mine = args.p_device_id;
         const row = f.data.profiles.find(p => p.email === me);
@@ -805,6 +813,48 @@ function fixture() {
   });
 
   /* ================= PARTICIPANT PROFILE ================= */
+  await check('participant profile: tutorial performance and timed-session history use game report', async () => {
+    const data = makeData({ tutorial_reports: {
+      'student01@example.test': {
+        summary: { sessions: 2, completed_questions: 4, clean_questions: 3,
+          best_topic: 2, avg_speed_seconds: 52, accuracy_percent: 75,
+          score_sum: 350, errors: 2, hints: 1 },
+        history_total: 2, history: [
+          { started_at: '2026-10-04T02:00:00Z', window_no: 2, status: 'active',
+            duration_seconds: 125, best_topic: 2, completed_questions: 1, clean_questions: 1,
+            score_sum: 100, errors: 0, hints: 0 },
+          { started_at: '2026-10-03T02:00:00Z', window_no: 1, status: 'ended',
+            duration_seconds: 600, best_topic: 1, completed_questions: 3, clean_questions: 2,
+            score_sum: 250, errors: 2, hints: 1 }
+        ]
+      }
+    } });
+    const p = await open('students', { data, width: 320 }); await waitStudents(p);
+    await p.locator('#student-tbody tr[data-student="student01@example.test"]').click();
+    await p.waitForFunction(() => document.querySelector('#drawer-tutorial-performance')?.textContent.includes('75%'));
+    const performance = await p.locator('#drawer-tutorial-performance').innerText();
+    assert.match(performance, /Medium/); assert.match(performance, /52s/);
+    assert.match(performance, /Sessions\s*2/); assert.match(performance, /Total points\s*350/);
+    assert.match(performance, /Total errors\s*2/);
+    const history = await p.locator('#drawer-session-history').innerText();
+    assert.match(history, /Active/); assert.match(history, /Ended/);
+    assert.match(history, /Points: 250/); assert.match(history, /Questions: 3/);
+    assert.match(history, /Hints: 1/);
+    const calls = await p.evaluate(() => fixture.calls.filter(c => c.name === 'pia_admin_tutorial_report'));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args.p_student_email, 'student01@example.test');
+    assert.equal(await overflow(p), true, 'populated report fits a 320px viewport');
+    await shot(p, 'student-game-report-320');
+    await p.context().close();
+  });
+  await check('participant profile: no game activity is shown as empty, not zero accuracy', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await p.locator('#student-tbody tr[data-student="student01@example.test"]').click();
+    await p.waitForFunction(() => document.querySelector('#drawer-tutorial-performance')?.textContent.includes('No tutoring activity yet'));
+    assert.match(await p.locator('#drawer-session-history').innerText(), /No sessions yet/);
+    assert.equal((await p.locator('#drawer-tutorial-performance').innerText()).includes('0%'), false);
+    await p.context().close();
+  });
   await check('participant profile: back-arrow only, removals, Escape + focus restore', async () => {
     const p = await open('students'); await waitStudents(p);
     const row = p.locator('#student-tbody tr[data-student]').first();

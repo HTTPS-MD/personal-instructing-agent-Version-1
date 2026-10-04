@@ -711,6 +711,16 @@ html[data-surface="admin"] .modal-text { max-width: none; }
 .drawer-avatar { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; background: var(--bg-chip); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
 .drawer-identity .page-title { font-size: var(--fs-lg) !important; margin-top: 4px !important; }
 
+.game-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.game-report-stat { min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-chip); }
+.game-report-stat-label { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: var(--fs-xs); }
+.game-report-stat-value { display: block; color: var(--text); font-size: var(--fs-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.game-report-note { margin-top: 8px; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.5; }
+.game-history-list { display: grid; gap: 8px; }
+.game-history-row { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.game-history-top { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); font-weight: 600; }
+.game-history-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--text-muted); font-size: var(--fs-xs); }
+
 /* ------------------------------------------------- 10. COMMAND PALETTE ---- */
 .palette-overlay { align-items: flex-start; padding-top: 12vh !important; background: var(--scrim); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 .palette {

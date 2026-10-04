@@ -2049,7 +2049,83 @@
         });
 
         renderTraits(s);
+        renderTutorialReport(s);
         openModal('drawer-student', trigger);
+    }
+
+    function gameTopicLabel(topic) {
+        return { 1: 'Easy', 2: 'Medium', 3: 'Hard' }[Number(topic)] || '—';
+    }
+
+    function gameDuration(seconds) {
+        if (seconds == null || !Number.isFinite(Number(seconds))) { return '—'; }
+        var s = Math.max(0, Math.floor(Number(seconds)));
+        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        return h ? h + 'h ' + m + 'm' : m ? m + 'm ' + (s % 60) + 's' : s + 's';
+    }
+
+    function gameStat(label, value) {
+        return '<div class="game-report-stat"><span class="game-report-stat-label">' + esc(label) +
+            '</span><strong class="game-report-stat-value">' + esc(value) + '</strong></div>';
+    }
+
+    async function renderTutorialReport(s) {
+        var performance = $('#drawer-tutorial-performance');
+        var history = $('#drawer-session-history');
+        performance.innerHTML = noticeHtml('info', 'Loading game records', '');
+        history.innerHTML = '';
+        performance.setAttribute('aria-busy', 'true');
+        history.setAttribute('aria-busy', 'true');
+
+        var res = await sb.rpc('pia_admin_tutorial_report', { p_student_email: s.email });
+        if (state.activeStudent !== s) { return; }
+        performance.removeAttribute('aria-busy');
+        history.removeAttribute('aria-busy');
+
+        if (res.error || !res.data || !res.data.summary || !Array.isArray(res.data.history)) {
+            performance.innerHTML = noticeHtml('alert', 'Could not load game records',
+                res.error ? friendlyDbError(res.error, 'Unknown database error.') :
+                    'The admin tutorial report is not available yet.');
+            history.innerHTML = '';
+            return;
+        }
+
+        var summary = res.data.summary;
+        if (!Number(summary.sessions)) {
+            performance.innerHTML = noticeHtml('info', 'No tutoring activity yet',
+                'Game performance will appear after this student starts a timed session.');
+            history.innerHTML = noticeHtml('info', 'No sessions yet', '');
+            return;
+        }
+
+        performance.innerHTML = '<div class="game-report-grid">' +
+            gameStat('Best level', gameTopicLabel(summary.best_topic)) +
+            gameStat('Average speed', summary.avg_speed_seconds == null
+                ? '—' : gameDuration(summary.avg_speed_seconds)) +
+            gameStat('Accuracy', summary.accuracy_percent == null
+                ? '—' : Number(summary.accuracy_percent) + '%') +
+            gameStat('Sessions', Number(summary.sessions)) +
+            gameStat('Total points', Number(summary.score_sum) || 0) +
+            gameStat('Total errors', Number(summary.errors) || 0) +
+            '</div><p class="game-report-note">Best level is the highest solved topic. Accuracy is the share of completed ' +
+            'questions solved without a wrong answer. Average speed uses recorded question times. ' +
+            'Points add the game’s saved 100/50 score per completed question.</p>';
+
+        history.innerHTML = '<div class="game-history-list">' + res.data.history.map(function (row) {
+            return '<div class="game-history-row"><div class="game-history-top"><span>' +
+                esc(formatStamp(row.started_at)) + '</span><span>' +
+                esc(row.status === 'active' ? 'Active' : 'Ended') + '</span></div>' +
+                '<div class="game-history-meta"><span>Difficulty: ' + esc(gameTopicLabel(row.best_topic)) +
+                '</span><span>Duration: ' + esc(gameDuration(row.duration_seconds)) +
+                '</span><span>Points: ' + esc(Number(row.score_sum) || 0) +
+                '</span><span>Errors: ' + esc(Number(row.errors) || 0) +
+                '</span><span>Questions: ' + esc(Number(row.completed_questions) || 0) +
+                '</span><span>Hints: ' + esc(Number(row.hints) || 0) +
+                '</span></div></div>';
+        }).join('') + '</div>' +
+            (Number(res.data.history_total) > res.data.history.length
+                ? '<p class="game-report-note">Showing the latest 100 timed sessions.</p>' : '') +
+            '<p class="game-report-note">Each row is one continuous time-limit window. The elapsed time includes time away from the page.</p>';
     }
 
     /* ---- Assessment results (BFPT) ------------------------------------
