@@ -1183,6 +1183,12 @@ body:not([data-boot="pending"]) .boot-veil[hidden] { display: none; }
 
 .qb-gen-controls .field { flex: 1 1 10rem; }
 .qb-gen-controls .btn { flex: 0 0 auto; height: var(--field-h); }
+/* The number sizes sit on their own row under the question count, one tick each, and wrap on a phone. */
+.qb-gen-range { flex: 1 1 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-5); }
+.qb-gen-range .label { flex: 1 1 100%; margin: 0; }
+.qb-gen-range .check { flex: 0 0 auto; width: auto; }
+.qb-gen-range .field-msg { flex: 1 1 100%; margin: 0; }
+.qb-gen-range.is-invalid .check-box { box-shadow: inset 0 0 0 2px var(--danger, #ff5d5d); }
 .qb-gen-empty { min-height: 200px; }
 .qb-preview-q { min-height: 72px; }
 

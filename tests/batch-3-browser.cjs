@@ -486,6 +486,77 @@ function fixture() {
     await p.context().close();
   });
 
+  await check('math task generator: number range ticks (Tens, Hundreds, Thousands), at least one required, the chosen sizes decide the real values, nothing else changes', async () => {
+    const bank = [{ id: 1, difficulty: 'EASY', question: 'What is 10% of 50?', final_answer: '5', points: 10, hint: JSON.stringify({ defaultHint: 'd', steps: [{ prompt: 'p', answer: '0.1', hint1: 'a', hint2: 'b', hint3: 'c' }, { prompt: 'q', answer: '5', hint1: 'm', hint2: 'n', hint3: 'o' }] }) }];
+    const p = await open('mathtask', { data: makeData({ question_bank: bank, app_config: [{ id: 1, game_closes_at: null, score_wrong_pct: 20, score_hint_pct: 10, score_fast_bonus_pct: 20, score_fast_seconds: 30, score_speed_bonus: true, score_min: 0, score_repeat_enabled: false, score_repeat_pct: 50 }] }) });
+    await p.waitForFunction(() => !document.querySelector('#qb-generate-btn').disabled);
+    const writes = async () => (await calls(p)).filter(c => (c.table === 'app_config' || c.table === 'question_bank') && c.write).length;
+    await p.locator('#qb-generate-btn').click();
+    await p.waitForSelector('#modal-qb-generate.is-open');
+    // the labels are plain; the defaults are Tens + Hundreds; nothing internal is shown
+    const labels = await p.locator('#qb-gen-range .check-text').allInnerTexts();
+    assert.deepEqual(labels.map(s => s.trim()), ['Tens (10–99)', 'Hundreds (100–999)', 'Thousands (1,000–9,999)']);
+    assert.deepEqual(await p.locator('#qb-gen-range input').evaluateAll(els => els.map(e => e.checked)), [true, true, false]);
+    assert.equal(/rangeType|magnitude|PIAMathGen/.test(await p.locator('#modal-qb-generate').innerText()), false, 'no internal terms on screen');
+    const drafts = () => p.evaluate(() => [...document.querySelectorAll('#qb-previews > li')].map(li => ({ q: li.querySelector('[data-preview="q"]').value, final: li.querySelector('[data-preview="final"]').value, pts: li.querySelector('[data-preview="points"]').value, meta: li.querySelector('.qb-preview-meta').innerText })));
+    const mainValue = q => Number((q.match(/(?:of|PHP) ([\d,]+)/) || [])[1].replace(/,/g, ''));
+    const tick = async (which, on) => { const box = p.locator('#qb-gen-' + which); if ((await box.isChecked()) !== on) await p.locator('label:has(#qb-gen-' + which + ')').click(); };
+    // 1. nothing ticked: a clear message, no drafts, nothing generated
+    await tick('tens', false); await tick('hundreds', false);
+    await p.locator('#qb-gen-run').click();
+    assert.match(await p.locator('#qb-gen-range-msg').innerText(), /Select at least one number range\./);
+    assert.equal((await drafts()).length, 0, 'no drafts when nothing is chosen');
+    assert.deepEqual(await p.locator('#qb-gen-range input').evaluateAll(els => els.map(e => e.checked)), [false, false, false], 'the empty choice is not silently replaced by a default');
+    // 2. Thousands only: real values in 1,000-9,999
+    await tick('thousands', true);
+    await p.locator('#qb-gen-count').selectOption('10');
+    await p.locator('#qb-gen-run').click();
+    let ds = await drafts(); assert.equal(ds.length, 10);
+    assert.equal(await p.locator('#qb-gen-range-msg').innerText(), '', 'the message clears');
+    await shot(p, 'generator-ranges-dark-1280');
+    for (const d of ds) { const v = mainValue(d.q); assert.ok(v >= 1000 && v <= 9999, 'thousands: ' + d.q); assert.match(d.meta, /^Thousands · 2 steps/); assert.equal(d.pts, '10', 'points unchanged'); }
+    // 3. Tens only
+    await tick('thousands', false); await tick('tens', true);
+    await p.locator('#qb-gen-run').click(); ds = await drafts();
+    for (const d of ds) { const v = mainValue(d.q); assert.ok(v >= 10 && v <= 99, 'tens: ' + d.q); }
+    // 4. all three: a mixture across ten drafts (3-4 of each), shuffled
+    await tick('hundreds', true); await tick('thousands', true);
+    await p.locator('#qb-gen-run').click(); ds = await drafts();
+    const kinds = ds.map(d => { const v = mainValue(d.q); return v < 100 ? 'tens' : v < 1000 ? 'hundreds' : 'thousands'; });
+    for (const k of ['tens', 'hundreds', 'thousands']) { const n = kinds.filter(x => x === k).length; assert.ok(n >= 3 && n <= 4, k + ' = ' + n + ' of 10: ' + kinds.join(',')); }
+    // 5. the other topics follow the same choice and stay correct
+    await p.locator('#modal-qb-generate .modal-close').click();
+    for (const topic of ['MEDIUM', 'HARD']) {
+      await p.locator('[data-qb-topic="' + topic + '"]').click();
+      await p.locator('#qb-generate-btn').click(); await p.waitForSelector('#modal-qb-generate.is-open');
+      await tick('tens', false); await tick('hundreds', true); await tick('thousands', false);
+      await p.locator('#qb-gen-count').selectOption('10');
+      await p.locator('#qb-gen-run').click(); ds = await drafts();
+      for (const d of ds) {
+        const m = d.q.match(/PHP ([\d,]+) (?:increased in price to|is marked down to) PHP ([\d,]+)/); assert.ok(m, d.q);
+        const a = Number(m[1].replace(/,/g, '')), b = Number(m[2].replace(/,/g, '')); assert.ok(a >= 100 && a <= 999 && b >= 100 && b <= 999, topic + ' stays in the hundreds: ' + d.q);
+        const pct = Math.abs(b - a) / a * 100; assert.equal(d.final, Math.round(pct) + '%', 'the final answer matches the problem');
+      }
+      await p.locator('#modal-qb-generate .modal-close').click();
+    }
+    // 6. nothing was written by generating or ticking; existing questions and the points config are untouched
+    assert.equal(await writes(), 0, 'generating drafts changes nothing in the database');
+    assert.equal((await p.evaluate(() => window.fixture.data.question_bank)).length, 1);
+    assert.equal((await p.evaluate(() => window.fixture.data.question_bank[0].question)), 'What is 10% of 50?');
+    // 7. saving still works and stores only the existing fields
+    await p.locator('[data-qb-topic="EASY"]').click();
+    await p.locator('#qb-generate-btn').click(); await p.waitForSelector('#modal-qb-generate.is-open');
+    await p.locator('#qb-gen-count').selectOption('3');
+    await p.locator('#qb-gen-run').click();
+    await p.locator('#qb-gen-save').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'question_bank' && c.write === 'insert'));
+    const ins = (await calls(p)).find(c => c.table === 'question_bank' && c.write === 'insert');
+    assert.equal(ins.values.length, 3);
+    for (const r of ins.values) { assert.deepEqual(Object.keys(r).sort(), ['difficulty', 'final_answer', 'hint', 'points', 'question'], 'only the existing columns are saved'); assert.equal(r.points, 10); assert.equal(JSON.parse(r.hint).steps.length, 2); }
+    assert.equal((await calls(p)).filter(c => c.table === 'app_config' && c.write).length, 0, 'the points / scoring configuration is untouched');
+    await p.context().close();
+  });
+
   /* ================= LIVE SESSIONS ================= */
   await check('live: Connected/Offline/Unknown only, hh:mm:ss in mono, connected first, sections and stages truthful', async () => {
     const p = await open('live');

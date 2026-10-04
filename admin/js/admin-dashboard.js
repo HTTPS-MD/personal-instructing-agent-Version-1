@@ -4511,6 +4511,7 @@
         hasClosing: false,
         scoring: { wrong: 20, hint: 10, fast: 20, secs: 30, speed: true, min: 0, repeatOn: false, repeatPct: 50 },
         hasScoring: false,
+        genRanges: ['tens', 'hundreds'],   /* the number sizes ticked in the generator; kept while the page is open */
         configSeen: null,        /* what the server last said about the rules and closing time (to notice another admin's save) */
         liveTimer: null,
         dirty: false,
@@ -5308,113 +5309,18 @@
     }
 
     /* ---- 16.7 Auto-generate ----
-       The generator is the original, unchanged in what it produces: two
-       templates for topic 1, one each for topics 2 and 3, every problem with
-       its worked steps and three tiers of hints. `pts` is passed in rather
-       than read from the page. */
-    function generateRandomSentenceQuestion(diff, pts) {
-        var pick = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
-
-        if (diff === 'EASY') {
-            var templates = [
-                function () {
-                    var total = Math.floor(Math.random() * 8 + 2) * 50;
-                    var pct = pick([10, 20, 25, 30, 40, 50, 60, 75]);
-                    var result = (total * pct) / 100;
-                    var act = pick(['sports club', 'art workshop', 'math olympiad', 'science fair']);
-                    return {
-                        q: 'In a school of ' + total + ' students, ' + pct + '% joined the ' + act + '. How many students joined?',
-                        final: String(result),
-                        points: pts,
-                        steps: [
-                            { prompt: 'Step 1: Convert ' + pct + '% into a decimal.', answer: String(pct / 100),
-                              hint1: 'Divide percentage by 100 to convert to decimal.',
-                              hint2: pct + ' / 100', hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.' },
-                            { prompt: 'Step 2: Multiply decimal (' + (pct / 100) + ') by total students (' + total + ').',
-                              answer: String(result),
-                              hint1: 'Multiply decimal value by total number of students.',
-                              hint2: (pct / 100) + ' * ' + total, hint3: 'Work out ' + (pct / 100) + ' times ' + total + ', then write the result as your final answer.' }
-                        ]
-                    };
-                },
-                function () {
-                    var price = pick([500, 800, 1000, 1200, 1500, 2000]);
-                    var pct = pick([10, 15, 20, 25, 30, 50]);
-                    var discount = (price * pct) / 100;
-                    var item = pick(['jacket', 'pair of shoes', 'backpack', 'watch']);
-                    return {
-                        q: 'A ' + item + ' originally priced at PHP ' + price.toLocaleString() + ' is on sale with a ' + pct +
-                            '% discount. What is the discount amount in PHP?',
-                        final: String(discount),
-                        points: pts,
-                        steps: [
-                            { prompt: 'Step 1: Convert ' + pct + '% into decimal form.', answer: String(pct / 100),
-                              hint1: 'Divide the rate by 100.', hint2: pct + ' / 100', hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.' },
-                            { prompt: 'Step 2: Calculate discount amount by multiplying ' + price + ' by ' + (pct / 100) + '.',
-                              answer: String(discount),
-                              hint1: 'Multiply original price by percentage in decimal.',
-                              hint2: price + ' * ' + (pct / 100), hint3: 'Work out ' + price + ' times ' + (pct / 100) + ', then write the result as your final answer.' }
-                        ]
-                    };
-                }
-            ];
-            return pick(templates)();
-        }
-
-        if (diff === 'MEDIUM') {
-            var orig = Math.floor(Math.random() * 10 + 5) * 100;
-            var pctUp = pick([10, 20, 25, 30, 50]);
-            var inc = (orig * pctUp) / 100;
-            var newPrice = orig + inc;
-            var thing = pick(['smartphone', 'bicycle', 'monitor', 'guitar']);
-            return {
-                q: 'A ' + thing + ' originally priced at PHP ' + orig.toLocaleString() + ' increased in price to PHP ' +
-                    newPrice.toLocaleString() + '. What is the percentage increase?',
-                final: pctUp + '%',
-                points: pts,
-                steps: [
-                    { prompt: 'Step 1: Calculate the amount of price increase (' + newPrice + ' - ' + orig + ').',
-                      answer: String(inc), hint1: 'Subtract original price from new price.',
-                      hint2: newPrice + ' - ' + orig, hint3: 'Subtract ' + orig + ' from ' + newPrice + ' to find the increase.' },
-                    { prompt: 'Step 2: Divide increase (' + inc + ') by original price (' + orig + ').',
-                      answer: String(inc / orig), hint1: 'Divide increase amount by original price.',
-                      hint2: inc + ' / ' + orig, hint3: 'Divide the increase by the original price, ' + orig + '.' },
-                    { prompt: 'Step 3: Convert decimal (' + (inc / orig) + ') to percentage by multiplying by 100.',
-                      answer: pctUp + '%', hint1: 'Multiply decimal by 100 and add % sign.',
-                      hint2: (inc / orig) + ' * 100', hint3: 'Multiply by 100 and add the % sign.' }
-                ]
-            };
-        }
-
-        /* HARD: percentage decrease */
-        var base = Math.floor(Math.random() * 10 + 10) * 100;
-        var pctDown = pick([10, 20, 25, 30, 40, 50]);
-        var dec = (base * pctDown) / 100;
-        var sale = base - dec;
-        var goods = pick(['television', 'tablet', 'pair of sneakers', 'camera']);
-        return {
-            q: 'An item (' + goods + ') originally priced at PHP ' + base.toLocaleString() + ' is marked down to PHP ' +
-                sale.toLocaleString() + '. What is the percentage decrease?',
-            final: pctDown + '%',
-            points: pts,
-            steps: [
-                { prompt: 'Step 1: Calculate the amount of price decrease (' + base + ' - ' + sale + ').',
-                  answer: String(dec), hint1: 'Subtract new sale price from original price.',
-                  hint2: base + ' - ' + sale, hint3: 'Subtract ' + sale + ' from ' + base + ' to find the decrease.' },
-                { prompt: 'Step 2: Divide decrease (' + dec + ') by original price (' + base + ').',
-                  answer: String(dec / base), hint1: 'Divide decrease amount by original price.',
-                  hint2: dec + ' / ' + base, hint3: 'Divide the decrease by the original price, ' + base + '.' },
-                { prompt: 'Step 3: Convert decimal (' + (dec / base) + ') to percentage by multiplying by 100.',
-                  answer: pctDown + '%', hint1: 'Multiply decimal by 100.',
-                  hint2: (dec / base) + ' * 100', hint3: 'Multiply by 100 and add the % sign.' }
-            ]
-        };
+       The problems, their worked steps and their three tiers of hints are built by admin/js/math-task-generator.js
+       (no page code in it, so it can be tested on its own). The admin picks the size of the numbers: Tens,
+       Hundreds and/or Thousands. `pts` is passed in rather than read from the page. */
+    function generateRandomSentenceQuestion(diff, pts, range) {
+        return window.PIAMathGen.generate(diff, pts, range);
     }
 
     function qbOpenGenerator(trigger) {
         qb.drafts = [];
         $('#qb-gen-sub').textContent = qbTopicLabel(qb.topic);
         $('#qb-gen-status').textContent = '';
+        qbPaintRanges();
         renderQbDrafts();
         openModal('modal-qb-generate', trigger);
         $('#qb-gen-count').focus({ preventScroll: true });
@@ -5438,7 +5344,8 @@
             $$('label[data-for]', node).forEach(function (label) {
                 label.htmlFor = 'qb-draft-' + i + '-' + label.getAttribute('data-for');
             });
-            $('.qb-preview-meta', node).textContent = qbStepSummary(draft) + ' included — edit them after saving.';
+            $('.qb-preview-meta', node).textContent = (draft.range && window.PIAMathGen.RANGES[draft.range] ? window.PIAMathGen.RANGES[draft.range].label + ' · ' : '') +
+                qbStepSummary(draft) + ' included — edit them after saving.';
             list.appendChild(node);
         });
 
@@ -5449,12 +5356,35 @@
         save.textContent = n ? 'Save ' + n + ' to bank' : 'Save to bank';
     }
 
+    var QB_RANGE_BOXES = { tens: '#qb-gen-tens', hundreds: '#qb-gen-hundreds', thousands: '#qb-gen-thousands' };
+
+    function qbPaintRanges() {
+        Object.keys(QB_RANGE_BOXES).forEach(function (r) { $(QB_RANGE_BOXES[r]).checked = qb.genRanges.indexOf(r) !== -1; });
+        $('#qb-gen-range-msg').textContent = '';
+        $('#qb-gen-range').classList.remove('is-invalid');
+    }
+
+    function qbReadRanges() {
+        return Object.keys(QB_RANGE_BOXES).filter(function (r) { return $(QB_RANGE_BOXES[r]).checked; });
+    }
+
     function qbGenerateDrafts(event) {
         event.preventDefault();
+        var ranges = qbReadRanges();
+        qb.genRanges = ranges;
+        if (!ranges.length) {
+            /* Nothing is picked on purpose: say so, and generate nothing (no quiet default). */
+            $('#qb-gen-range-msg').textContent = 'Select at least one number range.';
+            $('#qb-gen-range').classList.add('is-invalid');
+            $('#qb-gen-status').textContent = 'Select at least one number range.';
+            $('#qb-gen-tens').focus();
+            return;
+        }
+        $('#qb-gen-range-msg').textContent = '';
+        $('#qb-gen-range').classList.remove('is-invalid');
         var count = toInt($('#qb-gen-count').value, 5);
         var pts = qbUniformPoints(qb.bank[qb.topic]) || 10;
-        qb.drafts = [];
-        for (var i = 0; i < count; i++) { qb.drafts.push(generateRandomSentenceQuestion(qb.topic, pts)); }
+        qb.drafts = window.PIAMathGen.generateBatch(qb.topic, pts, count, ranges);
         renderQbDrafts();
         $('#qb-gen-status').textContent = count + (count === 1 ? ' draft' : ' drafts') + ' ready to review.';
     }
