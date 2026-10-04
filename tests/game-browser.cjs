@@ -434,89 +434,75 @@ const DASH = '/student/html/student-dashboard.html';
     await p.context().close();
   });
 
-  /* ---------------- the time limit ---------------- */
-  await check('clock: shown in the progress card as mm:ss (role=timer), counts down, start screen states the limit', async () => {
-    const p = await open(DASH, { limit: 600 });
-    await p.waitForFunction(() => /10 mins/.test(document.querySelector('#fact-limit').textContent));
+  /* ---------------- the closing time (0045): the student sees NO time ---------------- */
+  const noTime = async p => {
+    const text = await p.evaluate(() => document.body.innerText);
+    assert.equal(/\b\d{1,2}:\d{2}\b/.test(text), false, 'a clock-like time is on the page: ' + (text.match(/\b\d{1,2}:\d{2}\b/) || [''])[0]);
+    assert.equal(/\b\d+\s*(mins?|minutes?|secs?|seconds?|hours?)\b/i.test(text), false, 'a duration is on the page');
+    assert.equal(/time limit|time left|closes at|deadline|countdown/i.test(text), false, 'time wording is on the page');
+    assert.equal(await p.locator('#time-left, #fact-limit, [role="timer"], .time-badge').count(), 0, 'a clock element exists');
+  };
+  await check('no time anywhere for the student: start screen and game show no clock, limit, minutes or closing time', async () => {
+    const p = await open(DASH);
+    await p.waitForSelector('#start-btn');
+    await noTime(p);
     await start(p);
-    assert.match(await p.locator('#time-left').innerText(), /^(10:00|09:5\d)$/);
-    assert.equal(await p.locator('#time-left').getAttribute('role'), 'timer');
-    assert.equal(await p.locator('.problem-header-block #time-left').count(), 1, 'inside the redesigned game, not a top strip');
-    const a = await p.locator('#time-left').innerText(); await p.waitForTimeout(1300);
-    assert.notEqual(await p.locator('#time-left').innerText(), a, 'counts down');
+    await submit(p, '9'); await submit(p, '8');
+    await noTime(p);
+    assert.equal(await p.locator('#time-announce').innerText(), '', 'nothing is announced while open');
     await p.context().close();
   });
-  await check('clock: one continuous deadline - questions, topics and a page reload do not reset it', async () => {
-    const p = await open(DASH, { limit: 600 });
-    await start(p);
-    const w1 = await p.evaluate(() => window.__mockWindow().deadline);
-    await finishQuestion(p); await finishQuestion(p);
-    assert.equal(await p.evaluate(() => window.__mockWindow().deadline), w1);
-    await p.reload(); await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape'); await p.locator('#start-btn').click(); await p.waitForSelector('#step-input');
-    assert.equal(await p.evaluate(() => window.__mockWindow().deadline), w1, 'reload did not give more time');
-    await p.context().close();
-  });
-  await check('clock: low-time warning style and polite screen-reader announcements; expiry announced', async () => {
-    const p = await open(DASH, { limit: 32 });
-    await start(p);
-    await p.waitForFunction(() => /30 seconds left/.test(document.querySelector('#time-announce').textContent), null, { timeout: 8000 });
-    assert.equal(await p.locator('#time-left.is-low').count(), 1);
-    assert.equal(await p.locator('#time-announce').getAttribute('aria-live'), 'polite');
-    await p.waitForSelector('#modal-time.is-open', { timeout: 40000 });
-    assert.match(await p.locator('#time-announce').innerText(), /Time limit reached/);
-    await p.context().close();
-  });
-  await check('expiry: dialog with limit/started/finished/spent, inputs locked, not dismissible, focus trapped, Try again restarts the problem', async () => {
-    const p = await open(DASH, { limit: 4 });
-    await start(p);
-    const q = await p.locator('#problem-expression').innerText();
-    await submit(p, '9'); await submit(p, '8');          // two errors, hint unlocked
-    await p.waitForSelector('#modal-time.is-open', { timeout: 8000 });
-    assert.equal(await p.locator('#modal-time').getAttribute('role'), 'alertdialog');
-    assert.match(await p.locator('#time-limit').innerText(), /4 secs/);
-    assert.match(await p.locator('#time-started').innerText(), /\d/); assert.match(await p.locator('#time-finished').innerText(), /\d/);
-    assert.match(await p.locator('#time-spent').innerText(), /sec/);
-    assert.equal(await p.locator('#step-input').isDisabled(), true); assert.equal(await p.locator('#step-submit').isDisabled(), true); assert.equal(await p.locator('#hint-btn').isDisabled(), true);
-    assert.match(await p.locator('#agent-speech').innerText(), /Time is up/);
-    await p.keyboard.press('Escape'); await p.mouse.click(4, 4);
-    assert.equal(await p.locator('#modal-time.is-open').count(), 1, 'cannot be dismissed');
-    for (let i = 0; i < 3; i++) { await p.keyboard.press('Tab'); assert.equal(await p.evaluate(() => !!document.activeElement.closest('#modal-time')), true); }
-    await p.screenshot({ path: path.join(out, 'game-time-expired.png') });
-    await p.evaluate(() => localStorage.setItem('__mock_limit', '600'));
-    await p.locator('#time-retry').click();
-    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'));
-    assert.equal(await p.locator('#problem-expression').innerText(), q, 'same problem reloaded');
-    assert.equal(await p.locator('.step-card').count(), 1, 'from step 1'); assert.equal(await p.locator('#step-input').isDisabled(), false);
-    assert.equal(await p.locator('#hint-btn').isVisible(), false, 'errors and hints back at zero');
-    assert.match(await p.locator('#time-left').innerText(), /^(10:00|09:5\d)$/, 'fresh limit');
-    assert.equal(await p.evaluate(() => window.__mockWindow().no), 2);
-    await submit(p, '7'); assert.match(await p.locator('#step-feedback').innerText(), /Incorrect/);
-    await p.context().close();
-  });
-  await check('expiry: an answer sent after the server says time is up is refused and shows the dialog; reload while expired shows it again', async () => {
-    const p = await open(DASH, { limit: 600 });
+  await check('closed by the admin: the page learns only "closed", locks, says so without any time, and Sign out is the way on', async () => {
+    const p = await open(DASH);
     await start(p);
     await p.evaluate(() => window.__mockExpireNow());
-    await submit(p, '9');
-    await p.waitForSelector('#modal-time.is-open');
-    assert.equal(await p.locator('#error-list .history-item').count(), 0, 'the refused answer is not counted');
-    await p.reload(); await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape'); await p.locator('#start-btn').click();
-    await p.waitForSelector('#modal-time.is-open');
-    assert.equal(await p.locator('#time-retry').isVisible(), true);
+    await submit(p, '1');
+    await p.waitForSelector('#modal-time.is-open', { timeout: 8000 });
+    assert.equal(await p.locator('#modal-time').getAttribute('role'), 'alertdialog');
+    assert.match(await p.locator('#time-title').innerText(), /Tutoring is closed/);
+    assert.equal(/\d/.test(await p.locator('#modal-time').innerText()), false, 'no number in the closed dialog');
+    assert.equal(await p.locator('#step-input').isDisabled(), true);
+    assert.equal(await p.locator('#step-submit').isDisabled(), true);
+    assert.equal(await p.locator('#hint-btn').isDisabled(), true);
+    await p.keyboard.press('Escape');
+    assert.equal(await p.locator('#modal-time.is-open').count(), 1, 'cannot be dismissed');
+    assert.equal(await p.locator('#closed-signout').isVisible(), true);
+    assert.equal(await p.locator('#time-retry').count(), 0, 'there is no Try again');
+    assert.equal(await p.evaluate(() => window.__calls.some(c => c.m === 'rpc' && c.name === 'restart_after_expiry')), false, 'the page never asks to restart');
+    await noTime(p);
     await p.context().close();
   });
-  await check('expiry: topic progress and topic are kept across Try again', async () => {
-    const p = await open(DASH, { limit: 600 });
+  await check('closed before the student arrives: the start screen says so, Start is disabled, nothing is served', async () => {
+    const p = await open(DASH);
+    await p.waitForSelector('#start-btn');
+    await p.evaluate(() => window.__mockExpireNow());
+    await p.reload();
+    await p.waitForSelector('#start-btn');
+    await p.waitForFunction(() => /closed/i.test(document.querySelector('#start-lede').textContent));
+    assert.equal(await p.locator('#start-btn').isDisabled(), true);
+    assert.equal(/\d/.test(await p.locator('#start-lede').innerText()), false, 'no time in the message');
+    assert.equal(await p.evaluate(() => window.__calls.some(c => c.m === 'rpc' && /serve_next/.test(c.name))), false);
+    await p.context().close();
+  });
+  await check('reopened by the admin: the student continues the same question where they stopped', async () => {
+    const p = await open(DASH);
     await start(p);
-    for (let i = 0; i < 3; i++) await finishQuestion(p);
-    await p.waitForSelector('#modal-offer.is-open'); await p.locator('#offer-accept').click(); await p.waitForSelector('#step-input');
-    assert.match(await p.locator('#problem-kicker').innerText(), /^Topic 2:/);
-    await p.evaluate(() => window.__mockExpireNow()); await submit(p, '1');
-    await p.waitForSelector('#modal-time.is-open'); await p.locator('#time-retry').click();
-    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'));
-    assert.match(await p.locator('#problem-kicker').innerText(), /^Topic 2:/); assert.equal(await p.locator('#solved-list .q-btn').count(), 3);
+    const q = await p.locator('#problem-expression').innerText();
+    await submit(p, '9');
+    await p.evaluate(() => window.__mockExpireNow());
+    await submit(p, '1');
+    await p.waitForSelector('#modal-time.is-open');
+    await p.evaluate(() => window.__mockReopen());
+    await p.reload();
+    await p.waitForSelector('#start-btn');
+    await p.waitForFunction(() => !document.querySelector('#start-btn').disabled);
+    await start(p);
+    assert.equal(await p.locator('#problem-expression').innerText(), q, 'same question, not a restart');
+    assert.equal(await p.locator('#step-input').isEnabled(), true);
+    await noTime(p);
     await p.context().close();
   });
+
   await check('privacy: no ocean_* column is ever selected by the game page', async () => {
     const p = await open(DASH); await start(p);
     assert.equal(await p.evaluate(() => JSON.stringify(window.__calls).includes('ocean_')), false);

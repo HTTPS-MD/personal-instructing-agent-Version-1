@@ -568,17 +568,11 @@
                                     </div>
 
                                     <div class="field qb-global">
-                                        <label class="label" for="qb-max-points">Max points <span class="qb-scope">All topics</span></label>
-                                        <input class="input tnum" type="number" id="qb-max-points" min="1" max="500"
-                                            step="1" inputmode="numeric" value="10" disabled>
-                                        <p class="field-msg" data-msg-for="qb-max-points"></p>
-                                    </div>
-                                    <div class="field qb-global">
-                                        <label class="label" for="qb-time-limit">Game time limit (minutes) <span class="qb-scope">All topics</span></label>
-                                        <input class="input tnum" type="number" id="qb-time-limit" min="1" max="240"
-                                            step="1" inputmode="numeric" value="10" disabled>
-                                        <p class="field-msg" data-msg-for="qb-time-limit"></p>
-                                        <p class="qb-help" id="qb-time-note">Available after the game database update.</p>
+                                        <label class="label" for="qb-closes-at">Tutoring closes at <span class="qb-scope">All topics</span></label>
+                                        <input class="input" type="datetime-local" id="qb-closes-at" step="60" disabled>
+                                        <p class="field-msg" data-msg-for="qb-closes-at"></p>
+                                        <p class="qb-help" id="qb-closes-note">Available after the game database update.</p>
+                                        <button class="btn btn-secondary btn-sm" type="button" id="qb-closes-clear" disabled>Clear closing time</button>
                                     </div>
                                 </div>
                                 <div class="card-foot">

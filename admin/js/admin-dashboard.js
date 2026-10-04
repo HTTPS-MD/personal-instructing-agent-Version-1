@@ -4484,9 +4484,8 @@
         error: '',
         bank: { EASY: [], MEDIUM: [], HARD: [] },
         rules: { EASY: qbDefaultRules(), MEDIUM: qbDefaultRules(), HARD: qbDefaultRules() },
-        maxPoints: 10,
-        timeLimit: 10,
-        hasTimeLimit: false,
+        closesAt: '',            /* 'YYYY-MM-DDTHH:mm' in Philippine time; '' = no closing time */
+        hasClosing: false,
         dirty: false,
         editingId: null,
         drafts: [],
@@ -4548,6 +4547,18 @@
     }
 
     /* A whole number in 1..500, or null. */
+    /* The closing time is stored as a timestamp with time zone and always shown and
+       entered in Philippine time (UTC+8, no daylight saving). */
+    function qbPhLocal(iso) {
+        var t = Date.parse(iso);
+        return isNaN(t) ? '' : new Date(t + 8 * 3600 * 1000).toISOString().slice(0, 16);
+    }
+    function qbPhToIso(local) {
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) { return null; }
+        var iso = local + ':00+08:00';
+        return isNaN(Date.parse(iso)) ? null : iso;
+    }
+
     function qbPoints(raw) {
         var text = String(raw == null ? '' : raw).trim();
         if (!/^\d+$/.test(text)) { return null; }
@@ -4634,9 +4645,8 @@
                     maxErrors: toInt(c[key + '_max_errors'], 3)
                 };
             });
-            qb.maxPoints = toInt(c.max_points, 10);
-            qb.hasTimeLimit = Object.prototype.hasOwnProperty.call(c, 'time_limit');
-            if (qb.hasTimeLimit) { qb.timeLimit = toInt(c.time_limit, 10); }
+            qb.hasClosing = Object.prototype.hasOwnProperty.call(c, 'game_closes_at');
+            qb.closesAt = qb.hasClosing && c.game_closes_at ? qbPhLocal(c.game_closes_at) : '';
         }
 
         qb.status = 'ready';
@@ -4830,19 +4840,21 @@
         qbPaintRange();
         $('#qb-min-questions').value = rules.minQuestions == null ? '' : String(rules.minQuestions);
         $('#qb-max-errors').value = rules.maxErrors == null ? '' : String(rules.maxErrors);
-        if (document.activeElement !== $('#qb-max-points')) {
-            $('#qb-max-points').value = qb.maxPoints == null ? '' : String(qb.maxPoints);
+        if (document.activeElement !== $('#qb-closes-at')) {
+            $('#qb-closes-at').value = qb.closesAt;
         }
-        if (document.activeElement !== $('#qb-time-limit')) {
-            $('#qb-time-limit').value = String(qb.timeLimit);
-        }
-        $('#qb-time-note').textContent = qb.hasTimeLimit
-            ? 'One limit for the full game session.' : 'Available after the game database update.';
+        var passed = qb.closesAt && qbPhToIso(qb.closesAt) && Date.parse(qbPhToIso(qb.closesAt)) <= Date.now();
+        $('#qb-closes-note').textContent = !qb.hasClosing
+            ? 'Available after the game database update.'
+            : (passed
+                ? 'This time has already passed: the tutoring will be locked for every student as soon as you save.'
+                : 'Philippine time. From this moment the tutoring is locked for every student, even if they quit and come back, until you set a later time. Leave it empty for no closing time. Students are never shown this time.');
 
-        ['#qb-mastery', '#qb-min-questions', '#qb-max-errors', '#qb-max-points'].forEach(function (sel) {
+        ['#qb-mastery', '#qb-min-questions', '#qb-max-errors'].forEach(function (sel) {
             $(sel).disabled = !ready;
         });
-        $('#qb-time-limit').disabled = !ready || !qb.hasTimeLimit;
+        $('#qb-closes-at').disabled = !ready || !qb.hasClosing;
+        $('#qb-closes-clear').disabled = !ready || !qb.hasClosing || !qb.closesAt;
         $('#qb-config-save').disabled = !ready || qb.busy.config;
         $('#qb-dirty').classList.toggle('is-on', qb.dirty);
     }
@@ -5387,21 +5399,18 @@
             }
         }
 
-        var maxPoints = qbPoints(qb.maxPoints);
-        if (maxPoints === null) {
-            setFieldError('qb-max-points', 'Use a whole number from 1 to ' + QB_POINTS_MAX + '.');
-            $('#qb-max-points').focus();
-            return;
-        }
-        var timeLimit = qb.hasTimeLimit ? qbIntIn(qb.timeLimit, 1, 240) : null;
-        if (qb.hasTimeLimit && timeLimit === null) {
-            setFieldError('qb-time-limit', 'Use a whole number from 1 to 240 minutes.');
-            $('#qb-time-limit').focus();
-            return;
+        var closesIso = null;
+        if (qb.hasClosing && qb.closesAt) {
+            closesIso = qbPhToIso(qb.closesAt);
+            if (closesIso === null) {
+                setFieldError('qb-closes-at', 'Pick a valid date and time.');
+                $('#qb-closes-at').focus();
+                return;
+            }
         }
 
-        var row = { id: 1, max_points: maxPoints };
-        if (qb.hasTimeLimit) { row.time_limit = timeLimit; }
+        var row = { id: 1 };
+        if (qb.hasClosing) { row.game_closes_at = closesIso; }
         QB_ORDER.forEach(function (topic) {
             var key = topic.toLowerCase();
             row[key + '_mastery'] = toInt(qb.rules[topic].mastery, 80);
@@ -5422,8 +5431,6 @@
         }
 
         qb.dirty = false;
-        qb.maxPoints = maxPoints;
-        if (qb.hasTimeLimit) { qb.timeLimit = timeLimit; }
         renderQbRules();
         toastOk('Rules saved', 'All three topics updated.');
     }
@@ -5472,15 +5479,18 @@
                 qbMarkDirty();
             });
         });
-        $('#qb-max-points').addEventListener('input', function () {
-            qb.maxPoints = this.value;
+        $('#qb-closes-at').addEventListener('input', function () {
+            qb.closesAt = this.value;
             setFieldError(this.id, '');
             qbMarkDirty();
+            renderQbRules();
         });
-        $('#qb-time-limit').addEventListener('input', function () {
-            qb.timeLimit = this.value;
-            setFieldError(this.id, '');
+        $('#qb-closes-clear').addEventListener('click', function () {
+            qb.closesAt = '';
+            $('#qb-closes-at').value = '';
+            setFieldError('qb-closes-at', '');
             qbMarkDirty();
+            renderQbRules();
         });
         $('#qb-config-form').addEventListener('submit', qbSaveRules);
 

@@ -29,13 +29,11 @@
  *      sends "correct: true", never evaluates an answer, never picks a
  *      question and never decides a topic.
  *
- * TIME. The attached game's rule: one session time limit (app_config.time_limit
- * minutes), one continuous deadline, no pause between questions or topics. The
- * SERVER owns the deadline (game_windows); this file only draws it. When it
- * passes, the server refuses answers and hints, the page shows the "Time limit
- * reached" dialog, and "Try again" restarts the open problem with a fresh limit
- * (restart_after_expiry). The countdown sits in the progress card, not in a top
- * strip, and its milestones and the expiry are announced to screen readers.
+ * TIME. The admin sets one CLOSING TIME for the tutoring (app_config.game_closes_at,
+ * migration 0045). The SERVER owns it: after it, answers and hints are refused,
+ * whether the student stays, quits or comes back, until the admin sets a later one.
+ * The student is shown no clock, no limit and no time at all, so there is no
+ * pressure; the page only learns "closed or not" and says "Tutoring is closed".
  *
  * TUTOR WORDING. The words the tutor says come from tutor-personas.js and are
  * cosmetic. Their "learning profile" comes from the ML service, reached
@@ -138,9 +136,6 @@
         pendingOffer: null,
         starting: false,
         bankEmpty: false,
-        clock: null,         /* { limit, base, at, expired, started, finished } from the server */
-        clockTimer: null,
-        announced: {},
         expired: false,
         expiring: false,
         restarting: false,
@@ -676,87 +671,16 @@
         else if (state.bankEmpty) { noQuestions(); }
     }
 
-    /* ============================================ 4b. THE CLOCK ======== */
+    /* ============================================ 4b. CLOSING TIME ===== */
 
-    /* The deadline lives on the server. Every reply that carries a `clock`
-       re-bases this display; between replies it counts down on the browser's
-       monotonic clock, so changing the computer's clock changes nothing the
-       server enforces. */
-    function fmtClock(sec) {
-        sec = Math.max(0, Math.round(sec));
-        var m = Math.floor(sec / 60), r = sec % 60;
-        return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
-    }
-
-    function fmtLimit(sec) {
-        var m = Math.floor(sec / 60), r = sec % 60;
-        if (m > 0) { return r > 0 ? m + 'm ' + r + 's' : m + (m > 1 ? ' mins' : ' min'); }
-        return r + ' secs';
-    }
-
-    function fmtTime(iso) {
-        var d = new Date(iso);
-        return isNaN(d) ? '--:--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
-
-    function fmtSpent(a, b) {
-        var sec = Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
-        var m = Math.floor(sec / 60), r = sec % 60;
-        return (m ? m + (m > 1 ? ' mins ' : ' min ') : '') + r + (r === 1 ? ' sec' : ' secs');
-    }
-
-    function secondsLeft() {
-        var c = state.clock;
-        if (!c) { return null; }
-        if (c.expired) { return 0; }
-        return Math.max(0, c.base - (performance.now() - c.at) / 1000);
-    }
-
+    /* The admin sets one closing time for the tutoring. The student is never shown a
+       clock, a limit or the time: only the server knows it. Every reply that carries
+       a `clock` says whether the tutoring is closed; once it is, nothing more is
+       accepted (the server refuses answers and hints) and the page says so, with no
+       time in it. Opened again by the admin, a refresh continues where they stopped. */
     function syncClock(c) {
         if (!c) { return; }
-        var newWindow = !state.clock || state.clock.window !== c.window;
-        state.clock = {
-            window: c.window, limit: Number(c.limit_seconds) || 600, base: Number(c.remaining_seconds) || 0,
-            at: performance.now(), expired: c.expired === true, started: c.started_at, finished: c.finished_at
-        };
-        if (newWindow) { state.announced = {}; }
-        paintClock();
-        if (!state.clockTimer) { state.clockTimer = setInterval(tickClock, 250); }
-        if (state.clock.expired && state.inSession) { expire(); }
-    }
-
-    function paintClock() {
-        var left = secondsLeft();
-        if (left === null) { return; }
-        var node = $('#time-left');
-        node.textContent = fmtClock(left);
-        node.classList.toggle('is-low', left <= 30);
-    }
-
-    /* Said once each, politely, so a screen-reader user is told without a
-       countdown being read every second. */
-    var MILESTONES = [[300, 'About 5 minutes left.'], [60, 'About 1 minute left.'], [30, '30 seconds left.']];
-
-    function tickClock() {
-        var left = secondsLeft();
-        if (left === null || state.expired || !state.inSession) { return; }
-        paintClock();
-        MILESTONES.forEach(function (m) {
-            if (left <= m[0] && left > 0 && state.clock.limit > m[0] && !state.announced[m[0]]) {
-                state.announced[m[0]] = true;
-                $('#time-announce').textContent = m[1];
-            }
-        });
-        if (left <= 0 && !state.expiring) { confirmExpiry(); }
-    }
-
-    /* The page thinks time is up. Only the server's word counts: ask it. */
-    async function confirmExpiry() {
-        state.expiring = true;
-        var res = await sb.rpc('serve_next_step_question', { p_session_id: state.sessionId });
-        state.expiring = false;
-        if (res.error || !res.data || !res.data.clock) { return; }
-        syncClock(res.data.clock);
+        if ((c.closed === true || c.expired === true) && state.inSession) { expire(); }
     }
 
     function lockForExpiry() {
@@ -770,47 +694,10 @@
         if (state.expired) { return; }
         closePreview();
         state.expired = true;
-        paintClock();
         lockForExpiry();
-        speak('Time is up! Let me show your session summary.', 'sad');
-        $('#time-announce').textContent = 'Time limit reached.';
-
-        var c = state.clock;
-        $('#time-limit').textContent = fmtLimit(c.limit);
-        $('#time-started').textContent = fmtTime(c.started);
-        $('#time-finished').textContent = fmtTime(c.finished);
-        $('#time-spent').textContent = fmtSpent(c.started, c.finished);
+        speak('Tutoring is closed for now. Thank you for your hard work!', 'default');
+        $('#time-announce').textContent = 'Tutoring is closed.';
         openModal('modal-time');
-    }
-
-    /* The game's "Try Again": the open problem is reloaded from step 1 with a
-       fresh limit; topic and topic progress are kept. */
-    async function tryAgain() {
-        if (state.restarting) { return; }
-        state.restarting = true;
-        var release = setBusy($('#time-retry'), 'Restarting…');
-
-        var res = await sb.rpc('restart_after_expiry', { p_session_id: state.sessionId });
-        release();
-        state.restarting = false;
-
-        if (res.error || !res.data) {
-            console.error('Could not restart:', res.error && res.error.message);
-            toast('Could not restart', 'Please try again.', 'danger');
-            return;
-        }
-
-        state.expired = false;
-        closeModal('modal-time');
-        state.problem = null;
-        state.stepWrong = 0;
-        state.stepStartedAt = Date.now();
-        syncClock(res.data.clock);
-        if (res.data.pending_offer) { return showOffer(res.data.pending_offer); }
-        if (res.data.done) { return noQuestions(); }
-        applyQuestion(res.data);
-        renderProblem();
-        speak(line('greet') || 'Let’s try again. Read the problem carefully.', 'default');
     }
 
     function noQuestions() {
@@ -1414,7 +1301,7 @@
         $('#start-btn').addEventListener('click', handleStart);
         $('#offer-accept').addEventListener('click', function () { answerOffer(true); });
         $('#offer-stay').addEventListener('click', function () { answerOffer(false); });
-        $('#time-retry').addEventListener('click', tryAgain);
+        $('#closed-signout').addEventListener('click', signOut);
         paintSolved();
         paintErrors();
         paintHintButton();
@@ -1441,7 +1328,6 @@
             applySession(peek.data);
 
             $('#fact-progress').textContent = state.answered;
-            $('#fact-limit').textContent = fmtLimit(Number(peek.data.time_limit_seconds) || 600);
 
             var where = 'You are on topic ' + state.topic + ': ' + topicOf(state.topic).short.toLowerCase() + '.';
             if (peek.data.resumed) {
@@ -1453,6 +1339,14 @@
                 $('#start-lede').textContent = where + ' The session has a time limit, and you can ask ' +
                     'for a hint whenever you’re stuck.';
             }
+        }
+
+        /* Closed by the admin? Say so on the start screen; the server refuses everything
+           anyway. If this call is not available yet, the tutoring is treated as open. */
+        var status = await sb.rpc('tutoring_status');
+        if (status.data && status.data.closed === true) {
+            $('#start-btn').disabled = true;
+            $('#start-lede').textContent = 'Tutoring is closed right now. Please wait for your teacher to open it again.';
         }
 
         reveal();

@@ -343,10 +343,13 @@ function fixture() {
     await p.context().close();
   });
   await check('math task: admin bank follows game step counts and avoids duplicate modal exits', async () => {
-    const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, time_limit: 10, max_points: 10 }] }) });
+    const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, time_limit: 10, max_points: 10, game_closes_at: null }] }) });
     await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
     assert.equal((await p.locator('#view-mathtask .page-title').innerText()).trim(), 'Math task bank');
-    assert.equal(await p.locator('#qb-time-limit').isEnabled(), true);
+    assert.equal(await p.locator('#qb-closes-at').isEnabled(), true);
+    assert.equal(await p.locator('#qb-max-points, #qb-time-limit').count(), 0, 'Max points and the minutes limit are gone');
+    assert.match(await p.locator('#qb-closes-note').innerText(), /Philippine time/);
+    assert.match(await p.locator('#qb-closes-note').innerText(), /never shown/);
     await shot(p, 'mathtask-dark-1280');
     await p.locator('#qb-add-btn').click();
     assert.equal(await p.locator('#qb-steps .qb-step').count(), 2);
@@ -370,15 +373,25 @@ function fixture() {
     assert.equal(await p.locator('#qb-steps .qb-step').count(), 3);
     assert.equal(await overflow(p), true);
     await p.locator('#modal-qb-edit .modal-close').click();
-    await p.locator('#qb-time-limit').fill('15');
+    await p.locator('#qb-closes-at').fill('2031-10-06T08:00');
     await p.locator('#qb-config-save').click();
     await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
     const configWrite = (await calls(p)).find(c => c.table === 'app_config' && c.write === 'upsert');
-    assert.equal(configWrite.values.time_limit, 15);
+    assert.equal(configWrite.values.game_closes_at, '2031-10-06T08:00:00+08:00', 'saved as Philippine time (UTC+8)');
+    assert.equal(Date.parse(configWrite.values.game_closes_at), Date.parse('2031-10-06T00:00:00Z'), '08:00 PHT is 00:00 UTC');
+    assert.equal('max_points' in configWrite.values, false, 'max points is no longer sent');
+    assert.equal('time_limit' in configWrite.values, false, 'the minutes limit is no longer sent');
+    await p.waitForFunction(() => !document.querySelector('#qb-closes-clear').disabled);
+    await p.locator('#qb-closes-clear').click();
+    assert.equal(await p.locator('#qb-closes-at').inputValue(), '');
+    await p.locator('#qb-config-save').click();
+    await p.waitForFunction(() => window.fixture.calls.filter(c => c.table === 'app_config' && c.write === 'upsert').length === 2);
+    const cleared = (await calls(p)).filter(c => c.table === 'app_config' && c.write === 'upsert')[1];
+    assert.equal(cleared.values.game_closes_at, null, 'cleared closing time is saved as null');
     await p.context().close();
     const beforeGameMigration = await open('mathtask');
     await beforeGameMigration.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
-    assert.equal(await beforeGameMigration.locator('#qb-time-limit').isEnabled(), false);
+    assert.equal(await beforeGameMigration.locator('#qb-closes-at').isEnabled(), false);
     await beforeGameMigration.context().close();
   });
 

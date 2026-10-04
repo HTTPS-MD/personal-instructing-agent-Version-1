@@ -90,14 +90,10 @@
                         <h1 class="start-hello" id="start-hello">Welcome back!</h1>
                         <p class="start-lede" id="start-lede">
                             Today you'll solve percentage word problems with your tutor, one step at a time. Work through
-                            as many as you can before the time limit, and use hints when you're stuck.
+                            as many as you can, and use hints when you're stuck.
                         </p>
 
                         <dl class="facts start-facts">
-                            <div class="fact">
-                                <dt class="fact-label">Session time limit</dt>
-                                <dd class="fact-value" id="fact-limit">10 mins</dd>
-                            </div>
                             <div class="fact">
                                 <dt class="fact-label">Steps per problem</dt>
                                 <dd class="fact-value">2–3</dd>
@@ -155,10 +151,6 @@
 
                     <div class="center-panel" id="center-panel">
                         <div class="problem-header-block">
-                            <div class="time-badge">
-                                <span class="time-badge-label" id="time-label">Time left</span>
-                                <span class="time-left" id="time-left" role="timer" aria-labelledby="time-label" aria-live="off">--:--</span>
-                            </div>
                             <div class="problem-label" id="problem-kicker">Topic 1: Finding Percentage</div>
                             <div class="problem-statement" id="problem-expression">Loading problem…</div>
                             <p class="sr-only" id="time-announce" role="status" aria-live="polite"></p>
@@ -202,21 +194,15 @@
         </div>
     </div>
 
-    <!-- ============================================ MODAL · TIME LIMIT ----
-         The game's "Time Limit Reached!" card. Not dismissible: the only way on is
-         Try Again, which restarts the open problem with a fresh limit. -->
+    <!-- ============================================ MODAL · CLOSED ----
+         Shown when the admin's closing time has passed. No time is mentioned anywhere:
+         the student is only told the tutoring is closed. Not dismissible. -->
     <div class="overlay" id="modal-time" role="alertdialog" aria-modal="true"
         aria-labelledby="time-title" aria-describedby="time-sub" data-static>
         <div class="modal modal-md game-card time-card">
-            <div class="time-modal-header" id="time-title">Time Limit Reached!</div>
-            <div class="time-modal-subtitle" id="time-sub">The session time limit has been reached.</div>
-            <dl class="time-stats-grid">
-                <div class="time-stat-row"><dt class="time-stat-label">Time Limit:</dt><dd class="time-stat-val" id="time-limit">--</dd></div>
-                <div class="time-stat-row"><dt class="time-stat-label">Time Started:</dt><dd class="time-stat-val" id="time-started">--:--:--</dd></div>
-                <div class="time-stat-row"><dt class="time-stat-label">Time Finished:</dt><dd class="time-stat-val" id="time-finished">--:--:--</dd></div>
-                <div class="time-stat-row"><dt class="time-stat-label">Time Spent:</dt><dd class="time-stat-val" id="time-spent">0 secs</dd></div>
-            </dl>
-            <button class="time-modal-btn" id="time-retry" type="button">Try Again</button>
+            <div class="time-modal-header" id="time-title">Tutoring is closed</div>
+            <div class="time-modal-subtitle" id="time-sub">Thank you for your hard work. Your tutor will be here again when your teacher opens the session.</div>
+            <button class="time-modal-btn" id="closed-signout" type="button">Sign out</button>
         </div>
     </div>
 

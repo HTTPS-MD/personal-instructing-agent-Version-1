@@ -53,12 +53,12 @@
   function find(pid) { return S.served.filter(function (q) { return q.pid === pid; })[0]; }
   function bankq(id) { return BANK.filter(function (b) { return b.id === id; })[0]; }
   var rules = { mastery: 80, min: 3, max: 3 };
-  function limitSec() { return Number(localStorage.getItem('__mock_limit')) || 600; }
-  function win() { if (!S.win) { S.win = { no: 1, limit: limitSec(), started: Date.now(), deadline: Date.now() + limitSec() * 1000 }; persist(); } return S.win; }
-  function expired() { return Date.now() >= win().deadline; }
-  function clock() { var w = win(); return { window: w.no, limit_seconds: w.limit, started_at: new Date(w.started).toISOString(), finished_at: new Date(Math.min(Date.now(), w.deadline)).toISOString(), remaining_seconds: Math.max(0, Math.ceil((w.deadline - Date.now()) / 1000)), expired: expired() }; }
-  window.__mockExpireNow = function () { var w = win(); w.deadline = Date.now() - 1000; persist(); };
-  window.__mockWindow = function () { return S.win; };
+  /* The admin's closing time, reduced to what the page can learn: closed or not. A test flips it. */
+  function expired() { return localStorage.getItem('__mock_closed') === '1'; }
+  function clock() { return { window: 1, closed: expired(), expired: expired(), limit_seconds: 86400, remaining_seconds: 86400 }; }
+  window.__mockExpireNow = function () { localStorage.setItem('__mock_closed', '1'); };
+  window.__mockReopen = function () { localStorage.removeItem('__mock_closed'); };
+  window.__mockWindow = function () { return { closed: expired() }; };
 
   var RPC = {
     set_student_stage: function () {   /* migration 0038 (Control OCEAN-only) rule: a tutor is NOT required to enter the stage */
@@ -68,7 +68,7 @@
     resume_or_start_game_session: function () {
       var g = guard(); if (g) return g;
       var pend = S.served.filter(function (q) { return S.done.indexOf(q.pid) < 0; })[0];
-      return { data: { session_id: S.sessionId, resumed: S.served.length > 0, time_limit_seconds: limitSec(), problems_answered: S.progress.answered, correct_count: S.progress.clean || 0, topic: S.progress.topic, consecutive_correct: 0, pending_problem_id: pend ? pend.pid : null } };
+      return { data: { session_id: S.sessionId, resumed: S.served.length > 0, problems_answered: S.progress.answered, correct_count: S.progress.clean || 0, topic: S.progress.topic, consecutive_correct: 0, pending_problem_id: pend ? pend.pid : null } };
     },
     serve_next_step_question: function () {
       var g = guard(); if (g) return g;
@@ -89,13 +89,10 @@
     },
     restart_after_expiry: function () {
       var g = guard(); if (g) return g;
-      if (!expired()) { var r0 = RPC.serve_next_step_question(); r0.data.restarted = false; return r0; }
-      var w = win(); w.log = (w.log || []); S.windowsLog = (S.windowsLog || []).concat([{ no: w.no }]);
-      S.win = { no: w.no + 1, limit: limitSec(), started: Date.now(), deadline: Date.now() + limitSec() * 1000 };
-      var open = S.served.filter(function (q) { return S.done.indexOf(q.pid) < 0; })[0];
-      if (open && !S.states[open.pid].completed) S.states[open.pid] = { step: 0, stage: 'work', work: null, wrong: 0, tier: 0, errors: 0, hints: 0, unlocked: false, doneSteps: [], completed: false };
-      persist(); var r = RPC.serve_next_step_question(); r.data.restarted = true; return r;
+      if (expired()) return { data: { closed: true, restarted: false, clock: clock() } };
+      var r0 = RPC.serve_next_step_question(); r0.data.restarted = false; return r0;
     },
+    tutoring_status: function () { var g = guard(); if (g) return g; return { data: { closed: expired() } }; },
     check_step_answer: function (a) {
       var g = guard(); if (g) return g;
       var q = find(a.p_problem_id), st = S.states[a.p_problem_id], b = bankq(q.id), sub = String(a.p_submitted).trim().slice(0, 60);
@@ -191,6 +188,6 @@
   };
   window.__bank = BANK; window.__answerKeys = BANK.reduce(function (a, b) { return a.concat(b.steps.map(function (s) { return s.answer; })); }, []);
   window.__emitRealtime = function (name, payload) { (window.__realtime || []).filter(function (r) { return r.name.indexOf(name) === 0; }).forEach(function (r) { r.cb(payload); }); };
-  window.__mockReset = function () { localStorage.removeItem(K_STATE); };
+  window.__mockReset = function () { localStorage.removeItem(K_STATE); localStorage.removeItem('__mock_closed'); };
   window.supabase = { createClient: function () { return api; } };
 })();

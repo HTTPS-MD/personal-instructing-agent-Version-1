@@ -432,7 +432,7 @@ function fixture() {
       assert.equal(await p.locator('.start-card svg, .agent-card svg, #start-btn svg, #signout-btn svg').count(), 0);
       assert.equal(await p.locator('.dot-live').count(), 0);
       assert.deepEqual(await iconsOf(p), ['#i-help']);
-      assert.equal(await p.locator('dl.facts > .fact > dt').count(), 3);
+      assert.equal(await p.locator('dl.facts > .fact > dt').count(), 2);
       assert.equal(await p.locator('.start-card #start-btn').count(), 1, 'Start sits inside the start section');
       assert.equal(await p.evaluate(() => { const a = document.querySelector('.start-card').getBoundingClientRect(), b = document.querySelector('.agent-card').getBoundingClientRect(); return b.top >= a.top - 1 && (innerWidth < 720 || b.left >= a.right - 1 || b.top >= a.bottom - 1); }), true);
       assert.ok(isFlat(await flat(p, '.start-card')));
