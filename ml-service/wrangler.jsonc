@@ -6,7 +6,10 @@
   "main": "src/entry.py",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["python_workers"],
-  "workers_dev": false,
+  // The Edge Function reaches the Worker over its workers.dev address. That is safe
+  // here: every request needs the ML_TOKEN bearer secret (401 without it), the
+  // Worker sends no CORS headers, and it never writes anything.
+  "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": false },
   "env": {
