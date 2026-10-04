@@ -1,12 +1,12 @@
 // ==========================================
-// SET NEW PASSWORD -- ang sapilitang pagpapalit ng temporary password
+// SET NEW PASSWORD -- required after an admin reset only when the admin chose
+// that option; otherwise this page is available from the student header.
 //
-// Kapag ang admin ang nag-set ng temporary password (Edge Function
-// admin-set-temp-password), must_change_password = true ang profile. Dito
+// Kapag pinili ng admin na required ang change sa Edge Function
+// admin-set-temp-password, must_change_password = true ang profile. Dito
 // sila dinadala sa sign-in, at dito sila ibinabalik ng requireStudentSession()
 // mula sa kahit anong ibang student page, hanggang makapili sila ng password na
-// SILA LANG ang nakakaalam (zero-knowledge: alam ng admin ang temporary, hindi
-// ang susunod).
+// SILA LANG ang nakakaalam.
 //
 // Paano bumababa ang flag: HINDI ito isinusulat ng page na ito -- bawal iyon sa
 // estudyante (0001 write guard). Ang updateUser() ang nagpapalit ng password,
@@ -17,11 +17,13 @@
     'use strict';
 
     const form = document.getElementById('new-password-form');
+    const currentField = document.getElementById('pw-current');
     const newField = document.getElementById('pw-new');
     const confirmField = document.getElementById('pw-confirm');
     const submitBtn = document.getElementById('pw-submit');
     const statusEl = document.getElementById('pw-status');
     const showToggle = document.getElementById('pw-show-toggle');
+    const backLink = document.getElementById('pw-back');
 
     let profile = null;
 
@@ -63,7 +65,11 @@
         const code = (error && error.code) || '';
         const raw = String((error && error.message) || '');
         if (code === 'same_password' || /different from the old password/i.test(raw)) {
-            return 'That is the temporary password. Choose a new one that only you know.';
+            return 'Choose a password different from the one you used to sign in.';
+        }
+        if (code === 'current_password_required' || code === 'current_password_mismatch' ||
+            /current password required/i.test(raw)) {
+            return 'The current password is missing or incorrect. Check the password you used to sign in.';
         }
         if (code === 'weak_password' || /weak|at least|characters/i.test(raw)) {
             return raw || 'That password is too weak. Make it longer, with letters and numbers.';
@@ -81,14 +87,17 @@
         event.preventDefault();
         setStatus('');
 
+        const current = currentField.value;
         const pw = newField.value;
         const r = renderRules();
 
+        setFieldMsg('pw-current', current ? '' : 'Enter the password you used to sign in.');
         setFieldMsg('pw-new', (!r.length || !r.letter || !r.number)
             ? 'Use at least 8 characters, with at least one letter and one number.' : '');
         setFieldMsg('pw-confirm', r.match ? '' : 'The two passwords do not match.');
         if (!r.length || !r.letter || !r.number) { newField.focus(); return; }
         if (!r.match) { confirmField.focus(); return; }
+        if (!current) { currentField.focus(); return; }
 
         // Bumabalik sa type="password" bago isumite -- ang browser ay nag-aalok
         // lang na i-save ang password na galing sa password field.
@@ -99,8 +108,15 @@
         submitBtn.textContent = 'Saving…';
 
         try {
-            const { error } = await supabaseClient.auth.updateUser({ password: pw });
+            const { error } = await supabaseClient.auth.updateUser({
+                password: pw,
+                current_password: current
+            });
             if (error) {
+                if (error.code === 'current_password_required' || error.code === 'current_password_mismatch') {
+                    setFieldMsg('pw-current', 'Check the password you used to sign in.');
+                    currentField.focus();
+                }
                 setStatus(friendlyUpdateError(error), 'error');
                 return;
             }
@@ -139,15 +155,21 @@
         profile = await requireStudentSession({ allowPasswordChange: true });
         if (!profile) return;
 
-        // Walang dapat palitan -- diretso sa tamang lugar nila.
+        // When not forced, this is the optional change-password page linked
+        // from every student page. Give them a clear way back.
         if (profile.must_change_password !== true) {
-            window.location.replace(await resolveStudentRedirect(profile));
-            return;
+            document.querySelector('.gate-title').textContent = 'Change your password';
+            document.getElementById('pw-lede').textContent =
+                'Enter your current password, then choose a new one only you know.';
+            document.querySelector('label[for="pw-current"]').textContent = 'Current password';
+            backLink.href = await resolveStudentRedirect(profile);
+            backLink.hidden = false;
         }
 
         document.getElementById('pw-email').textContent = profile.email;
         document.getElementById('pw-username').value = profile.email;
 
+        currentField.addEventListener('input', () => { if (currentField.classList.contains('is-invalid')) setFieldMsg('pw-current', ''); });
         newField.addEventListener('input', () => { renderRules(); if (newField.classList.contains('is-invalid')) setFieldMsg('pw-new', ''); });
         confirmField.addEventListener('input', () => { renderRules(); if (confirmField.classList.contains('is-invalid')) setFieldMsg('pw-confirm', ''); });
         showToggle.addEventListener('change', () => {
@@ -158,7 +180,7 @@
         renderRules();
 
         document.body.classList.remove('opacity-0');
-        newField.focus();
+        currentField.focus();
     }
 
     boot();
