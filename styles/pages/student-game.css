@@ -153,11 +153,7 @@ body.is-playing .learn-main { padding: var(--sp-3) 0 var(--sp-4); }
     padding: 0 16px 6px 12px;
 }
 
-/* The 3D-style character art. The pictures are opaque with a plain white
-   (#fefefe) background of their own, so each sits in a framed card (the same
-   white as the picture) instead of floating on the classroom video. Scaled to
-   fit, never recoloured or filtered. The card keeps its size from first paint,
-   so a change of expression moves nothing. */
+/* Keep each transparent character fully visible as expressions change. */
 .mentor-overlay-avatar {
     display: block;
     width: 100%;
@@ -166,9 +162,9 @@ body.is-playing .learn-main { padding: var(--sp-3) 0 var(--sp-4); }
     max-height: 100%;
     object-fit: contain;
     object-position: center bottom;
-    background: #fefefe;
-    border: 3px solid var(--palette-ink);
-    box-shadow: 5px 5px 0 var(--pop);
+    background: transparent;
+    border: 0;
+    box-shadow: none;
 }
 .mentor-overlay-avatar.talking { animation: avatarTalk 0.4s ease-in-out infinite alternate; }
 
@@ -658,7 +654,7 @@ body.is-playing .learn-main { padding: var(--sp-3) 0 var(--sp-4); }
 .mastery-speech-bubble { position: relative; }
 .mastery-speech-bubble::before { bottom: -18px; margin-left: -14px; border-width: 18px 14px 0; }
 .mastery-speech-bubble::after { bottom: -11px; margin-left: -9px; border-width: 13px 9px 0; border-color: var(--palette-paper) transparent; }
-.mastery-avatar-img { width: 100%; max-width: 180px; height: 230px; object-fit: contain; object-position: center bottom; background: #fefefe; border: 3px solid var(--palette-ink); box-shadow: 4px 4px 0 var(--palette-ink); }
+.mastery-avatar-img { width: 100%; max-width: 180px; height: 230px; object-fit: contain; object-position: center bottom; background: transparent; border: 0; box-shadow: none; }
 
 .mastery-destination {
     width: 100%;

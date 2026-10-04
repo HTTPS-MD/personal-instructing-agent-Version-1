@@ -226,13 +226,12 @@
     object-fit: contain;
 }
 
-/* The tutor is full-length artwork, so the start portrait is a tall box. The
-   3D-style pictures carry their own white background: a framed card. */
+/* Show the full-length transparent artwork without a white card. */
 .agent-card .agent-portrait {
     width: clamp(7rem, 30vw, 10rem);
     aspect-ratio: 220 / 431;
-    background: #fefefe;
-    border: 3px solid var(--text);
+    background: transparent;
+    border: 0;
     border-radius: 0;
 }
 
