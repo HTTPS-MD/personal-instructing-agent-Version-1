@@ -437,6 +437,55 @@ function fixture() {
     await p.context().close();
   });
 
+  await check('math task: scoring rules are configurable, validated, saved to the database config and shown with a live example; points are labelled as the maximum', async () => {
+    const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, game_closes_at: null, score_wrong_pct: 20, score_hint_pct: 10, score_fast_bonus_pct: 20, score_fast_seconds: 30, score_speed_bonus: true, score_min: 0, score_repeat_enabled: false, score_repeat_pct: 50 }] }) });
+    await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    const val = id => p.locator('#' + id).inputValue();
+    assert.deepEqual([await val('qb-sc-wrong'), await val('qb-sc-hint'), await val('qb-sc-fast'), await val('qb-sc-secs'), await val('qb-sc-min'), await val('qb-sc-repeat-pct')], ['20', '10', '20', '30', '0', '50'], 'the saved values are shown');
+    assert.equal(await p.locator('#qb-sc-speed').isChecked(), true);
+    assert.equal(await p.locator('#qb-sc-repeat').isChecked(), false);
+    assert.equal(await p.locator('#qb-sc-repeat-pct').isDisabled(), true, 'the repeat percentage is off while repeat scoring is off');
+    assert.match(await p.locator('label[for="qb-bulk-points"]').innerText(), /Maximum \(base\) points/);
+    assert.match(await p.locator('#modal-qb-edit label[for="qb-points"]').innerText(), /Maximum \(base\) points/);
+    // the worked example follows the fields (the issue's numbers: 20 -> 20 / 16 / 18 / 14 / 24)
+    assert.match(await p.locator('#qb-sc-example').innerText(), /clean 20 · 1 wrong 16 · 1 hint 18 · 1 wrong \+ 1 hint 14 · fast and clean \(under 30 s\) 24/);
+    await p.locator('#qb-sc-wrong').fill('50');
+    assert.match(await p.locator('#qb-sc-example').innerText(), /1 wrong 10 /);
+    await p.locator('label:has(#qb-sc-repeat)').click();   // the repeat percentage can only be edited while repeat scoring is on
+    // invalid values are refused before anything is sent
+    const before = (await calls(p)).filter(c => c.table === 'app_config' && c.write).length;
+    for (const [id, bad, msg] of [['qb-sc-wrong', '101', /0 to 100/], ['qb-sc-wrong', '-1', /0 to 100/], ['qb-sc-hint', '', /0 to 100/], ['qb-sc-fast', '1e9', /0 to 100/], ['qb-sc-secs', '0', /1 to 3600/], ['qb-sc-secs', '99999', /1 to 3600/], ['qb-sc-secs', '2.5', /1 to 3600/], ['qb-sc-min', '-3', /0 to 500/], ['qb-sc-repeat-pct', '', /0 to 100/]]) {
+      await p.locator('#qb-sc-wrong').fill('20'); await p.locator('#qb-sc-hint').fill('10'); await p.locator('#qb-sc-fast').fill('20'); await p.locator('#qb-sc-secs').fill('30'); await p.locator('#qb-sc-min').fill('0'); await p.locator('#qb-sc-repeat-pct').fill('50');
+      await p.locator('#' + id).fill(bad);
+      await p.locator('#qb-config-save').click();
+      assert.match(await p.locator('[data-msg-for="' + id + '"]').innerText(), msg, id + ' = ' + bad);
+    }
+    assert.equal((await calls(p)).filter(c => c.table === 'app_config' && c.write).length, before, 'nothing was sent for invalid values');
+    // a valid change is saved to app_config (not localStorage)
+    await p.locator('#qb-sc-wrong').fill('25'); await p.locator('#qb-sc-hint').fill('5'); await p.locator('#qb-sc-fast').fill('15'); await p.locator('#qb-sc-secs').fill('45'); await p.locator('#qb-sc-min').fill('2'); await p.locator('#qb-sc-repeat-pct').fill('40');
+    await p.locator('label:has(#qb-sc-speed)').click();
+    await p.locator('#qb-config-save').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
+    const w = (await calls(p)).filter(c => c.table === 'app_config' && c.write === 'upsert').pop().values;
+    assert.deepEqual([w.score_wrong_pct, w.score_hint_pct, w.score_fast_bonus_pct, w.score_fast_seconds, w.score_min, w.score_repeat_pct, w.score_speed_bonus, w.score_repeat_enabled], [25, 5, 15, 45, 2, 40, false, true]);
+    assert.equal(await p.evaluate(() => Object.keys(localStorage).some(k => /score/i.test(k))), false, 'nothing is kept only in localStorage');
+    assert.equal(await p.locator('#qb-sc-fast').isDisabled(), true, 'fast fields off while the speed bonus is off');
+    await p.context().close();
+    const old = await open('mathtask');   // a database without the scoring columns
+    await old.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    assert.equal(await old.locator('#qb-sc-wrong').isDisabled(), true);
+    assert.match(await old.locator('#qb-sc-note').innerText(), /Available after the scoring database update/);
+    await old.context().close();
+  });
+  await check('math task: another admin\'s scoring change reaches this screen', async () => {
+    const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, game_closes_at: null, score_wrong_pct: 20, score_hint_pct: 10, score_fast_bonus_pct: 20, score_fast_seconds: 30, score_speed_bonus: true, score_min: 0, score_repeat_enabled: false, score_repeat_pct: 50 }] }) });
+    await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    await p.evaluate(() => { window.fixture.data.app_config[0].score_wrong_pct = 35; });
+    await p.evaluate(() => (window.__rt || []).filter(r => r.filter && r.filter.table === 'app_config').forEach(r => r.cb({ eventType: 'UPDATE' })));
+    await p.waitForFunction(() => document.querySelector('#qb-sc-wrong').value === '35', null, { timeout: 4000 });
+    await p.context().close();
+  });
+
   /* ================= LIVE SESSIONS ================= */
   await check('live: Connected/Offline/Unknown only, hh:mm:ss in mono, connected first, sections and stages truthful', async () => {
     const p = await open('live');
@@ -890,6 +939,9 @@ function fixture() {
     const performance = await p.locator('#drawer-tutorial-performance').innerText();
     assert.match(performance, /Medium/); assert.match(performance, /52s/);
     assert.match(performance, /Sessions\s*2/); assert.match(performance, /Total points\s*350/);
+    assert.match(performance, /calculated from each question.s configured base value, adjusted by the active scoring rules/);
+    assert.doesNotMatch(performance, /100\/50/, 'the old fixed-score wording is gone');
+    for (const label of ['Total points', 'Accuracy', 'Total errors', 'Best level', 'Sessions']) assert.ok(performance.includes(label), 'the report still shows ' + label);
     assert.match(performance, /Total errors\s*2/);
     const history = await p.locator('#drawer-session-history').innerText();
     assert.match(history, /Active/); assert.match(history, /Ended/);

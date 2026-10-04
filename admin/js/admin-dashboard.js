@@ -2109,7 +2109,7 @@
             gameStat('Total errors', Number(summary.errors) || 0) +
             '</div><p class="game-report-note">Best level is the highest solved topic. Accuracy is the share of completed ' +
             'questions solved without a wrong answer. Average speed uses recorded question times. ' +
-            'Points add the game’s saved 100/50 score per completed question.</p>';
+            'Points are calculated from each question’s configured base value, adjusted by the active scoring rules, and saved when the question is finished.</p>';
 
         history.innerHTML = '<div class="game-history-list">' + res.data.history.map(function (row) {
             return '<div class="game-history-row"><div class="game-history-top"><span>' +
@@ -4509,6 +4509,8 @@
         rules: { EASY: qbDefaultRules(), MEDIUM: qbDefaultRules(), HARD: qbDefaultRules() },
         closesAt: '',            /* 'YYYY-MM-DDTHH:mm' in Philippine time; '' = no closing time */
         hasClosing: false,
+        scoring: { wrong: 20, hint: 10, fast: 20, secs: 30, speed: true, min: 0, repeatOn: false, repeatPct: 50 },
+        hasScoring: false,
         configSeen: null,        /* what the server last said about the rules and closing time (to notice another admin's save) */
         liveTimer: null,
         dirty: false,
@@ -4572,10 +4574,47 @@
     }
 
     /* A whole number in 1..500, or null. */
+    /* ---- Scoring rules: the defaults and the checks. The database enforces the same limits. ---- */
+    function qbScoringFromRow(c) {
+        return {
+            wrong: toInt(c.score_wrong_pct, 20), hint: toInt(c.score_hint_pct, 10),
+            fast: toInt(c.score_fast_bonus_pct, 20), secs: toInt(c.score_fast_seconds, 30),
+            speed: c.score_speed_bonus !== false, min: toInt(c.score_min, 0),
+            repeatOn: c.score_repeat_enabled === true, repeatPct: toInt(c.score_repeat_pct, 50)
+        };
+    }
+
+    /* A whole number in range, or null: NaN, Infinity, blanks and decimals never get through. */
+    function qbWhole(raw, low, high) {
+        var text = String(raw == null ? '' : raw).trim();
+        if (!/^-?\d+$/.test(text)) { return null; }
+        var n = Number(text);
+        return (isFinite(n) && n >= low && n <= high) ? n : null;
+    }
+
+    /* The same formula the server uses, for the worked example only (the server's score is the real one). */
+    function qbExampleScore(base, errors, hints, fast, sc) {
+        var raw = base - base * sc.wrong / 100 * errors - base * sc.hint / 100 * hints;
+        if (sc.speed && errors === 0 && fast) { raw += base * sc.fast / 100; }
+        return Math.max(sc.min, Math.round(raw));
+    }
+
+    function qbRenderScoringExample() {
+        var sc = qb.scoring, n = $('#qb-sc-example');
+        var ok = qbWhole(sc.wrong, 0, 100) !== null && qbWhole(sc.hint, 0, 100) !== null && qbWhole(sc.fast, 0, 100) !== null &&
+            qbWhole(sc.secs, 1, 3600) !== null && qbWhole(sc.min, 0, 500) !== null;
+        if (!ok) { n.textContent = ''; return; }
+        var v = { wrong: +sc.wrong, hint: +sc.hint, fast: +sc.fast, secs: +sc.secs, speed: sc.speed, min: +sc.min };
+        var bits = ['clean ' + qbExampleScore(20, 0, 0, false, v), '1 wrong ' + qbExampleScore(20, 1, 0, false, v),
+            '1 hint ' + qbExampleScore(20, 0, 1, false, v), '1 wrong + 1 hint ' + qbExampleScore(20, 1, 1, false, v)];
+        if (v.speed) { bits.push('fast and clean (under ' + v.secs + ' s) ' + qbExampleScore(20, 0, 0, true, v)); }
+        n.textContent = 'Example for a 20-point question: ' + bits.join(' · ') + '.';
+    }
+
     /* A short fingerprint of the rules and the closing time, so a refresh can tell whether ANOTHER
        admin saved something (our own save records the new fingerprint first, so it stays silent). */
-    function qbConfigSig(closes, rules) {
-        return JSON.stringify([closes || '', QB_ORDER.map(function (t) {
+    function qbConfigSig(closes, rules, scoring) {
+        return JSON.stringify([closes || '', scoring || null, QB_ORDER.map(function (t) {
             var r = rules[t] || {};
             return [toInt(r.mastery, 80), toInt(r.minQuestions, 3), toInt(r.maxErrors, 3)];
         })]);
@@ -4682,14 +4721,18 @@
             });
             var serverHasClosing = Object.prototype.hasOwnProperty.call(c, 'game_closes_at');
             var serverCloses = serverHasClosing && c.game_closes_at ? qbPhLocal(c.game_closes_at) : '';
-            var sig = qbConfigSig(serverCloses, serverRules);
+            var serverHasScoring = Object.prototype.hasOwnProperty.call(c, 'score_wrong_pct');
+            var serverScoring = serverHasScoring ? qbScoringFromRow(c) : null;
+            var sig = qbConfigSig(serverCloses, serverRules, serverScoring);
             var byOther = qb.configSeen !== null && qb.configSeen !== sig;
             qb.configSeen = sig;
             qb.hasClosing = serverHasClosing;
+            qb.hasScoring = serverHasScoring;
             if (!qb.dirty) {
                 qb.rules = serverRules;
                 qb.closesAt = serverCloses;
-                if (byOther) { toastOk('Updated by another admin', 'The rules and the closing time on this screen now match what was just saved.'); }
+                if (serverScoring) { qb.scoring = serverScoring; }
+                if (byOther) { toastOk('Updated by another admin', 'The rules, the scoring and the closing time on this screen now match what was just saved.'); }
             } else if (byOther) {
                 toastErr('Changed by another admin', 'Your unsaved edits were kept. Saving will replace what the other admin just saved.');
             }
@@ -4901,6 +4944,24 @@
         });
         $('#qb-closes-at').disabled = !ready || !qb.hasClosing;
         $('#qb-closes-clear').disabled = !ready || !qb.hasClosing || !qb.closesAt;
+
+        var sc = qb.scoring, sActive = document.activeElement && document.activeElement.id;
+        [['#qb-sc-wrong', 'wrong'], ['#qb-sc-hint', 'hint'], ['#qb-sc-fast', 'fast'], ['#qb-sc-secs', 'secs'],
+         ['#qb-sc-min', 'min'], ['#qb-sc-repeat-pct', 'repeatPct']].forEach(function (pair) {
+            if (sActive !== pair[0].slice(1)) { $(pair[0]).value = String(sc[pair[1]]); }
+            $(pair[0]).disabled = !ready || !qb.hasScoring;
+        });
+        $('#qb-sc-speed').checked = !!sc.speed;
+        $('#qb-sc-repeat').checked = !!sc.repeatOn;
+        $('#qb-sc-speed').disabled = !ready || !qb.hasScoring;
+        $('#qb-sc-repeat').disabled = !ready || !qb.hasScoring;
+        $('#qb-sc-fast').disabled = !ready || !qb.hasScoring || !sc.speed;
+        $('#qb-sc-secs').disabled = !ready || !qb.hasScoring || !sc.speed;
+        $('#qb-sc-repeat-pct').disabled = !ready || !qb.hasScoring || !sc.repeatOn;
+        $('#qb-sc-note').textContent = qb.hasScoring
+            ? 'Saved with the rules above. A change applies to questions finished from then on; scores already earned are never rewritten.'
+            : 'Available after the scoring database update.';
+        qbRenderScoringExample();
         $('#qb-config-save').disabled = !ready || qb.busy.config;
         $('#qb-dirty').classList.toggle('is-on', qb.dirty);
     }
@@ -5494,6 +5555,33 @@
 
         var row = { id: 1 };
         if (qb.hasClosing) { row.game_closes_at = closesIso; }
+        if (qb.hasScoring) {
+            var scv = qb.scoring, specs = [
+                ['qb-sc-wrong', scv.wrong, 0, 100, 'a whole number from 0 to 100'],
+                ['qb-sc-hint', scv.hint, 0, 100, 'a whole number from 0 to 100'],
+                ['qb-sc-fast', scv.fast, 0, 100, 'a whole number from 0 to 100'],
+                ['qb-sc-secs', scv.secs, 1, 3600, 'a whole number of seconds from 1 to 3600'],
+                ['qb-sc-min', scv.min, 0, 500, 'a whole number from 0 to 500'],
+                ['qb-sc-repeat-pct', scv.repeatPct, 0, 100, 'a whole number from 0 to 100']
+            ], values = {};
+            for (var spi = 0; spi < specs.length; spi++) {
+                var sv = qbWhole(specs[spi][1], specs[spi][2], specs[spi][3]);
+                if (sv === null) {
+                    setFieldError(specs[spi][0], 'Use ' + specs[spi][4] + '.');
+                    $('#' + specs[spi][0]).focus();
+                    return;
+                }
+                values[specs[spi][0]] = sv;
+            }
+            row.score_wrong_pct = values['qb-sc-wrong'];
+            row.score_hint_pct = values['qb-sc-hint'];
+            row.score_fast_bonus_pct = values['qb-sc-fast'];
+            row.score_fast_seconds = values['qb-sc-secs'];
+            row.score_min = values['qb-sc-min'];
+            row.score_repeat_pct = values['qb-sc-repeat-pct'];
+            row.score_speed_bonus = !!scv.speed;
+            row.score_repeat_enabled = !!scv.repeatOn;
+        }
         QB_ORDER.forEach(function (topic) {
             var key = topic.toLowerCase();
             row[key + '_mastery'] = toInt(qb.rules[topic].mastery, 80);
@@ -5514,7 +5602,11 @@
         }
 
         qb.dirty = false;
-        qb.configSeen = qbConfigSig(qb.closesAt, qb.rules);
+        if (qb.hasScoring) {
+            qb.scoring = { wrong: row.score_wrong_pct, hint: row.score_hint_pct, fast: row.score_fast_bonus_pct, secs: row.score_fast_seconds,
+                speed: row.score_speed_bonus, min: row.score_min, repeatOn: row.score_repeat_enabled, repeatPct: row.score_repeat_pct };
+        }
+        qb.configSeen = qbConfigSig(qb.closesAt, qb.rules, qb.hasScoring ? qb.scoring : null);
         renderQbRules();
         toastOk('Rules saved', 'All three topics updated.');
     }
@@ -5568,6 +5660,22 @@
             setFieldError(this.id, '');
             qbMarkDirty();
             renderQbRules();
+        });
+        [['#qb-sc-wrong', 'wrong'], ['#qb-sc-hint', 'hint'], ['#qb-sc-fast', 'fast'], ['#qb-sc-secs', 'secs'],
+         ['#qb-sc-min', 'min'], ['#qb-sc-repeat-pct', 'repeatPct']].forEach(function (pair) {
+            $(pair[0]).addEventListener('input', function () {
+                qb.scoring[pair[1]] = this.value;
+                setFieldError(this.id, '');
+                qbMarkDirty();
+                qbRenderScoringExample();
+            });
+        });
+        [['#qb-sc-speed', 'speed'], ['#qb-sc-repeat', 'repeatOn']].forEach(function (pair) {
+            $(pair[0]).addEventListener('change', function () {
+                qb.scoring[pair[1]] = this.checked;
+                qbMarkDirty();
+                renderQbRules();
+            });
         });
         $('#qb-closes-clear').addEventListener('click', function () {
             qb.closesAt = '';

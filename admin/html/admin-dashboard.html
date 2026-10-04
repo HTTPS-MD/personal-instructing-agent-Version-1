@@ -497,7 +497,7 @@
                                 </div>
 
                                 <form class="qb-bulk" id="qb-bulk-form" novalidate>
-                                    <label class="label" for="qb-bulk-points">Points for every question in this topic</label>
+                                    <label class="label" for="qb-bulk-points">Maximum (base) points for every question in this topic</label>
                                     <div class="qb-bulk-row">
                                         <input class="input tnum" type="number" id="qb-bulk-points" min="1" max="500"
                                             step="1" inputmode="numeric" placeholder="Mixed" disabled>
@@ -513,7 +513,7 @@
                                             <tr>
                                                 <th scope="col">Problem</th>
                                                 <th scope="col" class="qb-col-answer">Final answer</th>
-                                                <th scope="col" class="qb-col-points">Points</th>
+                                                <th scope="col" class="qb-col-points">Max points</th>
                                                 <th scope="col" class="col-right qb-col-actions">Actions</th>
                                             </tr>
                                         </thead>
@@ -574,6 +574,54 @@
                                         <p class="qb-help" id="qb-closes-note">Available after the game database update.</p>
                                         <button class="btn btn-secondary btn-sm" type="button" id="qb-closes-clear" disabled>Clear closing time</button>
                                     </div>
+                                    <fieldset class="qb-scoring" id="qb-scoring">
+                                        <legend class="label">Scoring rules <span class="qb-scope">All topics</span></legend>
+                                        <p class="qb-help">A question's score = its maximum points, minus a penalty for each wrong answer and each hint, plus a bonus for a fast answer with no wrong answer. Percentages are of that question's own maximum, so they work for any point value. The server works the score out when the question is finished; students never see it.</p>
+                                        <div class="form-grid">
+                                            <div class="field">
+                                                <label class="label" for="qb-sc-wrong">Wrong answer penalty (%)</label>
+                                                <input class="input tnum" type="number" id="qb-sc-wrong" min="0" max="100" step="1" inputmode="numeric" disabled>
+                                                <p class="field-msg" data-msg-for="qb-sc-wrong"></p>
+                                            </div>
+                                            <div class="field">
+                                                <label class="label" for="qb-sc-hint">Hint penalty (%)</label>
+                                                <input class="input tnum" type="number" id="qb-sc-hint" min="0" max="100" step="1" inputmode="numeric" disabled>
+                                                <p class="field-msg" data-msg-for="qb-sc-hint"></p>
+                                            </div>
+                                            <div class="field">
+                                                <label class="label" for="qb-sc-fast">Fast correct bonus (%)</label>
+                                                <input class="input tnum" type="number" id="qb-sc-fast" min="0" max="100" step="1" inputmode="numeric" disabled>
+                                                <p class="field-msg" data-msg-for="qb-sc-fast"></p>
+                                            </div>
+                                            <div class="field">
+                                                <label class="label" for="qb-sc-secs">Fast answer threshold (seconds)</label>
+                                                <input class="input tnum" type="number" id="qb-sc-secs" min="1" max="3600" step="1" inputmode="numeric" disabled>
+                                                <p class="field-msg" data-msg-for="qb-sc-secs"></p>
+                                            </div>
+                                            <div class="field">
+                                                <label class="label" for="qb-sc-min">Minimum score</label>
+                                                <input class="input tnum" type="number" id="qb-sc-min" min="0" max="500" step="1" inputmode="numeric" disabled>
+                                                <p class="field-msg" data-msg-for="qb-sc-min"></p>
+                                            </div>
+                                            <div class="field">
+                                                <label class="label" for="qb-sc-repeat-pct">Repeat score (% of the normal score)</label>
+                                                <input class="input tnum" type="number" id="qb-sc-repeat-pct" min="0" max="100" step="1" inputmode="numeric" disabled>
+                                                <p class="field-msg" data-msg-for="qb-sc-repeat-pct"></p>
+                                            </div>
+                                        </div>
+                                        <label class="check">
+                                            <input type="checkbox" id="qb-sc-speed" disabled>
+                                            <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                                            <span class="check-text">Speed bonus enabled (only for a question answered with no wrong answer; being slow never costs points)</span>
+                                        </label>
+                                        <label class="check">
+                                            <input type="checkbox" id="qb-sc-repeat" disabled>
+                                            <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                                            <span class="check-text">Score repeated questions (off: a question already completed in the session earns 0 when it comes around again; the student can still answer it)</span>
+                                        </label>
+                                        <p class="qb-help" id="qb-sc-example" aria-live="polite"></p>
+                                        <p class="qb-help" id="qb-sc-note">Available after the scoring database update.</p>
+                                    </fieldset>
                                 </div>
                                 <div class="card-foot">
                                     <button class="btn btn-primary btn-block" type="submit" id="qb-config-save" disabled>
@@ -1455,9 +1503,10 @@
                                 <p class="field-msg" data-msg-for="qb-final"></p>
                             </div>
                             <div class="field">
-                                <label class="label" for="qb-points">Points <span class="req">*</span></label>
+                                <label class="label" for="qb-points">Maximum (base) points <span class="req">*</span></label>
                                 <input class="input tnum" type="number" id="qb-points" min="1" max="500" step="1"
                                     inputmode="numeric" value="10">
+                                <p class="qb-help">The most this question can earn with no wrong answers and no hints. The scoring rules below adjust it.</p>
                                 <p class="field-msg" data-msg-for="qb-points"></p>
                             </div>
                         </div>

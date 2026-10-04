@@ -67,3 +67,19 @@ Not restored (kept server-driven): client-side answer checking, the question-ban
 
 ## Closing time and Max points (0045)
 The admin Math Task rules no longer have **Max points** or **Game time limit (minutes)**. They have **Tutoring closes at** (date and time, Philippine time) with a Clear button. `app_config.max_points` and `time_limit` stay in the table, unused; per-question points are unchanged. Apply 0045 BEFORE deploying the page: an old page against the new database would show a meaningless clock, and the new page against the old database would show a closed dialog without a way back.
+
+## Points (0049): configurable, calculated by the server
+`question_bank.points` is the **maximum (base) points** of a question; the admin's Scoring rules (in `app_config`) adjust it. `finish_step_question` works the score out from the server's own records and saves it once in `step_states.score` (the old fixed 100/50 is gone):
+
+    raw   = base - base*wrong%*wrong_answers - base*hint%*hints_taken
+            + base*fast_bonus%   (speed bonus on, NO wrong answer, finished within the fast threshold)
+    score = max(minimum, round(raw))
+    a repeat of a question already completed in the session: 0, or score*repeat% when repeat scoring is on
+
+Defaults: wrong 20%, hint 10%, fast bonus 20% within 30 s, speed bonus on, minimum 0, repeat scoring off (50% if turned on). A 20-point question: clean 20, 1 wrong 16, 1 hint 18, 1 wrong + 1 hint 14, fast and clean 24.
+- Fast needs no wrong answer; hints still cost their penalty. Being slow never costs points. Time is from when the question was served to the last step answered, one threshold for the whole question.
+- Hints are counted as distinct (step, tier) actually taken, so pressing the last tier again is not a second penalty.
+- `served_questions.base_points` is stamped when a question is served: changing a question's points affects only questions served afterwards. Scores already saved are never rewritten.
+- Repeats are told apart by `question_id` (the bank question) within the session; the student can still answer them.
+- Separate on purpose: the learning profile (`get_learning_features`, the ML) and the topic rules (mastery / min questions / max errors) do not use the score, and the score does not use them. Students are not shown points.
+- Admin: Math task bank -> Rules -> Scoring rules (validated in the page and by CHECK constraints). The tutorial report's Total points still sums `step_states.score`.
