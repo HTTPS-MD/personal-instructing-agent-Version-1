@@ -2137,6 +2137,11 @@
         var meta = 'Submitted ' + esc(formatStamp(r.submitted_at)) +
             (rows.length > 1 ? ' · latest of ' + rows.length + ' attempts' : '') +
             ' · scored with the BFPT sheet';
+        var matchingNote = s.group_type === 'assigned' && r.ocean_n != null
+            ? '<p class="bfpt-meta">For character matching, Neuroticism is ' +
+                esc(40 - Number(r.ocean_n)) + '/40 (higher means more stress). ' +
+                'The BFPT N score above runs in the opposite direction.</p>'
+            : '';
 
         var answers;
         if (Array.isArray(r.responses) && r.responses.length === 50) {
@@ -2156,7 +2161,7 @@
                 'answer storage and was carried over from the old profile record.</p>';
         }
 
-        box.innerHTML = scores + '<p class="bfpt-meta">' + meta + '</p>' + answers;
+        box.innerHTML = scores + matchingNote + '<p class="bfpt-meta">' + meta + '</p>' + answers;
     }
 
     function initDrawerActions() {
@@ -2402,12 +2407,9 @@
     }
 
     /* ---- Tutor persona (profiles.selected_character) ----------------------
-       A separate field from the research group (profiles.group_type). An
-       Assigned student is given a tutor by an admin; a Free choice student
-       picks their own in Character Selection; Control has none. Nothing here
-       assigns anyone automatically, and a group change never touches the
-       tutor. 'pia-neutral' is a tutor like the others, not a group. The keys
-       and names are the ones in student/html/character-selection.html. */
+       Assigned students receive a tutor from the OCEAN result. Free choice
+       students choose their own. This form displays, but never edits, the
+       selected_character stored on the profile. */
     var TUTORS = [
         { key: 'pia-open', name: 'PIA Open' },
         { key: 'pia-conscientious', name: 'PIA Structure' },
@@ -2439,23 +2441,23 @@
     /* What the drawer says about the tutor, by group. */
     function tutorLabel(s) {
         if (s.selected_character) { return tutorName(s.selected_character); }
-        if (s.group_type === 'assigned') { return 'Not assigned yet'; }
+        if (s.group_type === 'assigned') {
+            return s.is_ocean_done ? 'No character saved' : 'Assigned after OCEAN';
+        }
         if (s.group_type === 'non-assigned') { return 'Not chosen yet'; }
         return '—';
     }
 
-    /* Shows the tutor field for the group currently ticked. In Edit, a student
-       who has a tutor but is no longer Assigned still sees it, read-only, so
-       the admin can see that changing the group does not clear it. */
+    /* Keep an existing choice visible on group changes, always read-only. */
     function syncTutorField(prefix) {
         var group = ($('input[name="' + prefix + '-condition"]:checked') || {}).value;
         var select = $('#' + prefix + '-tutor');
         var held = select.getAttribute('data-initial') || '';
         var assigned = group === 'assigned';
         $('#' + prefix + '-tutor-field').hidden = !(assigned || held);
-        select.disabled = !assigned;
+        select.disabled = true;
         $('#' + prefix + '-tutor-hint').textContent = assigned
-            ? 'Separate from the research group. Leave as "Not assigned yet" to decide later; saving does not choose one for you.'
+            ? 'Automatically assigned from the OCEAN result when the student finishes the questionnaire. Tied highest traits are resolved by the system.'
             : 'Kept as it is. Only Assigned students are given a tutor here; changing the group does not clear this.';
     }
 
@@ -2470,14 +2472,6 @@
         $('#register-student-form').addEventListener('reset', function () {
             setTimeout(function () { $('#rs-tutor').value = ''; syncTutorField('rs'); }, 0);
         });
-    }
-
-    /* '' = none; otherwise a known key, or an error message. */
-    function readTutor(prefix) {
-        var select = $('#' + prefix + '-tutor');
-        var value = select.value;
-        if (value && !TUTORS.some(function (t) { return t.key === value; })) { return { ok: false }; }
-        return { ok: true, value: value };
     }
 
     /* ---- Register student ---- */
@@ -2503,11 +2497,6 @@
            refuses the row without both as well (migration 0037). */
         valid = setFieldError('rs-consent', $('#rs-consent').checked ? '' : 'Parental consent must be recorded first.') && valid;
         valid = setFieldError('rs-assent', $('#rs-assent').checked ? '' : 'Student assent must be recorded first.') && valid;
-        var tutor = { ok: true, value: '' };
-        if (groupType === 'assigned') {
-            tutor = readTutor('rs');
-            valid = setFieldError('rs-tutor', tutor.ok ? '' : 'Choose one of the listed tutors.') && valid;
-        }
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2560,8 +2549,6 @@
                 status: 'inactive',
                 role: 'student'
             };
-            /* Only an explicit choice for an Assigned student is stored. */
-            if (groupType === 'assigned' && tutor.value) { newRow.selected_character = tutor.value; }
             var insertRes = await sb.from('profiles').insert([newRow]);
 
             if (insertRes.error) {
@@ -2723,13 +2710,6 @@
                 valid = false;
             }
         });
-        var tutorSel = $('#es-tutor');
-        var tutorInitial = tutorSel.getAttribute('data-initial') || '';
-        var tutorChosen = tutorSel.value;
-        var tutorKnown = !tutorChosen || tutorChosen === tutorInitial || TUTORS.some(function (t) { return t.key === tutorChosen; });
-        if (groupType === 'assigned') {
-            valid = setFieldError('es-tutor', tutorKnown ? '' : 'Choose one of the listed tutors.') && valid;
-        }
         if (!valid) { return; }
 
         var fullName = [first, middle, last].filter(Boolean).join(' ');
@@ -2750,11 +2730,6 @@
             /* A legacy neutral student who is left as neutral is not re-sent:
                their assignment is not touched by an unrelated edit. */
             if (groupType !== 'neutral') { payload.group_type = groupType; }
-            /* The tutor is written only when an Assigned student's tutor was
-               actually changed in this dialog; otherwise it is left alone. */
-            if (groupType === 'assigned' && tutorChosen !== tutorInitial) {
-                payload.selected_character = tutorChosen || null;
-            }
             /* Only a test whose fields changed is sent, and only its raw data:
                the database calculates the transmuted score. Untouched fields
                leave a score entered before 0034 as it was. */
@@ -2778,7 +2753,6 @@
                     ? MIGRATION_MISSING
                     : friendlyDbError(updateRes.error, 'Could not update the profile.');
                 toastErr('Update failed', updateMsg);
-                if ('selected_character' in payload) { setFieldError('es-tutor', 'The tutor was not saved: ' + updateMsg); }
                 return;
             }
 
