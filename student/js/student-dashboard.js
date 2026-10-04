@@ -38,8 +38,8 @@
  * strip, and its milestones and the expiry are announced to screen readers.
  *
  * TUTOR WORDING. The words the tutor says come from tutor-personas.js and are
- * cosmetic. Their "learning profile" is fixed at 'average'; the attached
- * game's external ML service is deliberately not called (decision pending).
+ * cosmetic. Their "learning profile" comes from the ML service, reached
+ * ONLY through the Edge Function `learning-profile` (never from this page).
  * ==========================================================================*/
 (function () {
     'use strict';
@@ -55,10 +55,17 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
-    /* The tutor's wording profile. The attached game raised or lowered it from
-       an external ML service; that service is not connected, so the game's own
-       default is used. */
+    /* The tutor's wording profile: 'struggling', 'average' or 'outstanding'.
+       It starts at 'average' and is moved ONE step at a time toward the profile
+       the ML service returns. The page never talks to that service:
+       it asks the Edge Function `learning-profile` with the session id and nothing
+       else. The function reads the numbers from the database as this student and
+       holds the service's secret. If the call fails or the function is not set up,
+       the profile simply stays where it is. Wording only: never what is asked or
+       how anything is checked. */
     var LEARNING_PROFILE = 'average';
+    var PROFILE_ORDER = ['struggling', 'average', 'outstanding'];
+    var profileCall = 0;
 
     var TUTOR_NAMES = {
         'pia-open': 'Ava · your curious tutor',
@@ -1087,6 +1094,20 @@
         onStepResult(res.data, raw, input);
     }
 
+    /* Ask the database for the profile and move one step toward it. Fire and
+       forget: a failure or a stale answer leaves the wording unchanged. */
+    async function refreshProfile() {
+        var mine = ++profileCall;
+        var res;
+        try { res = await sb.functions.invoke('learning-profile', { body: { session_id: state.sessionId } }); }
+        catch (e) { return; }
+        if (mine !== profileCall || !res || res.error || !res.data) { return; }
+        var target = PROFILE_ORDER.indexOf(res.data.profile);
+        var now = PROFILE_ORDER.indexOf(LEARNING_PROFILE);
+        if (target < 0 || now < 0 || target === now) { return; }
+        LEARNING_PROFILE = PROFILE_ORDER[now + (target > now ? 1 : -1)];
+    }
+
     function onStepResult(d, raw, input) {
         var p = state.problem;
         var stepNo = p.stepIndex + 1;
@@ -1097,6 +1118,7 @@
         syncClock(d.clock);
         applyQuestion(d.state);
         input.disabled = false;
+        refreshProfile();
 
         if (outcome === 'time_expired') { renderSteps(false); lockForExpiry(); return; }
 
@@ -1192,6 +1214,7 @@
 
         var d = res.data;
         syncClock(d.clock);
+        refreshProfile();
         var keep = state.problem.hint;
         applyQuestion(d.state);
         state.problem.hint = keep;

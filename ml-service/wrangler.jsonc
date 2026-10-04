@@ -1,0 +1,22 @@
+{
+  // Hardened pia-ml-api. Deploy to YOUR Cloudflare account, staging first.
+  // Secret (never in this file, never in the browser):
+  //   npx wrangler secret put ML_TOKEN --env staging
+  "name": "pia-ml-api",
+  "main": "src/entry.py",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["python_workers"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "env": {
+    "staging": {
+      "name": "pia-ml-api-staging",
+      "workers_dev": true,
+      "preview_urls": false
+      // Optional: bind a KV namespace named ML_MODEL (READ ONLY use) to carry the
+      // centres of the old live model. Without it the original cold-start
+      // centres in entry.py are used.
+    }
+  }
+}

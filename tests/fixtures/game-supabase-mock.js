@@ -167,6 +167,14 @@
       onAuthStateChange: function () { return { data: { subscription: { unsubscribe: function () {} } } }; },
       signOut: async function () { return { error: null }; } },
     from: chain,
+    /* Stand-in for the Edge Function `learning-profile`. The page can only ask; the
+       answer is whatever the test sets. */
+    functions: { invoke: async function (name, opts) {
+      window.__calls.push({ m: 'fn', name: name, body: opts && opts.body });
+      if (guard()) return { data: null, error: { message: 'not available' } };
+      if (localStorage.getItem('__mock_lp_fail')) return { data: null, error: { message: 'boom' } };
+      return { data: { profile: localStorage.getItem('__mock_lp') || 'average', confidence: 0.7, source: 'ml' }, error: null };
+    } },
     rpc: async function (name, args) {
       window.__calls.push({ m: 'rpc', name: name, args: args });
       var f = RPC[name]; var r = f ? f(args || {}) : { data: name === 'check_student_session' || name === 'jwt_is_current' ? true : null };

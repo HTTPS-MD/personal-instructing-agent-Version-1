@@ -20,11 +20,18 @@ Deliberate differences (flag if you disagree):
 - The game's end-of-session summary screen is gone: the game has no ending. `finalizeStageTime` is no longer called by the page, because nothing ends the stage; heartbeat time tracking continues. Confirm that is acceptable for the stage-time research data.
 - `^` is not accepted in working; questions without steps are skipped (no browser-side guessing).
 
-## External ML service: deliberately NOT connected (decision: review separately before the real study)
+## Tutor wording profile: the pia-ml-api model, reached only through an Edge Function
 
-This is a deliberate difference from the attached game. The page makes no request to the Cloudflare endpoint, sends no performance or timing data outside the system, and keeps the game's default "average" tutor wording. `tests/game-browser.cjs` asserts that no request to `workers.dev` is made and that the student JS contains no ML endpoint, `fetch`, `sendBeacon` or ML config.
+Flow: **student's browser -> Supabase Edge Function `learning-profile` -> ML service (our Cloudflare account)**. The page never contacts the service, holds no secret, and the CSP does not allow its host.
+- **Model and inference are the original's**, copied verbatim into `ml-service/src/entry.py` (the block between the BEGIN/END VERBATIM markers equals the original `src/entry.py`; `ml-service/ORIGINAL_entry.py` is the untouched copy and `ml-service/tests/test_ml_service.py` checks both, plus 2000 random inputs against the original's `/predict`).
+- **What changed is only the exposure** (the source's own risks: `learn:true` rewrote shared centroids, CORS `*`, no authentication): bearer-token only, no CORS headers, no `learn`, no model update, no KV writes, exactly seven numeric features (anything else is rejected), reply is only `profile` + `confidence`, no logging, no `GET /model`.
+- **Numbers** come from the database, not the browser: migration 0044 `get_learning_features(session_id)` computes the seven rolling numbers from `step_events`, `step_hints` and `problem_serves`, run AS the student (the game's guard applies: Control, teachers, signed-out callers refused). They contain no identity.
+- **The Edge Function** (`supabase/functions/learning-profile`) accepts only `{session_id}`, forwards exactly the seven numbers with the secret `PIA_ML_TOKEN`, and returns only `profile`, `confidence`, `source`. Fewer than two answers: `average` without calling the service. Any failure: the page keeps its wording. Until `PIA_ML_URL` and `PIA_ML_TOKEN` are set it answers 503, so the feature stays off.
+- Wording only; the page moves one level at a time. Never questions, grading, hints, topics or the time limit.
+- Differences from the browser version, because the server measures: response time = gap since the previous recorded event or hint (else since the question was served), capped at 300 s; a revisited step counts once. The old live model's centres may have drifted in its KV store: seed the new KV (read-only use) from the old service's `GET /model` if you want them; otherwise the original cold-start centres apply.
+- Remaining unverified: the Python Worker has only been run with a stand-in for Cloudflare's `workers` module, not on Cloudflare itself (do `wrangler dev` then staging first); Cloudflare logging/retention settings of our account; research approval of adaptive wording.
 
-What the attached game did (for the later review):
+What the attached game did, for reference:
 - Endpoint: `POST https://pia-ml-api.marcstephen444.workers.dev/predict` (a Cloudflare Worker on an individual's account).
 - Sent after every answer or hint once two answers exist (5 s timeout), as JSON: seven numbers over the last 8 answer events: `recent_accuracy`, `average_attempts`, `hint_rate`, `average_response_time` (correct answers only), `correct_response_efficiency`, `consecutive_correct`, `consecutive_wrong`, plus `learn: false`.
 - Not sent: name, email, student id, session id, question text, answers, tutor, group, OCEAN. The third party still sees the browser's IP address and request timing.

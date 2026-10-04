@@ -362,6 +362,49 @@ const DASH = '/student/html/student-dashboard.html';
     await p.context().close();
   });
 
+  /* ---------------- tutor wording profile (0044: worked out by the database) ---------------- */
+  const wrongLine = async (p, key) => {
+    const bank = await p.evaluate(() => window.PIA_TUTORS['pia-open'].profiles);
+    const said = await p.locator('#agent-speech').innerText();
+    const lines = k => [].concat(bank[k].wrong || [], (bank[k].reactions && bank[k].reactions.wrongFirst) || [], (bank[k].reactions && bank[k].reactions.wrongRepeated) || []);
+    return ['struggling', 'average', 'outstanding'].filter(k => lines(k).some(l => said.includes(l))).filter(k => !key || k === key);
+  };
+  const wrongOnce = async p => {
+    const q = await p.locator('#problem-expression').innerText();
+    const b = (await bank(p)).find(x => x.question === q);
+    await submit(p, b.steps[0].answer === '999' ? '998' : '999');
+    await p.waitForTimeout(250);
+  };
+  await check('wording profile: asks the Edge Function with the session id only, moves ONE step at a time, never calls the ML service itself', async () => {
+    const p = await open(DASH);
+    await start(p);
+    await p.evaluate(() => localStorage.setItem('__mock_lp', 'outstanding'));
+    await wrongOnce(p); await wrongOnce(p);
+    assert.deepEqual(await wrongLine(p), ['outstanding'], 'average -> outstanding after the service says so');
+    await p.evaluate(() => localStorage.setItem('__mock_lp', 'struggling'));
+    await wrongOnce(p); await wrongOnce(p);
+    assert.ok((await wrongLine(p)).includes('average'), 'outstanding -> average, not straight to struggling');
+    await wrongOnce(p);
+    assert.deepEqual(await wrongLine(p), ['struggling']);
+    const calls = await p.evaluate(() => window.__calls.filter(c => c.m === 'fn' && c.name === 'learning-profile'));
+    assert.ok(calls.length >= 5);
+    for (const c of calls) assert.deepEqual(Object.keys(c.body), ['session_id'], 'only the session id is sent');
+    assert.equal(await p.evaluate(() => window.__calls.some(c => c.m === 'rpc' && /learning/.test(c.name))), false, 'no learning RPC from the page');
+    assert.deepEqual(p.__reqs.filter(u => !u.startsWith(origin) && !/fonts\.(googleapis|gstatic)\.com|cdn\.jsdelivr\.net/.test(u)), [], 'nothing but the pages\' own fonts/SDK is requested; no ML or other outside service');
+    await p.context().close();
+  });
+  await check('wording profile: a failing profile call keeps the wording and the game works', async () => {
+    const p = await open(DASH);
+    await start(p);
+    await p.evaluate(() => { localStorage.setItem('__mock_lp', 'outstanding'); localStorage.setItem('__mock_lp_fail', '1'); });
+    await wrongOnce(p); await wrongOnce(p); await wrongOnce(p);
+    assert.ok((await wrongLine(p)).includes('average'));
+    assert.equal(await p.locator('#step-input').isEnabled(), true);
+    await solveCurrent(p);
+    assert.equal(await p.locator('.step-card.correct').count(), 1);
+    await p.context().close();
+  });
+
   /* ---------------- the time limit ---------------- */
   await check('clock: shown in the progress card as mm:ss (role=timer), counts down, start screen states the limit', async () => {
     const p = await open(DASH, { limit: 600 });
