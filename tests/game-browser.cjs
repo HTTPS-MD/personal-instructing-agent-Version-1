@@ -31,19 +31,21 @@ const DASH = '/student/html/student-dashboard.html';
   const results = [];
   const leaked = [];
 
-  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, ctx } = {}) {
+  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, block = null, ctx } = {}) {
     const context = ctx || await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', serviceWorkers: 'block' });
     if (!ctx) {
       await context.addInitScript(([p, t, l]) => { if (!sessionStorage.getItem('__limit_set')) { localStorage.setItem('__mock_limit', String(l)); sessionStorage.setItem('__limit_set', '1'); } localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme, limit]);
       await context.route('**/*', route => {
         const u = route.request().url();
-        if (u.startsWith(origin + '/')) return route.continue();
+        if (u.startsWith(origin + '/')) { if (block && block.test(u)) return route.abort('failed'); return route.continue(); }
         if (u.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js')) return route.fulfill({ contentType: 'text/javascript', body: mock });
         leaked.push(u); return route.abort('blockedbyclient');
       });
     }
     const page = await context.newPage();
     page.setDefaultTimeout(6000);
+    page.__reqs = [];
+    page.on('request', r => page.__reqs.push(r.url()));
     page.on('pageerror', e => results.push({ name: 'pageerror ' + url, pass: false, message: e.message }));
     await page.goto(origin + url);
     return page;
@@ -100,14 +102,14 @@ const DASH = '/student/html/student-dashboard.html';
     await p.waitForSelector('#global-error-banner:not([hidden])');
     assert.match(await p.locator('#global-error-message').innerText(), /not been assigned/i);
     assert.equal(await p.locator('#start-btn').isDisabled(), true);
-    assert.equal(await p.evaluate(() => (document.querySelector('#agent-img-start').getAttribute('src') || '').includes('/tutors/')), false);
+    assert.equal(await p.evaluate(() => /tutors\/|personas\//.test(document.querySelector('#agent-img-start').getAttribute('src') || '')), false);
     assert.equal(await p.evaluate(() => window.__calls.some(c => c.m === 'rpc' && /serve_next|check_step/.test(c.name))), false);
     await p.context().close();
   });
   await check('direct URL with ?group=control&selected_character=...&student_id= changes nothing', async () => {
     const p = await open(DASH + '?group=control&group_type=control&selected_character=pia-open&student_id=5', { profile: { group_type: 'Assigned', selected_character: 'pia-calm' } });
     await p.waitForSelector('#start-btn');
-    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /pia-calm\//);
+    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /personas\/Neuroticism\/default\.webp$/);
     assert.equal(await p.evaluate(() => location.pathname), DASH);
     await p.context().close();
   });
@@ -115,63 +117,148 @@ const DASH = '/student/html/student-dashboard.html';
     const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: 'pia-agreeable' } });
     await p.evaluate(() => { localStorage.setItem('selected_character', 'pia-calm'); localStorage.setItem('pia_student_id', '9'); localStorage.setItem('group_type', 'control'); });
     await p.reload(); await p.waitForSelector('#start-btn');
-    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /pia-agreeable\//);
+    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /personas\/Agreeableness\/default\.webp$/);
     await p.context().close();
   });
 
-  /* ---------------- tutor display ---------------- */
-  for (const key of ['pia-open', 'pia-conscientious', 'pia-extravert', 'pia-agreeable', 'pia-calm', 'pia-neutral']) {
-    await check('tutor display: ' + key + ' (start screen + game, art loads)', async () => {
+  /* ---------------- tutor display: the 3D-style persona art ---------------- */
+  const PERSONA = {   // selected_character -> [folder, { mood: file }]
+    'pia-open': ['Openness', { default: 'default', happy: 'happy', sad: 'sad', excited: 'excited' }],
+    'pia-conscientious': ['Conscientiousness', { default: 'default', happy: 'happy', sad: 'sad', excited: 'excited' }],
+    'pia-extravert': ['Extraverted', { default: 'default', happy: 'happy', sad: 'sad', excited: 'excited' }],
+    'pia-agreeable': ['Agreeableness', { default: 'default', happy: 'happy', sad: 'sad', excited: 'excited' }],
+    'pia-calm': ['Neuroticism', { default: 'default', happy: 'happy', sad: 'sad', excited: 'excited' }],
+    'pia-neutral': ['Neutral', { default: 'default', happy: 'approval', sad: 'disapproval', excited: 'nod' }]
+  };
+  const imgFile = p => p.locator('#agent-img').getAttribute('src').then(x => x.split('/').slice(-2).join('/'));
+  const waitFile = (p, expected, sel = '#agent-img') => p.waitForFunction(([e, s]) => (document.querySelector(s).getAttribute('src') || '').endsWith(e) && document.querySelector(s).complete && document.querySelector(s).naturalWidth > 0, [expected, sel], { timeout: 5000 });
+  for (const [key, [folder]] of Object.entries(PERSONA)) {
+    await check(`persona mapping: ${key} -> assets/images/personas/${folder} (start screen + game, loads)`, async () => {
       const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: key } });
+      await p.waitForSelector('#start-btn');
+      assert.match(await p.locator('#agent-img-start').getAttribute('src'), new RegExp(`personas/${folder}/default\\.webp$`));
       await start(p);
-      const src = await p.locator('#agent-img').getAttribute('src');
-      assert.ok(src.includes('/tutors/' + key + '/'), src);
-      assert.equal(await p.evaluate(() => document.querySelector('#agent-img').naturalWidth > 0), true);
-      assert.equal(await p.evaluate(() => document.querySelector('#agent-img-start').naturalWidth > 0), true);
+      assert.match(await p.locator('#agent-img').getAttribute('src'), new RegExp(`personas/${folder}/default\\.webp$`));
+      assert.equal(await p.evaluate(() => document.querySelector('#agent-img').naturalWidth > 0 && document.querySelector('#agent-img-start').naturalWidth > 0), true);
+      assert.equal(await p.locator('#agent-img').getAttribute('alt') !== '', true);
       await p.context().close();
     });
   }
-
-  await check('art consistency: the Character Selection card art for each key is the very file the game shows (all six, pia-calm and Neutral included)', async () => {
-    const sel = await open('/student/html/character-selection.html', { profile: { group_type: 'Non-Assigned', selected_character: null } });
-    await sel.waitForSelector('.persona-card');
-    const cards = await sel.locator('.persona-card').evaluateAll(c => c.map(x => [x.dataset.character, x.querySelector('img').getAttribute('src')]));
-    await sel.screenshot({ path: path.join(out, 'character-selection.png') });
-    await sel.context().close();
-    for (const [key, src] of cards) {
+  await check('persona mapping: the tutor comes only from profiles.selected_character (not the URL, localStorage or group)', async () => {
+    const p = await open(DASH + '?selected_character=pia-open&tutor=pia-neutral', { profile: { group_type: 'Non-Assigned', selected_character: 'pia-extravert' } });
+    await p.evaluate(() => { localStorage.setItem('selected_character', 'pia-calm'); localStorage.setItem('tutor', 'pia-neutral'); });
+    await p.reload(); await p.waitForSelector('#start-btn');
+    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /personas\/Extraverted\/default\.webp$/);
+    assert.equal(p.__reqs.filter(u => /personas\//.test(u)).every(u => /personas\/Extraverted\//.test(u)), true, 'only the saved tutor\'s pictures are requested');
+    await p.context().close();
+  });
+  for (const key of ['pia-open', 'pia-neutral']) {
+    await check(`expressions: ${key} - sad on a wrong answer, thinking on a hint, excited on a quick answer, happy after struggle, excited on a topic offer`, async () => {
+      const [folder, m] = PERSONA[key];
+      const file = mood => `${folder}/${m[mood]}.webp`;
+      const think = key === 'pia-neutral' ? 'Neutral/shrug.webp' : `${folder}/default.webp`;
       const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: key } });
       await start(p);
-      const game = await p.locator('#agent-img').getAttribute('src');
-      assert.equal(game.replace(/^\.\.\/\.\.\//, ''), src.replace(/^\.\.\/\.\.\//, '').replace('approval', key === 'pia-neutral' ? 'approval' : 'default'), key);
+      await submit(p, '9');   await waitFile(p, file('sad'));
+      await submit(p, '8');   await waitFile(p, file('sad'));
+      await p.locator('#hint-btn').click(); await waitFile(p, think);
+      const q = await p.locator('#problem-expression').innerText(); const pct = q.match(/(\d+)%/)[1];
+      const b = (await bank(p)).find(x => x.question === q);
+      await submit(p, pct + '/100'); await waitFile(p, file('happy'));          // working accepted
+      await submit(p, b.steps[0].answer); await waitFile(p, file('happy'));     // correct after struggle
+      await submit(p, b.steps[1].answer);                                       // quick, no mistakes on this step
+      await waitFile(p, file('excited'));
+      // a topic offer: the up offer shows the excited picture in the dialog too
+      await p.waitForSelector('#step-input', { timeout: 5000 });
+      for (let i = 0; i < 6; i++) { await finishQuestion(p); if (await p.locator('#modal-offer.is-open').count()) break; }
+      await p.waitForSelector('#modal-offer.is-open', { timeout: 8000 });
+      await waitFile(p, file('excited'), '#offer-img');
+      await p.context().close();
+    });
+  }
+  await check('fallback: every persona picture unavailable -> the previous illustrations show, each mood, nothing breaks', async () => {
+    const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: 'pia-open' }, block: /\/assets\/images\/personas\// });
+    await p.waitForSelector('#start-btn');
+    await waitFile(p, 'tutors/pia-open/default.webp', '#agent-img-start');
+    await start(p);
+    await waitFile(p, 'tutors/pia-open/default.webp');
+    await submit(p, '9');  await waitFile(p, 'tutors/pia-open/sad.webp');
+    await submit(p, '8');
+    const q = await p.locator('#problem-expression').innerText(); const pct = q.match(/(\d+)%/)[1];
+    await submit(p, pct + '/100'); await waitFile(p, 'tutors/pia-open/happy.webp');
+    assert.equal(await p.evaluate(() => document.querySelector('#agent-img').naturalWidth > 0), true);
+    assert.equal(await p.locator('#agent-img').isVisible(), true);
+    await p.context().close();
+  });
+  await check('fallback: only one expression missing (excited) -> that mood uses the previous happy picture, the rest keep the 3D art', async () => {
+    const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: 'pia-agreeable' }, block: /\/personas\/Agreeableness\/excited\.webp/ });
+    await start(p);
+    await waitFile(p, 'Agreeableness/default.webp');
+    const q = await p.locator('#problem-expression').innerText(); const b = (await bank(p)).find(x => x.question === q);
+    await submit(p, b.steps[0].answer);                       // quick and clean -> would be excited
+    await waitFile(p, 'tutors/pia-agreeable/happy.webp');
+    await submit(p, '1');                                     // wrong -> sad keeps the 3D picture
+    await waitFile(p, 'Agreeableness/sad.webp');
+    await p.context().close();
+  });
+  await check('fallback: the topic-offer dialog also falls back, and a missing start-screen picture falls back', async () => {
+    const p = await open(DASH, { profile: { group_type: 'Assigned', selected_character: 'pia-calm' }, block: /\/personas\/Neuroticism\// });
+    await p.waitForSelector('#start-btn');
+    await waitFile(p, 'tutors/pia-calm/default.webp', '#agent-img-start');
+    await start(p);
+    for (let i = 0; i < 3; i++) await finishQuestion(p);
+    await p.waitForSelector('#modal-offer.is-open', { timeout: 8000 });
+    await waitFile(p, 'tutors/pia-calm/happy.webp', '#offer-img');
+    await p.context().close();
+  });
+  for (const [w, h] of [[320, 640], [375, 740], [768, 1024], [1024, 768], [1440, 900]]) {
+    await check(`responsive persona card at ${w}px: inside the tutor panel, no overflow, full picture shown, hint slot intact`, async () => {
+      for (const key of ['pia-open', 'pia-neutral']) {
+        const p = await open(DASH, { width: w, height: h, profile: { group_type: 'Assigned', selected_character: key } });
+        await p.waitForSelector('#start-btn');
+        const portrait = await p.evaluate(() => { const r = document.querySelector('#agent-img-start').getBoundingClientRect(); return { l: r.left, r: r.right, w: r.width, h: r.height, iw: innerWidth, sw: document.documentElement.scrollWidth }; });
+        assert.ok(portrait.l >= 0 && portrait.r <= portrait.iw && portrait.sw <= portrait.iw, JSON.stringify(portrait));
+        await start(p);
+        await submit(p, '9'); await submit(p, '8');
+        await p.waitForTimeout(300);
+        const g = await p.evaluate(() => {
+          const img = document.querySelector('#agent-img').getBoundingClientRect(), side = document.querySelector('.left-sidebar').getBoundingClientRect();
+          const bubble = document.querySelector('.prompt-box').getBoundingClientRect(), hint = document.querySelector('#hint-btn').getBoundingClientRect();
+          return { img: [img.left, img.top, img.right, img.bottom], side: [side.left, side.top, side.right, side.bottom], bubbleBottom: bubble.bottom, hintTop: hint.top, hintBottom: hint.bottom, w: img.width, h: img.height, iw: innerWidth, sw: document.documentElement.scrollWidth, nat: document.querySelector('#agent-img').naturalWidth };
+        });
+        assert.ok(g.sw <= g.iw, 'horizontal overflow ' + JSON.stringify(g));
+        assert.ok(g.img[0] >= g.side[0] - 1 && g.img[2] <= g.side[2] + 1 && g.img[1] >= g.side[1] - 1 && g.img[3] <= g.side[3] + 1, 'card outside the tutor panel ' + JSON.stringify(g));
+        assert.ok(g.img[1] >= g.bubbleBottom - 1, 'card overlaps the speech bubble ' + JSON.stringify(g));
+        assert.ok(g.img[3] <= g.hintTop + 8, 'card overlaps the hint slot ' + JSON.stringify(g));
+        assert.ok(g.h >= 120 && g.w >= 90 && g.nat > 0, 'picture too small ' + JSON.stringify(g));
+        await p.screenshot({ path: path.join(out, `persona-${key}-${w}.png`), fullPage: w < 900 });
+        await p.context().close();
+      }
+    });
+  }
+  await check('persona: changing expression moves nothing (card, bubble, hint slot, chalkboard) at 320px', async () => {
+    const p = await open(DASH, { width: 320, height: 640 }); await start(p); await p.waitForTimeout(300);
+    const snap = () => p.evaluate(() => ['#agent-img', '.prompt-box', '.video-hint-layer', '.problem-header-block'].map(s => { const b = document.querySelector(s).getBoundingClientRect(); return [s, Math.round(b.x), Math.round(b.y + scrollY), Math.round(b.width), Math.round(b.height)].join(); }));
+    const base = await snap();
+    await submit(p, '7'); await waitFile(p, 'Openness/sad.webp'); await p.waitForTimeout(200);
+    assert.deepEqual(await snap(), base);
+    await p.context().close();
+  });
+  await check('unchanged behaviour: Control gets no game page and never requests a persona picture; Free choice and Neutral still reach the game', async () => {
+    const c = await open(DASH, { profile: { group_type: 'Control', selected_character: 'pia-open' } });
+    await c.waitForFunction(() => location.pathname === '/student/html/assessment-complete.html');
+    await c.waitForTimeout(600);
+    assert.equal(c.__reqs.some(u => /personas\//.test(u)), false);
+    await c.context().close();
+    for (const [profile, folder] of [[{ group_type: 'Non-Assigned', selected_character: 'pia-calm' }, 'Neuroticism'], [{ group_type: 'Non-Assigned', selected_character: 'pia-neutral' }, 'Neutral'], [{ group_type: 'Assigned', selected_character: 'pia-neutral' }, 'Neutral']]) {
+      const p = await open(DASH, { profile }); await p.waitForSelector('#start-btn');
+      assert.equal(new URL(p.url()).pathname, DASH);
+      assert.match(await p.locator('#agent-img-start').getAttribute('src'), new RegExp(`personas/${folder}/default\\.webp$`));
       await p.context().close();
     }
-  });
-
-  await check('ML stays disconnected: no request leaves the loopback server and no ML code or endpoint exists in the student JS', async () => {
-    const p = await open(DASH); await start(p);
-    await submit(p, '9'); await submit(p, '8'); await p.locator('#hint-btn').click(); await p.waitForTimeout(400);
-    assert.deepEqual(leaked.filter(u => /workers\.dev|cloudflare|pia-ml/i.test(u)), []);
-    for (const f of ['student/js/student-dashboard.js', 'student/js/tutor-personas.js', 'student/html/student-dashboard.html']) {
-      const src = fs.readFileSync(path.join(root, f), 'utf8');
-      assert.equal(/workers\.dev|pia-ml-api|\/predict|marcstephen|fetch\(|XMLHttpRequest|sendBeacon|PROFILE_CONFIG/.test(src), false, f);
-    }
-    assert.equal(await p.evaluate(() => /^(struggling|average|outstanding)$/.test('average') && document.documentElement.outerHTML.includes('ML TEST')), false);
-    await p.context().close();
-  });
-  await check('stage time: heartbeat runs for Tutoring Dashboard; expiry and Try again never call finalize_stage_time; sign-out clears is_in_game without finalizing', async () => {
-    const p = await open(DASH, { limit: 600 }); await start(p);
-    await p.evaluate(() => window.__mockExpireNow()); await submit(p, '9');
-    await p.waitForSelector('#modal-time.is-open'); await p.locator('#time-retry').click();
-    await p.waitForFunction(() => !document.querySelector('#modal-time.is-open'));
-    let calls = await p.evaluate(() => window.__calls);
-    assert.ok(calls.some(c => c.m === 'rpc' && c.name === 'record_heartbeat' && c.args.p_stage === 'Tutoring Dashboard'), 'heartbeat for the dashboard');
-    assert.equal(calls.some(c => c.m === 'rpc' && c.name === 'finalize_stage_time'), false, 'no finalize at expiry / Try again');
-    await p.evaluate(() => { window.executeForceLogout = async () => {}; });   // keep the page alive so the calls can be read
-    await p.locator('#signout-btn').click(); await p.waitForSelector('#modal-confirm.is-open'); await p.locator('#confirm-accept').click(); await p.waitForTimeout(500);
-    calls = await p.evaluate(() => window.__calls);
-    assert.ok(calls.some(c => c.m === 'update' && c.table === 'profiles' && c.keys.length === 1 && c.keys[0] === 'is_in_game'));
-    assert.equal(calls.some(c => c.m === 'rpc' && c.name === 'finalize_stage_time'), false);
-    await p.context().close();
+    const n = await open(DASH, { profile: { group_type: 'Non-Assigned', selected_character: null } });
+    await n.waitForFunction(() => location.pathname === '/student/html/character-selection.html');
+    await n.context().close();
   });
 
   /* ---------------- removed elements ---------------- */

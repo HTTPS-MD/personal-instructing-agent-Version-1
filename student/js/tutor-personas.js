@@ -1267,7 +1267,7 @@ const ADAPTIVE_PERSONA_MESSAGES = {
 };
 
     /* saved selected_character -> dialogue/art set. pia-calm is the Neuroticism
-       persona's folder ("Neuroticsm" in the source); see the migration notes. */
+       persona's folder; the source art folder was spelled "Neuroticsm". */
     var KEYS = {
         'pia-open': 'openness',
         'pia-conscientious': 'conscientiousness',
@@ -1277,12 +1277,37 @@ const ADAPTIVE_PERSONA_MESSAGES = {
         'pia-neutral': 'neutral'
     };
 
+    /* The 3D-style character art (assets/images/personas/<Folder>/<file>.webp).
+       The folder comes from the saved selected_character key and nothing else.
+       Moods the art set has no picture for use the closest one it has. Neutral
+       has its own set (approval, disapproval, nod, shrug) instead of
+       happy/sad/excited, so those moods map to the nearest of them. */
+    var ART_DIR = '../../assets/images/personas/';
+    var ART = {
+        'pia-open':          ['Openness',          { 'default': 'default', happy: 'happy', sad: 'sad', excited: 'excited', thinking: 'default' }],
+        'pia-conscientious': ['Conscientiousness', { 'default': 'default', happy: 'happy', sad: 'sad', excited: 'excited', thinking: 'default' }],
+        'pia-extravert':     ['Extraverted',       { 'default': 'default', happy: 'happy', sad: 'sad', excited: 'excited', thinking: 'default' }],
+        'pia-agreeable':     ['Agreeableness',     { 'default': 'default', happy: 'happy', sad: 'sad', excited: 'excited', thinking: 'default' }],
+        'pia-calm':          ['Neuroticism',       { 'default': 'default', happy: 'happy', sad: 'sad', excited: 'excited', thinking: 'default' }],
+        'pia-neutral':       ['Neutral',           { 'default': 'default', happy: 'approval', sad: 'disapproval', excited: 'nod', thinking: 'shrug' }]
+    };
+
     var out = {};
     Object.keys(KEYS).forEach(function (key) {
         var trait = KEYS[key];
+        var art = ART[key];
+        var images = {};
+        Object.keys(art[1]).forEach(function (mood) { images[mood] = ART_DIR + art[0] + '/' + art[1][mood] + '.webp'; });
+
+        /* The previous illustrations stay as the fallback for any picture that
+           is missing or fails to load (excited falls back to happy). */
+        var old = PERSONA_CONFIG[trait].images;
+        var fallback = { 'default': old['default'], happy: old.happy, sad: old.sad, excited: old.happy, thinking: old.thinking || old['default'] };
+
         out[key] = {
             name: PERSONA_CONFIG[trait].name,
-            images: PERSONA_CONFIG[trait].images,
+            images: images,
+            fallback: fallback,
             profiles: PERSONA_CONFIG[trait].profiles,
             adaptive: ADAPTIVE_PERSONA_MESSAGES[trait] || ADAPTIVE_PERSONA_MESSAGES.neutral
         };

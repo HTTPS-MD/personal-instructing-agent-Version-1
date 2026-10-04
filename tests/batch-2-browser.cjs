@@ -967,7 +967,7 @@ function fixture() {
     p = await pageFor(dash, { account: 'dash-neutral', initial: { profile: { selected_character: 'pia-neutral' } } });
     await p.waitForSelector('#start-btn');
     /* Step game: PIA Neutral now has real art (Personas/Neutral), so the monogram placeholder is no longer used. */
-    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /tutors\/pia-neutral\/approval\.webp$/);
+    assert.match(await p.locator('#agent-img-start').getAttribute('src'), /personas\/Neutral\/default\.webp$/);   // the game's 3D-style Neutral art
     await p.context().close();
   });
   await check('no request left the loopback server', async () => { assert.deepEqual(leaked.filter(u => /supabase\.co/.test(u)), []); });

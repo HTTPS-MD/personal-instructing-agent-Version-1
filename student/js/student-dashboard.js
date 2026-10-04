@@ -467,27 +467,56 @@
         if (node) { node.textContent = clean(text); }
     }
 
-    /* Each expression is decoded before it replaces the last, so the figure
-       never blinks empty between two moods. */
+    /* The tutor's pictures. Each expression is decoded before it replaces the
+       last, so the figure never blinks empty between two moods. A picture that is
+       missing or fails to load is replaced, for that mood only, by the previous
+       illustration of the same tutor (tutor.fallback); excited falls back to
+       happy. Nothing here ever chooses a different tutor. */
     var preloaded = {};
+    var missing = {};          /* mood -> true once its 3D picture failed to load */
     var moodToken = 0;
+    var currentMood = 'default';
+
+    function knownMood(mood) { return tutor && tutor.images[mood] ? mood : 'default'; }
+
+    function moodSrc(mood) {
+        var m = knownMood(mood);
+        return missing[m] ? tutor.fallback[m] : tutor.images[m];
+    }
+
+    /* Wired to every tutor <img>: if the picture it is showing cannot load, show
+       that mood's fallback instead (once; a failing fallback is left alone). */
+    function guardImage(img) {
+        if (!img || img.dataset.guarded) { return; }
+        img.dataset.guarded = '1';
+        img.addEventListener('error', function () {
+            if (!tutor) { return; }
+            var shown = img.getAttribute('src');
+            Object.keys(tutor.images).forEach(function (m) {
+                if (tutor.images[m] === shown) {
+                    missing[m] = true;
+                    if (tutor.fallback[m] && tutor.fallback[m] !== shown) { img.setAttribute('src', tutor.fallback[m]); }
+                }
+            });
+        });
+    }
 
     function setMood(mood) {
         if (!tutor) { return; }
-        var key = tutor.images[mood] ? mood : 'default';
-        var src = tutor.images[key];
+        currentMood = knownMood(mood);
+        var src = moodSrc(currentMood);
         var img = $('#agent-img');
         if (!img || !src || img.getAttribute('src') === src) { return; }
 
         var token = ++moodToken;
-        var pre = preloaded[key];
-        var ready = pre && pre.decode ? pre.decode().catch(function () {}) : Promise.resolve();
+        var pre = preloaded[currentMood];
+        var ready = pre && pre.decode && !missing[currentMood] ? pre.decode().catch(function () {}) : Promise.resolve();
         ready.then(function () {
-            if (token === moodToken) { img.setAttribute('src', src); }
+            if (token === moodToken) { img.setAttribute('src', moodSrc(currentMood)); }
         });
     }
 
-    /* A line with a face to go with it: happy, sad or thinking. */
+    /* A line with a face to go with it: default, happy, excited, sad or thinking. */
     var talkTimer = null;
 
     function speak(text, mood) {
@@ -515,9 +544,22 @@
         tutor = found;
         tutorKey = key;
 
-        /* Load every expression now, so a mood change never flashes. */
+        /* Load every expression now, so a mood change never flashes. One that
+           cannot be loaded is marked missing and its fallback is used. */
         preloaded = {};
-        Object.keys(tutor.images).forEach(function (m) { var p = new Image(); p.src = tutor.images[m]; preloaded[m] = p; });
+        missing = {};
+        currentMood = 'default';
+        Object.keys(tutor.images).forEach(function (m) {
+            var p = new Image();
+            p.onerror = function () {
+                missing[m] = true;
+                var fb = new Image(); fb.src = tutor.fallback[m];
+                var shown = $('#agent-img');
+                if (shown && currentMood === m) { shown.setAttribute('src', moodSrc(m)); }
+            };
+            p.src = tutor.images[m];
+            preloaded[m] = p;
+        });
 
         var label = TUTOR_NAMES[key] || 'PIA · your tutor';
         var first = label.split(' · ')[0];
@@ -527,7 +569,8 @@
         ['#agent-img', '#agent-img-start'].forEach(function (sel) {
             var img = $(sel);
             if (!img) { return; }
-            img.setAttribute('src', tutor.images['default']);
+            guardImage(img);
+            img.setAttribute('src', moodSrc('default'));
             img.setAttribute('alt', 'Your tutor, ' + first);
         });
         return true;
@@ -1100,7 +1143,9 @@
             : (!wasConfirming && Date.now() - state.stepStartedAt <= FAST_CORRECT_MS) ? 'fastCorrect'
             : (state.correctRun >= STREAK_FOR_PRAISE) ? 'correctStreak'
             : 'correctFirstTry';
-        speak(reaction(kindOfReaction, 'correct'), 'happy');
+        /* Quick answers and streaks get the excited picture; the rest, happy. */
+        speak(reaction(kindOfReaction, 'correct'),
+            (kindOfReaction === 'fastCorrect' || kindOfReaction === 'correctStreak') ? 'excited' : 'happy');
 
         state.stepWrong = 0;
         state.stepStartedAt = Date.now();
@@ -1211,10 +1256,11 @@
         $('#offer-destination').textContent = (up ? 'Available progression: ' : 'Recommended review: ') + topicOf(target).name;
 
         var img = $('#offer-img');
-        img.setAttribute('src', tutor.images[up ? 'happy' : 'default'] || tutor.images['default']);
+        guardImage(img);
+        img.setAttribute('src', moodSrc(up ? 'excited' : 'default'));
         img.setAttribute('alt', '');
 
-        speak(null, up ? 'happy' : 'default');
+        speak(null, up ? 'excited' : 'default');
         state.pendingOffer = offer;
         state.offering = false;
         openModal('modal-offer');
