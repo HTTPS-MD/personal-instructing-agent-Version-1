@@ -952,15 +952,18 @@ function fixture() {
       loaded: (card.querySelector('img')?.naturalWidth || 0) > 0,
       fallback: card.querySelector('.persona-thumb').hasAttribute('data-mono')
     })));
-    /* Tutor art is one set: the game's sprites (tutors/<key>/...), for all six keys. */
-    const keys = ['pia-open', 'pia-conscientious', 'pia-extravert', 'pia-agreeable', 'pia-calm'];
+    const folders = [
+      ['pia-open', 'Openness'], ['pia-conscientious', 'Conscientiousness'],
+      ['pia-extravert', 'Extraverted'], ['pia-agreeable', 'Agreeableness'],
+      ['pia-calm', 'Neuroticism']
+    ];
     art.slice(0, 5).forEach((item, index) => {
-      assert.equal(item.key, keys[index]);
-      assert.match(item.src, new RegExp(`tutors/${item.key}/default\\.webp$`));
+      assert.equal(item.key, folders[index][0]);
+      assert.match(item.src, new RegExp(`personas/${folders[index][1]}/default\\.webp$`));
       assert.equal(item.loaded, true, item.key + ' art missing');
       assert.equal(item.fallback, false, item.key + ' fell back to monogram');
     });
-    assert.match(art[5].src, /tutors\/pia-neutral\/approval\.webp$/);
+    assert.match(art[5].src, /personas\/Neutral\/default\.webp$/);
     assert.equal(art[5].loaded, true); assert.equal(art[5].fallback, false, 'Neutral now has real art');
     await p.screenshot({ path: path.join(out, 'redesign-cast-1280.png') });
     await p.context().close();

@@ -434,25 +434,19 @@
                             <p class="account-guidance signed-out-copy">Use your school email to sign in.<br>First time here? Activate the account created by your admin.</p>
                         </div>
 
-                        <!-- THE CAST. Six comic cutouts, dealt onto the cover.
+                        <!-- THE CAST. Six persona cutouts, dealt onto the cover.
                              Each is a link down to the character select, and
                              agent-select.js highlights that tutor when you land
                              there (data-pick = the tutor's data-agent id).
 
-                             ART. .cast-art is locked to 3:4 in CSS, so nothing moves
-                             when an image arrives. Each <picture> holds a 600px
-                             WebP (about 45 KB) cut from the original char-N.png.
-                             No PNG fallback: every browser the site supports reads
-                             WebP, and the 2 MB originals stay out of the repo. alt is
-                             empty and the span aria-hidden: the tutor's name is the
-                             link text. The sixth tutor has no art yet and is shown
-                             LOCKED (landing.css section 7.2b). -->
+                             ART. Each full-body persona image fits its reserved box.
+                             The previous cast illustration is the image fallback. -->
                         <ul class="cast" aria-label="The six tutors">
                             <li class="cast-slot" data-reveal>
                                 <a class="cast-card" href="#agent-select" data-pick="pia-open">
                                     <span class="cast-art" aria-hidden="true">
                                         <picture>
-                                            <img src="assets/images/cast/pia-open.webp" alt="" width="600" height="840" decoding="async">
+                                            <img src="assets/images/personas/Openness/default.webp" data-fallback="assets/images/cast/pia-open.webp" alt="" width="1428" height="2000" decoding="async">
                                         </picture>
                                     </span>
                                     <span class="cast-name">Explorer</span>
@@ -463,7 +457,7 @@
                                 <a class="cast-card" href="#agent-select" data-pick="pia-conscientious">
                                     <span class="cast-art" aria-hidden="true">
                                         <picture>
-                                            <img src="assets/images/cast/pia-conscientious.webp" alt="" width="600" height="840" decoding="async">
+                                            <img src="assets/images/personas/Conscientiousness/default.webp" data-fallback="assets/images/cast/pia-conscientious.webp" alt="" width="1428" height="2000" decoding="async">
                                         </picture>
                                     </span>
                                     <span class="cast-name">Detective</span>
@@ -474,7 +468,7 @@
                                 <a class="cast-card" href="#agent-select" data-pick="pia-extravert">
                                     <span class="cast-art" aria-hidden="true">
                                         <picture>
-                                            <img src="assets/images/cast/pia-extravert.webp" alt="" width="600" height="840" decoding="async">
+                                            <img src="assets/images/personas/Extraverted/default.webp" data-fallback="assets/images/cast/pia-extravert.webp" alt="" width="1428" height="2000" decoding="async">
                                         </picture>
                                     </span>
                                     <span class="cast-name">Spark</span>
@@ -485,7 +479,7 @@
                                 <a class="cast-card" href="#agent-select" data-pick="pia-agreeable">
                                     <span class="cast-art" aria-hidden="true">
                                         <picture>
-                                            <img src="assets/images/cast/pia-agreeable.webp" alt="" width="600" height="840" decoding="async">
+                                            <img src="assets/images/personas/Agreeableness/default.webp" data-fallback="assets/images/cast/pia-agreeable.webp" alt="" width="1428" height="2000" decoding="async">
                                         </picture>
                                     </span>
                                     <span class="cast-name">Ally</span>
@@ -496,7 +490,7 @@
                                 <a class="cast-card" href="#agent-select" data-pick="pia-calm">
                                     <span class="cast-art" aria-hidden="true">
                                         <picture>
-                                            <img src="assets/images/cast/pia-calm.webp" alt="" width="600" height="840" decoding="async">
+                                            <img src="assets/images/personas/Neuroticism/default.webp" data-fallback="assets/images/cast/pia-calm.webp" alt="" width="1428" height="2000" decoding="async">
                                         </picture>
                                     </span>
                                     <span class="cast-name">Cautious</span>
@@ -507,7 +501,7 @@
                                 <a class="cast-card" href="#agent-select" data-pick="pia-neutral">
                                     <span class="cast-art" aria-hidden="true">
                                         <picture>
-                                            <img src="assets/images/cast/pia-neutral.webp" alt="" width="600" height="840" decoding="async">
+                                            <img src="assets/images/personas/Neutral/default.webp" data-fallback="assets/images/cast/pia-neutral.webp" alt="" width="1428" height="2000" decoding="async">
                                         </picture>
                                     </span>
                                     <span class="cast-name">Neutral</span>
@@ -637,7 +631,7 @@
                                     <div class="model-canvas-wrapper has-art" data-model="pia-open" role="img"
                                         aria-label="PIA Explorer, character art">
                                         <picture class="stage-art">
-                                            <img src="assets/images/cast/pia-open.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                            <img src="assets/images/personas/Openness/default.webp" data-fallback="assets/images/cast/pia-open.webp" alt="" width="1428" height="2000" decoding="async" loading="lazy">
                                         </picture>
                                     </div>
                                 </div>
@@ -645,7 +639,7 @@
                                     <div class="model-canvas-wrapper has-art" data-model="pia-conscientious" role="img"
                                         aria-label="PIA Detective, character art">
                                         <picture class="stage-art">
-                                            <img src="assets/images/cast/pia-conscientious.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                            <img src="assets/images/personas/Conscientiousness/default.webp" data-fallback="assets/images/cast/pia-conscientious.webp" alt="" width="1428" height="2000" decoding="async" loading="lazy">
                                         </picture>
                                     </div>
                                 </div>
@@ -653,7 +647,7 @@
                                     <div class="model-canvas-wrapper has-art" data-model="pia-extravert" role="img"
                                         aria-label="PIA Spark, character art">
                                         <picture class="stage-art">
-                                            <img src="assets/images/cast/pia-extravert.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                            <img src="assets/images/personas/Extraverted/default.webp" data-fallback="assets/images/cast/pia-extravert.webp" alt="" width="1428" height="2000" decoding="async" loading="lazy">
                                         </picture>
                                     </div>
                                 </div>
@@ -661,7 +655,7 @@
                                     <div class="model-canvas-wrapper has-art" data-model="pia-agreeable" role="img"
                                         aria-label="PIA Ally, character art">
                                         <picture class="stage-art">
-                                            <img src="assets/images/cast/pia-agreeable.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                            <img src="assets/images/personas/Agreeableness/default.webp" data-fallback="assets/images/cast/pia-agreeable.webp" alt="" width="1428" height="2000" decoding="async" loading="lazy">
                                         </picture>
                                     </div>
                                 </div>
@@ -669,7 +663,7 @@
                                     <div class="model-canvas-wrapper has-art" data-model="pia-calm" role="img"
                                         aria-label="PIA Cautious, character art">
                                         <picture class="stage-art">
-                                            <img src="assets/images/cast/pia-calm.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                            <img src="assets/images/personas/Neuroticism/default.webp" data-fallback="assets/images/cast/pia-calm.webp" alt="" width="1428" height="2000" decoding="async" loading="lazy">
                                         </picture>
                                     </div>
                                 </div>
@@ -677,7 +671,7 @@
                                     <div class="model-canvas-wrapper has-art" data-model="pia-neutral" role="img"
                                         aria-label="PIA Neutral, character art">
                                         <picture class="stage-art">
-                                            <img src="assets/images/cast/pia-neutral.webp" alt="" width="600" height="840" decoding="async" loading="lazy">
+                                            <img src="assets/images/personas/Neutral/default.webp" data-fallback="assets/images/cast/pia-neutral.webp" alt="" width="1428" height="2000" decoding="async" loading="lazy">
                                         </picture>
                                     </div>
                                 </div>

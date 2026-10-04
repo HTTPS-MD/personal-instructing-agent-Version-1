@@ -212,9 +212,8 @@ document.addEventListener('click', (event) => {
     if (run) run();
 });
 
-// Persona art fallback. A missing illustration marks its container with
-// the persona's initials; CSS then renders a tinted monogram in place of
-// the broken image. Wired before first paint so nothing flashes.
+// Try the previous tutor illustration if a persona image is unavailable.
+// Only show initials if both images fail.
 (function wireArtFallback() {
     function monogram(name) {
         return (name || 'PIA').replace(/^PIA\s*/i, '').slice(0, 2).toUpperCase() || 'PIA';
@@ -224,11 +223,17 @@ document.addEventListener('click', (event) => {
         var img = card.querySelector('img');
         var box = card.querySelector('.persona-thumb');
         if (!img || !box) { return; }
-        img.addEventListener('error', function () {
-            box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
-        }, { once: true });
+        function useFallbackOrMonogram() {
+            var fallback = card.getAttribute('data-fallback-img');
+            if (fallback && img.getAttribute('src') !== fallback) {
+                img.src = fallback;
+            } else {
+                box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
+            }
+        }
+        img.addEventListener('error', useFallbackOrMonogram);
         if (img.complete && img.naturalWidth === 0) {
-            box.setAttribute('data-mono', monogram(card.getAttribute('data-name')));
+            useFallbackOrMonogram();
         }
     });
 
@@ -242,7 +247,15 @@ document.addEventListener('click', (event) => {
         preview.setAttribute('data-mono',
             chosen ? monogram(chosen.getAttribute('data-name')) : '·');
     }
-    previewImg.addEventListener('error', markPreview);
+    previewImg.addEventListener('error', function () {
+        var chosen = document.querySelector('.persona-card.selected');
+        var fallback = chosen && chosen.getAttribute('data-fallback-img');
+        if (fallback && previewImg.getAttribute('src') !== fallback) {
+            previewImg.src = fallback;
+        } else {
+            markPreview();
+        }
+    });
     // previewCharacter() swaps the src; re-arm the check after each swap.
     new MutationObserver(function () {
         preview.removeAttribute('data-mono');

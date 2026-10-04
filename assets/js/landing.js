@@ -527,6 +527,16 @@
 
     function boot() {
         initWire();          /* first, so it can catch a throw from any of the rest */
+        $$('img[data-fallback]').forEach(function (img) {
+            function useFallback() {
+                var fallback = img.getAttribute('data-fallback');
+                if (fallback && !img.getAttribute('src').includes('/cast/')) {
+                    img.src = fallback;
+                }
+            }
+            img.addEventListener('error', useFallback);
+            if (img.complete && img.naturalWidth === 0) { useFallback(); }
+        });
         initTheme();
         initSkipLink();
         initReveals();

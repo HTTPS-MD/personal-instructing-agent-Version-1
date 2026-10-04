@@ -566,7 +566,7 @@ body.opacity-0 { opacity: 0; }
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 186px;
+    min-height: 216px;
     padding: var(--sp-4);
     border-radius: var(--r-lg);
     background: var(--bg-surface);
@@ -582,8 +582,8 @@ body.opacity-0 { opacity: 0; }
 
 .persona-thumb {
     width: 76px;
-    height: 76px;
-    flex: 0 0 76px;
+    height: 106px;
+    flex: 0 0 106px;
     margin-bottom: var(--sp-3);
     border-radius: var(--r-md);
     background: var(--bg-field);
@@ -593,10 +593,6 @@ body.opacity-0 { opacity: 0; }
 }
 
 .persona-thumb img { width: 100%; height: 100%; object-fit: contain; }
-/* The game's tutor sprites are full-length; in the square thumbnail and preview they
-   show head and shoulders (the same file, only framed -- never edited or recoloured). */
-.persona-thumb img[src*="/tutors/"],
-.preview-portrait img[src*="/tutors/"] { object-fit: cover; object-position: top center; }
 
 /* Unchosen personas sit back rather than being dimmed to grey mush — the
    filter is what the controller toggles, so the class name is preserved. */
@@ -618,7 +614,7 @@ body.opacity-0 { opacity: 0; }
 
 .preview-portrait {
     width: clamp(6rem, 28vw, 8.25rem);
-    aspect-ratio: 1;
+    aspect-ratio: 5 / 7;
     height: auto;
     margin: 0 auto var(--sp-4);
     border-radius: var(--r-lg);
@@ -718,15 +714,13 @@ body.opacity-0 { opacity: 0; }
 
 @media (max-width: 380px) {
     .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
-    .persona-card { min-height: 168px; padding: var(--sp-3); }
-    .persona-thumb { width: 64px; height: 64px; flex-basis: 64px; }
+    .persona-card { min-height: 188px; padding: var(--sp-3); }
+    .persona-thumb { width: 64px; height: 90px; flex-basis: 90px; }
     .question-text { min-height: 144px; }
 }
 
 /* ---------------------------------------------- 7. PERSONA ART FALLBACK --
-   The five illustrated tutors reuse the landing-page cast. Neutral has no
-   illustration yet; its monogram also covers a failed image request without
-   changing the thumbnail or preview dimensions. */
+   If both persona and tutor images fail, show a monogram in the same box. */
 .persona-thumb[data-mono]::after,
 .preview-portrait[data-mono]::after {
     content: attr(data-mono);
