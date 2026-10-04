@@ -21,7 +21,7 @@ create function public.submit_ocean_results(p_responses integer[]) returns jsonb
 create table public.tutoring_attempts (
   session_id uuid not null, student_email text not null, problem_id text not null, problem_number int not null,
   level_before int, level_after int, attempts_used int, hints_used int, time_taken_ms bigint, is_correct boolean,
-  classification text check (classification in ('smooth','struggling')), created_at timestamptz default now(),
+  classification text check (classification in ('smooth','struggling')),
   primary key (session_id, problem_number));
 create function public.start_game_session() returns uuid language plpgsql security definer as $$ begin return gen_random_uuid(); end $$;
 create function public.end_game_session(p_session_id uuid) returns void language sql as $$ select $$;
