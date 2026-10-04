@@ -408,6 +408,43 @@ const DASH = '/student/html/student-dashboard.html';
     await p.context().close();
   });
 
+  /* ---------------- a refresh keeps the trail (0046) ---------------- */
+  await check('refresh: solved questions (with the student\'s working) and the error log come back from the server', async () => {
+    const p = await open(DASH);
+    await start(p);
+    await submit(p, '9'); await submit(p, '8');
+    const q1 = await p.locator('#problem-expression').innerText();
+    await finishQuestion(p);
+    if (await p.locator('#modal-offer.is-open').count()) { await p.locator('#offer-stay').click(); }
+    await p.waitForSelector('#step-input');
+    assert.equal(await p.locator('#solved-list .q-btn').count(), 1, 'one solved before the refresh');
+    assert.equal(await p.locator('#error-list .history-item').count(), 2, 'two errors before the refresh');
+    await p.reload();
+    await p.waitForSelector('#start-btn');
+    await p.waitForFunction(() => document.querySelectorAll('#solved-list .q-btn').length === 1, null, { timeout: 8000 });
+    assert.equal(await p.locator('#error-list .history-item').count(), 2, 'both errors survive the refresh');
+    assert.deepEqual(await p.locator('#error-list .history-item').allInnerTexts(), ['Step 1: Error on "9"', 'Step 1: Error on "8"']);
+    await start(p);
+    assert.equal(await p.locator('#solved-list .q-btn').innerText(), q1, 'the solved question is listed');
+    await p.locator('#solved-list .q-btn').click();
+    await p.waitForSelector('.workspace-preview-step');
+    assert.equal(await p.locator('.workspace-preview-step').count(), 2, 'the saved working is shown, step by step');
+    assert.match(await p.locator('.workspace-preview-step-title').first().innerText(), /^Step 1: Conversion/);
+    await p.locator('#preview-back').click();
+    assert.equal(await p.locator('#step-input').count(), 1, 'back to the live question');
+    assert.equal(await p.evaluate(() => window.__calls.filter(c => c.m === 'rpc' && c.name === 'get_session_history').length), 1, 'history is asked once, by the page, with the session id only');
+    assert.deepEqual(Object.keys(await p.evaluate(() => window.__calls.find(c => c.name === 'get_session_history').args)), ['p_session_id']);
+    await p.context().close();
+  });
+  await check('refresh: a brand-new session has an empty trail and asks nothing extra', async () => {
+    const p = await open(DASH);
+    await p.waitForSelector('#start-btn');
+    assert.equal(await p.locator('#solved-list .q-btn').count(), 0);
+    assert.equal(await p.locator('#error-list .history-item').count(), 0);
+    assert.equal(await p.evaluate(() => window.__calls.some(c => c.name === 'get_session_history')), false, 'not asked when nothing is being resumed');
+    await p.context().close();
+  });
+
   /* ---------------- clean URLs (Cloudflare Pages) ---------------- */
   await check('clean URL (no .html): a realtime profile update does not throw the student out of the game', async () => {
     const p = await open('/student/html/student-dashboard');

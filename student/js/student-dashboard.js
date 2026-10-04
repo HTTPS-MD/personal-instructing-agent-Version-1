@@ -123,8 +123,8 @@
         clean: 0,            /* questions finished without a wrong answer */
         streak: 0,
         hintsUsedTotal: 0,
-        solved: [],          /* this visit only: { number, topic, question, steps } */
-        errors: [],          /* this visit only: the student's own wrong entries */
+        solved: [],          /* { number, topic, question, steps }: restored from the server on a refresh */
+        errors: [],          /* the student's own wrong entries: restored from the server on a refresh */
         preview: null,       /* index into solved[] while a solved question is being reviewed */
         stepWrong: 0,        /* wording only */
         correctRun: 0,       /* wording only */
@@ -1338,6 +1338,20 @@
             } else if (state.topic > 1) {
                 $('#start-lede').textContent = where + ' The session has a time limit, and you can ask ' +
                     'for a hint whenever you’re stuck.';
+            }
+        }
+
+        /* A refresh must not wipe the trail: the questions already solved (with the
+           student's own working) and the last five wrong entries come back from the
+           server. Failing to load them leaves the trail empty, never the game broken. */
+        if (state.sessionId && peek.data && peek.data.resumed) {
+            var past = await sb.rpc('get_session_history', { p_session_id: state.sessionId });
+            if (!past.error && past.data) {
+                state.solved = Array.isArray(past.data.solved) ? past.data.solved : [];
+                state.errors = Array.isArray(past.data.errors) ? past.data.errors : [];
+                state.hintsUsedTotal = Number(past.data.hints_total) || 0;
+                paintSolved();
+                paintErrors();
             }
         }
 

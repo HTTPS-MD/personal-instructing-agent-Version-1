@@ -107,10 +107,19 @@
         var n = finalFmt(kind, sub) ? ev(sub) : null;
         if (n != null && Math.abs(n - ev(key)) <= 0.001) { out = 'step_done'; text = st.work; confirmed = fmt(kind, n); } else out = 'format_error';
       }
-      if (out === 'wrong' || out === 'format_error') { st.errors++; st.wrong++; if (st.wrong >= 2) st.unlocked = true; }
+      if (out === 'wrong' || out === 'format_error') { st.errors++; st.wrong++; if (st.wrong >= 2) st.unlocked = true; (S.events = S.events || []).push({ step: st.step, outcome: out, sub: sub }); }
       else if (out === 'needs_final') { st.stage = 'confirm'; st.work = sub; st.wrong = 0; st.tier = 0; }
       else { st.doneSteps.push({ text: text, confirmed: confirmed || null }); st.step++; st.stage = 'work'; st.work = null; st.wrong = 0; st.tier = 0; if (st.step >= req(q.topic)) { st.completed = true; out = 'question_done'; } }
       persist(); return { data: { outcome: out, step_text: text, confirmed: confirmed, state: sj(q, st), clock: clock() } };
+    },
+    /* Stand-in for 0046: what the page used to forget on a refresh. */
+    get_session_history: function () {
+      var g = guard(); if (g) return g;
+      var solved = S.served.filter(function (q) { return S.states[q.pid] && S.states[q.pid].completed; }).map(function (q) {
+        return { number: q.number, topic: q.topic, question: q.question, steps: S.states[q.pid].doneSteps.map(function (d, n) { return { title: 'Step ' + (n + 1) + ': ' + label(q.topic, n), text: d.text, confirmed: d.confirmed }; }) };
+      });
+      var errors = (S.events || []).slice(-5).map(function (e) { return 'Step ' + (e.step + 1) + ': ' + (e.outcome === 'format_error' ? 'Final-answer error on "' : 'Error on "') + e.sub + '"'; });
+      return { data: { solved: solved, errors: errors, hints_total: S.hintCount || 0 } };
     },
     consume_step_hint: function (a) {
       var g = guard(); if (g) return g;
