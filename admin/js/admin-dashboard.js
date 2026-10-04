@@ -230,7 +230,7 @@
     var CONDITIONS = {
         'assigned': { short: 'EXP · Assigned', badge: 'badge-accent', family: 'experimental' },
         'non-assigned': { short: 'EXP · Free choice', badge: 'badge', family: 'experimental' },
-        'neutral': { short: 'EXP · Neutral (legacy)', badge: 'badge-warn', family: 'experimental' },
+        'neutral': { short: 'EXP · Neutral', badge: 'badge', family: 'experimental' },
         'control': { short: 'CTRL · Traditional', badge: '', family: 'control' }
     };
 
@@ -2521,20 +2521,27 @@
             return s.is_ocean_done ? 'No character saved' : 'Assigned after OCEAN';
         }
         if (s.group_type === 'non-assigned') { return 'Not chosen yet'; }
+        if (s.group_type === 'neutral') { return tutorName('pia-neutral'); }
         return '—';
     }
 
-    /* Keep an existing choice visible on group changes, always read-only. */
+    /* The tutor field, always read-only. Assigned: set by the server after OCEAN. Neutral: always the Neutral
+       tutor (the database sets it; the OCEAN result never chooses it). Any other group keeps what it holds. */
     function syncTutorField(prefix) {
         var group = ($('input[name="' + prefix + '-condition"]:checked') || {}).value;
         var select = $('#' + prefix + '-tutor');
         var held = select.getAttribute('data-initial') || '';
-        var assigned = group === 'assigned';
-        $('#' + prefix + '-tutor-field').hidden = !(assigned || held);
+        var assigned = group === 'assigned', neutral = group === 'neutral';
+        $('#' + prefix + '-tutor-field').hidden = !(assigned || neutral || held);
         select.disabled = true;
-        $('#' + prefix + '-tutor-hint').textContent = assigned
-            ? 'Automatically assigned from the OCEAN result when the student finishes the questionnaire. Tied highest traits are resolved by the system.'
-            : 'Kept as it is. Only Assigned students are given a tutor here; changing the group does not clear this.';
+        if (neutral) { select.value = 'pia-neutral'; }
+        else if (held) { select.value = held; }
+        else { select.value = ''; }
+        $('#' + prefix + '-tutor-hint').textContent = neutral
+            ? 'Always the Neutral tutor. The student goes from OCEAN to the tutoring dashboard and the game as an Assigned student would, but the OCEAN result does not choose the tutor.'
+            : assigned
+                ? 'Automatically assigned from the OCEAN result when the student finishes the questionnaire. Tied highest traits are resolved by the system.'
+                : 'Kept as it is. Only Assigned and Neutral students are given a tutor here; changing the group does not clear this.';
     }
 
     function initTutorFields() {
@@ -2691,9 +2698,6 @@
         }
         sectionSelect.value = s.section || '';
 
-        /* "Neutral" is a retired condition (0038). Only a student who already has
-           it sees it, selected, so saving cannot silently change them. */
-        $('#es-neutral-choice').hidden = s.group_type !== 'neutral';
         var radio = $('input[name="es-condition"][value="' + (s.group_type || '') + '"]');
         if (radio) { radio.checked = true; }
 
@@ -2803,9 +2807,7 @@
                 full_name: fullName,
                 section: section
             };
-            /* A legacy neutral student who is left as neutral is not re-sent:
-               their assignment is not touched by an unrelated edit. */
-            if (groupType !== 'neutral') { payload.group_type = groupType; }
+            payload.group_type = groupType;
             /* Only a test whose fields changed is sent, and only its raw data:
                the database calculates the transmuted score. Untouched fields
                leave a score entered before 0034 as it was. */

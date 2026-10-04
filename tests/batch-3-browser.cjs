@@ -883,7 +883,7 @@ function fixture() {
     await group.click();
     assert.equal(await p.locator('#group-filter-list').isVisible(), true);
     assert.equal(await p.locator('#roster-thead').evaluate(el => el.getBoundingClientRect().top), tableTop, 'opening list does not shift rows');
-    assert.deepEqual(await p.locator('#group-filter-list .custom-select-option').allInnerTexts(), ['All groups', 'Experimental', 'Assigned', 'Free choice', 'Neutral (legacy)', 'Control']);
+    assert.deepEqual(await p.locator('#group-filter-list .custom-select-option').allInnerTexts(), ['All groups', 'Experimental', 'Assigned', 'Free choice', 'Neutral', 'Control']);
     await shot(p, 'student-custom-group-list-dark-1280');
     await p.keyboard.press('Escape');
     assert.equal(await p.locator('#group-filter-list').isVisible(), false);
@@ -1113,31 +1113,51 @@ function fixture() {
   });
 
   /* ================= NEUTRAL / CONTROL POLICY (migration 0038) ================= */
-  await check('conditions: Register offers Assigned, Free choice and Control only (Neutral is a persona, not a condition)', async () => {
+  await check('conditions: Register offers Assigned, Free choice, Neutral and Control; Neutral is saved as the Neutral condition and always shows the Neutral tutor', async () => {
     const p = await open('students'); await waitStudents(p);
     const vals = await p.locator('#modal-register-student input[name="rs-condition"]').evaluateAll(els => els.map(e => e.value));
-    assert.deepEqual(vals, ['assigned', 'non-assigned', 'control']);
-    assert.equal(/Neutral/i.test((await p.locator('#modal-register-student label.choice').allInnerTexts()).join(' ')), false, 'no Neutral condition');
-    assert.equal(await p.locator('#rs-tutor option[value="pia-neutral"]').count(), 1, 'PIA Neutral is a tutor choice');
+    assert.deepEqual(vals, ['assigned', 'non-assigned', 'neutral', 'control']);
+    assert.deepEqual((await p.locator('#modal-register-student .choice-title').allInnerTexts()).map(s => s.trim()), ['EXP · Assigned persona', 'EXP · Free choice', 'EXP · Neutral persona', 'CTRL · Traditional']);
+    assert.equal(await p.locator('#rs-tutor option[value="pia-neutral"]').count(), 1, 'PIA Neutral is a tutor');
+    await p.locator('#register-student-btn, [data-modal-open="modal-register-student"]').first().click();
+    await p.waitForSelector('#modal-register-student.is-open');
+    await p.locator('label:has(input[name="rs-condition"][value="neutral"])').click();
+    assert.equal(await p.locator('#rs-tutor-field').isVisible(), true, 'the tutor is shown for Neutral');
+    assert.equal(await p.locator('#rs-tutor').inputValue(), 'pia-neutral');
+    assert.equal(await p.locator('#rs-tutor').isDisabled(), true, 'read-only');
+    assert.match(await p.locator('#rs-tutor-hint').innerText(), /Always the Neutral tutor[\s\S]*does not choose the tutor/);
+    await p.locator('label:has(input[name="rs-condition"][value="assigned"])').click();
+    assert.equal(await p.locator('#rs-tutor').inputValue(), '', 'switching away clears the Neutral tutor');
+    await p.locator('label:has(input[name="rs-condition"][value="neutral"])').click();
+    await p.locator('#rs-first').fill('Nina'); await p.locator('#rs-last').fill('Neutral'); await p.locator('#rs-email').fill('nina.neutral@student.ue.edu.ph');
+    await p.locator('label:has(#rs-consent)').click(); await p.locator('label:has(#rs-assent)').click();
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#rs-submit').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'insert'));
+    const ins = (await calls(p)).find(c => c.table === 'profiles' && c.write === 'insert').values[0];
+    assert.equal(ins.group_type, 'neutral', 'saved as the Neutral condition');
+    assert.equal('selected_character' in ins, false, 'no tutor is sent from the browser: the database sets pia-neutral');
     await p.context().close();
   });
-  await check('conditions: a legacy Neutral student keeps the value on an unrelated edit; nobody else is offered it', async () => {
+  await check('conditions: a Neutral student shows as Neutral with the Neutral tutor; Neutral is offered when editing anyone; an edit keeps the group', async () => {
     const p = await open('students'); await waitStudents(p);
     /* student02 is group_type "neutral" in the fixture (i % 4 === 2). */
     await p.locator('#student-tbody tr[data-student="student02@example.test"]').focus(); await p.keyboard.press('Enter');
     await p.waitForSelector('#drawer-student.is-open');
-    assert.match(await p.locator('#student-tbody tr[data-student="student02@example.test"]').innerText(), /Neutral \(legacy\)/);
+    assert.match(await p.locator('#student-tbody tr[data-student="student02@example.test"]').innerText(), /EXP · Neutral/);
+    assert.equal(/legacy/i.test(await p.locator('#student-tbody tr[data-student="student02@example.test"]').innerText()), false, 'no "legacy" label any more');
     await p.locator('[data-student-action="edit"]').click();
     await p.waitForSelector('#modal-edit-student.is-open');
     assert.equal(await p.locator('#es-neutral-choice').isVisible(), true);
     assert.equal(await p.locator('input[name="es-condition"][value="neutral"]').isChecked(), true);
-    assert.match(await p.locator('#es-neutral-choice').innerText(), /legacy, unchanged/i);
+    assert.equal(await p.locator('#es-tutor').inputValue(), 'pia-neutral');
     await p.locator('#es-first').fill('Renamed');
     await p.evaluate(() => { window.fixture.calls.length = 0; });
     await p.locator('#es-submit').click();
     await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'profiles' && c.write === 'update'));
     const upd = (await calls(p)).find(c => c.table === 'profiles' && c.write === 'update');
-    assert.equal(Object.prototype.hasOwnProperty.call(upd.values, 'group_type'), false, 'group_type is not re-sent: ' + JSON.stringify(upd.values));
+    assert.equal(upd.values.group_type, 'neutral', 'the group stays Neutral');
+    assert.equal('selected_character' in upd.values, false, 'the tutor is never written by the browser');
     assert.equal(upd.values.full_name.startsWith('Renamed'), true);
     await p.context().close();
     const q = await open('students'); await waitStudents(q);
@@ -1145,9 +1165,10 @@ function fixture() {
     await q.waitForSelector('#drawer-student.is-open');
     await q.locator('[data-student-action="edit"]').click();
     await q.waitForSelector('#modal-edit-student.is-open');
-    assert.equal(await q.locator('#es-neutral-choice').isVisible(), false, 'Neutral is not offered for a non-neutral student');
     const vis = await q.locator('#modal-edit-student input[name="es-condition"]').evaluateAll(els => els.filter(e => e.getClientRects().length).map(e => e.value));
-    assert.deepEqual(vis, ['assigned', 'non-assigned', 'control']);
+    assert.deepEqual(vis, ['assigned', 'non-assigned', 'neutral', 'control']);
+    await q.locator('#modal-edit-student label.choice:has(input[value="neutral"])').click();
+    assert.equal(await q.locator('#es-tutor').inputValue(), 'pia-neutral', 'moving a student to Neutral shows the Neutral tutor');
     await q.context().close();
   });
   await check('stage controls: reference policy table removed, stage actions retained', async () => {

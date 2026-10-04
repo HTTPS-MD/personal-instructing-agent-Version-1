@@ -297,7 +297,7 @@
                                     <option value="experimental">Experimental</option>
                                     <option value="assigned">· Assigned</option>
                                     <option value="non-assigned">· Free choice</option>
-                                    <option value="neutral">· Neutral (legacy)</option>
+                                    <option value="neutral">· Neutral</option>
                                     <option value="control">Control</option>
                                 </select>
                             </div>
@@ -707,11 +707,15 @@
                                 <span class="choice-title">EXP · Free choice</span>
                             </label>
                             <label class="choice">
+                                <input type="radio" name="rs-condition" value="neutral">
+                                <span class="choice-title">EXP · Neutral persona</span>
+                            </label>
+                            <label class="choice">
                                 <input type="radio" name="rs-condition" value="control">
                                 <span class="choice-title">CTRL · Traditional</span>
                             </label>
                         </div>
-                        <!-- Assigned tutor is chosen by the server after OCEAN. -->
+                        <!-- Assigned: the tutor is chosen by the server after OCEAN. Neutral: always the Neutral tutor. -->
                         <div class="field" id="rs-tutor-field" hidden>
                             <label class="label" for="rs-tutor">Tutor persona · automatic after OCEAN</label>
                             <select class="select" id="rs-tutor" aria-describedby="rs-tutor-hint"></select>
@@ -823,12 +827,9 @@
                                 <input type="radio" name="es-condition" value="non-assigned">
                                 <span class="choice-title">EXP · Free choice</span>
                             </label>
-                            <!-- Legacy only: shown when the student already holds this value so it is
-                                 kept unless the admin chooses another. Never offered for anyone else
-                                 (the database refuses new neutral assignments, migration 0038). -->
-                            <label class="choice" id="es-neutral-choice" hidden>
+                            <label class="choice" id="es-neutral-choice">
                                 <input type="radio" name="es-condition" value="neutral">
-                                <span class="choice-title">EXP · Neutral (legacy, unchanged)</span>
+                                <span class="choice-title">EXP · Neutral persona</span>
                             </label>
                             <label class="choice">
                                 <input type="radio" name="es-condition" value="control">

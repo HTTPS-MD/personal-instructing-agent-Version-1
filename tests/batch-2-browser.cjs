@@ -431,7 +431,8 @@ function fixture() {
       await p.keyboard.press('Escape');
       assert.equal(await p.locator('.start-card svg, .agent-card svg, #start-btn svg, #signout-btn svg').count(), 0);
       assert.equal(await p.locator('.dot-live').count(), 0);
-      await p.waitForFunction(() => document.querySelector('#tutorial-btn svg'), null, { timeout: 8000 });   // the tutorial button's icon is added once the page has finished starting
+      await p.keyboard.press('Escape');   // the first-visit tutorial can open a moment after the page; close it, then wait until nothing covers the page
+      await p.waitForFunction(() => { const s = document.querySelector('#tutorial-btn svg'); return s && s.getClientRects().length && getComputedStyle(s).visibility !== 'hidden' && !document.querySelector('.overlay.is-open'); }, null, { timeout: 8000 });
       assert.deepEqual(await iconsOf(p), ['#i-help']);
       assert.equal(await p.locator('dl.facts > .fact > dt').count(), 2);
       assert.equal(await p.locator('.start-card #start-btn').count(), 1, 'Start sits inside the start section');
@@ -447,7 +448,8 @@ function fixture() {
     await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape');
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
     assert.equal(await p.locator('#hint-btn svg, #submit-btn svg').count(), 0);
-    await p.waitForFunction(() => document.querySelector('#tutorial-btn svg'), null, { timeout: 8000 });   // the tutorial button's icon is added once the page has finished starting
+    await p.keyboard.press('Escape');   // the first-visit tutorial can open a moment after the page; close it, then wait until nothing covers the page
+      await p.waitForFunction(() => { const s = document.querySelector('#tutorial-btn svg'); return s && s.getClientRects().length && getComputedStyle(s).visibility !== 'hidden' && !document.querySelector('.overlay.is-open'); }, null, { timeout: 8000 });
       assert.deepEqual(await iconsOf(p), ['#i-help']);                 // tutorial control only: the step game has no status icons
     assert.equal(await p.locator('.left-sidebar').count() + await p.locator('.center-panel').count() + await p.locator('.right-sidebar').count(), 3);   // the original game's three areas
     await p.screenshot({ path: path.join(out, 'audit-dash-session-375.png') });
