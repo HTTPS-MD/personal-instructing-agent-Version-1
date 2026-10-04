@@ -337,7 +337,7 @@ function canEnterStage(profile, pageKey) {
 
 // Ang page kung saan pinapalitan ng estudyante ang temporary password na
 // ibinigay ng admin. Dito lang sila pwedeng pumunta habang naka-flag.
-const SET_NEW_PASSWORD_URL = '/student/html/set-new-password.html';
+const SET_NEW_PASSWORD_URL = '/student/html/set-new-password.html?v=20261004-password-route';
 
 // I-verify ang tunay na session at kunin ang profile. Nagbabalik ng profile,
 // o null kung nag-redirect na (huwag nang ituloy ang caller).
@@ -500,6 +500,20 @@ function renderSignOutControl(profile) {
             white-space:nowrap; max-width:42vw; overflow:hidden; text-overflow:ellipsis; }
         #pia-signout-who.pia-signout-inline { max-width:26vw; text-align:right; }
         #pia-signout-who small { display:block; color:var(--text-faint); font-size:var(--fs-xs); }
+        #pia-change-password { display:block; color:var(--accent-text, var(--accent, #a855f7)); font-size:var(--fs-xs);
+            line-height:1.25; white-space:nowrap; }
+        #pia-change-password .pw-short { display:none; }
+        .learn-bar-right > #pia-change-password, .journey-bar-right > #pia-change-password { display:inline-flex; align-items:center; min-height:44px;
+            padding:0 var(--sp-2); font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+        @media (max-width: 400px) {
+            .learn-bar-right:has(> #pia-change-password), .journey-bar-right:has(> #pia-change-password) { gap:4px; }
+            .learn-bar-right > #pia-change-password, .journey-bar-right > #pia-change-password { padding:0 4px; }
+        }
+        @media (max-width: 720px) {
+            .learn-bar-right > .who { display:none; }
+            #pia-change-password .pw-long { display:none; }
+            #pia-change-password .pw-short { display:inline; }
+        }
     `;
     document.head.appendChild(style);
 
@@ -519,6 +533,21 @@ function renderSignOutControl(profile) {
             who.innerHTML = `<small>Signed in as:</small>${escapeHTML(name)}`;
             own.parentNode.insertBefore(who, own);
         }
+        if (!document.getElementById('pia-change-password') &&
+            !location.pathname.endsWith('/set-new-password.html')) {
+            const link = document.createElement('a');
+            link.id = 'pia-change-password';
+            link.href = SET_NEW_PASSWORD_URL;
+            link.setAttribute('aria-label', 'Change password');
+            // Short wording on a phone, where the header has no room for more.
+            link.innerHTML = '<span class="pw-long">Change password</span><span class="pw-short" aria-hidden="true">Password</span>';
+            // A sibling of the page's own Sign out button, never inside the name
+            // block: that block is hidden on phones, and a link inside it could
+            // not be reached there.
+            const bar = document.querySelector('.learn-bar-right');
+            if (bar) bar.insertBefore(link, bar.firstChild);
+            else own.parentNode.insertBefore(link, own);
+        }
         return;
     }
 
@@ -526,6 +555,7 @@ function renderSignOutControl(profile) {
     wrap.id = 'pia-signout-control';
     wrap.innerHTML = `
         <span id="pia-signout-who"><small>Signed in as:</small>${escapeHTML(name)}</span>
+        <a id="pia-change-password" href="${SET_NEW_PASSWORD_URL}">Change password</a>
         <button id="pia-signout-btn" class="btn btn-signout" type="button">Sign out</button>
     `;
 
@@ -1368,6 +1398,11 @@ const STAGE_PAGES = {
 };
 
 function setupStudentRealtimeStageSync() {
+    // Changing a password is an intentional detour from the current stage.
+    // Profile updates can arrive while this page loads (especially as OCEAN
+    // answers are saved); stage sync must not send the student straight back.
+    if (window.location.pathname.endsWith('/set-new-password.html')) return;
+
     const userEmail = localStorage.getItem('pia_user_email');
     const userRole = localStorage.getItem('pia_user_role');
 

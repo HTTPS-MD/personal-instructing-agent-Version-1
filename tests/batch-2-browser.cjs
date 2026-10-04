@@ -47,6 +47,7 @@ function fixture() {
         if (args && args.password !== undefined) {
           await window.__acct('submit', { pwKeys: Object.keys(args) });
           if (f.updateDelay) await new Promise(r => setTimeout(r, f.updateDelay));
+          if (!args.current_password) return { data: null, error: { code: 'current_password_required', message: 'Current password required when setting new password.' } };
           if (f.passwordError) return { data: null, error: f.passwordError };
           f.profile = Object.assign({}, f.profile, { must_change_password: false });   // MOCK of the migration-0019 trigger
           return { data: { user }, error: null };
@@ -66,7 +67,16 @@ function fixture() {
       if (name === 'resume_or_start_game_session') return { data: { session_id: 's1', resumed: false, topic: 1, answered: 0 }, error: null };
       return { data: null, error: null };
     },
-    channel: () => { const ch = { on() { return ch; }, subscribe() { return ch; } }; return ch; },
+    channel: (name) => {
+      const ch = {
+        on(_event, _filter, callback) {
+          if (name.startsWith('student-stage-sync-')) f.stageUpdate = callback;
+          return ch;
+        },
+        subscribe() { return ch; }
+      };
+      return ch;
+    },
     removeChannel() {}
   };
   window.supabase = { createClient: () => api };
@@ -612,6 +622,65 @@ function fixture() {
   }
   const PW = ['/student/html/set-new-password.html', { profile: { must_change_password: true } }];
   const pwPage = (o = {}) => pageFor(PW[0], Object.assign({ account: 'pw' }, o, { initial: Object.assign({}, PW[1], o.initial || {}) }));
+  await check('student header: optional change-password link is visible', async () => {
+    const p = await pageFor(dash, { account: 'pw-link' });
+    await p.waitForSelector('#pia-change-password');
+    assert.equal(await p.locator('#pia-change-password').isVisible(), true);
+    assert.equal(new URL(await p.locator('#pia-change-password').getAttribute('href'), p.url()).pathname,
+      '/student/html/set-new-password.html');
+    await p.context().close();
+  });
+  await check('password change, OPTIONAL (flag off): OCEAN page -> Change password link -> the page opens and stays, back link returns to OCEAN', async () => {
+    const oceanUrl = '/student/html/ocean-test.html';
+    const p = await pageFor(oceanUrl, { account: 'pw-opt', initial: { profile: { is_ocean_done: false, must_change_password: false } } });
+    await p.waitForSelector('#pia-change-password');
+    assert.equal(new URL(p.url()).pathname, oceanUrl);
+    await p.click('#pia-change-password');
+    await p.waitForURL(u => u.pathname === '/student/html/set-new-password.html');
+    await p.waitForFunction(() => !document.body.classList.contains('opacity-0'));
+    await p.waitForTimeout(1200);                                   // long enough for any redirect to fire
+    assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
+    assert.match(await p.locator('h1').innerText(), /Change your password/);
+    assert.match(await p.locator('label[for="pw-current"]').innerText(), /Current password/);
+    assert.equal(await p.locator('#pw-back').isVisible(), true);
+    assert.equal(new URL(await p.locator('#pw-back').getAttribute('href'), p.url()).pathname, oceanUrl);
+    assert.equal(await p.locator('#pia-change-password').count(), 0, 'no change-password link on the change-password page itself');
+    await p.context().close();
+  });
+  await check('password change, OPTIONAL: also reachable from the thank-you screen and the waiting room without bouncing', async () => {
+    for (const u of ['/student/html/assessment-complete.html', '/student/html/waiting-room.html']) {
+      const p = await pageFor(u, { account: 'pw-opt2', initial: { stageOpen: false, profile: { must_change_password: false } } });
+      await p.waitForSelector('#pia-change-password');
+      await p.click('#pia-change-password');
+      await p.waitForURL(x => x.pathname === '/student/html/set-new-password.html');
+      await p.waitForTimeout(1000);
+      assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
+      await p.context().close();
+    }
+  });
+  await check('password change, OPTIONAL: the link is reachable on a phone (375px) from the dashboard and OCEAN', async () => {
+    for (const [u, prof] of [[dash, {}], ['/student/html/ocean-test.html', { is_ocean_done: false }]]) {
+      const p = await pageFor(u, { account: 'pw-opt3', width: 375, initial: { profile: Object.assign({ must_change_password: false }, prof) } });
+      await p.waitForSelector('#pia-change-password');
+      await p.keyboard.press('Escape');
+      assert.equal(await p.locator('#pia-change-password').isVisible(), true, u);
+      await p.context().close();
+    }
+  });
+  await check('password change, REQUIRED (flag on): any student page sends the student to the password page, which has no way around it', async () => {
+    for (const u of ['/student/html/ocean-test.html', dash, '/student/html/assessment-complete.html']) {
+      const p = await pageFor(u, { account: 'pw-req', initial: { profile: { must_change_password: true, is_ocean_done: u !== '/student/html/ocean-test.html' } } });
+      await p.waitForURL(x => x.pathname === '/student/html/set-new-password.html');
+      await p.waitForFunction(() => !document.body.classList.contains('opacity-0'));
+      assert.match(await p.locator('h1').innerText(), /Choose a new password/);
+      assert.match(await p.locator('label[for="pw-current"]').innerText(), /Temporary password/);
+      assert.equal(await p.locator('#pw-back').isVisible(), false, 'no back link while the change is required');
+      assert.equal(await p.locator('#pia-change-password').count(), 0);
+      await p.waitForTimeout(600);
+      assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
+      await p.context().close();
+    }
+  });
   for (const [w, t] of [[320, 'light'], [375, 'dark'], [768, 'light'], [1280, 'dark'], [1440, 'light']]) {
     await check(`set new password: one surface, left-aligned, email from session, rules visible (${w}px ${t})`, async () => {
       const p = await pwPage({ width: w, theme: t });
@@ -619,6 +688,7 @@ function fixture() {
       assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
       assert.equal(await p.locator('.gate-glyph, svg.icon-lg, .pw-identity[style], .modal-hero').count(), 0);
       assert.equal(await p.locator('#pw-email').innerText(), 'fixture@example.test');
+      assert.equal(await p.locator('#pw-current').getAttribute('type'), 'password');
       assert.equal(await p.locator('#pw-rules li').count(), 4);
       assert.equal(await p.locator('#pw-new').getAttribute('placeholder'), null);   // requirements are not placeholders
       assert.ok(isFlat(await flat(p, '.pw-identity')));
@@ -652,6 +722,17 @@ function fixture() {
     assert.equal((await calls(p)).filter(c => c.method === 'updateUser').length, 0);
     await p.context().close();
   });
+  await check('set new password: temporary password is required and stays hidden', async () => {
+    const p = await pwPage(); await p.waitForSelector('#pw-current');
+    await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1');
+    await p.click('#pw-submit');
+    assert.match(await p.locator('#pw-current-msg').innerText(), /password you used to sign in/i);
+    assert.equal(await p.evaluate(() => document.activeElement.id), 'pw-current');
+    assert.equal((await calls(p)).filter(c => c.method === 'updateUser').length, 0);
+    await p.check('#pw-show-toggle');
+    assert.equal(await p.locator('#pw-current').getAttribute('type'), 'password');
+    await p.context().close();
+  });
   await check('set new password: rules show a text cue (not colour alone) when met', async () => {
     const p = await pwPage(); await p.waitForSelector('#pw-new');
     await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1');
@@ -662,17 +743,19 @@ function fixture() {
   });
   await check('set new password: pending state, confirmed success, then existing redirect', async () => {
     const p = await pwPage({ initial: { updateDelay: 700 } }); await p.waitForSelector('#pw-new');
+    await p.fill('#pw-current', 'TempPass42');
     await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1');
     await p.click('#pw-submit');
     assert.equal(await p.locator('#pw-submit').isDisabled(), true);
     assert.equal(await p.locator('#pw-submit').innerText(), 'Saving…');
     await p.screenshot({ path: path.join(out, 'final-password-pending.png') });
     await p.waitForURL(u => !/set-new-password/.test(u.pathname), { timeout: 5000 });
-    assert.deepEqual(submitted, { pwKeys: ['password'] });     // only the password, nothing else, was sent
+    assert.deepEqual(submitted, { pwKeys: ['password', 'current_password'] });
     await p.context().close();
   });
   await check('set new password: confirmed failure keeps the fields and re-enables submit', async () => {
     const p = await pwPage({ initial: { passwordError: { message: 'Password should be at least 8 characters', code: 'weak_password' } } }); await p.waitForSelector('#pw-new');
+    await p.fill('#pw-current', 'TempPass42');
     await p.fill('#pw-new', 'abcdefg1'); await p.fill('#pw-confirm', 'abcdefg1'); await p.click('#pw-submit');
     await p.waitForFunction(() => document.querySelector('#pw-status').textContent.length > 0);
     assert.equal(await p.locator('#pw-status').evaluate(el => el.classList.contains('is-error')), true);
@@ -683,9 +766,18 @@ function fixture() {
     await p.screenshot({ path: path.join(out, 'final-password-error-375.png') });
     await p.context().close();
   });
-  await check('set new password: an unflagged account is sent on (existing guard unchanged)', async () => {
+  await check('set new password: unflagged students may change it or return to their page', async () => {
     const p = await pageFor('/student/html/set-new-password.html', { account: 'pw2', initial: { profile: { must_change_password: false } } });
-    await p.waitForURL(u => !/set-new-password/.test(u.pathname)); await p.context().close();
+    await p.waitForFunction(() => !document.body.classList.contains('opacity-0'));
+    assert.match(await p.locator('h1').innerText(), /Change your password/);
+    assert.equal(await p.locator('#pw-back').isVisible(), true);
+    assert.match(await p.locator('#pw-back').getAttribute('href'), /student\/html\//);
+    // A profile write from the OCEAN page must not pull this optional detour
+    // back to the student's stage before they can change their password.
+    await p.evaluate(() => window.fixture.stageUpdate?.({ new: { role: 'student', current_stage: 'OCEAN' } }));
+    await p.waitForTimeout(150);
+    assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
+    await p.context().close();
   });
   const zoomCss = 'html { font-size: 200% !important; }';
   await check('zoom 200%: OCEAN question reachable, no overflow (375x667)', async () => {
