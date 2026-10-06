@@ -68,7 +68,7 @@ function fixture() {
     await context.route('**/*',route=>{
       const url=route.request().url();
       if(url.startsWith(origin+'/'))return route.continue();
-      if(url.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js'))return route.fulfill({contentType:'text/javascript',body:`(${fixture.toString()})();`});
+      if(url.includes('/assets/js/vendor/supabase.js'))return route.fulfill({contentType:'text/javascript',body:`(${fixture.toString()})();`});
       return route.abort('blockedbyclient');
     });
     const page=await context.newPage();

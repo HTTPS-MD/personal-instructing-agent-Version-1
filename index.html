@@ -40,7 +40,7 @@
         media-src 'self';
         font-src 'self' https://fonts.gstatic.com;
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-        script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' blob:;
+        script-src 'self' 'wasm-unsafe-eval' blob:;
         worker-src 'self' blob:;
         connect-src 'self' https://hvfqqdtemayhhfavmfbs.supabase.co wss://hvfqqdtemayhhfavmfbs.supabase.co;
     ">
@@ -95,7 +95,7 @@
          so if jsDelivr is unreachable the page renders but stays inert. The
          real fix for a filtered school network is to vendor supabase-js into
          assets/js/ and drop the third-party origin entirely. -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="/assets/js/vendor/supabase.js"></script>
 </head>
 
 <body>

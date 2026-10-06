@@ -41,7 +41,7 @@ const DASH = '/student/html/student-dashboard.html';
       await context.route('**/*', route => {
         const u = route.request().url();
         if (u.startsWith(origin + '/')) { if (block && block.test(u)) return route.abort('failed'); return route.continue(); }
-        if (u.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js')) return route.fulfill({ contentType: 'text/javascript', body: mock });
+        if (u.includes('/assets/js/vendor/supabase.js')) return route.fulfill({ contentType: 'text/javascript', body: mock });
         leaked.push(u); return route.abort('blockedbyclient');
       });
     }
@@ -393,7 +393,7 @@ const DASH = '/student/html/student-dashboard.html';
     assert.ok(calls.length >= 5);
     for (const c of calls) assert.deepEqual(Object.keys(c.body), ['session_id'], 'only the session id is sent');
     assert.equal(await p.evaluate(() => window.__calls.some(c => c.m === 'rpc' && /learning/.test(c.name))), false, 'no learning RPC from the page');
-    assert.deepEqual(p.__reqs.filter(u => !u.startsWith(origin) && !/fonts\.(googleapis|gstatic)\.com|cdn\.jsdelivr\.net/.test(u)), [], 'nothing but the pages\' own fonts/SDK is requested; no ML or other outside service');
+    assert.deepEqual(p.__reqs.filter(u => !u.startsWith(origin) && !/fonts\.(googleapis|gstatic)\.com/.test(u)), [], 'nothing but the pages\' own fonts/SDK is requested; no ML or other outside service');
     await p.context().close();
   });
   await check('wording profile: a failing profile call keeps the wording and the game works', async () => {

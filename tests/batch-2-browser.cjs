@@ -99,7 +99,7 @@ function fixture() {
       await context.route('**/*', route => {
         const u = route.request().url();
         if (u.startsWith(origin + '/')) return route.continue();
-        if (u.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js')) return route.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
+        if (u.includes('/assets/js/vendor/supabase.js')) return route.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
         leaked.push(u); return route.abort('blockedbyclient');
       });
       await context.exposeBinding('__acct', (_s, op, data) => {

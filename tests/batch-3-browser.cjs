@@ -192,7 +192,7 @@ function fixture() {
     await context.route('**/*', r => {
       const u = r.request().url();
       if (u.startsWith(origin + '/')) return r.continue();
-      if (u.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js')) return r.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
+      if (u.includes('/assets/js/vendor/supabase.js')) return r.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
       leaked.push(u); return r.abort('blockedbyclient');
     });
     const page = await context.newPage();
@@ -231,7 +231,7 @@ function fixture() {
       const u = r.request().url();
       if (u.endsWith('/admin/js/admin-dashboard.js')) return r.abort('failed');
       if (u.startsWith(origin + '/')) return r.continue();
-      if (u.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js')) return r.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
+      if (u.includes('/assets/js/vendor/supabase.js')) return r.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
       return r.abort('blockedbyclient');
     });
     const page = await context.newPage();
