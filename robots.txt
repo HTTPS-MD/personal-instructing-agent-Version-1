@@ -1,0 +1,5 @@
+# Search engines may read the landing page. The staff and student pages are
+# kept out of search results by X-Robots-Tag in _headers, not listed here:
+# robots.txt is public, so naming /admin/ here would only point people at it.
+User-agent: *
+Allow: /
