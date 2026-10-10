@@ -71,7 +71,7 @@
         'pia-extravert': 'Theo · your energetic tutor',
         'pia-agreeable': 'Amy · your patient tutor',
         'pia-calm': 'Kai · your careful tutor',
-        'pia-neutral': 'PIA · your tutor'
+        'pia-neutral': 'Noel · your straightforward tutor'
     };
 
     /* The three study topics. The server numbers them 1-3 (question_bank's

@@ -79,18 +79,25 @@
        reads paper on ink; violet and volt are the accents in both.
        Measured with these values: paper on ink 17.27:1 · ink on violet
        5.02:1 · ink on volt 16.85:1. Re-check contrast if you change them. */
-    --palette-ink: #0E0B16;        /* the dark base; light mode's text       */
-    --palette-paper: #F4F1EA;      /* newsprint; dark mode's text            */
-    --palette-violet: #A259FF;     /* primary accent: actions, selection     */
-    --palette-volt: #D4FF3A;       /* highlight accent: captions, "correct"  */
+    /* Blue, yellow and green on a deep-navy ink and warm comic-page paper.
+       The --palette-violet and --palette-volt NAMES are kept so every
+       formula below keeps working; read them as "primary blue" and
+       "highlight yellow". Green is the new third colour: "correct".
+       Measured: paper on ink 17.40:1 · ink on blue 5.60:1 · ink on yellow
+       13.18:1 · ink on green 9.47:1. Re-check contrast if you change them. */
+    --palette-ink: #0B1233;        /* deep navy; light mode's text           */
+    --palette-paper: #FFF9EA;      /* warm comic-page cream; dark mode's text */
+    --palette-violet: #3A8DFF;     /* PRIMARY BLUE: actions, selection       */
+    --palette-volt: #FFD83D;       /* HIGHLIGHT YELLOW: captions, stars      */
+    --palette-green: #2ED573;      /* GREEN: "correct", success              */
 
     /* ── B. STATUS COLOURS ───────────────────────────────── EDIT TO RESKIN ──
        Used for status only, never decoration. Each has a light-mode text
        shade (-ink) and a dark-mode shade (-dark). */
-    --status-coral: #F2613F;       /* "not yet" — a wrong answer             */
-    --status-coral-ink: #A83607;
-    --status-coral-dark: #FB8C68;
-    --status-amber: #F5C518;       /* warning / needs attention              */
+    --status-coral: #FFB938;       /* "not yet" — a wrong answer (warm gold, same family as the brand yellow) */
+    --status-coral-ink: #7A4B00;
+    --status-coral-dark: #FFD27A;
+    --status-amber: #FFCB3D;       /* warning / needs attention              */
     --status-red: #DC2626;         /* danger — admin destructive actions     */
     --status-red-ink: #B91C1C;
     --status-red-dark: #F87171;
@@ -167,11 +174,13 @@
     --volt: var(--palette-volt);
     --on-volt: var(--palette-ink);                                                /* 16.85 */
 
-    /* Status roles. Correct is volt — as a fill under ink, or the olive text
+    /* Status roles. Correct is green — as a fill under ink, or the olive text
        shade (5.06). */
-    --color-correct: color-mix(in srgb, var(--palette-volt) 40%, var(--palette-ink));
-    --correct-soft: color-mix(in srgb, var(--palette-volt) 30%, transparent);
-    --correct-ink: color-mix(in srgb, var(--palette-volt) 40%, var(--palette-ink));
+    --green: var(--palette-green);
+    --on-green: var(--palette-ink);
+    --color-correct: color-mix(in srgb, var(--palette-green) 40%, var(--palette-ink));
+    --correct-soft: color-mix(in srgb, var(--palette-green) 26%, transparent);
+    --correct-ink: color-mix(in srgb, var(--palette-green) 40%, var(--palette-ink));
 
     --color-retry: var(--status-coral);
     --retry-soft: color-mix(in srgb, var(--status-coral) 14%, transparent);
@@ -333,9 +342,9 @@
     --accent-line: color-mix(in srgb, var(--palette-violet) 50%, transparent);
     --on-accent: var(--palette-ink);
 
-    --color-correct: var(--palette-volt);                                           /* 15.39 on surface */
-    --correct-soft: color-mix(in srgb, var(--palette-volt) 16%, transparent);
-    --correct-ink: var(--palette-volt);
+    --color-correct: var(--palette-green);                                          /* 8.45 on surface */
+    --correct-soft: color-mix(in srgb, var(--palette-green) 18%, transparent);
+    --correct-ink: var(--palette-green);
 
     --color-retry: var(--status-coral-dark);
     --retry-soft: color-mix(in srgb, var(--status-coral-dark) 16%, transparent);
@@ -466,8 +475,8 @@
     --pine: var(--palette-violet);
     --pine-deep: var(--accent-strong);
     --pine-dim: var(--accent-strong);
-    --mint: var(--accent-soft);
-    --spring: var(--palette-violet);
+    --mint: var(--correct-soft);
+    --spring: var(--palette-green);
     --coral: var(--palette-violet);
     --coral-soft: var(--accent-soft);
     --coral-ink: var(--accent-text);
@@ -1515,9 +1524,11 @@ button.stat.is-active { background: var(--accent-soft); }
 .toast-title { font-size: var(--fs-sm); font-weight: 600; }
 .toast-desc { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
 
-/* Body lock: the scrollbar width is substituted as padding so opening a
-   modal cannot shift the page horizontally. */
-body.is-locked { overflow: hidden; padding-right: var(--scrollbar-w); }
+/* Body lock: the root always reserves its scrollbar gutter, so hiding the
+   scrollbar while a modal, drawer or the search palette is open cannot shift
+   the page horizontally. (No padding compensation: it would double the gap.) */
+html { scrollbar-gutter: stable; }
+body.is-locked { overflow: hidden; }
 
 /* ------------------------------------------------------- 15. REDUCED MOTION */
 @media (prefers-reduced-motion: reduce) {

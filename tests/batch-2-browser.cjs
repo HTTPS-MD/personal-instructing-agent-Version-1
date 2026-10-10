@@ -545,12 +545,12 @@ function fixture() {
     await p.waitForURL(/assessment-complete\.html/);
     await p.context().close();
   });
-  await check('assigned + pia-neutral: the student goes straight to the dashboard, sees PIA as their tutor, never Character Selection', async () => {
+  await check('assigned + pia-neutral: the student goes straight to the dashboard, sees Noel as their tutor, never Character Selection', async () => {
     const asg = { is_ocean_done: true, group_type: 'Assigned', selected_character: 'pia-neutral' };
     let p = await pageFor('/student/html/student-dashboard.html', { account: 'asg-neutral', initial: { stageOpen: true, profile: asg } });
     await p.waitForSelector('#agent-name-start'); await p.waitForTimeout(400);
     assert.match(p.url(), /student-dashboard\.html/);
-    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'PIA · your tutor');
+    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'Noel · your straightforward tutor');
     await p.context().close();
     p = await pageFor('/student/html/character-selection.html', { account: 'asg-char', initial: { stageOpen: true, profile: asg } });
     await p.waitForURL(/student-dashboard\.html/);

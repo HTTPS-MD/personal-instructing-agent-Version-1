@@ -274,8 +274,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .cta-primary { background: var(--accent); color: var(--on-accent); }
 .cta-primary .cta-orb { background: var(--fg); color: var(--bg); }
 
-.cta-quiet { background: var(--bg); color: var(--text); }
-.cta-quiet .cta-orb { background: var(--volt); color: var(--on-volt); }
+.cta-quiet { background: var(--green); color: var(--on-green); }
+.cta-quiet .cta-orb { background: var(--fg); color: var(--bg); }
 .cta-quiet:hover { background: var(--fg); color: var(--bg); }
 
 .cta:disabled { cursor: not-allowed; border-style: dashed; box-shadow: none; transform: none; }
@@ -1074,8 +1074,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     transition: transform 180ms var(--ease-snap), box-shadow 180ms var(--ease-snap);
 }
 
-/* The portrait. 3:4, screentone, and manga focus lines converging on the
-   tutor. The art is a transparent cutout, so the lines show round it. */
+/* The portrait. 3:4, on a manga speed-line image. The art is a transparent
+   cutout, so the background shows round it. */
 .cast-art {
     position: relative;
     display: grid;
@@ -1083,17 +1083,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     aspect-ratio: 3 / 4;
     overflow: hidden;
     border-block-end: 1px solid var(--rule);
-    background: radial-gradient(var(--dot) 0.075rem, transparent 0.09rem) 0 0 / 0.5rem 0.5rem, var(--bg-surface);
-}
-
-.cast-art::before {
-    content: "";
-    position: absolute;
-    inset: -30%;
-    background: repeating-conic-gradient(from 0deg at 50% 50%, var(--speed) 0deg 1.6deg, transparent 1.6deg 8deg);
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 24%, var(--bg) 60%);
-    mask-image: radial-gradient(circle at 50% 50%, transparent 24%, var(--bg) 60%);
-    pointer-events: none;
+    background: var(--bg-surface) url("../../assets/images/landing-page-card-1.webp") center / cover no-repeat;
 }
 
 /* The glyph a card shows if it has no art (none do now, but a new tutor
@@ -1153,7 +1143,6 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     color: color-mix(in srgb, var(--palette-paper) 11%, var(--palette-ink));
 }
 
-.cast-art.locked-art::before { display: none; }
 
 /* The figure: the same chibi proportions as the other five, standing on
    the bottom edge, outlined in violet. fill is currentColor (above). */
@@ -1365,6 +1354,98 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     width: 100%;
 }
 
+/* The whole section is the scene: a classroom, with the tutors in it. A cream
+   veil keeps the text readable on top of it (from the left on a wide screen,
+   over everything on a phone), and the type is navy because the room is light. */
+.act-select {
+    isolation: isolate;
+    background: var(--palette-paper);
+}
+
+/* On a phone the classroom lives in the scene card itself (see .select-board),
+   so it is never stretched over a tall section. */
+@media (min-width: 56rem) {
+    .act-select {
+        background: url("../../assets/images/landing-tutor-bg.webp") center bottom / cover no-repeat;
+    }
+
+    .act-select::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(to right, rgba(255, 249, 234, 0.92) 0, rgba(255, 249, 234, 0.78) 32%, rgba(255, 249, 234, 0) 62%);
+        pointer-events: none;
+    }
+}
+
+/* One screen. On a wide screen the section is two columns: the heading, the
+   tutors and the button on the left, the whole scene on the right at the
+   height of the screen, so nothing needs scrolling. */
+@media (min-width: 56rem) {
+    .act.act-select { padding-block: calc(var(--topbar-h) + var(--sp-4)) var(--sp-5); }
+
+    .act-select .select-shell {
+        display: grid;
+        grid-template-columns: 22rem minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: var(--sp-4) var(--sp-6);
+        height: calc(100svh - var(--topbar-h) - var(--sp-4) - var(--sp-5));
+        min-height: 34rem;
+    }
+
+    .act-select .select-layout { display: contents; }
+
+    .act-select .select-head { grid-column: 1; grid-row: 1; gap: var(--sp-2); }
+    .act-select .select-title { max-width: none; font-size: clamp(1.75rem, 4.6vh, 2.75rem); }
+    .act-select .select-lede { font-size: var(--fs-sm); line-height: 1.5; }
+
+    .act-select .roster { grid-column: 1; grid-row: 2; align-self: start; gap: 0.4rem; padding-block: 0.75rem 0; }
+    .act-select .roster-item { min-height: 0; padding: 0.25rem 0.75rem 0.25rem 0.25rem; }
+    .act-select .roster-icon { width: 2.5rem; }
+
+    .act-select .select-foot { grid-column: 1; grid-row: 3; align-self: end; flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
+    .act-select .select-foot .cta { min-width: 0; width: 100%; }
+    .act-select .select-note { display: none; font-size: var(--fs-xs); line-height: 1.5; }
+    .act-select .select-foot .cta { min-height: 3.25rem; }
+
+    .act-select .select-board {
+        grid-column: 2;
+        grid-row: 1 / -1;
+        aspect-ratio: auto;
+        max-width: none;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        margin: 0;
+    }
+
+    .act-select .detail { width: min(52%, 28rem); }
+    .select-board .stage-art img { object-position: center bottom; }
+    .select-board .model-canvas-wrapper.has-art::before { inset-inline: 20%; }
+}
+
+/* Room to spare: bring the note back. Short screens: drop the tutors' tagline. */
+@media (min-width: 56rem) and (min-height: 56rem) {
+    .act-select .select-note { display: block; }
+}
+
+@media (min-width: 56rem) and (max-height: 46rem) {
+    .act-select .roster-strength { display: none; }
+    .act-select .roster-icon { width: 2.25rem; }
+    .act-select .roster { gap: 0.25rem; padding-block-start: 0.5rem; }
+    .act-select .select-head .mono-tag { display: none; }
+    .act-select .select-title { font-size: 1.75rem; }
+    .act-select .select-lede { font-size: var(--fs-xs); line-height: 1.4; }
+    .act-select .select-foot .cta { min-height: 3rem; }
+}
+
+.act-select .select-title,
+.act-select .select-lede,
+.act-select .select-note { color: var(--palette-ink); }
+
+.act-select .mono-tag { color: color-mix(in srgb, var(--palette-ink) 75%, transparent); }
+
 /* ---- 8.1 Header: left-aligned, the counterweight to the centred board. */
 .select-head {
     display: flex;
@@ -1435,8 +1516,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     flex: 0 0 auto;
     width: 2.75rem;
     aspect-ratio: 1;
+    overflow: hidden;
     border: 1px solid currentColor;
+    background: color-mix(in srgb, var(--palette-paper) 85%, var(--palette-violet));
 }
+
+.roster-icon img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 .roster-icon .icon { width: 1.25rem; height: 1.25rem; }
 .roster-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -1492,82 +1577,58 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     }
 }
 
-@media (min-width: 64rem) {
-    .roster {
+.select-layout { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+
+/* From 56rem the scene and the tutors sit side by side: the tutors are a
+   column on the left, so the whole section fits in one screen. */
+@media (min-width: 56rem) {
+    .select-layout {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: 15.5rem minmax(0, 1fr);
+        gap: var(--sp-6);
+        align-items: start;
+    }
+
+    .roster {
+        flex-direction: column;
         margin-inline: 0;
         padding: 0.875rem 0 var(--sp-2);
         overflow: visible;
     }
 
-    .roster-item {
-        flex-direction: column;
-        justify-content: center;
-        gap: var(--sp-2);
-        padding: var(--sp-5) var(--sp-3) var(--sp-4);
-        text-align: center;
-    }
-
-    .roster-icon { width: 3rem; }
-    .roster-text { align-items: center; }
+    .roster-item { min-height: 4.5rem; padding-block: var(--sp-2); }
+    .roster-icon { width: 3.25rem; }
 }
 
 /* ---- 8.3 The profile panel ------------------------------------------------ */
 .select-board {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    border: var(--edge-w) solid var(--rule);
-    background: var(--bg);
-    box-shadow: var(--hard-lg) var(--hard-lg) 0 var(--pop);
-}
-
-@media (min-width: 56rem) {
-    .select-board { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
-}
-
-/* The figure's side: screentone, and manga focus lines converging on the
-   tutor. The tutor's name is ghosted behind in outline — decoration,
-   aria-hidden, because the real name is in the panel beside it. */
-.stage {
     position: relative;
-    display: grid;
-    place-items: center;
-    min-height: clamp(18rem, 44vh, 30rem);
-    padding: var(--sp-6);
+    width: 100%;
+    aspect-ratio: 3 / 5;
+    max-width: 52rem;
+    margin-inline: auto;
     overflow: hidden;
-    border-block-end: 1px solid var(--rule);
-    background: radial-gradient(var(--dot) 0.075rem, transparent 0.09rem) 0 0 / 0.5rem 0.5rem, var(--bg-surface);
+    border: var(--edge-w) solid var(--palette-ink);
+    background: var(--palette-paper) url("../../assets/images/landing-tutor-bg.webp") 62% bottom / cover no-repeat;
+    box-shadow: var(--hard) var(--hard) 0 var(--palette-ink);
 }
 
 @media (min-width: 56rem) {
-    .stage { border-block-end: 0; border-inline-end: 1px solid var(--rule); }
+    /* Never taller than the screen: the width follows the available height. */
+    .select-board { aspect-ratio: 8 / 7; max-width: min(52rem, calc((100svh - 8rem) * 8 / 7)); margin-inline: 0; border: 0; background: none; box-shadow: none; }
 }
 
-.stage::before {
-    content: "";
+/* The scene: the tutor stands on the left, the speech bubble sits on the right. */
+.stage {
     position: absolute;
-    inset: -20%;
-    background: repeating-conic-gradient(from 0deg at 50% 55%, var(--speed) 0deg 1.4deg, transparent 1.4deg 7deg);
-    -webkit-mask-image: radial-gradient(circle at 50% 55%, transparent 22%, var(--bg) 62%);
-    mask-image: radial-gradient(circle at 50% 55%, transparent 22%, var(--bg) 62%);
-    pointer-events: none;
-}
-
-.stage-ghost {
-    position: absolute;
-    inset-block-start: clamp(0.5rem, 2.5vh, 1.5rem);
+    inset-block: 44% 0;
     inset-inline: 0;
-    text-align: center;
-    font-family: var(--font-display);
-    font-size: clamp(3.5rem, 9vw, 7.5rem);
-    font-weight: 700;
-    line-height: 0.9;
-    letter-spacing: -0.06em;
-    color: transparent;
-    -webkit-text-stroke: 1px color-mix(in srgb, var(--fg) 35%, transparent);
-    pointer-events: none;
-    user-select: none;
+    display: grid;
+    place-items: end center;
+}
+
+@media (min-width: 56rem) {
+    .stage { inset-block-start: 0; inset-inline-end: 42%; }
 }
 
 .stage-figure { position: relative; z-index: 1; width: 100%; display: grid; place-items: center; }
@@ -1577,12 +1638,20 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .stage-figure[hidden] { display: none; }
 
 /* ---- 8.4 The profile ------------------------------------------------------ */
+/* The speech bubble. A container, so the type and padding inside scale with
+   the bubble (cqi) rather than with the page. */
 .detail {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 0;
-    padding: clamp(var(--sp-6), 4vw, var(--sp-9));
+    position: absolute;
+    inset-block-start: 1%;
+    inset-inline: 3% 11%;
+    container-type: inline-size;
+    aspect-ratio: 4 / 3;
+    background: url("../../assets/images/landing-tutor-bubble.svg") center / 100% 100% no-repeat;
+    color: var(--palette-ink);
+}
+
+@media (min-width: 56rem) {
+    .detail { inset-inline: auto 2%; inset-block-start: 4%; width: 52%; }
 }
 
 .detail-panel[hidden] { display: none; }
@@ -1607,7 +1676,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     gap: var(--sp-2);
     padding: 0.3125rem 0.625rem;
     border: 1px solid var(--on-volt);
-    background: var(--volt);
+    background: var(--green);
     color: var(--on-volt);
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
@@ -1673,40 +1742,98 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     color: var(--text-muted);
 }
 
-/* The stat sheet: two plates, mono keys. */
-.detail-spec {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-    margin: var(--sp-6) 0 0;
-    border: 1px solid var(--rule);
+/* Inside the bubble only the role, the name and the tutor's line show. The
+   text sits in the bubble's white area (the image tilts about 2 degrees). */
+.detail-panel {
+    height: 100%;
+    padding: 17cqi 21cqi 19cqi 20cqi;
+    justify-content: center;
+    transform: rotate(-2deg);
 }
 
-.detail-spec-row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    padding: var(--sp-3) var(--sp-4);
+.detail-strength,
+.detail-desc { display: none; }
+
+.detail-name {
+    margin: 0;
+    font-size: 10cqi;
+    line-height: 0.95;
 }
 
-.detail-spec-row + .detail-spec-row { border-inline-start: 1px solid var(--rule); }
+.detail-name-a { font-size: 2.8cqi; letter-spacing: 0.24em; text-transform: uppercase; color: color-mix(in srgb, var(--palette-ink) 70%, transparent); }
+.detail-name-b { margin: 0; color: var(--palette-ink); }
 
-.detail-spec dt {
+.detail-line {
+    margin: 3cqi 0 0;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 4.4cqi;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    color: var(--palette-ink);
+}
+
+.detail-line::before { display: none; }
+
+/* The line changes when the tutor is tapped: it pops in like a new bubble. */
+.detail-line.is-talking { animation: lineIn 220ms var(--ease-snap); }
+
+@keyframes lineIn {
+    from { opacity: 0; transform: translateY(0.3rem); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* A small caption on the tutor until the first tap, so they know to tap. */
+.stage-figure:not(.has-poked) .stage-poke::after {
+    content: "Tap me!" / "";
+    position: absolute;
+    inset-block-end: 12%;
+    inset-inline-end: 5%;
+    padding: 0.25rem 0.5rem;
+    border: 2px solid var(--palette-ink);
+    background: var(--volt);
+    color: var(--on-volt);
+    box-shadow: 3px 3px 0 var(--palette-ink);
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    letter-spacing: 0.16em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-faint);
+    animation: tapBob 1.2s ease-in-out infinite;
 }
 
-.detail-spec dd {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.0625rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.25;
-    color: var(--text);
+@keyframes tapBob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-0.3rem); }
+}
+
+/* Tap the tutor and they change expression. The button covers the figure. */
+.stage-poke {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.stage-poke:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; }
+
+.stage-figure.is-poked .stage-art { animation: pokeBounce 360ms var(--ease-snap); }
+
+@keyframes pokeBounce {
+    0%   { transform: none; }
+    35%  { transform: translateY(-3%) scale(1.03); }
+    100% { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stage-figure.is-poked .stage-art { animation: none; }
+    .detail-line.is-talking { animation: none; }
+    .stage-figure:not(.has-poked) .stage-poke::after { animation: none; }
 }
 
 /* ---- 8.5 Foot ------------------------------------------------------------- */
@@ -1764,6 +1891,13 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 }
 
 .stage-art { position: absolute; inset: 0; }
+
+/* In the scene the tutor fills the stage, standing at the bottom. */
+.select-board .stage-figure { height: 100%; }
+.select-board .model-canvas-wrapper { height: 100%; max-height: none; max-width: none; aspect-ratio: auto; }
+/* Phone: the tutor stands left of centre, under the bubble's tail. */
+.select-board .stage-art img { object-position: 15% bottom; }
+.select-board .model-canvas-wrapper.has-art::before { inset-inline: 12% 36%; background: color-mix(in srgb, var(--palette-ink) 22%, transparent); }
 
 .stage-art img {
     display: block;

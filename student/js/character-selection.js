@@ -44,7 +44,6 @@ function previewCharacter(element) {
     const imgPath = element.getAttribute('data-img');
     const style = element.getAttribute('data-style');
     const pace = element.getAttribute('data-pace');
-    const best = element.getAttribute('data-best');
 
     document.getElementById('preview-role').textContent = role;
     document.getElementById('preview-name').textContent = name;
@@ -53,7 +52,6 @@ function previewCharacter(element) {
 
     document.getElementById('preview-style').textContent = style;
     document.getElementById('preview-pace').textContent = pace;
-    document.getElementById('preview-best').textContent = best;
     document.getElementById('preview-characteristics').classList.remove('hidden');
 
     const lockBtn = document.getElementById('lock-in-btn');

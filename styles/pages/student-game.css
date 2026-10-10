@@ -59,7 +59,7 @@ body.is-playing #pia-change-password { display: none; }
 }
 /* The still gets the same dimming as the film. */
 .video-mentor-sidebar::before {
-    content: ''; position: absolute; inset: 0; z-index: 0; background: rgba(14, 11, 22, 0.42); pointer-events: none;
+    content: ''; position: absolute; inset: 0; z-index: 0; background: rgba(11, 18, 51, 0.42); pointer-events: none;
 }
 
 /* The classroom, dimmed, behind the tutor (the landing page's own hero film). */
@@ -191,7 +191,7 @@ body.is-playing #pia-change-password { display: none; }
     flex: none;
     width: 100%;
     padding: 16px 14px 14px;
-    background: linear-gradient(180deg, transparent 0%, rgba(14, 11, 22, 0.58) 34%, rgba(14, 11, 22, 0.88) 100%);
+    background: linear-gradient(180deg, transparent 0%, rgba(11, 18, 51, 0.58) 34%, rgba(11, 18, 51, 0.88) 100%);
 }
 
 /* Request Hint: its slot is always there; it is only invisible until the server
@@ -261,8 +261,8 @@ body.is-playing #pia-change-password { display: none; }
     color: var(--palette-paper);
     background:
         radial-gradient(ellipse at 18% 12%, rgba(244, 241, 234, 0.10), transparent 55%),
-        radial-gradient(ellipse at 88% 90%, rgba(162, 89, 255, 0.14), transparent 50%),
-        #17122a;
+        radial-gradient(ellipse at 88% 90%, rgba(58, 141, 255, 0.18), transparent 50%),
+        #0f1a44;
     border: 3px solid var(--g-edge);
     box-shadow:
         inset 0 0 0 7px var(--accent),
@@ -277,7 +277,7 @@ body.is-playing #pia-change-password { display: none; }
 }
 .problem-header-block::before {
     left: 40px; bottom: -17px; width: 54px; height: 15px;
-    background: linear-gradient(to bottom, var(--volt) 0 55%, #3d3a5c 55%);
+    background: linear-gradient(to bottom, var(--volt) 0 55%, #3a4a85 55%);
     transform: rotate(3deg);
 }
 .problem-header-block::after {
@@ -296,7 +296,7 @@ body.is-playing #pia-change-password { display: none; }
     padding: 6px 12px 0 0;
     font-family: var(--font-mono);
 }
-.time-badge-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #c9c5d6; }
+.time-badge-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #c5d0ee; }
 .time-left { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--volt); }
 .time-left.is-low { color: var(--status-coral-dark); }
 
@@ -308,7 +308,7 @@ body.is-playing #pia-change-password { display: none; }
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--volt);
-    text-decoration: underline wavy rgba(212, 255, 58, 0.65);
+    text-decoration: underline wavy rgba(255, 216, 61, 0.65);
     text-underline-offset: 6px;
 }
 
@@ -359,7 +359,7 @@ body.is-playing #pia-change-password { display: none; }
     border-right: 3px solid var(--g-edge);
 }
 .step-card.correct { background: var(--correct-soft); }
-.step-card.correct::before { background-color: var(--volt); }
+.step-card.correct::before { background-color: var(--green); }
 .step-card.correct::after {
     content: '\2713';
     position: absolute;
@@ -580,8 +580,8 @@ body.is-playing #pia-change-password { display: none; }
     position: absolute;
     top: -9px; left: 50%;
     width: 38px; height: 13px;
-    background: rgba(212, 255, 58, 0.85);
-    border: 1.5px solid rgba(14, 11, 22, 0.35);
+    background: rgba(255, 216, 61, 0.85);
+    border: 1.5px solid rgba(11, 18, 51, 0.35);
     transform: translateX(-50%) rotate(-3deg);
 }
 #error-list:empty::after {

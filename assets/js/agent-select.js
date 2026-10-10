@@ -3,7 +3,8 @@
  * PIA SYSTEM — AGENT SELECT
  * ============================================================================
  * Drives "Meet your tutors" in Act 2: the row of tutor tabs, the figure on
- * the stage, the detail panel and the faded name behind the figure.
+ * the stage and the speech-bubble panel; tapping the figure on the stage
+ * cycles its expression.
  *
  * Deliberately its own file, on the same rule the rest of this codebase
  * follows: landing.js owns the scroll engine, the reveals and the video
@@ -40,7 +41,6 @@
     if (!tabs.length) { return; }
 
     var counter = document.getElementById('select-counter');
-    var ghost = document.getElementById('stage-ghost');
 
     function figureFor(id) { return root.querySelector('.stage-figure[data-figure="' + id + '"]'); }
     function panelFor(id) { return document.getElementById('panel-' + id); }
@@ -60,12 +60,10 @@
 
             var fig = figureFor(tid);
             var pan = panelFor(tid);
+            if (fig && !on && fig._reset) { fig._reset(); }
             if (fig) { fig.hidden = !on; }
             if (pan) { pan.hidden = !on; }
         });
-
-        var name = (tab.querySelector('.roster-name') || {}).textContent || '';
-        if (ghost) { ghost.textContent = name.trim(); }
 
         /* The "01 / 06" readout was removed with the number badges; kept
            null-safe so markup that still carries one keeps working. */
@@ -83,6 +81,60 @@
 
     tabs.forEach(function (tab) {
         tab.addEventListener('click', function () { select(tab, { focus: false }); });
+    });
+
+    /* Tap the tutor on the stage and they change expression and say something
+       new. data-poses lists the images to cycle through, all friendly ones. A button covers the
+       figure so it works from the keyboard too. */
+    Array.prototype.forEach.call(root.querySelectorAll('.stage-figure[data-poses]'), function (fig) {
+        var poses = fig.getAttribute('data-poses').split(/\s+/).filter(Boolean);
+        var img = fig.querySelector('.stage-art img');
+        if (poses.length < 2 || !img) { return; }
+
+        poses.forEach(function (src) { new Image().src = src; });
+
+        var tab = tabs.filter(function (t) { return t.getAttribute('data-agent') === fig.getAttribute('data-figure'); })[0];
+        var name = tab ? tab.querySelector('.roster-name').textContent.trim() : 'the tutor';
+
+        var poke = document.createElement('button');
+        poke.type = 'button';
+        poke.className = 'stage-poke';
+        poke.setAttribute('aria-label', 'Hear more from ' + name);
+        fig.appendChild(poke);
+
+        /* Each pose has a line to go with it, so the tutor talks as the
+           student taps. The first line is also the markup's own text. */
+        var lines = (fig.getAttribute('data-lines') || '').split('|').filter(Boolean);
+        var panel = panelFor(fig.getAttribute('data-figure'));
+        var say = panel ? panel.querySelector('.detail-line') : null;
+
+        var i = 0;
+        function show() {
+            img.src = poses[i];
+            if (say && lines.length) {
+                say.textContent = lines[i] || lines[0];
+                say.classList.remove('is-talking');
+                void say.offsetWidth;
+                say.classList.add('is-talking');
+            }
+        }
+
+        /* Back to the first pose and line when the student picks another tutor. */
+        fig._reset = function () {
+            if (i === 0) { return; }
+            i = 0;
+            img.src = poses[0];
+            if (say && lines.length) { say.textContent = lines[0]; }
+        };
+
+        poke.addEventListener('click', function () {
+            i = (i + 1) % poses.length;
+            show();
+            fig.classList.add('has-poked');
+            fig.classList.remove('is-poked');
+            void fig.offsetWidth;
+            fig.classList.add('is-poked');
+        });
     });
 
     /* The cast on the cover: each card is a link to #agent-select carrying

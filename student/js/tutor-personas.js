@@ -5,7 +5,7 @@ window.PIA_TUTORS = (function () {
     'use strict';
 const PERSONA_CONFIG = {
     openness: {
-        name: "Explorer Mentor",
+        name: "Ava",
         images: {
             default: "../../assets/images/tutors/pia-open/default.webp",
             happy: "../../assets/images/tutors/pia-open/happy.webp",
@@ -207,7 +207,7 @@ const PERSONA_CONFIG = {
     },
 
     conscientiousness: {
-        name: "Structured Guide",
+        name: "Cara",
         images: {
             default: "../../assets/images/tutors/pia-conscientious/default.webp",
             happy: "../../assets/images/tutors/pia-conscientious/happy.webp",
@@ -409,7 +409,7 @@ const PERSONA_CONFIG = {
     },
 
     extraversion: {
-        name: "Energetic Coach",
+        name: "Theo",
         images: {
             default: "../../assets/images/tutors/pia-extravert/default.webp",
             happy: "../../assets/images/tutors/pia-extravert/happy.webp",
@@ -611,7 +611,7 @@ const PERSONA_CONFIG = {
     },
 
     agreeableness: {
-        name: "Supportive Pal",
+        name: "Amy",
         images: {
             default: "../../assets/images/tutors/pia-agreeable/default.webp",
             happy: "../../assets/images/tutors/pia-agreeable/happy.webp",
@@ -813,7 +813,7 @@ const PERSONA_CONFIG = {
     },
 
     neuroticism: {
-        name: "Cautious Mentor",
+        name: "Kai",
         images: {
             default: "../../assets/images/tutors/pia-calm/default.webp",
             happy: "../../assets/images/tutors/pia-calm/happy.webp",
@@ -1015,7 +1015,7 @@ const PERSONA_CONFIG = {
     },
 
     neutral: {
-        name: "Standard Tutor",
+        name: "Noel",
         images: {
             default: "../../assets/images/tutors/pia-neutral/approval.webp",
             happy: "../../assets/images/tutors/pia-neutral/approval.webp",

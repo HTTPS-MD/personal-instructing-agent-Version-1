@@ -138,7 +138,7 @@
     width: fit-content;
     margin: 0 0 var(--sp-5);
     padding: .5rem .75rem;
-    background: var(--volt);
+    background: var(--green);
     color: var(--on-volt);
     font-family: var(--font-mono);
     font-size: .75rem;

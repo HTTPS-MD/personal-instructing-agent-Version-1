@@ -281,7 +281,7 @@ body.opacity-0 { opacity: 0; }
     width: fit-content;
     margin: 0 0 var(--sp-5);
     padding: .5rem .75rem;
-    background: var(--volt);
+    background: var(--green);
     color: var(--on-volt);
     font-family: var(--font-mono);
     font-size: .75rem;
@@ -302,7 +302,7 @@ body.opacity-0 { opacity: 0; }
 
 .gate-lede { font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.65; color: var(--text-muted); margin-bottom: var(--sp-6); }
 
-.assessment-finish { border-top: .375rem solid var(--volt); }
+.assessment-finish { border-top: .375rem solid var(--green); }
 .assessment-finish .journey-kicker { margin-top: var(--sp-6); }
 .assessment-finish .gate-actions { max-width: 16rem; }
 
