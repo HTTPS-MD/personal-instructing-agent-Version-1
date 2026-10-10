@@ -124,7 +124,7 @@
         return 'number';
     }
 
-    var EXAMPLE_INTRO = 'Let me show you with a different problem. Press Next to follow along.';
+    var EXAMPLE_INTRO = 'Let me show you with a different problem.';
 
     var FAST_CORRECT_MS = 12000;      /* wording only: picks a "that was quick" line */
     var STREAK_FOR_PRAISE = 3;
@@ -544,6 +544,8 @@
     }
 
     function setSpeech(text) {
+        /* A worked example in the chat goes when the tutor says something else, like any hint. */
+        if (window.PIAHintBoard) { window.PIAHintBoard.close(); }
         var node = $('#agent-speech');
         if (node) { node.textContent = clean(text); }
     }
@@ -672,13 +674,6 @@
 
         var tier = state.problem && state.problem.hint;
         $('#hint-tier-label').textContent = tier ? '(Tier ' + tier.tier + '/' + tier.total + ')' : '';
-
-        /* The worked example: the "watch again" button follows the step; the board closes with it. */
-        var board = window.PIAHintBoard;
-        var again = $('#hint-example-btn');
-        var example = !!(board && state.problem && state.problem.example && !state.problem.locked && !state.expired);
-        if (again) { again.classList.toggle('is-away', !example); again.disabled = !example; }
-        if (board && !example) { board.close(); }
     }
 
     /* ---- 4.1 Solved questions (click to review) and the error log ---- */
@@ -891,7 +886,6 @@
     function applyQuestion(d) {
         var prev = state.problem;
         var sameQuestion = prev && prev.id === d.problem_id;
-        var sameStep = sameQuestion && prev.stepIndex === (Number(d.current_step) || 0);
         state.problem = {
             id: d.problem_id,
             number: Number(d.problem_number) || (state.answered + 1),
@@ -908,9 +902,7 @@
             hintUnlocked: d.hint_unlocked === true,
             hintTier: Number(d.hint_tier) || 0,
             locked: d.locked === true,
-            hint: sameQuestion ? prev.hint : null,
-            /* The worked example the Tier 2 hint showed, kept for this step only, so it can be watched again. */
-            example: sameStep ? prev.example || null : null
+            hint: sameQuestion ? prev.hint : null
         };
         state.topic = state.problem.topic;
     }
@@ -1264,15 +1256,14 @@
         if (d.hint) {
             state.problem.hint = { text: d.hint.text, tier: d.hint.tier, total: d.hint.tiers_total, step: d.hint.step };
             state.hintsUsedTotal++;
-            /* A hint that is a worked example is drawn on the whiteboard; the tutor just introduces it. The
-               text itself is unchanged and is what the server sent. Any other hint is spoken as before. */
+            /* A hint that is a worked example is drawn step by step INSIDE the tutor's chat bubble, under a short
+               introduction. The text is what the server sent; any other hint is spoken as before. Whatever the
+               tutor says next replaces it (see setSpeech), like every other hint. */
             var example = window.PIAHintBoard ? window.PIAHintBoard.parseExample(d.hint.text) : null;
             if (example) {
-                state.problem.example = example;
-                window.PIAHintBoard.open(example, { host: $('.video-copy-layer') });
                 speak(EXAMPLE_INTRO, 'thinking');
+                window.PIAHintBoard.open(example, { host: $('#status-msg'), root: $('.video-copy-layer') });
             } else {
-                if (window.PIAHintBoard) { window.PIAHintBoard.close(); }
                 speak((reaction('hintRequested', 'hint') + ' ' + d.hint.text).trim(), 'thinking');
             }
 
@@ -1478,9 +1469,6 @@
             resizeTimer = setTimeout(function () { fitSpeech(); centerFigure(); }, 120);
         });
         $('#hint-btn').addEventListener('click', handleHint);
-        $('#hint-example-btn').addEventListener('click', function () {
-            if (window.PIAHintBoard && state.problem && state.problem.example) { window.PIAHintBoard.open(state.problem.example, { host: $('.video-copy-layer') }); }
-        });
         $('#signout-btn').addEventListener('click', signOut);
         $('#start-btn').addEventListener('click', handleStart);
         $('#offer-accept').addEventListener('click', function () { answerOffer(true); });

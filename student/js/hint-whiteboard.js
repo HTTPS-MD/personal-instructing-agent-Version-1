@@ -1,13 +1,14 @@
 /* PIA -- hint whiteboard: a worked example, drawn step by step.
  *
  * When a Tier 2 hint is a worked example ("Example: 0.25 * 55. Ignore the decimal point: ..."), this draws it
- * as written column work on a small floating board: the numbers line up on the right, a whole number shows
+ * as written column work INSIDE the tutor's chat bubble: the numbers line up on the right, a whole number shows
  * its hidden decimal point, the points are ignored, the rows are multiplied and added, the decimal places
  * are counted, and the point moves into the answer. The student presses Next for each step.
  *
- * It only SHOWS the example. The hint text still comes from the server and is still in the tutor's bubble;
- * nothing here reads or sends an answer, counts anything, or touches the clock. If the text is not an
- * example this knows how to draw, parseExample() returns null and the game shows the text alone.
+ * It only SHOWS the example. The hint text still comes from the server; the tutor introduces it in the chat
+ * and the work is drawn under that, in the same bubble (no separate board). Nothing here reads or sends an
+ * answer, counts anything, or touches the clock. If the text is not an example this knows how to draw,
+ * parseExample() returns null and the game shows the text alone.
  *
  * Two layers, so the maths can be tested without a browser:
  *   parseExample(text) and build(example)   pure: text -> numbers -> the steps and what each one says
@@ -74,7 +75,7 @@
 
     /* ---- The board: needs a DOM ------------------------------------------------------------------ */
 
-    var current = null;     // only one board at a time
+    var current = null;     // only one example at a time
 
     function el(tag, className, text) {
         var node = document.createElement(tag);
@@ -91,26 +92,23 @@
         return row;
     }
 
+    /* Draws the example INSIDE `options.host` (the tutor's chat bubble), after whatever the tutor said. It is part of
+       the chat, not a window: there is no close button, and it goes when the tutor next speaks (the game calls
+       close()), like any other hint. `options.root` gets the class "has-example" while it is open, so the page can
+       give the bubble the room it needs. */
     function open(example, options) {
         options = options || {};
+        var host = options.host;
+        if (!host) { return null; }
         if (current) { current.close(); }
 
         var model = build(example);
         var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-        var returnFocus = document.activeElement;
         var index = 0;
 
-        var card = el('div', 'hint-board');
-        card.setAttribute('role', 'dialog');
-        card.setAttribute('aria-label', 'Worked example');
-
-        var head = el('div', 'hb-head');
-        head.appendChild(el('span', 'hb-title', 'PIA’s example'));
-        var closeBtn = el('button', 'hb-close', '✕');
-        closeBtn.type = 'button';
-        closeBtn.setAttribute('aria-label', 'Close the example');
-        head.appendChild(closeBtn);
-        card.appendChild(head);
+        var wrap = el('div', 'hb-inline');
+        wrap.setAttribute('role', 'group');
+        wrap.setAttribute('aria-label', 'Worked example');
 
         /* The written work. Every row is right-aligned so the last digits line up. */
         var board = el('div', 'hb-board');
@@ -142,7 +140,7 @@
             var row = el('div', 'hb-row hb-p hb-p' + k);
             var text = el('span', 'hb-chars');
             text.appendChild(chars(p.value));
-            if (p.zeros) { var z = chars(p.zeros, function () { return 'hb-zero'; }); text.appendChild(z); }
+            if (p.zeros) { text.appendChild(chars(p.zeros, function () { return 'hb-zero'; })); }
             row.appendChild(text);
             grid.appendChild(row);
         });
@@ -155,21 +153,23 @@
         rowSum.appendChild(dotEl);
         grid.appendChild(rowSum);
         board.appendChild(grid);
-        card.appendChild(board);
+        wrap.appendChild(board);
 
         var caption = el('p', 'hb-caption');
         caption.setAttribute('role', 'status');
         caption.setAttribute('aria-live', 'polite');
-        card.appendChild(caption);
+        wrap.appendChild(caption);
 
         var controls = el('div', 'hb-controls');
         var back = el('button', 'hb-btn hb-back', 'Back'); back.type = 'button';
         var next = el('button', 'hb-btn hb-next', 'Next'); next.type = 'button';
-        controls.appendChild(back);
-        controls.appendChild(next);
         var dots = el('span', 'hb-progress');
-        controls.insertBefore(dots, next);
-        card.appendChild(controls);
+        controls.appendChild(back);
+        controls.appendChild(dots);
+        controls.appendChild(next);
+        wrap.appendChild(controls);
+
+        function steps() { return model.steps; }
 
         /* Where the decimal point goes: just left of the digit `dp` places from the right. It starts at the far
            right, then slides there. */
@@ -203,55 +203,52 @@
             if (shown.indexOf('sum') === -1) { dotEl.style.opacity = '0'; }
             else {
                 dotEl.style.opacity = atPoint || focus.indexOf('point') !== -1 ? '1' : '0';
-                if (focus.indexOf('point') !== -1) { setDot(0, false); window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { setDot(model.dp, true); }); }); }
-                else { setDot(atPoint ? model.dp : 0, false); }
+                if (focus.indexOf('point') !== -1) {
+                    setDot(0, false);
+                    window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { setDot(model.dp, true); }); });
+                } else { setDot(atPoint ? model.dp : 0, false); }
             }
         }
-
-        function steps() { return model.steps; }
 
         function go(to) { index = Math.max(0, Math.min(steps().length - 1, to)); render(); }
 
         function close() {
-            document.removeEventListener('keydown', onKey, true);
-            if (card.parentNode) { card.parentNode.removeChild(card); }
-            if (current && current.card === card) { current = null; }
+            if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
+            if (options.root) { options.root.classList.remove('has-example'); }
+            if (current && current.wrap === wrap) { current = null; }
             if (options.onClose) { options.onClose(); }
-            if (returnFocus && returnFocus.focus) { try { returnFocus.focus({ preventScroll: true }); } catch (e) { /* element gone */ } }
         }
 
-        function onKey(e) {
-            if (e.key === 'Escape') { e.preventDefault(); close(); }
-            else if (e.key === 'ArrowRight') { e.preventDefault(); next.click(); }
-            else if (e.key === 'ArrowLeft') { e.preventDefault(); back.click(); }
-        }
-
-        closeBtn.addEventListener('click', close);
         back.addEventListener('click', function () { go(index - 1); });
         next.addEventListener('click', function () { go(index === steps().length - 1 ? 0 : index + 1); });
-        document.addEventListener('keydown', onKey, true);
+        /* Arrow keys only while focus is on the example: in the answer box they move the caret. */
+        wrap.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowRight') { e.preventDefault(); next.click(); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); back.click(); }
+        });
 
         if (reduced) {
             /* Everything at once: no motion, the whole example and every line of explanation. */
             controls.hidden = true;
-            index = steps().length - 1;
-            render();
             caption.hidden = true;
+            index = steps().length - 1;
             var list = el('ol', 'hb-all');
             steps().forEach(function (s) { list.appendChild(el('li', '', s.caption)); });
-            card.insertBefore(list, caption);
-            board.setAttribute('data-shown', ['a', 'b', 'ghost', 'ignore'].concat(model.partial.map(function (p, k) { return 'p' + k; }), ['sum', 'count', 'point', 'done']).join(' '));
-            dotEl.style.opacity = '1';
+            wrap.insertBefore(list, caption);
         }
 
-        (options.host || document.body).appendChild(card);
+        host.appendChild(wrap);
+        if (options.root) { options.root.classList.add('has-example'); }
         render();
-        if (reduced) { setDot(model.dp, false); }
-        (reduced ? closeBtn : next).focus({ preventScroll: true });
-        /* On a phone the page may be scrolled past it: bring the whole board into view (nothing moves on a page that does not scroll). */
-        try { card.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' }); } catch (e) { /* old browser: it simply stays where it is */ }
+        if (reduced) {
+            board.setAttribute('data-shown', ['a', 'b', 'ghost', 'ignore'].concat(model.partial.map(function (p, k) { return 'p' + k; }), ['sum', 'count', 'point', 'done']).join(' '));
+            dotEl.style.opacity = '1';
+            setDot(model.dp, false);
+        }
+        /* The page may be scrolled past the chat (a phone): bring it into view. */
+        try { host.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' }); } catch (e) { /* old browser: it stays where it is */ }
 
-        current = { card: card, close: close };
+        current = { wrap: wrap, close: close };
         return current;
     }
 

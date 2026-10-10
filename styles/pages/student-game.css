@@ -190,9 +190,6 @@ body.is-playing #pia-change-password { display: none; }
 .video-hint-layer {
     flex: none;
     width: 100%;
-    display: flex;
-    align-items: stretch;
-    gap: 8px;
     padding: 16px 14px 14px;
     background: linear-gradient(180deg, transparent 0%, rgba(11, 18, 51, 0.58) 34%, rgba(11, 18, 51, 0.88) 100%);
 }
@@ -229,27 +226,7 @@ body.is-playing #pia-change-password { display: none; }
 .hint-btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--palette-ink); }
 .hint-btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--palette-ink); }
 .hint-btn.is-away { visibility: hidden; }
-.video-hint-layer .hint-btn { flex: 1 1 auto; width: auto; min-width: 0; }
 
-/* Watch the worked example again: a play button beside Request Hint. Its slot is always there. */
-.hint-example-btn {
-    flex: none;
-    width: 52px;
-    min-height: 52px;
-    display: grid;
-    place-items: center;
-    background: var(--palette-paper);
-    color: var(--palette-ink);
-    border: 3px solid var(--palette-ink);
-    box-shadow: 4px 4px 0 var(--palette-ink);
-    font-size: 1.125rem;
-    cursor: pointer;
-    transition: transform 0.12s, box-shadow 0.12s;
-}
-.hint-example-btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--palette-ink); }
-.hint-example-btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--palette-ink); }
-.hint-example-btn.is-away { visibility: hidden; }
-.hint-example-btn:focus-visible { outline: 3px solid var(--palette-paper); outline-offset: 3px; }
 .hint-btn:focus-visible { outline: 3px solid var(--palette-paper); outline-offset: 3px; }
 .hint-tier { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; }
 
@@ -763,66 +740,30 @@ body.is-playing #pia-change-password { display: none; }
     .prompt-box { --bubble-h: 7.5rem; margin-bottom: 18px; padding: 9px 12px; }
 }
 
-/* ---- Hint whiteboard ----------------------------------------------------------
-   A worked example drawn as written column work (student/js/hint-whiteboard.js). It floats at the
-   bottom right so the student can still see and type in their own step; on a phone it is a sheet along
-   the bottom. Every row exists from the start and only fades in, so the board never changes size. The
-   card uses the palette directly, not the theme roles: it is a sheet of paper in both themes. */
-.hint-board {
-    position: fixed;
-    z-index: 90;
-    inset-block-end: 1rem;
-    inset-inline-end: 1rem;
-    width: min(24rem, calc(100vw - 2rem));
-    padding: 0.75rem 1rem 1rem;
-    background: var(--palette-paper);
-    color: var(--palette-ink);
-    border: 3px solid var(--palette-ink);
-    box-shadow: 5px 5px 0 var(--palette-ink);
-    animation: hbIn 220ms var(--ease-snap);
+/* ---- Worked example in the chat -----------------------------------------------
+   A worked example is drawn step by step INSIDE the tutor's chat bubble (student/js/hint-whiteboard.js), under
+   a short introduction; there is no separate board. The bubble normally keeps one reserved height so the tutor
+   is never pushed around; while an example is open it takes the height the work needs and the tutor gets
+   smaller, and both go back as soon as the tutor says something else. Every row of the work exists from the
+   start and only fades in, so nothing inside changes size as the steps go by. */
+.video-copy-layer.has-example { --bubble-h: 23rem; }
+
+.video-copy-layer.has-example .prompt-box {
+    --bubble-h: 23rem;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding-block: 8px 10px;
+    overflow-y: auto;
+    scrollbar-width: none;
 }
+.video-copy-layer.has-example .prompt-box::-webkit-scrollbar { display: none; }
+.video-copy-layer.has-example .tutor-speech { flex: none; max-height: none; font-size: 0.875rem; }
 
-@keyframes hbIn {
-    from { opacity: 0; transform: translateY(0.75rem); }
-    to   { opacity: 1; transform: none; }
-}
-
-.hint-board [hidden] { display: none !important; }
-
-.hb-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-block-end: 0.5rem; }
-
-.hb-title {
-    padding: 0.125rem 0.5rem;
-    border: 2px solid var(--palette-ink);
-    background: var(--volt);
-    color: var(--on-volt);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    transform: rotate(-2deg);
-}
-
-.hb-close,
-.hb-btn {
-    min-height: 2.75rem;
-    border: 2px solid var(--palette-ink);
-    background: #fff;
-    color: var(--palette-ink);
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.hb-close { width: 2.75rem; font-size: 1rem; }
-.hb-btn { padding: 0 1rem; }
-.hb-next { background: var(--palette-violet); }
-.hb-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.hb-close:focus-visible, .hb-btn:focus-visible { outline: 3px solid var(--palette-ink); outline-offset: 2px; }
+.hb-inline { display: flex; flex-direction: column; gap: 0.375rem; margin-block-start: 0.375rem; text-align: start; }
 
 .hb-board {
-    padding: 0.75rem 0.75rem 0.75rem 1rem;
+    padding: 0.375rem 0.625rem 0.375rem 0.875rem;
     border: 2px dashed color-mix(in srgb, var(--palette-ink) 35%, transparent);
     background: #fff;
     overflow: hidden;
@@ -833,9 +774,9 @@ body.is-playing #pia-change-password { display: none; }
     flex-direction: column;
     align-items: flex-end;
     gap: 0.125rem;
-    padding-inline-end: 1rem;       /* room for the hidden point hanging off the right edge */
+    padding-inline-end: 0.875rem;   /* room for the hidden point hanging off the right edge */
     font-family: var(--font-mono);
-    font-size: 1.75rem;
+    font-size: 1.2rem;
     font-weight: 700;
     line-height: 1.25;
 }
@@ -859,10 +800,11 @@ body.is-playing #pia-change-password { display: none; }
 
 .hb-zero { opacity: 0.45; }
 
-/* The decimal point travelling into the answer. JS sets its position; it starts at the right. */
+/* The decimal point travelling into the answer. JS sets its position; it starts at the right. A circle, so it
+   sits on the digits' baseline whatever the font. */
 .hb-dot {
     position: absolute;
-    inset-block-end: 0.32em;        /* sits on the digits' baseline; a circle, so it does not depend on the font */
+    inset-block-end: 0.32em;
     inset-inline-start: 0;
     width: 0.26em;
     aspect-ratio: 1;
@@ -885,11 +827,11 @@ body.is-playing #pia-change-password { display: none; }
 .hb-board[data-shown~="sum"] .hb-line2,
 .hb-board[data-shown~="sum"] .hb-sum { opacity: 1; }
 
-/* Step 3: the decimal points (and the leading zeros) are set aside. */
+/* The decimal points (and the leading zeros) are set aside. */
 .hb-board[data-shown~="ignore"] .hb-ign { opacity: 0.28; text-decoration: line-through; }
 .hb-board[data-shown~="ignore"] .hb-ghost { opacity: 0.28; }
 
-/* Step: the places that count, underlined. */
+/* The places that count, underlined. */
 .hb-board[data-shown~="count"] .hb-dec { border-block-end: 4px solid var(--palette-green); }
 
 /* What the caption is talking about right now. */
@@ -903,41 +845,46 @@ body.is-playing #pia-change-password { display: none; }
 @keyframes hbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
 
 .hb-caption {
-    min-height: 4.5em;              /* three lines, so a long step does not move the buttons */
-    margin: 0.75rem 0 0.5rem;
-    font-size: 0.9375rem;
+    min-height: 3.9em;              /* three lines, so a long step does not move the buttons */
+    margin: 0;
+    font-size: 0.8125rem;
     font-weight: 600;
-    line-height: 1.45;
+    line-height: 1.4;
 }
 
 .hb-controls { display: flex; align-items: center; gap: 0.5rem; }
 .hb-progress { margin-inline: auto; font-family: var(--font-mono); font-size: 0.75rem; }
-.hb-all { margin: 0.75rem 0 0; padding-inline-start: 1.25rem; font-size: 0.875rem; line-height: 1.45; }
-
-/* In the game it sits in the tutor's own area (above the Request Hint button), as if the tutor were holding it
-   up: it covers the tutor, never the question, the step the student is typing in, or the buttons below it. */
-.video-copy-layer { position: relative; }
-
-.video-copy-layer .hint-board {
-    position: absolute;
-    z-index: 5;
-    inset-inline: 10px;
-    inset-block: auto 8px;
-    width: auto;
+.hb-btn {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border: 2px solid var(--palette-ink);
+    background: #fff;
+    color: var(--palette-ink);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
 }
-
-@media (max-width: 40rem) {
-    .hint-board { inset-inline: 0.5rem; inset-block-end: 0.5rem; width: auto; }
-    .hb-grid { font-size: 1.5rem; }
-}
+.hb-next { background: var(--palette-violet); }
+.hb-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.hb-btn:focus-visible { outline: 3px solid var(--palette-ink); outline-offset: 2px; }
+.hb-all { margin: 0.375rem 0 0; padding-inline-start: 1.25rem; font-size: 0.8125rem; line-height: 1.4; }
+.hb-inline [hidden] { display: none !important; }
 
 @media (max-height: 760px) {
-    .hb-grid { font-size: 1.4rem; }
-    .hb-caption { min-height: 3.4em; margin-block: 0.5rem 0.375rem; }
-    .hint-board { padding-block: 0.5rem 0.75rem; }
+    .video-copy-layer.has-example { --bubble-h: 20.5rem; }
+    .video-copy-layer.has-example .prompt-box { --bubble-h: 20.5rem; }
+    .hb-grid { font-size: 1rem; }
+    .hb-caption { min-height: 3.4em; font-size: 0.78rem; }
+    .hb-btn { min-height: 2.5rem; }
+}
+
+/* On a phone the tutor's panel is a fixed height; while the example is open it is taller, so the tutor is not
+   squeezed out by the bigger bubble. (Where :has() is unsupported the tutor is simply smaller meanwhile.) */
+@media (max-width: 900px) {
+    .video-mentor-sidebar:has(.has-example) { height: 700px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .hint-board, .hb-board[data-focus~="ghost"] .hb-ghost { animation: none; }
+    .hb-board[data-focus~="ghost"] .hb-ghost { animation: none; }
     .hb-row, .hb-line, .hb-ghost { transition: none; }
 }
