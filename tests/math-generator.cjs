@@ -18,6 +18,46 @@ const leaks = (hint, answers) => {   // a number shown as a RESULT ("= 140", "th
   return false;
 };
 
+const numsIn = t => (String(t).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+const decimals = x => { const t = String(x), i = t.indexOf('.'); return i === -1 ? 0 : t.length - i - 1; };
+
+/* The hint of a multiply step teaches the method with a worked example that uses OTHER numbers. The example's own
+   maths is re-derived here from its text. `answers`: every answer of the question; none may appear as an example result. */
+function workedMult(step, dec, other, answers) {
+  const m = step.hint2.match(/^Example: ([\d.]+) \* (\d+)\. Ignore the decimal point: (\d+) \* (\d+) = (\d+)\. [\d.]+ has (\d) decimal places?, so put the point back (\d) places? from the right: ([\d.]+)\.$/);
+  assert.ok(m, 'hint2 of a multiply step is a worked example: "' + step.hint2 + '"');
+  const [, d, n, whole, n2, prod, dp, dp2, result] = m;
+  assert.equal(n, n2); assert.equal(dp, dp2); assert.equal(decimals(d), Number(dp), 'decimal places stated correctly');
+  assert.equal(Number(whole), Math.round(Number(d) * 10 ** Number(dp)), 'the whole number is the decimal without its point');
+  assert.equal(Number(whole) * Number(n), Number(prod), 'the multiplication in the example is right');
+  assert.ok(Math.abs(Number(prod) / 10 ** Number(dp) - Number(result)) < 1e-9, 'the point goes back to the right place');
+  assert.ok(Math.abs(Number(d) * Number(n) - Number(result)) < 1e-9, 'the example result is d * n');
+  assert.equal([dec, other].some(x => Math.abs(x - Number(d)) < 1e-9 || Math.abs(x - Number(n)) < 1e-9), false, 'the example works on the question\'s own numbers: "' + step.hint2 + '"');
+  for (const r of [Number(prod), Number(result)]) assert.equal(answers.some(a => Math.abs(a - r) < 1e-9), false, 'the example shows an answer of the question: ' + r);
+  assert.equal(Number(dp), decimals(dec), 'the example has as many decimal places as the question: ' + step.hint2 + ' for ' + dec);
+  assert.ok(step.hint3.includes(String(dec)) && step.hint3.includes(' by ' + other + ','), 'hint3 sends the student back to their own numbers: ' + step.hint3);
+  assert.equal(/\d\s*=\s*\d/.test(step.hint3), false, 'hint3 writes no result');
+}
+
+/* The same for a divide step (top / bottom, a decimal below 1). */
+function workedDiv(step, top, bottom, answers) {
+  const m = step.hint2.match(/^Example: (\d+) \/ (\d+)\. \1 is smaller than \2, so the answer starts with "0\." Then: (.+)\. So \1 \/ \2 = (0\.\d+)\.$/);
+  assert.ok(m, 'hint2 of a divide step is a worked example: "' + step.hint2 + '"');
+  const [, a, b, steps, result] = m;
+  assert.ok(Math.abs(Number(a) / Number(b) - Number(result)) < 1e-9, 'the example result is a / b: ' + step.hint2);
+  let digits = ''; const shown = [Number(result)];
+  for (const part of steps.split(', then ')) {
+    const k = part.match(/^(\d+) \/ (\d+) = (\d+)(?: \(remainder (\d+)\))?$/); assert.ok(k, 'a long-division line: ' + part);
+    assert.equal(Number(k[2]), Number(b)); assert.equal(Number(k[3]) * Number(b) + Number(k[4] || 0), Number(k[1]), 'long division line is right: ' + part);
+    digits += k[3]; shown.push(Number(k[3]));
+  }
+  assert.equal('0.' + digits, result, 'the digits spell the result');
+  assert.equal([top, bottom].some(x => Math.abs(x - Number(a)) < 1e-9 || Math.abs(x - Number(b)) < 1e-9), false, 'the example works on the question\'s own numbers: "' + step.hint2 + '"');
+  for (const r of shown) assert.equal(answers.some(x => Math.abs(x - r) < 1e-9), false, 'the example shows an answer of the question: ' + r);
+  assert.ok(step.hint3.includes('divide ' + top + ' by ' + bottom), 'hint3 sends the student back to their own numbers: ' + step.hint3);
+  assert.equal(/\d\s*=\s*\d/.test(step.hint3), false, 'hint3 writes no result');
+}
+
 /* Checks one generated problem completely and returns { main, pct } for range checks. */
 function verify(d, diff, range) {
   const [lo, hi] = BOUNDS[range];
@@ -39,7 +79,7 @@ function verify(d, diff, range) {
       assert.ok(d.steps[0].prompt.includes(pct + '%'));
       assert.ok(d.steps[1].prompt.includes('(' + (pct / 100) + ')') && d.steps[1].prompt.includes('(' + main + ')'), 'step 2 prompt uses the generated values: ' + d.steps[1].prompt);
       assert.equal(d.steps[0].hint2, pct + ' / 100');
-      assert.equal(d.steps[1].hint2, (pct / 100) + ' * ' + main);
+      workedMult(d.steps[1], pct / 100, main, [pct / 100, res]);
     } else {
       m = d.q.match(/PHP ([\d,]+) is on sale with a (\d+)% discount/); assert.ok(m, 'a known EASY template: ' + d.q);
       main = num(m[1]); pct = Number(m[2]);
@@ -48,7 +88,7 @@ function verify(d, diff, range) {
       assert.equal(d.steps[0].answer, String(pct / 100));
       assert.equal(d.steps[1].answer, String(res));
       assert.ok(d.steps[1].prompt.includes(String(main)) && d.steps[1].prompt.includes(String(pct / 100)));
-      assert.equal(d.steps[1].hint2, main + ' * ' + (pct / 100));
+      workedMult(d.steps[1], pct / 100, main, [pct / 100, res]);
     }
   } else if (diff === 'MEDIUM') {
     const m = d.q.match(/PHP ([\d,]+) increased in price to PHP ([\d,]+)/); assert.ok(m, d.q);
@@ -61,7 +101,7 @@ function verify(d, diff, range) {
     assert.equal(d.steps[0].answer, String(inc)); assert.equal(d.steps[1].answer, String(inc / main)); assert.equal(d.steps[2].answer, Math.round(pct) + '%');
     assert.ok(d.steps[0].prompt.includes('(' + to + ' - ' + main + ')'));
     assert.ok(d.steps[1].prompt.includes('(' + inc + ')') && d.steps[1].prompt.includes('(' + main + ')'));
-    assert.equal(d.steps[0].hint2, to + ' - ' + main); assert.equal(d.steps[1].hint2, inc + ' / ' + main);
+    assert.equal(d.steps[0].hint2, to + ' - ' + main); workedDiv(d.steps[1], inc, main, [inc, inc / main, Math.round(pct)]);
     extra.other = to;
   } else {
     const m = d.q.match(/PHP ([\d,]+) is marked down to PHP ([\d,]+)/); assert.ok(m, d.q);
@@ -73,7 +113,7 @@ function verify(d, diff, range) {
     assert.equal(d.final, Math.round(pct) + '%');
     assert.equal(d.steps[0].answer, String(dec)); assert.equal(d.steps[1].answer, String(dec / main)); assert.equal(d.steps[2].answer, Math.round(pct) + '%');
     assert.ok(d.steps[0].prompt.includes('(' + main + ' - ' + to + ')'));
-    assert.equal(d.steps[0].hint2, main + ' - ' + to); assert.equal(d.steps[1].hint2, dec + ' / ' + main);
+    assert.equal(d.steps[0].hint2, main + ' - ' + to); workedDiv(d.steps[1], dec, main, [dec, dec / main, Math.round(pct)]);
     extra.other = to;
   }
   assert.ok(main >= lo && main <= hi, `the main value ${main} is a ${range} number: ${d.q}`);

@@ -146,6 +146,10 @@
                                 <span id="hint-btn-label">Request Hint</span>
                                 <span class="hint-tier" id="hint-tier-label"></span>
                             </button>
+                            <!-- Opens the worked example again (hint-whiteboard.js). Its slot is always there, so it
+                                 appearing moves nothing; it is invisible until a step has an example. -->
+                            <button id="hint-example-btn" class="hint-example-btn is-away" type="button"
+                                aria-label="Watch the example again" title="Watch the example again" disabled>&#9654;</button>
                         </div>
                     </div>
 
@@ -253,6 +257,7 @@
 
     <script src="../../assets/js/function.js"></script>
     <script src="../js/tutor-personas.js"></script>
+    <script src="../js/hint-whiteboard.js"></script>
     <script src="../js/student-dashboard.js"></script>
     <script src="../js/student-tutorial.js"></script>
 </body>

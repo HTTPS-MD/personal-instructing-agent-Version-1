@@ -88,24 +88,43 @@
     var TOPIC_TITLES = { 1: 'Topic 1: Finding Percentage', 2: 'Topic 2: Percentage Increase', 3: 'Topic 3: Percentage Decrease' };
     function topicTitle(n) { return TOPIC_TITLES[n] || TOPIC_TITLES[1]; }
 
-    /* What the confirm box asks for once correct working has been accepted. */
+    /* What the confirm box asks for once correct working has been accepted.
+       Placeholders show the SHAPE of the answer ("0.x"), never a real value:
+       a real number could be the answer to the question on screen. Display
+       text only; nothing here is read by the checking. */
     var CONFIRM = {
         decimal: {
             label: 'Converted decimal', prompt: 'Now write the converted decimal.',
-            placeholder: 'e.g. 0.8', button: 'Submit conversion',
+            placeholder: 'e.g. 0.x', button: 'Submit conversion',
             error: 'Enter the converted decimal value only.'
         },
         percentage: {
             label: 'Final percentage', prompt: 'Now write the final percentage.',
-            placeholder: 'e.g. 20 or 20%', button: 'Submit conversion',
+            placeholder: 'a number, with or without %', button: 'Submit conversion',
             error: 'Enter the final percentage as a number, with or without the % sign.'
         },
         number: {
             label: 'Final answer', prompt: 'Now write the final answer.',
-            placeholder: 'Enter final value', button: 'Submit final answer',
+            placeholder: 'a number only', button: 'Submit final answer',
             error: 'Enter the final numeric answer only, not the calculation.'
         }
     };
+
+    /* The first box of a step takes the value or the working. Its hint shows
+       the shape the step ends in, from the step's name and the question's
+       topic (the same rule the server uses for the confirm box). */
+    var WORK_PLACEHOLDER = {
+        decimal: 'e.g. 0.x',
+        percentage: 'a number, with or without %',
+        number: 'your calculation or a number'
+    };
+    function workKind(p) {
+        var label = p.labels && p.labels[p.stepIndex];
+        if (label === 'Conversion') { return p.questionTopic === 1 ? 'decimal' : 'percentage'; }
+        return 'number';
+    }
+
+    var EXAMPLE_INTRO = 'Let me show you with a different problem. Press Next to follow along.';
 
     var FAST_CORRECT_MS = 12000;      /* wording only: picks a "that was quick" line */
     var STREAK_FOR_PRAISE = 3;
@@ -653,6 +672,13 @@
 
         var tier = state.problem && state.problem.hint;
         $('#hint-tier-label').textContent = tier ? '(Tier ' + tier.tier + '/' + tier.total + ')' : '';
+
+        /* The worked example: the "watch again" button follows the step; the board closes with it. */
+        var board = window.PIAHintBoard;
+        var again = $('#hint-example-btn');
+        var example = !!(board && state.problem && state.problem.example && !state.problem.locked && !state.expired);
+        if (again) { again.classList.toggle('is-away', !example); again.disabled = !example; }
+        if (board && !example) { board.close(); }
     }
 
     /* ---- 4.1 Solved questions (click to review) and the error log ---- */
@@ -865,6 +891,7 @@
     function applyQuestion(d) {
         var prev = state.problem;
         var sameQuestion = prev && prev.id === d.problem_id;
+        var sameStep = sameQuestion && prev.stepIndex === (Number(d.current_step) || 0);
         state.problem = {
             id: d.problem_id,
             number: Number(d.problem_number) || (state.answered + 1),
@@ -881,7 +908,9 @@
             hintUnlocked: d.hint_unlocked === true,
             hintTier: Number(d.hint_tier) || 0,
             locked: d.locked === true,
-            hint: sameQuestion ? prev.hint : null
+            hint: sameQuestion ? prev.hint : null,
+            /* The worked example the Tier 2 hint showed, kept for this step only, so it can be watched again. */
+            example: sameStep ? prev.example || null : null
         };
         state.topic = state.problem.topic;
     }
@@ -1019,7 +1048,7 @@
         input.setAttribute('autocapitalize', 'off');
         input.setAttribute('spellcheck', 'false');
         input.setAttribute('maxlength', '60');
-        input.setAttribute('placeholder', confirming ? conf2.placeholder : 'Enter answer');
+        input.setAttribute('placeholder', confirming ? conf2.placeholder : WORK_PLACEHOLDER[workKind(p)]);
         input.setAttribute('aria-describedby', 'step-feedback');
         row.appendChild(input);
         form.appendChild(row);
@@ -1235,7 +1264,17 @@
         if (d.hint) {
             state.problem.hint = { text: d.hint.text, tier: d.hint.tier, total: d.hint.tiers_total, step: d.hint.step };
             state.hintsUsedTotal++;
-            speak((reaction('hintRequested', 'hint') + ' ' + d.hint.text).trim(), 'thinking');
+            /* A hint that is a worked example is drawn on the whiteboard; the tutor just introduces it. The
+               text itself is unchanged and is what the server sent. Any other hint is spoken as before. */
+            var example = window.PIAHintBoard ? window.PIAHintBoard.parseExample(d.hint.text) : null;
+            if (example) {
+                state.problem.example = example;
+                window.PIAHintBoard.open(example, { host: $('.video-copy-layer') });
+                speak(EXAMPLE_INTRO, 'thinking');
+            } else {
+                if (window.PIAHintBoard) { window.PIAHintBoard.close(); }
+                speak((reaction('hintRequested', 'hint') + ' ' + d.hint.text).trim(), 'thinking');
+            }
 
             syncProgress();
         }
@@ -1439,6 +1478,9 @@
             resizeTimer = setTimeout(function () { fitSpeech(); centerFigure(); }, 120);
         });
         $('#hint-btn').addEventListener('click', handleHint);
+        $('#hint-example-btn').addEventListener('click', function () {
+            if (window.PIAHintBoard && state.problem && state.problem.example) { window.PIAHintBoard.open(state.problem.example, { host: $('.video-copy-layer') }); }
+        });
         $('#signout-btn').addEventListener('click', signOut);
         $('#start-btn').addEventListener('click', handleStart);
         $('#offer-accept').addEventListener('click', function () { answerOffer(true); });
