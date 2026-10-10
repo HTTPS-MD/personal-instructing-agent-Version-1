@@ -288,6 +288,8 @@ body:not([data-boot="pending"]) .learn-veil[hidden] { display: none; }
    below are specific to it. */
 .btn-tutorial { gap: var(--sp-2); }
 @media (max-width: 480px) {
+    .learn-bar-right { gap: var(--sp-2); }
+    .btn-signout { padding-inline: var(--sp-3); }
     .btn-tutorial { min-width: 44px; padding-inline: var(--sp-3); }
     .btn-tutorial .hide-sm-inline { display: none; }
 }

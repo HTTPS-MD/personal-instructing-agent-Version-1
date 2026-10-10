@@ -649,6 +649,12 @@ body {
     max-width: 100%;
 }
 
+/* The logo is a 2:1 wordmark: at 40px tall it is 80px wide, which is more than a phone header or a 768px
+   header with the student's name has to spare. A little shorter on those screens. */
+@media (max-width: 56rem) {
+    :root { --logo-h: 32px; }
+}
+
 /* The home link around it: shrink-wraps the logo, never squeezed by a
    flex row. */
 .brand-link {
