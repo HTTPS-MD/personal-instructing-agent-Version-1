@@ -67,8 +67,9 @@ function fixture() {
     await context.addInitScript(theme=>localStorage.setItem('pia_theme',theme),theme);
     await context.route('**/*',route=>{
       const url=route.request().url();
-      if(url.startsWith(origin+'/'))return route.continue();
+      /* The SDK is served from this origin now, so the stand-in must be matched BEFORE the origin check. */
       if(url.includes('/assets/js/vendor/supabase.js'))return route.fulfill({contentType:'text/javascript',body:`(${fixture.toString()})();`});
+      if(url.startsWith(origin+'/'))return route.continue();
       return route.abort('blockedbyclient');
     });
     const page=await context.newPage();

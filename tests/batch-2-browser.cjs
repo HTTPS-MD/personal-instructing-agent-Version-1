@@ -98,8 +98,9 @@ function fixture() {
       await context.addInitScript(t => { localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'fixture@example.test'); }, theme);
       await context.route('**/*', route => {
         const u = route.request().url();
-        if (u.startsWith(origin + '/')) return route.continue();
+        /* The SDK is served from this origin now, so the stand-in must be matched BEFORE the origin check. */
         if (u.includes('/assets/js/vendor/supabase.js')) return route.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
+        if (u.startsWith(origin + '/')) return route.continue();
         leaked.push(u); return route.abort('blockedbyclient');
       });
       await context.exposeBinding('__acct', (_s, op, data) => {

@@ -40,8 +40,9 @@ const DASH = '/student/html/student-dashboard.html';
       await context.addInitScript(([p, t, l, pm]) => { if (pm) window.PIA_TUTORING_POLL_MS = pm; if (!sessionStorage.getItem('__limit_set')) { localStorage.setItem('__mock_limit', String(l)); sessionStorage.setItem('__limit_set', '1'); } localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme, limit, poll]);
       await context.route('**/*', route => {
         const u = route.request().url();
-        if (u.startsWith(origin + '/')) { if (block && block.test(u)) return route.abort('failed'); return route.continue(); }
+        /* The SDK is served from this origin now, so the stand-in must be matched BEFORE the origin check. */
         if (u.includes('/assets/js/vendor/supabase.js')) return route.fulfill({ contentType: 'text/javascript', body: mock });
+        if (u.startsWith(origin + '/')) { if (block && block.test(u)) return route.abort('failed'); return route.continue(); }
         leaked.push(u); return route.abort('blockedbyclient');
       });
     }
