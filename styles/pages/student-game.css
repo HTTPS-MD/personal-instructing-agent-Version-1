@@ -741,26 +741,42 @@ body.is-playing #pia-change-password { display: none; }
 }
 
 /* ---- Worked example in the chat -----------------------------------------------
-   A worked example is drawn step by step INSIDE the tutor's chat bubble (student/js/hint-whiteboard.js), under
-   a short introduction; there is no separate board. The bubble normally keeps one reserved height so the tutor
-   is never pushed around; while an example is open it takes the height the work needs and the tutor gets
-   smaller, and both go back as soon as the tutor says something else. Every row of the work exists from the
+   A worked example is drawn step by step INSIDE the tutor's chat bubble (student/js/hint-whiteboard.js); there is
+   no separate board. The bubble keeps its reserved height and the tutor keeps his or her size and place: the
+   example is the bubble grown downward, laid over the tutor like a speech bubble in a comic, with its own tail.
+   It goes as soon as the tutor says anything else, like any other hint. Every row of the work exists from the
    start and only fades in, so nothing inside changes size as the steps go by. */
-.video-copy-layer.has-example { --bubble-h: 23rem; }
+.video-copy-layer.has-example .prompt-box { overflow: visible; }
+.video-copy-layer.has-example .tutor-speech { visibility: hidden; }   /* the example says its own introduction */
 
-.video-copy-layer.has-example .prompt-box {
-    --bubble-h: 23rem;
+.hb-inline {
+    position: absolute;
+    z-index: 6;
+    inset: -3px -3px auto -3px;
+    display: flex;
     flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
-    padding-block: 8px 10px;
-    overflow-y: auto;
-    scrollbar-width: none;
+    gap: 0.375rem;
+    padding: 0.5rem 0.875rem 0.75rem;
+    background: var(--palette-paper);
+    color: var(--palette-ink);
+    border: 3px solid var(--palette-ink);
+    box-shadow: 6px 6px 0 var(--pop);
+    text-align: start;
 }
-.video-copy-layer.has-example .prompt-box::-webkit-scrollbar { display: none; }
-.video-copy-layer.has-example .tutor-speech { flex: none; max-height: none; font-size: 0.875rem; }
 
-.hb-inline { display: flex; flex-direction: column; gap: 0.375rem; margin-block-start: 0.375rem; text-align: start; }
+/* Its own tail, at the bottom, like the bubble it grew from. */
+.hb-inline::before,
+.hb-inline::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    border-style: solid;
+    border-color: var(--palette-ink) transparent;
+}
+.hb-inline::before { bottom: -21px; margin-left: -14px; border-width: 18px 14px 0; }
+.hb-inline::after { bottom: -14px; margin-left: -9px; border-width: 13px 9px 0; border-color: var(--palette-paper) transparent; }
+
+.hb-intro { margin: 0; text-align: center; font-size: 0.875rem; font-weight: 600; line-height: 1.4; }
 
 .hb-board {
     padding: 0.375rem 0.625rem 0.375rem 0.875rem;
@@ -871,17 +887,9 @@ body.is-playing #pia-change-password { display: none; }
 .hb-inline [hidden] { display: none !important; }
 
 @media (max-height: 760px) {
-    .video-copy-layer.has-example { --bubble-h: 20.5rem; }
-    .video-copy-layer.has-example .prompt-box { --bubble-h: 20.5rem; }
     .hb-grid { font-size: 1rem; }
     .hb-caption { min-height: 3.4em; font-size: 0.78rem; }
     .hb-btn { min-height: 2.5rem; }
-}
-
-/* On a phone the tutor's panel is a fixed height; while the example is open it is taller, so the tutor is not
-   squeezed out by the bigger bubble. (Where :has() is unsupported the tutor is simply smaller meanwhile.) */
-@media (max-width: 900px) {
-    .video-mentor-sidebar:has(.has-example) { height: 700px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

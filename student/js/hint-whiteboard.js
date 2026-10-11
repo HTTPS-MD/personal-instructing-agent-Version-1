@@ -109,6 +109,7 @@
         var wrap = el('div', 'hb-inline');
         wrap.setAttribute('role', 'group');
         wrap.setAttribute('aria-label', 'Worked example');
+        if (options.intro) { wrap.appendChild(el('p', 'hb-intro', options.intro)); }
 
         /* The written work. Every row is right-aligned so the last digits line up. */
         var board = el('div', 'hb-board');

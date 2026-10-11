@@ -513,8 +513,9 @@ const DASH = '/student/html/student-dashboard.html';
   await check('live: the start screen follows the admin too (closed -> Start off, reopened -> Start on, closed again -> off)', async () => {
     const p = await open(DASH, { poll: 600 });
     await p.waitForSelector('#start-btn');
-    /* The lede is written once the profile has loaded: read it only when it has text, or a slow run compares against ''. */
-    await p.waitForFunction(() => document.querySelector('#start-lede').textContent.trim().length > 0);
+    /* The lede is written once the profile has loaded and is visible only once the screen has shown: read it when it has VISIBLE
+       text (innerText, as below), or a slow run compares against ''. */
+    await p.waitForFunction(() => document.querySelector('#start-lede').innerText.trim().length > 0);
     const lede = await p.locator('#start-lede').innerText();
     await p.evaluate(() => window.__mockExpireNow());
     await p.waitForFunction(() => document.querySelector('#start-btn').disabled && /closed/i.test(document.querySelector('#start-lede').textContent), null, { timeout: 4000 });

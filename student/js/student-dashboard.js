@@ -1262,7 +1262,7 @@
             var example = window.PIAHintBoard ? window.PIAHintBoard.parseExample(d.hint.text) : null;
             if (example) {
                 speak(EXAMPLE_INTRO, 'thinking');
-                window.PIAHintBoard.open(example, { host: $('#status-msg'), root: $('.video-copy-layer') });
+                window.PIAHintBoard.open(example, { host: $('#status-msg'), root: $('.video-copy-layer'), intro: EXAMPLE_INTRO });
             } else {
                 speak((reaction('hintRequested', 'hint') + ' ' + d.hint.text).trim(), 'thinking');
             }
