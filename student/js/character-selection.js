@@ -22,6 +22,25 @@ async function enforceStageLock() {
 // Run check immediately
 enforceStageLock();
 
+/* The picked tutor stands in the room on the right: a picture, a line in the speech bubble, and a tap on the
+   picture changes the expression and the line (poses and lines come from the card, the same as the landing page). */
+let poses = [];
+let lines = [];
+let poseIndex = 0;
+
+function showPose() {
+    const img = document.getElementById('preview-bg-img');
+    if (poses.length) { img.src = poses[poseIndex % poses.length]; }
+    if (lines.length) { document.getElementById('preview-desc').textContent = lines[poseIndex % lines.length]; }
+}
+
+function hopBig() {
+    const big = document.getElementById('pick-big');
+    big.classList.remove('is-hop');
+    void big.offsetWidth;                       // restart the animation
+    big.classList.add('is-hop');
+}
+
 function previewCharacter(element) {
     if (isLockedIn) return;
 
@@ -35,17 +54,31 @@ function previewCharacter(element) {
 
     selectedChar = element.getAttribute('data-character');
     const name = element.getAttribute('data-name');
+    poses = (element.getAttribute('data-poses') || '').split(/\s+/).filter(Boolean);
+    lines = (element.getAttribute('data-lines') || '').split('|').filter(Boolean);
+    poseIndex = 0;
 
     document.getElementById('preview-name').textContent = name;
-    document.getElementById('preview-desc').textContent = element.getAttribute('data-line');
-    document.getElementById('preview-bg-img').src = element.getAttribute('data-img');
-    document.getElementById('preview-style').textContent = element.getAttribute('data-style');
-    document.getElementById('preview-pace').textContent = element.getAttribute('data-pace');
+    document.getElementById('pick-hello').textContent = 'Say hi to ' + name + '!';
+    document.getElementById('pick-big').setAttribute('aria-label', 'Tap ' + name + ' to hear more');
+    document.getElementById('pick-big').hidden = false;
+    document.getElementById('pick-bubble').hidden = false;
     document.getElementById('preview-card').classList.add('has-pick');
+    showPose();
+    hopBig();
 
     const lockBtn = document.getElementById('lock-in-btn');
+    lockBtn.hidden = false;
     lockBtn.textContent = 'Choose ' + name;
     lockBtn.disabled = false;
+}
+
+/* Tap the tutor: the next expression and the next line. */
+function nextPose() {
+    if (isLockedIn || poses.length < 2) { hopBig(); return; }
+    poseIndex = (poseIndex + 1) % poses.length;
+    showPose();
+    hopBig();
 }
 
 // Keyboard handling for the irreversible lock-in dialog: focus starts on the
@@ -134,8 +167,20 @@ async function finalLockIn() {
 
     isLockedIn = true;
     const statusEl = document.getElementById('status-text');
-    statusEl.textContent = 'Your tutor is chosen.';
+    statusEl.textContent = 'Locked in!';
     statusEl.style.color = '';
+    statusEl.classList.add('is-done');
+
+    /* The picked tutor stays up front, happy; the others sit back and cannot be pressed (see .is-locked in student-paper.css). */
+    const happy = poses.findIndex(src => /happy|approval/.test(src));
+    if (happy !== -1) { poseIndex = happy; }
+    const name = document.getElementById('preview-name').textContent;
+    document.getElementById('pick-hello').textContent = 'You picked ' + name + '!';
+    document.getElementById('preview-desc').textContent = 'Great choice! Let’s do this together.';
+    const img = document.getElementById('preview-bg-img');
+    if (poses.length) { img.src = poses[poseIndex % poses.length]; }
+    document.getElementById('pick-scene').classList.add('is-locked');
+    hopBig();
 
     document.querySelectorAll('.persona-card').forEach(card => {
         card.style.pointerEvents = 'none';
@@ -194,6 +239,8 @@ document.addEventListener('click', (event) => {
     const card = event.target.closest('.persona-card');
     if (card) { previewCharacter(card); return; }
 
+    if (event.target.closest('#pick-big')) { nextPose(); return; }
+
     const control = event.target.closest('[data-action]');
     if (!control || control.disabled) return;
     const run = ACTIONS[control.getAttribute('data-action')];
@@ -225,29 +272,17 @@ document.addEventListener('click', (event) => {
         }
     });
 
-    var preview = document.querySelector('.preview-portrait');
+    /* The big picture: if a pose is missing, the card's other illustration stands in; if that fails too, the tutor's
+       line is still there in the bubble. */
     var previewImg = document.getElementById('preview-bg-img');
-    function markPreview() {
-        // Derive the monogram from the SELECTED card, never from the
-        // preview heading — before a pick that heading is placeholder
-        // copy ("No one chosen yet"), which produced a stray "NO".
-        var chosen = document.querySelector('.persona-card.selected');
-        preview.setAttribute('data-mono',
-            chosen ? monogram(chosen.getAttribute('data-name')) : '·');
-    }
     previewImg.addEventListener('error', function () {
         var chosen = document.querySelector('.persona-card.selected');
         var fallback = chosen && chosen.getAttribute('data-fallback-img');
         if (fallback && previewImg.getAttribute('src') !== fallback) {
             previewImg.src = fallback;
         } else {
-            markPreview();
+            previewImg.style.visibility = 'hidden';
         }
     });
-    // previewCharacter() swaps the src; re-arm the check after each swap.
-    new MutationObserver(function () {
-        preview.removeAttribute('data-mono');
-        if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
-    }).observe(previewImg, { attributes: true, attributeFilter: ['src'] });
-    if (previewImg.complete && previewImg.naturalWidth === 0) { markPreview(); }
+    previewImg.addEventListener('load', function () { previewImg.style.visibility = ''; });
 })();

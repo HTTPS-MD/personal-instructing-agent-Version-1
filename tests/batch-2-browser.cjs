@@ -665,6 +665,15 @@ function fixture() {
       assert.equal(/Explorer|Detective|Spark|Ally|Cautious|Neutral|baseline|specialized|stage|CHOOSING|FIND YOUR FIT/.test(await words()), false, 'a research word is on the page after picking ' + name);
     }
     assert.equal(await p.locator('.persona-card.selected').count(), 1);
+    /* The picked tutor stands inside the room, above the button, and the line is in the bubble (every tutor, at 1280). */
+    for (let i = 0; i < 6; i++) {
+      await p.locator('.persona-card').nth(i).click();
+      await p.waitForFunction(() => { const im = document.querySelector('#preview-bg-img'); return im.complete && im.naturalWidth > 100; });
+      const box = await p.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect(); return { img: r('#preview-bg-img'), stage: r('#preview-card'), btn: r('#lock-in-btn'), bubble: r('#pick-bubble') }; });
+      assert.ok(box.img.top >= box.stage.top - 1 && box.img.bottom <= box.btn.top + 12 && box.img.left >= box.stage.left - 1 && box.img.right <= box.stage.right + 1, `tutor ${i + 1}: the picture leaves its place ` + JSON.stringify(box));
+      assert.ok((await p.locator('#preview-desc').innerText()).length > 10, 'a line in the bubble');
+      if (i === 2) { await p.waitForTimeout(500); await p.screenshot({ path: path.join(out, 'paper-choose-a-tutor-picked-1280.png') }); }
+    }
     await p.locator('#lock-in-btn').click();
     assert.equal(await p.locator('#confirm-modal [data-action="close"]').count(), 1);
     await p.context().close();
@@ -1046,24 +1055,47 @@ function fixture() {
     }
     await p.context().close();
   });
-  await check('redesign: mobile tutor choices come first and preview stays steady', async () => {
+  await check('redesign: the tutor boxes come first and the button does not move when a tutor is picked (320px)', async () => {
     const p = await pageFor('/student/html/character-selection.html', { width: 320, theme: 'light', account: 'char-redesign', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
     await p.waitForSelector('.persona-card');
-    const order = await p.evaluate(() => ['.pick-head', '.persona-grid', '.preview-card'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
-    assert.ok(order[0] < order[1] && order[1] < order[2], 'instructions and choices precede preview');
+    const order = await p.evaluate(() => ['.persona-grid', '#preview-card'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
+    assert.ok(order[0] < order[1], 'the boxes come before the stage');
+    await p.locator('.persona-card').first().click();
     const lockTop = () => p.locator('#lock-in-btn').evaluate(el => el.getBoundingClientRect().top + scrollY);
     const lockBefore = await lockTop();
-    const heights = [];
+    const gridBefore = await p.locator('.persona-grid').evaluate(el => el.getBoundingClientRect().height);
     for (const card of await p.locator('.persona-card').all()) {
       await card.click();
-      heights.push(await p.locator('.preview-card').evaluate(el => el.getBoundingClientRect().height));
+      assert.ok(Math.abs(await lockTop() - lockBefore) <= 1, 'the button moved when a tutor was picked');
+      assert.ok(Math.abs(await p.locator('.persona-grid').evaluate(el => el.getBoundingClientRect().height) - gridBefore) <= 1, 'the boxes changed size');
     }
-    assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, 'tutor copy shifts the preview: ' + heights.join(', '));
-    assert.ok(Math.abs(await lockTop() - lockBefore) <= 1, 'the button moved when a tutor was picked');
     await p.screenshot({ path: path.join(out, 'redesign-character-320.png') });
     await p.locator('#lock-in-btn').click();
     assert.equal(await p.locator('#confirm-modal [data-action="close"]').count(), 1);
     assert.equal(await p.locator('#confirm-modal .modal-close').count(), 0);
+    await p.context().close();
+  });
+  await check('choose a tutor: tapping the standing tutor changes the expression and the line; locking in sits the others back', async () => {
+    const p = await pageFor('/student/html/character-selection.html', { account: 'pick-tap', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+    await p.waitForSelector('.persona-card');
+    assert.equal(await p.locator('#pick-big').isVisible(), false, 'nobody stands there until one is picked');
+    assert.equal(await p.locator('#lock-in-btn').isVisible(), false, 'nothing to choose until one is picked');
+    await p.locator('.persona-card').first().click();          // Ava: three poses, three lines
+    const look = () => p.evaluate(() => ({ src: document.querySelector('#preview-bg-img').getAttribute('src'), line: document.querySelector('#preview-desc').textContent }));
+    const a = await look();
+    await p.locator('#pick-big').click();
+    const b = await look();
+    assert.notEqual(a.src, b.src, 'a new expression'); assert.notEqual(a.line, b.line, 'a new line');
+    await p.locator('#pick-big').click(); await p.locator('#pick-big').click();
+    assert.deepEqual(await look(), a, 'three taps come back to the first');
+    await p.locator('#lock-in-btn').click();
+    await p.locator('#confirm-modal [data-action="lock"]').click();
+    await p.waitForSelector('#pick-scene.is-locked');
+    assert.match(await p.locator('#pick-hello').innerText(), /You picked Ava!/);
+    assert.equal(await p.locator('.persona-card.selected').count(), 1);
+    await p.waitForTimeout(400);
+    const others = await p.locator('.persona-card:not(.selected)').evaluateAll(c => c.map(x => ({ pe: getComputedStyle(x).pointerEvents, op: Number(getComputedStyle(x).opacity), dis: x.disabled })));
+    assert.ok(others.length === 5 && others.every(o => o.pe === 'none' && o.op < 0.6 && o.dis), 'the others sit back and cannot be pressed: ' + JSON.stringify(others));
     await p.context().close();
   });
   await check('redesign: dashboard work comes first and each sign-out state has one control', async () => {
@@ -1103,7 +1135,7 @@ function fixture() {
     await p.waitForFunction(() => [...document.querySelectorAll('.persona-card img')].every(img => img.complete && img.naturalWidth > 0));
     const art = await p.locator('.persona-card').evaluateAll(cards => cards.map(card => ({
       key: card.dataset.character,
-      src: card.dataset.img || '',
+      src: (card.dataset.poses || '').split(' ')[0] || '',
       head: card.querySelector('img')?.getAttribute('src') || '',
       loaded: (card.querySelector('img')?.naturalWidth || 0) > 0,
       fallback: card.querySelector('.persona-thumb').hasAttribute('data-mono')
@@ -1115,7 +1147,7 @@ function fixture() {
     ];
     art.slice(0, 5).forEach((item, index) => {
       assert.equal(item.key, folders[index][0]);
-      assert.match(item.src, new RegExp(`personas/${folders[index][1]}/default\\.webp$`));
+      assert.match(item.src, new RegExp(`personas/${folders[index][1]}/(default|happy)\\.webp$`));
       assert.match(item.head, new RegExp(`heads/${item.key}\\.webp$`), 'the small picture is the tutor\'s head');
       assert.equal(item.loaded, true, item.key + ' head missing');
       assert.equal(item.fallback, false, item.key + ' fell back to monogram');
