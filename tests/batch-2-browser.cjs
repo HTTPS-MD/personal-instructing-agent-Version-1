@@ -615,6 +615,7 @@ function fixture() {
         const text = await p.evaluate(() => document.body.innerText);
         const hit = text.match(BANNED);
         assert.equal(hit, null, `${group} on ${url.split('/').pop()} says "${hit && hit[0]}"`);
+        assert.equal(await p.locator('.stage-rail, .stage-node').count(), 0, `${group} on ${url.split('/').pop()} is shown the list of stages (Waiting / Test / Tutor / Practice)`);
         await p.context().close();
       }
     }
