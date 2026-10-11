@@ -28,33 +28,23 @@ function previewCharacter(element) {
     document.querySelectorAll('.persona-card').forEach(card => {
         card.classList.remove('selected');
         card.setAttribute('aria-pressed', 'false');
-        const img = card.querySelector('.agent-img-thumbnail');
-        if (img) img.classList.add('grayscale');
     });
 
     element.classList.add('selected');
     element.setAttribute('aria-pressed', 'true');
-    const activeImg = element.querySelector('.agent-img-thumbnail');
-    if (activeImg) activeImg.classList.remove('grayscale');
 
     selectedChar = element.getAttribute('data-character');
     const name = element.getAttribute('data-name');
-    const role = element.getAttribute('data-role');
-    const desc = element.getAttribute('data-desc');
-    const imgPath = element.getAttribute('data-img');
-    const style = element.getAttribute('data-style');
-    const pace = element.getAttribute('data-pace');
 
-    document.getElementById('preview-role').textContent = role;
     document.getElementById('preview-name').textContent = name;
-    document.getElementById('preview-desc').textContent = desc;
-    document.getElementById('preview-bg-img').src = imgPath;
-
-    document.getElementById('preview-style').textContent = style;
-    document.getElementById('preview-pace').textContent = pace;
-    document.getElementById('preview-characteristics').classList.remove('hidden');
+    document.getElementById('preview-desc').textContent = element.getAttribute('data-line');
+    document.getElementById('preview-bg-img').src = element.getAttribute('data-img');
+    document.getElementById('preview-style').textContent = element.getAttribute('data-style');
+    document.getElementById('preview-pace').textContent = element.getAttribute('data-pace');
+    document.getElementById('preview-card').classList.add('has-pick');
 
     const lockBtn = document.getElementById('lock-in-btn');
+    lockBtn.textContent = 'Choose ' + name;
     lockBtn.disabled = false;
 }
 
@@ -122,13 +112,13 @@ async function finalLockIn() {
     if (error) {
         const status = document.getElementById('status-text');
         if (status) {
-            status.textContent = 'NOT SAVED';
+            status.textContent = 'Not saved. Please try again.';
             status.style.color = 'var(--danger)';
         }
         const btn = document.getElementById('lock-in-btn');
         if (btn) {
             btn.disabled = false;
-            btn.textContent = 'Try locking in again';
+            btn.textContent = 'Try again';
         }
         closeConfirmModal();
         console.error('Could not save selection:', error.message);
@@ -144,8 +134,8 @@ async function finalLockIn() {
 
     isLockedIn = true;
     const statusEl = document.getElementById('status-text');
-    statusEl.textContent = 'LOCKED IN';
-    statusEl.style.color = 'var(--accent)';
+    statusEl.textContent = 'Your tutor is chosen.';
+    statusEl.style.color = '';
 
     document.querySelectorAll('.persona-card').forEach(card => {
         card.style.pointerEvents = 'none';

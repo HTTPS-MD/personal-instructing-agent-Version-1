@@ -9,18 +9,19 @@
     <!-- Before first paint: the stored theme (dark by default) goes on
          <html> so there is never a flash of the wrong one. -->
     <script src="../../assets/js/theme-boot.js"></script>
-    <title>Choose Your Tutor — PIA</title>
+    <title>PIA</title>
 
     <script src="/assets/js/vendor/supabase.js"></script>
 
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/student-journey.css">
+    <link rel="stylesheet" href="../../styles/pages/student-paper.css">
 </head>
 
 <!-- enforceStudentStage('char') removes `opacity-0` once the whole
      prerequisite chain has passed on the server. -->
-<body class="opacity-0">
+<body class="opacity-0 paper">
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
@@ -29,7 +30,7 @@
     </svg>
 
     <div class="journey">
-        <div class="journey-ambient" aria-hidden="true"></div>
+        <div class="journey-ambient journey-ambient--classroom" aria-hidden="true"></div>
 
         <header class="journey-bar">
             <div class="journey-shell journey-bar-inner">
@@ -38,9 +39,10 @@
                 </div>
 
                 <div class="journey-bar-right">
-                    <span class="pick-status" id="status-text">CHOOSING</span>
-                    <button class="btn btn-signout" id="signout-btn" data-signout>
-                        Sign out
+                    <button class="btn btn-signout" id="signout-btn" data-signout data-no-who>Quit</button>
+                    <button type="button" class="btn btn-signout btn-theme" id="theme-toggle" aria-label="Switch to light theme">
+                        <svg class="theme-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+                        <svg class="theme-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
                     </button>
                 </div>
             </div>
@@ -49,157 +51,106 @@
         <main class="journey-main">
             <div class="journey-shell">
                 <div class="pick-wrap">
-                    <div>
+                    <section class="paper-card">
                         <div class="pick-head">
-                            <p class="journey-kicker">FIND YOUR FIT</p>
-                            <h1 class="pick-title">Choose your tutor</h1>
-                            <p class="pick-lede">
-                                Each tutor teaches the same maths, but explains it differently. Tap one to
-                                see how it works, then lock in the one that sounds right for you.
-                            </p>
-                            <p class="pick-mobile-note">Select a tutor to see their details below.</p>
+                            <h1 class="paper-title">Pick your <mark>tutor.</mark></h1>
+                            <p class="paper-lede">Tap a tutor to see how they teach, then choose the one you like.</p>
                         </div>
 
-                        <div class="persona-grid">
-                            <button type="button" class="persona-card"
+                        <div class="persona-grid" role="group" aria-label="Tutors">
+                            <button type="button" class="persona-card" aria-pressed="false"
                                 data-character="pia-open"
                                 data-name="Ava"
-                                data-role="Explorer"
+                                data-line="Hi, I’m Ava! I like to ask “why” before we do the “how”."
                                 data-img="../../assets/images/personas/Openness/default.webp"
                                 data-fallback-img="../../assets/images/tutors/pia-open/default.webp"
-                                data-desc="Creative and exploratory guidance designed for conceptual problem solvers who enjoy exploring deep mathematical perspectives."
-                                data-style="Explorative &amp; creative"
+                                data-style="Asks “why”"
                                 data-pace="Flexible pace">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/personas/Openness/default.webp"
-                                        alt="Ava, the Explorer" width="76" height="76">
-                                </span>
+                                <span class="persona-thumb"><img src="../../assets/images/heads/pia-open.webp" alt="" width="64" height="64"></span>
                                 <span class="persona-name">Ava</span>
-                                <span class="persona-role">Explorer</span>
+                                <span class="persona-tag">Finds the why</span>
                             </button>
-                            <button type="button" class="persona-card"
+                            <button type="button" class="persona-card" aria-pressed="false"
                                 data-character="pia-conscientious"
                                 data-name="Cara"
-                                data-role="Detective"
+                                data-line="Hi, I’m Cara! I check every step, so nothing gets missed."
                                 data-img="../../assets/images/personas/Conscientiousness/default.webp"
                                 data-fallback-img="../../assets/images/tutors/pia-conscientious/default.webp"
-                                data-desc="Structured, highly organized, and disciplined pacing for students who thrive in step-by-step routines."
-                                data-style="Step-by-step structure"
-                                data-pace="Steady &amp; methodical">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/personas/Conscientiousness/default.webp"
-                                        alt="Cara, the Detective" width="76" height="76">
-                                </span>
+                                data-style="Step by step"
+                                data-pace="Steady pace">
+                                <span class="persona-thumb"><img src="../../assets/images/heads/pia-conscientious.webp" alt="" width="64" height="64"></span>
                                 <span class="persona-name">Cara</span>
-                                <span class="persona-role">Detective</span>
+                                <span class="persona-tag">Every detail</span>
                             </button>
-                            <button type="button" class="persona-card"
+                            <button type="button" class="persona-card" aria-pressed="false"
                                 data-character="pia-extravert"
                                 data-name="Theo"
-                                data-role="Spark"
+                                data-line="Hey, I’m Theo! Let’s make maths quick and fun!"
                                 data-img="../../assets/images/personas/Extraverted/default.webp"
                                 data-fallback-img="../../assets/images/tutors/pia-extravert/default.webp"
-                                data-desc="High-energy, interactive, and enthusiastic reinforcement to keep active problem solvers engaged and motivated."
-                                data-style="Interactive &amp; engaging"
-                                data-pace="Fast &amp; energetic">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/personas/Extraverted/default.webp"
-                                        alt="Theo, the Spark" width="76" height="76">
-                                </span>
+                                data-style="Fast and fun"
+                                data-pace="Quick pace">
+                                <span class="persona-thumb"><img src="../../assets/images/heads/pia-extravert.webp" alt="" width="64" height="64"></span>
                                 <span class="persona-name">Theo</span>
-                                <span class="persona-role">Spark</span>
+                                <span class="persona-tag">High energy</span>
                             </button>
-                            <button type="button" class="persona-card"
+                            <button type="button" class="persona-card" aria-pressed="false"
                                 data-character="pia-agreeable"
                                 data-name="Amy"
-                                data-role="Ally"
+                                data-line="Hi, I’m Amy! I’ll ask how it’s going, and I really mean it."
                                 data-img="../../assets/images/personas/Agreeableness/default.webp"
                                 data-fallback-img="../../assets/images/tutors/pia-agreeable/default.webp"
-                                data-desc="Gentle, supportive, and collaborative encouragement built for learners who prefer a low-stress environment."
-                                data-style="Gentle encouragement"
+                                data-style="Gentle"
                                 data-pace="Relaxed pace">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/personas/Agreeableness/default.webp"
-                                        alt="Amy, the Ally" width="76" height="76">
-                                </span>
+                                <span class="persona-thumb"><img src="../../assets/images/heads/pia-agreeable.webp" alt="" width="64" height="64"></span>
                                 <span class="persona-name">Amy</span>
-                                <span class="persona-role">Ally</span>
+                                <span class="persona-tag">Endless patience</span>
                             </button>
-                            <button type="button" class="persona-card"
+                            <button type="button" class="persona-card" aria-pressed="false"
                                 data-character="pia-calm"
                                 data-name="Kai"
-                                data-role="Cautious"
+                                data-line="Hi, I’m Kai. We’ll go slowly and double-check together."
                                 data-img="../../assets/images/personas/Neuroticism/default.webp"
                                 data-fallback-img="../../assets/images/tutors/pia-calm/default.webp"
-                                data-desc="A careful guide who slows down, double-checks every step and talks through the worries, so nothing gets rushed."
-                                data-style="Careful &amp; cautious"
-                                data-pace="Slow">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/personas/Neuroticism/default.webp"
-                                        alt="Kai, the Cautious" width="76" height="76">
-                                </span>
+                                data-style="Careful"
+                                data-pace="Slow pace">
+                                <span class="persona-thumb"><img src="../../assets/images/heads/pia-calm.webp" alt="" width="64" height="64"></span>
                                 <span class="persona-name">Kai</span>
-                                <span class="persona-role">Cautious</span>
+                                <span class="persona-tag">Checks every step</span>
                             </button>
-                            <button type="button" class="persona-card"
+                            <button type="button" class="persona-card" aria-pressed="false"
                                 data-character="pia-neutral"
                                 data-name="Noel"
-                                data-role="Neutral"
+                                data-line="Hi, I’m Noel. Clear steps, no fuss."
                                 data-img="../../assets/images/personas/Neutral/default.webp"
                                 data-fallback-img="../../assets/images/tutors/pia-neutral/approval.webp"
-                                data-desc="Standard balanced baseline assistant with no specialized bias, perfect for standard adaptive learning modules."
-                                data-style="Standard adaptive"
+                                data-style="Straight talk"
                                 data-pace="Balanced pace">
-                                <span class="persona-thumb">
-                                    <img class="agent-img-thumbnail grayscale" src="../../assets/images/personas/Neutral/default.webp"
-                                        alt="Noel, the Neutral" width="76" height="76">
-                                </span>
+                                <span class="persona-thumb"><img src="../../assets/images/heads/pia-neutral.webp" alt="" width="64" height="64"></span>
                                 <span class="persona-name">Noel</span>
-                                <span class="persona-role">Neutral</span>
+                                <span class="persona-tag">Straightforward guidance</span>
                             </button>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Preview panel. Every text slot has a reserved height, so
-                         picking a persona swaps the content without the Lock-in
-                         button moving under the student's finger. -->
-                    <aside class="preview-card">
+                    <!-- The preview. Every slot keeps its place, so choosing a tutor changes the words but never moves the button. -->
+                    <aside class="paper-card preview-card" id="preview-card">
                         <div class="preview-portrait">
-                            <img id="preview-bg-img" src="../../assets/images/char-neutral.png" alt=""
-                                width="132" height="132">
+                            <img id="preview-bg-img" src="../../assets/images/personas/Neutral/default.webp" alt="" width="132" height="132">
                         </div>
 
-                        <span class="preview-role" id="preview-role">Pick a tutor</span>
-                        <p class="preview-name" id="preview-name">No one chosen yet</p>
-                        <p class="preview-desc" id="preview-desc">
-                            Tap any tutor and their teaching style shows up here.
-                        </p>
+                        <p class="preview-name" id="preview-name">Pick a tutor</p>
+                        <p class="preview-line" id="preview-desc">Tap a tutor on the left to see how they teach.</p>
 
-                        <!-- Present from first paint with em-dash placeholders. Revealing
-                             this block from display:none pushed the Lock-in button 131px
-                             down the moment a student picked their first tutor. The
-                             controller still calls classList.remove('hidden') on it; that
-                             is now a harmless no-op. -->
-                        <div class="preview-traits" id="preview-characteristics">
-                            <div class="trait-row">
-                                <span class="trait-key">Teaching style</span>
-                                <span class="trait-val" id="preview-style">—</span>
-                            </div>
-                            <div class="trait-row">
-                                <span class="trait-key">Pace</span>
-                                <span class="trait-val" id="preview-pace">—</span>
-                            </div>
-                        </div>
+                        <ul class="preview-chips" id="preview-characteristics">
+                            <li id="preview-style">—</li>
+                            <li id="preview-pace">—</li>
+                        </ul>
 
                         <div class="preview-actions">
-                            <button class="btn btn-primary btn-block" id="lock-in-btn"
-                                data-action="confirm" disabled>
-                                Lock in this tutor
-                            </button>
-                            <button class="btn btn-primary btn-block" id="continue-btn"
-                                data-action="continue" style="display:none">
-                                Continue to my session
-                            </button>
+                            <button class="btn btn-primary" id="lock-in-btn" data-action="confirm" disabled>Choose</button>
+                            <button class="btn btn-primary" id="continue-btn" data-action="continue" style="display:none">Continue</button>
+                            <p class="preview-status" id="status-text" role="status" aria-live="polite"></p>
                         </div>
                     </aside>
                 </div>
@@ -234,6 +185,7 @@
     </div>
 
     <script src="../../assets/js/function.js"></script>
+    <script src="../js/journey-header.js"></script>
     <script src="../js/character-selection.js"></script>
 </body>
 

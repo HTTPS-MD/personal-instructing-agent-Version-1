@@ -328,6 +328,7 @@ body:not([data-boot="pending"]) .learn-veil[hidden] { display: none; }
 .btn-tutorial.is-clicked { transform: scale(0.96); }
 
 .tutorial-callout {
+    min-height: 3.5rem;                 /* room for two lines, so the words arriving never move the page */
     border-bottom: 1px solid var(--line);
     background: var(--bg-surface);
     color: var(--text);

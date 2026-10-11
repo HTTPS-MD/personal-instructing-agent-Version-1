@@ -66,12 +66,12 @@
     var profileCall = 0;
 
     var TUTOR_NAMES = {
-        'pia-open': 'Ava · your curious tutor',
-        'pia-conscientious': 'Cara · your organised tutor',
-        'pia-extravert': 'Theo · your energetic tutor',
-        'pia-agreeable': 'Amy · your patient tutor',
-        'pia-calm': 'Kai · your careful tutor',
-        'pia-neutral': 'Noel · your straightforward tutor'
+        'pia-open': 'Ava · your tutor',
+        'pia-conscientious': 'Cara · your tutor',
+        'pia-extravert': 'Theo · your tutor',
+        'pia-agreeable': 'Amy · your tutor',
+        'pia-calm': 'Kai · your tutor',
+        'pia-neutral': 'Noel · your tutor'
     };
 
     /* The three study topics. The server numbers them 1-3 (question_bank's
@@ -653,9 +653,8 @@
 
         var label = TUTOR_NAMES[key] || 'PIA · your tutor';
         var first = label.split(' · ')[0];
-        ['#agent-name', '#agent-name-start'].forEach(function (sel) {
-            var node = $(sel); if (node) { node.textContent = label; }
-        });
+        var nameNode = $('#agent-name'); if (nameNode) { nameNode.textContent = label; }
+        var startName = $('#agent-name-start'); if (startName) { startName.textContent = first; }
         ['#agent-img', '#agent-img-start'].forEach(function (sel) {
             var img = $(sel);
             if (!img) { return; }
@@ -1387,15 +1386,26 @@
     /* On a shared lab PC an open session means the next student's answers
        land in this student's row. executeForceLogout() releases the device
        slot, signs out globally and clears storage. */
+    /* "Hi, Mark!" / "Welcome back, Mark!", the name on a yellow highlight. Built from nodes, never from markup:
+       the name comes from the database. */
+    function setHello(prefix, name) {
+        var hello = $('#start-hello');
+        if (!hello) { return; }
+        var mark = document.createElement('mark');
+        mark.textContent = name + '!';
+        hello.textContent = prefix;
+        hello.appendChild(mark);
+    }
+
     async function signOut() {
         var mid = !!state.sessionId;
         var ok = await confirmAction({
-            title: 'Sign out',
-            heading: mid ? 'Leave this session?' : 'Sign out?',
+            title: 'Quit',
+            heading: mid ? 'Quit this session?' : 'Quit for now?',
             message: mid
                 ? 'Your progress is saved. When you sign back in you will pick up from the same problem.'
-                : 'You can sign back in any time with your school email.',
-            confirmLabel: 'Sign out'
+                : 'You will be signed out. You can sign back in any time with your school email.',
+            confirmLabel: 'Quit'
         });
         if (!ok) { return; }
 
@@ -1453,10 +1463,7 @@
         var name = (me.data && me.data.full_name) || state.email.split('@')[0];
         var firstName = name.trim().split(/\s+/)[0];
 
-        $('#who-name').textContent = name;
-        $('#who-meta').textContent = (me.data && me.data.section) ? 'Section ' + me.data.section : 'Student';
-        $('#who-initials').textContent = firstName.slice(0, 2).toUpperCase();
-        $('#start-hello').textContent = 'Welcome back, ' + firstName + '!';
+        setHello('Hi, ', firstName);
 
         initModals();
 
@@ -1507,13 +1514,15 @@
             applySession(peek.data);
 
             $('#fact-progress').textContent = state.answered;
+            $('#start-chips').hidden = !(state.answered > 0);
 
             var where = 'You are on topic ' + state.topic + ': ' + topicOf(state.topic).short.toLowerCase() + '.';
             if (peek.data.resumed) {
-                $('#start-btn-label').textContent = 'Continue my session';
+                $('#start-btn-label').textContent = 'Continue';
+                setHello('Welcome back, ', firstName);
                 $('#start-lede').textContent = (state.answered > 0
-                    ? 'You already answered ' + state.answered + ' questions. '
-                    : '') + where + ' Pick up right where you left off.';
+                    ? 'You’ve answered ' + state.answered + ' question' + (state.answered === 1 ? '' : 's') + ' so far. '
+                    : '') + 'Pick up right where you left off.';
             } else if (state.topic > 1) {
                 $('#start-lede').textContent = where + ' The session has a time limit, and you can ask ' +
                     'for a hint whenever you’re stuck.';

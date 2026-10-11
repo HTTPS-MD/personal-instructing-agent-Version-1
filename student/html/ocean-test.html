@@ -16,11 +16,12 @@
 
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/student-journey.css">
+    <link rel="stylesheet" href="../../styles/pages/student-paper.css">
 </head>
 
 <!-- enforceStudentStage('ocean') removes `opacity-0` after verifying the
      session and the prerequisite chain on the server. -->
-<body class="opacity-0 quiz">
+<body class="opacity-0 quiz paper" data-own-quit>
 
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <defs>
@@ -139,6 +140,7 @@
     <script src="../../assets/js/function.js"></script>
     <!-- The 50 statements and the 1-5 scale. Must load before ocean-test.js. -->
     <script src="../../assets/js/bfpt-items.js"></script>
+    <script src="../js/journey-header.js"></script>
     <script src="../js/ocean-test.js"></script>
 </body>
 

@@ -459,7 +459,7 @@ function fixture() {
       await p.context().close();
     });
   }
-  await check('ocean: the questionnaire sits on the classroom, under a heavy wash; the other stages do not', async () => {
+  await check('ocean: the questionnaire and the waiting room sit on the classroom, under a wash of the page colour', async () => {
     const bg = p => p.locator('.journey-ambient').evaluate(el => ({ img: getComputedStyle(el).backgroundImage, cls: el.className }));
     for (const t of ['dark', 'light']) {
       const o = await pageFor(ocean, { theme: t, initial: { profile: { is_ocean_done: false } } });
@@ -472,7 +472,7 @@ function fixture() {
     const w = await pageFor('/student/html/waiting-room.html', { initial: { stageOpen: false, profile: { is_ocean_done: false } } });
     await w.waitForSelector('.journey-ambient', { state: 'attached' });
     assert.match(w.url(), /waiting-room/, 'still on the waiting room');
-    assert.doesNotMatch((await bg(w)).img, /classroom-bg/, 'the waiting room keeps its plain page');
+    assert.match((await bg(w)).img, /classroom-bg/, 'the waiting room sits on the same classroom');
     await w.context().close();
   });
   await check('audit: OCEAN quit dialog is plain text, no glyph/hero; behaviour unchanged', async () => {
@@ -506,19 +506,21 @@ function fixture() {
       await p.screenshot({ path: path.join(out, `audit-char-lock-${w}-${t}.png`) });
       await p.context().close();
     });
-    await check(`audit: dashboard start screen icons/cards (${w}px ${t}); facts are a description list`, async () => {
+    await check(`audit: dashboard start screen (${w}px ${t}): a card with the tutor, no icons, no stage, no name in the header`, async () => {
       const p = await pageFor(dash, { width: w, theme: t, account: 'dash-audit', initial: {} });
       await p.waitForSelector('#start-btn');
       await p.keyboard.press('Escape');
-      assert.equal(await p.locator('.start-card svg, .agent-card svg, #start-btn svg, #signout-btn svg').count(), 0);
+      assert.equal(await p.locator('.start-card svg, .agent-card svg, #start-btn svg, #tutorial-btn svg').count(), 0);
       assert.equal(await p.locator('.dot-live').count(), 0);
       await p.keyboard.press('Escape');   // the first-visit tutorial can open a moment after the page; close it, then wait until nothing covers the page
-      await p.waitForFunction(() => { const s = document.querySelector('#tutorial-btn svg'); return s && s.getClientRects().length && getComputedStyle(s).visibility !== 'hidden' && !document.querySelector('.overlay.is-open'); }, null, { timeout: 8000 });
-      assert.deepEqual(await iconsOf(p), ['#i-help']);
-      assert.equal(await p.locator('dl.facts > .fact > dt').count(), 2);
+      await p.waitForFunction(() => !document.querySelector('.overlay.is-open'), null, { timeout: 8000 });
       assert.equal(await p.locator('.start-card #start-btn').count(), 1, 'Start sits inside the start section');
-      assert.equal(await p.evaluate(() => { const a = document.querySelector('.start-card').getBoundingClientRect(), b = document.querySelector('.agent-card').getBoundingClientRect(); return b.top >= a.top - 1 && (innerWidth < 720 || b.left >= a.right - 1 || b.top >= a.bottom - 1); }), true);
-      assert.ok(isFlat(await flat(p, '.start-card')));
+      assert.equal(await p.locator('.start-card #tutorial-btn').count(), 1, 'How it works sits beside it');
+      assert.equal((await p.locator('#tutorial-btn').innerText()).trim(), 'How it works');
+      assert.equal(await p.evaluate(() => { const a = document.querySelector('.start-card').getBoundingClientRect(), b = document.querySelector('.agent-card').getBoundingClientRect(); return a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1; }), true, 'the tutor and the words do not overlap');
+      const head = await p.locator('header.learn-bar').innerText();
+      assert.equal(/Stage|Tutoring|Section|Francisco|Fixture|Learner|Tutorial|Sign out/i.test(head), false, 'header says: ' + head);
+      assert.equal(/stage/i.test(await p.evaluate(() => document.querySelector('#screen-start').innerText)), false, 'the welcome never names a stage');
       assert.equal(await p.locator('.agent-card').count(), 1);          // functional tutor card kept
       await p.screenshot({ path: path.join(out, `audit-dash-start-${w}-${t}.png`) });
       await p.context().close();
@@ -530,8 +532,8 @@ function fixture() {
     await p.evaluate(() => { document.querySelector('#screen-start').classList.remove('is-active'); document.querySelector('#screen-session').classList.add('is-active'); });
     assert.equal(await p.locator('#hint-btn svg, #submit-btn svg').count(), 0);
     await p.keyboard.press('Escape');   // the first-visit tutorial can open a moment after the page; close it, then wait until nothing covers the page
-      await p.waitForFunction(() => { const s = document.querySelector('#tutorial-btn svg'); return s && s.getClientRects().length && getComputedStyle(s).visibility !== 'hidden' && !document.querySelector('.overlay.is-open'); }, null, { timeout: 8000 });
-      assert.deepEqual(await iconsOf(p), ['#i-help']);                 // tutorial control only: the step game has no status icons
+      await p.waitForFunction(() => !document.querySelector('.overlay.is-open'), null, { timeout: 8000 });
+      assert.deepEqual(await iconsOf(p), []);                          // the step game has no status icons
     assert.equal(await p.locator('.left-sidebar').count() + await p.locator('.center-panel').count() + await p.locator('.right-sidebar').count(), 3);   // the original game's three areas
     await p.screenshot({ path: path.join(out, 'audit-dash-session-375.png') });
     assert.equal(await p.locator('#signout-btn').isVisible(), true);
@@ -580,33 +582,119 @@ function fixture() {
   /* ---------------- WAITING ROOM / ASSESSMENT COMPLETE / SET NEW PASSWORD ---------------- */
   const WAIT = ['/student/html/waiting-room.html', { stageOpen: false, profile: { is_ocean_done: false } }];
   for (const [w, t] of [[320, 'light'], [375, 'dark'], [768, 'light'], [1280, 'dark'], [1440, 'light']]) {
-    await check(`waiting room: open section + facts list, no card/glyph/icon/action (${w}px ${t})`, async () => {
+    await check(`waiting room: one card on the classroom, no stage named, no action (${w}px ${t})`, async () => {
       const p = await pageFor(WAIT[0], { width: w, theme: t, account: 'wr', initial: WAIT[1] });
-      await p.waitForSelector('#waiting-for'); await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'The questionnaire');
+      await p.waitForSelector('.wait-card'); await p.waitForTimeout(500);
       assert.equal(await p.evaluate(() => document.documentElement.dataset.surface), 'comic');
-      assert.equal(await p.locator('.wait-card, .wait-orb, .gate-glyph, svg.icon-lg').count(), 0);
+      assert.equal(await p.locator('.wait-orb, .gate-glyph, svg.icon-lg, dl, .wait-section').count(), 0);
       assert.deepEqual(await iconsOf(p), []);
       assert.equal(await p.locator('main button, main a.btn, main form').count(), 0, 'no action: the existing flow redirects automatically');
-      assert.equal(await p.locator('dl.facts-list > div').count(), 3);
-      assert.deepEqual(await p.locator('dl.facts-list dt').allInnerTexts(), ['Status', 'Your stage', 'Waiting for']);
-      assert.ok(isFlat(await flat(p, '.wait-section')));
-      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+      assert.match(await p.locator('h1').innerText(), /^Hang tight!$/);
+      const text = await p.evaluate(() => document.body.innerText);
+      assert.equal(/questionnaire|character|tutor|dashboard|stage|Waiting for|ON HOLD/i.test(text), false, 'it names the next stage: ' + text.slice(0, 200));
+      assert.equal((await flat(p, '.wait-card')).shadow, 'none');
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'fits one screen');
       await p.screenshot({ path: path.join(out, `final-waiting-${w}-${t}.png`) });
       await p.context().close();
     });
   }
+  /* ---------------- the paper pages share one header and one look ---------------- */
+  const PAPER = [
+    ['waiting room', '/student/html/waiting-room.html', { stageOpen: false, profile: { is_ocean_done: false } }, '.wait-card'],
+    ['choose a tutor', '/student/html/character-selection.html', { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } }, '.persona-card'],
+    ['welcome', '/student/html/student-dashboard.html', { profile: { selected_character: 'pia-extravert' } }, '#start-btn']
+  ];
+  for (const [name, url, initial, ready] of PAPER) {
+    await check(`${name}: header is the logo, Quit and the light/dark switch; the switch changes the theme and the classroom`, async () => {
+      const p = await pageFor(url, { account: 'paper-' + name.slice(0, 3), theme: 'dark', initial });
+      await p.waitForSelector(ready); await p.waitForTimeout(600); await p.keyboard.press('Escape');
+      const bar = name === 'welcome' ? 'header.learn-bar' : 'header.journey-bar';
+      const head = await p.locator(bar).innerText();
+      assert.equal(/Signed in|Fixture|Sign out|Change password|stage|Tutorial/i.test(head), false, 'header says: ' + head);
+      assert.deepEqual(await p.locator(bar + ' button').evaluateAll(b => b.map(x => (x.innerText || x.getAttribute('aria-label')).trim().toLowerCase())), ['quit', 'switch to light theme']);
+      assert.equal(await p.locator(bar + ' a').count(), 0, 'the logo is not a link');
+      const scene = () => p.evaluate(() => ({ theme: document.documentElement.dataset.theme, img: getComputedStyle(document.querySelector('.paper-scene, .journey-ambient--classroom')).backgroundImage }));
+      assert.match((await scene()).img, /classroom-bg-dark/);
+      await p.locator('#theme-toggle').click();
+      const after = await scene();
+      assert.equal(after.theme, 'light'); assert.match(after.img, /classroom-bg-light/);
+      assert.equal(await p.evaluate(() => localStorage.getItem('pia_theme')), 'light');
+      await p.context().close();
+    });
+    await check(`${name}: Quit asks first, and Stay keeps the student here`, async () => {
+      const p = await pageFor(url, { account: 'quit-' + name.slice(0, 3), initial });
+      await p.waitForSelector(ready); await p.waitForTimeout(600); await p.keyboard.press('Escape');
+      await p.locator('#signout-btn').click();
+      await p.waitForSelector('#quit-modal.modal-active, #modal-confirm.is-open');
+      assert.equal((await calls(p)).some(c => c.method === 'signout'), false, 'nothing signed out yet');
+      await p.keyboard.press('Escape');
+      await p.waitForFunction(() => !document.querySelector('#quit-modal.modal-active, #modal-confirm.is-open'));
+      assert.equal((await calls(p)).some(c => c.method === 'signout'), false);
+      assert.equal(new URL(p.url()).pathname, url);
+      await p.context().close();
+    });
+    for (const [w, h] of [[1440, 850], [1280, 720], [375, 700]]) {
+      await check(`${name}: fits one screen with no scrolling (${w}x${h})`, async () => {
+        const p = await pageFor(url, { width: w, height: h, account: 'fit-' + name.slice(0, 3), initial });
+        await p.waitForSelector(ready); await p.waitForTimeout(600); await p.keyboard.press('Escape');
+        const f = await p.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, wide: document.documentElement.scrollWidth - innerWidth }));
+        await p.screenshot({ path: path.join(out, `paper-${name.replace(/ /g, '-')}-${w}.png`) });
+        assert.ok(f.scroll <= 1 && f.wide <= 0, JSON.stringify(f));
+        await p.context().close();
+      });
+    }
+  }
+  await check('waiting room: Quit then Quit signs the student out', async () => {
+    const p = await pageFor('/student/html/waiting-room.html', { account: 'quit-out', initial: { stageOpen: false, profile: { is_ocean_done: false } } });
+    await p.waitForSelector('.wait-card');
+    await p.locator('#signout-btn').click();
+    await p.waitForSelector('#quit-modal.modal-active');
+    await p.locator('[data-quit="leave"]').click();
+    await p.waitForURL(u => /\/index\.html$|\/$/.test(u.pathname), { timeout: 8000 });
+    await p.context().close();
+  });
+  await check('choose a tutor: no personality words (Explorer, Detective, Spark, Ally, Cautious, Neutral), the button names the tutor', async () => {
+    const p = await pageFor('/student/html/character-selection.html', { account: 'pick-words', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+    await p.waitForSelector('.persona-card');
+    const words = async () => p.evaluate(() => document.body.innerText + ' ' + [...document.querySelectorAll('img')].map(i => i.alt).join(' '));
+    for (let i = 0; i < 6; i++) {
+      await p.locator('.persona-card').nth(i).click();
+      const name = await p.locator('.persona-card').nth(i).locator('.persona-name').innerText();
+      assert.equal((await p.locator('#preview-name').innerText()).trim(), name);
+      assert.equal((await p.locator('#lock-in-btn').innerText()).trim(), 'Choose ' + name);
+      assert.equal(/Explorer|Detective|Spark|Ally|Cautious|Neutral|baseline|specialized|stage|CHOOSING|FIND YOUR FIT/.test(await words()), false, 'a research word is on the page after picking ' + name);
+    }
+    assert.equal(await p.locator('.persona-card.selected').count(), 1);
+    await p.locator('#lock-in-btn').click();
+    assert.equal(await p.locator('#confirm-modal [data-action="close"]').count(), 1);
+    await p.context().close();
+  });
+  await check('welcome: "Hi, name!" for a new student, "Welcome back, name!" and the count for one who has answered', async () => {
+    let p = await pageFor('/student/html/student-dashboard.html', { account: 'wel-new', initial: { profile: { selected_character: 'pia-extravert' } } });
+    await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape');
+    assert.match((await p.locator('#start-hello').innerText()).trim(), /^Hi, \S+!$/);
+    assert.equal(await p.locator('#start-chips').isVisible(), false);
+    assert.equal((await p.locator('#start-btn-label').innerText()).trim(), 'Start');
+    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'Theo');
+    await p.context().close();
+  });
   await check('waiting room: existing redirect behaviour preserved when the stage opens', async () => {
     const p = await pageFor('/student/html/waiting-room.html', { account: 'wr2', initial: { stageOpen: true, profile: { is_ocean_done: false } } });
     await p.waitForURL(/ocean-test\.html/);
     await p.context().close();
   });
-  await check('waiting room: char/dash variants name the right stage', async () => {
-    let p = await pageFor('/student/html/waiting-room.html', { account: 'wr3', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Non-Assigned', selected_character: null } } });
-    await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'Character selection');
-    await p.context().close();
-    p = await pageFor('/student/html/waiting-room.html', { account: 'wr4', initial: { stageOpen: false, profile: { is_ocean_done: true, group_type: 'Assigned', selected_character: 'pia-open' } } });
-    await p.waitForFunction(() => document.querySelector('#waiting-for').textContent === 'The tutoring dashboard');
-    await p.context().close();
+  await check('waiting room: says the same thing whichever stage comes next (the questionnaire, choosing a tutor, the game)', async () => {
+    const words = [];
+    for (const [account, profile] of [['wr1', { is_ocean_done: false }],
+                                      ['wr3', { is_ocean_done: true, group_type: 'Non-Assigned', selected_character: null }],
+                                      ['wr4', { is_ocean_done: true, group_type: 'Assigned', selected_character: 'pia-open' }]]) {
+      const p = await pageFor('/student/html/waiting-room.html', { account, initial: { stageOpen: false, profile } });
+      await p.waitForSelector('.wait-card'); await p.waitForTimeout(500);
+      assert.match(p.url(), /waiting-room/);
+      words.push(await p.locator('.wait-card').innerText());
+      await p.context().close();
+    }
+    assert.equal(new Set(words).size, 1, 'the words differ by stage: ' + JSON.stringify(words));
   });
   await check('control (OCEAN only): thank-you screen has no next stage; waiting room and dashboard URL send Control there', async () => {
     const ctl = { is_ocean_done: true, group_type: 'Control', selected_character: null };
@@ -631,7 +719,7 @@ function fixture() {
     let p = await pageFor('/student/html/student-dashboard.html', { account: 'asg-neutral', initial: { stageOpen: true, profile: asg } });
     await p.waitForSelector('#agent-name-start'); await p.waitForTimeout(400);
     assert.match(p.url(), /student-dashboard\.html/);
-    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'Noel · your straightforward tutor');
+    assert.equal((await p.locator('#agent-name-start').innerText()).trim(), 'Noel');
     await p.context().close();
     p = await pageFor('/student/html/character-selection.html', { account: 'asg-char', initial: { stageOpen: true, profile: asg } });
     await p.waitForURL(/student-dashboard\.html/);
@@ -890,7 +978,7 @@ function fixture() {
       for (const c of await contrast(p, ['#tutorial-step', '#tutorial-title', '#tutorial-text', '#tutorial-skip', '#tutorial-next', '#tutorial-back'])) if (c.missing || c.ratio < 4.5) bad.push('tutorial ' + JSON.stringify(c));
       await p.locator('#tutorial-skip').click();
       await p.waitForSelector('.tutorial-callout-text');
-      for (const c of await contrast(p, ['.start-hello', '.start-lede', '.fact-label', '.fact-value', '#start-btn', '#tutorial-btn', '#signout-btn', '.tutorial-callout-text', '.agent-name'])) if (c.missing || c.ratio < 4.5) bad.push('dash ' + JSON.stringify(c));
+      for (const c of await contrast(p, ['.start-hello', '.start-lede', '#start-btn', '#tutorial-btn', '#signout-btn', '.tutorial-callout-text', '.agent-name'])) if (c.missing || c.ratio < 4.5) bad.push('dash ' + JSON.stringify(c));
       await p.context().close();
       assert.deepEqual(bad, []);
     });
@@ -963,12 +1051,15 @@ function fixture() {
     await p.waitForSelector('.persona-card');
     const order = await p.evaluate(() => ['.pick-head', '.persona-grid', '.preview-card'].map(s => document.querySelector(s).getBoundingClientRect().top + scrollY));
     assert.ok(order[0] < order[1] && order[1] < order[2], 'instructions and choices precede preview');
+    const lockTop = () => p.locator('#lock-in-btn').evaluate(el => el.getBoundingClientRect().top + scrollY);
+    const lockBefore = await lockTop();
     const heights = [];
     for (const card of await p.locator('.persona-card').all()) {
       await card.click();
       heights.push(await p.locator('.preview-card').evaluate(el => el.getBoundingClientRect().height));
     }
     assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, 'tutor copy shifts the preview: ' + heights.join(', '));
+    assert.ok(Math.abs(await lockTop() - lockBefore) <= 1, 'the button moved when a tutor was picked');
     await p.screenshot({ path: path.join(out, 'redesign-character-320.png') });
     await p.locator('#lock-in-btn').click();
     assert.equal(await p.locator('#confirm-modal [data-action="close"]').count(), 1);
@@ -1009,10 +1100,11 @@ function fixture() {
   await check('redesign: Character Selection uses the same tutor art as the game (all six)', async () => {
     let p = await pageFor('/student/html/character-selection.html', { account: 'char-art', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
     await p.waitForSelector('.persona-card');
-    await p.waitForFunction(() => [...document.querySelectorAll('.persona-card img')].slice(0, 5).every(img => img.complete && img.naturalWidth > 0));
+    await p.waitForFunction(() => [...document.querySelectorAll('.persona-card img')].every(img => img.complete && img.naturalWidth > 0));
     const art = await p.locator('.persona-card').evaluateAll(cards => cards.map(card => ({
       key: card.dataset.character,
-      src: card.querySelector('img')?.getAttribute('src') || '',
+      src: card.dataset.img || '',
+      head: card.querySelector('img')?.getAttribute('src') || '',
       loaded: (card.querySelector('img')?.naturalWidth || 0) > 0,
       fallback: card.querySelector('.persona-thumb').hasAttribute('data-mono')
     })));
@@ -1024,7 +1116,8 @@ function fixture() {
     art.slice(0, 5).forEach((item, index) => {
       assert.equal(item.key, folders[index][0]);
       assert.match(item.src, new RegExp(`personas/${folders[index][1]}/default\\.webp$`));
-      assert.equal(item.loaded, true, item.key + ' art missing');
+      assert.match(item.head, new RegExp(`heads/${item.key}\\.webp$`), 'the small picture is the tutor\'s head');
+      assert.equal(item.loaded, true, item.key + ' head missing');
       assert.equal(item.fallback, false, item.key + ' fell back to monogram');
     });
     assert.match(art[5].src, /personas\/Neutral\/default\.webp$/);

@@ -571,7 +571,7 @@ function setupExitGuard() {
 }
 
 // ==========================================
-// HEADER: Quit and the light / dark switch
+// HEADER: Quit (the light / dark switch is in journey-header.js)
 // Quit asks first (their answers so far are saved), then signs the student out, so the next person at a
 // shared computer starts clean. It listens in the capture phase, ahead of the page-wide Sign out wiring
 // in function.js, which would otherwise sign out at once.
@@ -588,24 +588,6 @@ document.addEventListener('click', (e) => {
         if (typeof executeForceLogout === 'function') executeForceLogout();
     });
 }, true);
-
-// The theme is the same one the landing page uses (stored as pia_theme, read before first paint by theme-boot.js).
-(function setupThemeToggle() {
-    const btn = document.getElementById('theme-toggle');
-    if (!btn) return;
-    const root = document.documentElement;
-    const sync = () => {
-        const light = root.getAttribute('data-theme') === 'light';
-        btn.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
-    };
-    btn.addEventListener('click', () => {
-        const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-        root.setAttribute('data-theme', next);
-        try { localStorage.setItem('pia_theme', next); } catch (err) { /* private mode: it just will not be remembered */ }
-        sync();
-    });
-    sync();
-})();
 
 checkAccessAndInit();
 

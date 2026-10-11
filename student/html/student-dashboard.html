@@ -9,7 +9,7 @@
     <!-- Before first paint: the stored theme (dark by default) goes on
          <html> so there is never a flash of the wrong one. -->
     <script src="../../assets/js/theme-boot.js"></script>
-    <title>My Tutoring Session — PIA</title>
+    <title>PIA</title>
 
     <!-- Convenience gate only. The real check is enforceStudentStage('dash')
          in student-dashboard.js, which verifies the session server-side and
@@ -22,9 +22,10 @@
     <link rel="stylesheet" href="../../styles/global.css">
     <link rel="stylesheet" href="../../styles/pages/student-dashboard.css">
     <link rel="stylesheet" href="../../styles/pages/student-game.css">
+    <link rel="stylesheet" href="../../styles/pages/student-paper.css">
 </head>
 
-<body data-boot="pending">
+<body class="paper" data-boot="pending" data-own-quit>
 
     <!-- ===================================================== ICON SPRITE -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -50,31 +51,21 @@
 
     <div class="learn">
         <div class="learn-ambient" aria-hidden="true"></div>
+        <div class="paper-scene" aria-hidden="true"></div>
 
         <!-- ==================================================== TOP BAR -->
         <header class="learn-bar">
             <div class="learn-shell learn-bar-inner">
                 <div class="learn-brand">
                     <span class="brand-link"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA" width="48" height="48"></span>
-                    <span class="stage-chip hide-sm">
-                        Stage 3 · Tutoring
-                    </span>
                 </div>
 
+                <!-- Only Quit and the light / dark switch: no name, no stage. -->
                 <div class="learn-bar-right">
-                    <div class="who">
-                        <span class="who-text">
-                            <span class="who-name" id="who-name">—</span>
-                            <span class="who-meta" id="who-meta">—</span>
-                        </span>
-                        <span class="avatar" id="who-initials" aria-hidden="true">··</span>
-                    </div>
-                    <button class="btn btn-secondary btn-tutorial" id="tutorial-btn" type="button" aria-haspopup="dialog" aria-label="Open the tutorial">
-                        <svg class="icon"><use href="#i-help"></use></svg>
-                        <span class="hide-sm-inline">Tutorial</span>
-                    </button>
-                    <button class="btn btn-signout" id="signout-btn">
-                        <span class="hide-sm-inline">Sign out</span>
+                    <button class="btn btn-signout" id="signout-btn" data-no-who>Quit</button>
+                    <button type="button" class="btn btn-signout btn-theme" id="theme-toggle" aria-label="Switch to light theme">
+                        <svg class="theme-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+                        <svg class="theme-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
                     </button>
                 </div>
             </div>
@@ -86,27 +77,21 @@
             <section class="learn-shell screen is-active" id="screen-start">
                 <div class="start-wrap">
                     <div class="start-card">
-                        <p class="learn-kicker">YOUR SESSION</p>
-                        <h1 class="start-hello" id="start-hello">Welcome back!</h1>
+                        <h1 class="start-hello" id="start-hello">Hi!</h1>
                         <p class="start-lede" id="start-lede">
-                            Today you'll solve percentage word problems with your tutor, one step at a time. Work through
-                            as many as you can, and use hints when you're stuck.
+                            Ready to practise percentages? Take your time. You can ask your tutor for a hint whenever you’re stuck.
                         </p>
 
-                        <dl class="facts start-facts">
-                            <div class="fact">
-                                <dt class="fact-label">Steps per problem</dt>
-                                <dd class="fact-value">2–3</dd>
-                            </div>
-                            <div class="fact">
-                                <dt class="fact-label">Already answered</dt>
-                                <dd class="fact-value" id="fact-progress">0</dd>
-                            </div>
-                        </dl>
+                        <ul class="paper-chips" id="start-chips" hidden>
+                            <li><span id="fact-progress">0</span> answered so far</li>
+                        </ul>
 
-                        <button class="btn btn-primary btn-start" id="start-btn">
-                            <span id="start-btn-label">Start my session</span>
-                        </button>
+                        <div class="start-actions">
+                            <button class="btn btn-tutorial" id="tutorial-btn" type="button" aria-haspopup="dialog">How it works</button>
+                            <button class="btn btn-primary btn-start" id="start-btn">
+                                <span id="start-btn-label">Start</span>
+                            </button>
+                        </div>
                     </div>
 
                     <aside class="agent-card">
@@ -115,7 +100,7 @@
                                 width="128" height="128">
                         </div>
                         <p class="agent-name" id="agent-name-start">Your tutor</p>
-                        <p class="agent-role">Here to help you through each step</p>
+                        <p class="agent-role">Your tutor</p>
                     </aside>
                 </div>
             </section>
@@ -252,6 +237,7 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script src="../../assets/js/function.js"></script>
+    <script src="../js/journey-header.js"></script>
     <script src="../js/tutor-personas.js"></script>
     <script src="../js/hint-whiteboard.js"></script>
     <script src="../js/student-dashboard.js"></script>

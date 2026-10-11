@@ -1,0 +1,197 @@
+/* ============================================================================
+   PIA -- the "paper" look of the student pages (questionnaire, waiting room, choose a tutor, welcome).
+   One paper-coloured card on the classroom, a thick outline, flat buttons, a yellow highlighter. It follows the
+   light / dark switch in the header. Nothing on these pages says which stage the student is in.
+
+   body.paper turns it on. The colours are four variables, so a retune is a four-line change.
+   ==========================================================================*/
+
+:root[data-theme="dark"] .paper  { --q-paper: #111A47; --q-ink: #FFF9EA; --q-soft: #B9C0E0; --q-field: #17225C; }
+:root[data-theme="light"] .paper { --q-paper: #FFF9EA; --q-ink: #0B1233; --q-soft: #4A5170; --q-field: #FFFFFF; }
+
+/* ---- the classroom, light or dark to match the theme, under a wash of the page colour ---- */
+.paper-scene,
+.learn > .paper-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.paper-scene,
+.journey-ambient--classroom {
+    background-image:
+        var(--grain),
+        linear-gradient(color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 64%, transparent)),
+        url("../../assets/images/classroom-bg-light.webp");
+    background-size: 11.25rem 11.25rem, cover, cover;
+    background-position: 0 0, center, center bottom;
+    background-repeat: repeat, no-repeat, no-repeat;
+}
+:root[data-theme="dark"] .paper-scene,
+:root[data-theme="dark"] .journey-ambient--classroom {
+    background-image:
+        var(--grain),
+        linear-gradient(color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 64%, transparent)),
+        url("../../assets/images/classroom-bg-dark.webp");
+}
+/* In the game itself the page keeps its own background. */
+body.is-playing .paper-scene { display: none; }
+
+/* ---- the header buttons: Quit and the light / dark switch, a square outline like the landing page ---- */
+.paper .journey-bar-right,
+.paper .learn-bar-right { gap: 10px; }
+.btn-theme { width: 44px; padding: 0; display: inline-grid; place-items: center; }
+.btn-theme svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-theme="dark"] .btn-theme .theme-moon,
+:root[data-theme="light"] .btn-theme .theme-sun { display: none; }
+
+/* ---- the card ---- */
+.paper-card {
+    width: 100%;
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 2.4rem 2.5rem 2rem;
+    border: 3px solid var(--q-ink);
+    border-radius: 0;
+    background: var(--q-paper);
+    color: var(--q-ink);
+    box-shadow: none;
+}
+
+.paper-title { margin: 0 0 .6rem; font-family: var(--font-display); font-size: clamp(2rem, 4.4vw, 2.8rem); font-weight: 700; letter-spacing: -.04em; line-height: 1.12; text-wrap: auto; }
+.paper-title mark { padding: .08em .2em; background: #FFD83D; color: #0B1233; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.paper-lede { max-width: none; margin: 0 0 1.2rem; color: var(--q-soft); font-size: 1.0625rem; line-height: 1.5; }
+
+ul.paper-chips[hidden] { display: none; }
+ul.paper-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
+.paper-chips li { padding: .35rem .7rem; border: 2px solid var(--q-ink); background: var(--q-field); color: var(--q-ink); font-size: .9rem; font-weight: 700; }
+
+/* ---- buttons inside a card: flat rectangles, an even outline on every side, no shadow ---- */
+.paper-card .btn {
+    height: 50px;
+    padding: 0 1.4rem;
+    border: 3px solid var(--q-ink);
+    border-radius: 0;
+    background: transparent;
+    color: var(--q-ink);
+    box-shadow: none;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.paper-card .btn-primary { background: #3A8DFF; color: #0B1233; }
+.paper-card .btn:disabled { border-style: dashed; background: transparent; color: var(--q-soft); opacity: .7; cursor: not-allowed; }
+
+.paper .journey-main { align-items: center; padding: var(--sp-5) 0; }
+
+/* ============================================================== WAITING ROOM */
+.wait-card .paper-lede { margin-bottom: 1.4rem; }
+.wait-dots { display: flex; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.wait-dots li { width: 14px; height: 14px; border: 2px solid var(--q-ink); background: #3A8DFF; }
+.wait-dots li:nth-child(2) { background: #FFD83D; }
+.wait-dots li:nth-child(3) { background: #2ED573; }
+
+/* ============================================================== CHOOSE A TUTOR */
+.pick-wrap { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.25rem; width: 100%; max-width: 62rem; margin: 0 auto; align-items: stretch; }
+.pick-wrap .paper-card { max-width: none; padding: 2rem 2rem 1.8rem; }
+
+.persona-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+.persona-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .25rem;
+    padding: .8rem .4rem .7rem;
+    border: 2px solid var(--q-ink);
+    border-radius: 0;
+    background: var(--q-field);
+    box-shadow: none;
+    color: var(--q-ink);
+    text-align: center;
+    cursor: pointer;
+}
+.persona-card:hover:not(.selected) { border-color: #3A8DFF; }
+/* The picked tutor: yellow highlighter, a heavier edge made with an inset ring so the box keeps its size. */
+.persona-card.selected { background: #FFD83D; color: #0B1233; border-color: #0B1233; box-shadow: inset 0 0 0 1px #0B1233; }
+.persona-thumb { display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border: 2px solid var(--q-ink); border-radius: 50%; background: #fff; }
+.persona-card.selected .persona-thumb { border-color: #0B1233; }
+.persona-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.persona-name { font-size: 1rem; font-weight: 700; line-height: 1.2; }
+.persona-tag { font-size: .78rem; line-height: 1.2; color: var(--q-soft); }
+.persona-card.selected .persona-tag { color: #0B1233; }
+
+/* The preview: every slot keeps its place, so choosing does not move the button. */
+.preview-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; text-align: center; }
+.preview-portrait { display: grid; place-items: center; width: 100%; height: 210px; }
+.preview-portrait img { width: 100%; height: 100%; object-fit: contain; }
+.preview-card:not(.has-pick) .preview-portrait img,
+.preview-card:not(.has-pick) .preview-chips { visibility: hidden; }
+.preview-name { margin: 0; font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; }
+.preview-line { min-height: 3em; margin: 0; color: var(--q-ink); font-size: 1rem; line-height: 1.5; }
+ul.preview-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; min-height: 2.1rem; margin: .2rem 0 .6rem; padding: 0; list-style: none; }
+.preview-chips li { padding: .3rem .65rem; border: 2px solid var(--q-ink); background: var(--q-field); font-size: .85rem; font-weight: 700; }
+.preview-actions { width: 100%; }
+.preview-actions .btn { width: 100%; }
+.preview-status { min-height: 1.4em; margin: .5rem 0 0; font-size: .85rem; color: var(--q-soft); }
+
+/* If both pictures fail, the first letters stand in. */
+.persona-thumb[data-mono]::after,
+.preview-portrait[data-mono]::after { content: attr(data-mono); font-size: 22px; font-weight: 800; color: var(--q-ink); }
+.preview-portrait[data-mono]::after { font-size: 34px; }
+.persona-thumb[data-mono] img,
+.preview-portrait[data-mono] img { display: none; }
+
+/* ============================================================== WELCOME (before the game) */
+.paper .start-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2.4rem 2.5rem;
+    border: 3px solid var(--q-ink);
+    background: var(--q-paper);
+    color: var(--q-ink);
+    box-shadow: none;
+}
+.paper .start-card { padding: 0; background: none; box-shadow: none; }
+.paper .start-hello { margin: 0 0 .6rem; font-family: var(--font-display); font-size: clamp(2rem, 4.4vw, 2.8rem); font-weight: 700; letter-spacing: -.04em; line-height: 1.12; }
+.paper .start-hello mark { padding: .08em .2em; background: #FFD83D; color: #0B1233; }
+.paper .start-lede { margin: 0 0 1.2rem; color: var(--q-soft); font-size: 1.0625rem; line-height: 1.5; }
+.paper .start-actions { display: flex; flex-wrap: wrap; gap: .8rem; }
+.paper .start-wrap .btn { height: 50px; padding: 0 1.4rem; border: 3px solid var(--q-ink); border-radius: 0; background: transparent; color: var(--q-ink); box-shadow: none; font-size: 1rem; font-weight: 700; }
+.paper .start-wrap .btn-primary { background: #3A8DFF; color: #0B1233; }
+.paper .start-wrap .btn:disabled { border-style: dashed; color: var(--q-soft); opacity: .7; }
+.paper .agent-card { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: 0; background: none; box-shadow: none; text-align: center; }
+.paper .agent-portrait { width: 100%; max-width: 210px; height: 230px; background: none; border-radius: 0; box-shadow: none; }
+.paper .agent-portrait img { width: 100%; height: 100%; object-fit: contain; }
+.paper .agent-name { margin: 0; font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; letter-spacing: -.03em; color: var(--q-ink); }
+.paper .agent-role { margin: 0; font-size: .95rem; color: var(--q-soft); }
+
+/* The welcome sits in the middle of the page (the game keeps its own layout). */
+.paper .learn-main:has(#screen-start.is-active) { display: flex; flex-direction: column; justify-content: center; }
+.paper .learn-main:has(#screen-start.is-active) > #screen-start { width: 100%; }
+
+/* ============================================================== PHONES */
+@media (max-width: 46rem) {
+    .paper-card { padding: 2.6rem 1.1rem 1.2rem; }
+    .pick-wrap { grid-template-columns: minmax(0, 1fr); gap: .8rem; }
+    .pick-wrap .paper-card { padding: 1rem .9rem; }
+    .pick-wrap { gap: .6rem; }
+    .persona-grid { gap: .5rem; }
+    .persona-thumb { width: 46px; height: 46px; }
+    .persona-card { padding: .5rem .2rem; }
+    .persona-tag { display: none; }
+    .preview-portrait { display: none; }
+    .preview-card { align-items: stretch; text-align: left; gap: .3rem; }
+    .preview-card ul.preview-chips { justify-content: flex-start; }
+    .preview-name { font-size: 1.3rem; }
+    .preview-line { min-height: 3em; }
+    .paper .journey-main { padding: 12px 0; }
+    .pick-wrap .paper-title { font-size: 1.75rem; }
+    .pick-wrap .paper-lede { margin-bottom: .8rem; }
+    .paper .start-wrap { grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: 1.6rem 1.1rem; }
+    .paper .agent-card { flex-direction: row; justify-content: flex-start; gap: .8rem; order: -1; text-align: left; }
+    .paper .agent-portrait { width: 84px; height: 92px; flex: none; }
+    .paper .start-actions .btn { flex: 1 1 auto; }
+}
+
+/* The narrowest phones wrap a tutor's line onto a third row, so keep room for it. */
+@media (max-width: 22.5rem) {
+    .preview-line { min-height: 4.5em; }
+}

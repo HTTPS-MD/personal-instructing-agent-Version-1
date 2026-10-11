@@ -56,25 +56,6 @@ body.opacity-0 { opacity: 0; }
 
 .journey > *:not(.journey-ambient) { position: relative; z-index: 1; }
 
-/* The classroom from the landing page (its light or dark version, to match the theme) behind the questionnaire, under a heavy wash of the page colour: the
-   room is there to be felt, not to compete with the questions. The wash follows the theme, so light and dark
-   both keep their reading contrast. */
-.journey-ambient--classroom {
-    background-image:
-        var(--grain),
-        linear-gradient(color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 64%, transparent)),
-        url("../../assets/images/classroom-bg-light.webp");
-    background-size: 11.25rem 11.25rem, cover, cover;
-    background-position: 0 0, center, center bottom;
-    background-repeat: repeat, no-repeat, no-repeat;
-}
-:root[data-theme="dark"] .journey-ambient--classroom {
-    background-image:
-        var(--grain),
-        linear-gradient(color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 64%, transparent)),
-        url("../../assets/images/classroom-bg-dark.webp");
-}
-
 /* The rule above outranks .journey-bar's own position: sticky, so the bar
    used to scroll away with the page — Sign out included. It stays on top
    now. <main> takes no stacking context of its own, so its fixed layers
@@ -125,151 +106,6 @@ body.opacity-0 { opacity: 0; }
 .journey-brand { display: flex; align-items: center; gap: var(--sp-3); flex: 0 0 auto; }
 
 .journey-bar-right { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; }
-
-/* ---- 2.2 Stage rail: shows all four stages so the student can see where
-        they are and what is still ahead. Fixed-size dots, so marking one
-        complete never reflows the row. ---- */
-.stage-rail {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    height: 32px;
-    padding: 0 var(--sp-3);
-    border: 1px solid var(--line);
-    border-radius: 0;
-    background: transparent;
-}
-
-.stage-node {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    font-size: var(--fs-sm);
-    font-weight: 600;
-    color: var(--text-faint);
-    white-space: nowrap;
-}
-
-.stage-node .pip {
-    width: 8px;
-    height: 8px;
-    flex: 0 0 8px;
-    border-radius: 50%;
-    background: var(--track);
-}
-
-.stage-node.is-done { color: var(--text-muted); }
-.stage-node.is-done .pip { background: var(--warning); }
-.stage-node.is-current { color: var(--accent); }
-.stage-node.is-current .pip { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-
-.stage-sep { width: 14px; height: 2px; border-radius: 2px; background: var(--track); flex: 0 0 14px; }
-
-/* ================================================== 3. WAITING ROOM ==== */
-
-/* Waiting room: the shared homepage type, caption and hard rules stay quiet
-   while the student waits; there is no fake action or decorative animation. */
-.wait-section {
-    width: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(19rem, .9fr);
-    align-items: center;
-    gap: clamp(2rem, 7vw, 7rem);
-    padding: clamp(2.5rem, 7vh, 6rem) 0;
-}
-
-.wait-intro,
-.wait-details { min-width: 0; }
-
-.wait-kicker,
-.wait-details-kicker {
-    width: fit-content;
-    margin: 0 0 var(--sp-6);
-    padding: .5rem .75rem;
-    background: var(--volt);
-    color: var(--on-volt);
-    font-family: var(--font-mono);
-    font-size: .75rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    line-height: 1.3;
-}
-
-.wait-kicker span { padding-inline: .25rem; }
-
-.wait-title {
-    max-width: 11ch;
-    margin: 0 0 var(--sp-5);
-    font-family: var(--font-display);
-    font-size: clamp(3.25rem, 6vw, 5.75rem);
-    font-weight: 700;
-    letter-spacing: -.065em;
-    line-height: .99;
-    text-wrap: balance;
-    overflow-wrap: anywhere;
-}
-
-.wait-desc {
-    font-size: clamp(1rem, 1.35vw, 1.125rem);
-    line-height: 1.6;
-    color: var(--text-muted);
-    max-width: 39ch;
-    margin: 0;
-}
-
-.wait-details {
-    border-top: .375rem solid var(--volt);
-    padding-top: var(--sp-6);
-}
-
-.wait-details-kicker {
-    margin-bottom: var(--sp-4);
-    padding: 0;
-    background: transparent;
-    color: var(--accent-strong);
-}
-
-.wait-promise {
-    max-width: 22ch;
-    margin: 0 0 var(--sp-6);
-    font-family: var(--font-display);
-    font-size: clamp(1.5rem, 2.2vw, 2.25rem);
-    font-weight: 700;
-    letter-spacing: -.04em;
-    line-height: 1.15;
-}
-
-.facts-list { margin: 0; }
-.facts-list > div {
-    display: grid;
-    grid-template-columns: minmax(6.5rem, .6fr) minmax(0, 1fr);
-    gap: var(--sp-3);
-    padding: .85rem 0;
-    border-top: 1px solid var(--line);
-}
-.facts-list > div:last-child { border-bottom: 1px solid var(--line); }
-.facts-list dt {
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: .75rem;
-    line-height: 1.5;
-    letter-spacing: .025em;
-}
-.facts-list dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; min-height: 1.5em; }
-
-.wait-note {
-    margin: var(--sp-5) 0 0;
-    max-width: 42ch;
-    font-size: var(--fs-sm);
-    line-height: 1.6;
-    color: var(--text-muted);
-}
-
-@media (max-width: 760px) {
-    .wait-section { grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); }
-    .wait-title { max-width: 13ch; font-size: clamp(3rem, 10vw, 4.75rem); }
-    .wait-details { max-width: 38rem; }
-}
 
 @media (max-width: 380px) {
     .journey #pia-signout-who { display: none; }
@@ -554,211 +390,19 @@ body.opacity-0 { opacity: 0; }
 
 .quit-progress-row b { color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* ============================================ 5. CHARACTER SELECTION === */
-
-.pick-wrap {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
-    gap: var(--sp-6);
-    align-items: start;
-    width: 100%;
-}
-
-.pick-head { margin-bottom: var(--sp-5); }
-
-.pick-title {
-    font-family: var(--font-display);
-    font-size: clamp(2.5rem, 5vw, 4.25rem);
-    font-weight: 700;
-    letter-spacing: -.055em;
-    line-height: 1.06;
-    margin-bottom: var(--sp-4);
-}
-
-.pick-lede { font-size: clamp(1rem, 1.4vw, 1.125rem); line-height: 1.65; color: var(--text-muted); max-width: 54ch; }
-.pick-mobile-note { display: none; }
-
-.persona-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
-
-/* Uniform min-height so the grid never re-flows as a card is chosen. */
-.persona-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 216px;
-    padding: var(--sp-4);
-    border-radius: var(--r-lg);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-    text-align: center;
-    cursor: pointer;
-    transition: background-color var(--t-base);
-}
-
-.persona-card:hover { background: var(--bg-surface-hover); }
-.persona-card.selected { background: var(--accent-soft); }
-.persona-card.selected .persona-name { color: var(--accent); }
-
-.persona-thumb {
-    width: 76px;
-    height: 106px;
-    flex: 0 0 106px;
-    margin-bottom: var(--sp-3);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-}
-
-.persona-thumb img { width: 100%; height: 100%; object-fit: contain; }
-
-/* Unchosen personas sit back rather than being dimmed to grey mush — the
-   filter is what the controller toggles, so the class name is preserved. */
-.agent-img-thumbnail { transition: filter var(--t-base), opacity var(--t-base); }
-.agent-img-thumbnail.grayscale { filter: grayscale(1); opacity: 0.55; }
-
-.persona-name { font-size: var(--fs-sm); font-weight: 700; line-height: 1.3; transition: color var(--t-base); }
-.persona-role { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-muted); }
-
-/* ---- 5.1 Preview panel ---- */
-.preview-card {
-    position: sticky;
-    top: 92px;
-    padding: var(--sp-6);
-    border-radius: var(--r-xl);
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-card);
-}
-
-.preview-portrait {
-    width: clamp(6rem, 28vw, 8.25rem);
-    aspect-ratio: 5 / 7;
-    height: auto;
-    margin: 0 auto var(--sp-4);
-    border-radius: var(--r-lg);
-    background: var(--bg-field);
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-}
-
-.preview-portrait img { width: 100%; height: 100%; object-fit: contain; }
-
-.preview-role {
-    display: block;
-    min-height: 18px;
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    text-align: center;
-}
-
-/* Both reserved: the panel starts empty and fills on the first pick, and the
-   text lengths differ per persona. */
-.preview-name {
-    min-height: 30px;
-    margin-top: var(--sp-1);
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    text-align: center;
-}
-
-.preview-desc {
-    min-height: 8rem;
-    margin-top: var(--sp-3);
-    font-size: var(--fs-sm);
-    line-height: 1.65;
-    color: var(--text-muted);
-    text-align: center;
-}
-
-.preview-traits { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-2); }
-
-.trait-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    min-height: 46px;
-    padding: 0 var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--bg-field);
-    font-size: var(--fs-sm);
-}
-
-.trait-key { color: var(--text-muted); }
-.trait-val { font-weight: 700; text-align: right; }
-
-.preview-actions { margin-top: var(--sp-5); }
-.preview-actions .btn { height: 52px; font-size: 15px; font-weight: 700; }
-
-.pick-status {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    height: 32px;
-    padding: 0 var(--sp-3);
-    border-radius: var(--r-pill);
-    background: var(--bg-chip);
-    font-size: var(--fs-sm);
-    font-weight: 700;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
 /* ------------------------------------------------------- 6. RESPONSIVE */
-@media (max-width: 1024px) {
-    .pick-wrap { grid-template-columns: minmax(0, 1fr); }
-    .preview-card { position: static; }
-    .pick-mobile-note { display: block; margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--accent); }
-    .preview-desc { min-height: 10rem; }
-}
-
 @media (max-width: 720px) {
     .journey-shell { padding: 0 var(--sp-4); }
     .journey-main { padding: var(--sp-5) 0 var(--sp-8); }
-    .wait-section { padding: var(--sp-5) 0; }
-    .facts-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
     .gate-wrap { padding: var(--sp-6) var(--sp-5); }
     .gate-wrap.gate-open { padding: var(--sp-5) 0; }
     .question-card { padding: var(--sp-6) var(--sp-4); }
-    .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stage-rail.hide-sm { display: none; }
     .test-nav .btn { min-width: 0; flex: 1 1 auto; }
 }
 
 @media (max-width: 380px) {
-    .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
-    .persona-card { min-height: 188px; padding: var(--sp-3); }
-    .persona-thumb { width: 64px; height: 90px; flex-basis: 90px; }
     .question-text { min-height: 144px; }
 }
-
-/* ---------------------------------------------- 7. PERSONA ART FALLBACK --
-   If both persona and tutor images fail, show a monogram in the same box. */
-.persona-thumb[data-mono]::after,
-.preview-portrait[data-mono]::after {
-    content: attr(data-mono);
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--accent);
-}
-
-.preview-portrait[data-mono]::after { font-size: 34px; }
-
-.persona-thumb[data-mono] img,
-.preview-portrait[data-mono] img { display: none; }
-
-/* Distinct tint per persona so they remain tellable apart at a glance. */
-/* Personas are told apart by their NAME, not by colour — relying on hue alone
-   to distinguish six options fails for colour-blind users anyway. The monogram
-   uses the accent, and the selected card carries the tint. */
-.persona-thumb[data-mono]::after { color: var(--accent); }
 
 /* Back/Next/Submit swap by question: [hidden] must beat .btn's display. */
 .test-nav [hidden] { display: none !important; }
@@ -769,7 +413,6 @@ body.opacity-0 { opacity: 0; }
 .journey-bar-right { min-width: 0; flex: 0 1 auto; }
 .journey-bar-right > :not(.btn-signout) { min-width: 0; }
 @media (max-width: 480px) {
-    .journey-bar-right .pick-status { display: none; }
     .journey-bar-right .btn-signout { flex: 0 0 auto; }
 }
 
@@ -778,9 +421,6 @@ body.opacity-0 { opacity: 0; }
    The questionnaire (body.quiz) is one paper-coloured card on the classroom: a thick outline, flat buttons,
    a yellow highlighter on the picked answer. It follows the light / dark switch in the header. Nothing here
    says which stage the student is in. */
-:root[data-theme="dark"] .quiz  { --q-paper: #111A47; --q-ink: #FFF9EA; --q-soft: #B9C0E0; --q-field: #17225C; }
-:root[data-theme="light"] .quiz { --q-paper: #FFF9EA; --q-ink: #0B1233; --q-soft: #4A5170; --q-field: #FFFFFF; }
-
 .quiz .journey-main,
 .quiz .journey-main:has(#test-container:not(.hidden)) { align-items: center; padding: var(--sp-5) 0; }
 
@@ -796,13 +436,6 @@ body.opacity-0 { opacity: 0; }
     color: var(--q-ink);
     box-shadow: none;
 }
-
-/* The header buttons: Quit and the theme switch, the same square outline as the landing page. */
-.quiz .btn-theme { width: 44px; padding: 0; display: inline-grid; place-items: center; }
-.btn-theme svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-:root[data-theme="dark"] .btn-theme .theme-moon,
-:root[data-theme="light"] .btn-theme .theme-sun { display: none; }
-.quiz .journey-bar-right { gap: 10px; }
 
 /* ---- consent screen ---- */
 .quiz .gate-title { margin: 0 0 .6rem; font-size: clamp(2rem, 4.4vw, 2.8rem); letter-spacing: -.04em; line-height: 1.12; text-wrap: auto; }

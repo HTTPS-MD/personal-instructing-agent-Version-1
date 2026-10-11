@@ -141,7 +141,6 @@
     function showHelpHint() {
         if (!helpBtn) { return; }
         clearSpotlight();
-        var rect = helpBtn.getBoundingClientRect();
 
         /* The note lives IN the page flow, directly under the top bar, so it
            can never sit on top of the heading or a control (at any width).
@@ -157,8 +156,12 @@
         if (bar && bar.parentNode) { bar.parentNode.insertBefore(note, bar.nextSibling); }
         else { document.body.insertBefore(note, document.body.firstChild); }
         setTimeout(function () {
-            inner.textContent = 'You can replay the tutorial any time with the Tutorial button at the top of the page.';
+            inner.textContent = 'You can replay the tutorial any time with the How it works button.';
         }, 50);
+
+        /* Measured AFTER the note is in the page: it takes a fixed height (see .tutorial-callout), so the button does not
+           move again when its words arrive. */
+        var rect = helpBtn.getBoundingClientRect();
 
         helpBtn.classList.add('is-spotlight');
         var done = function () { clearSpotlight(); };

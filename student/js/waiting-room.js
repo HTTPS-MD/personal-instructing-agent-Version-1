@@ -1,9 +1,3 @@
-// Presentation only: names the stage this page is waiting on.
-function setWaitingFor(label) {
-    const el = document.getElementById('waiting-for');
-    if (el) el.textContent = label;
-}
-
 /**
  * Evaluates the student's progress state and routes them accordingly without overriding targeted access.
  */
@@ -38,16 +32,12 @@ async function checkUserAndStage() {
         await supabaseClient.rpc('set_student_stage', { p_stage: 'Waiting Room' });
     }
 
+    // The page says the same thing whichever stage comes next: a waiting student is never told which one
+    // (a Control student has no tutoring stage at all, and nobody should learn the order of the study here).
     if (canEnterStage(profile, 'ocean')) {
-        // Hindi binabanggit ang pangalan ng instrumento sa estudyante.
-        document.getElementById('waiting-title').textContent = "Waiting for the questionnaire";
-        setWaitingFor('The questionnaire');
         checkAndListen('stage_ocean', 'ocean-test.html');
     }
     else if (canEnterStage(profile, 'char')) {
-        document.getElementById('waiting-title').textContent = "Waiting for Character Selection";
-        setWaitingFor('Character selection');
-        document.getElementById('waiting-desc').textContent = "The character selection stage is currently closed. Please wait for your instructor to open it.";
         checkAndListen('stage_char', 'character-selection.html');
     }
     else if (isControlGroup(profile)) {
@@ -55,9 +45,6 @@ async function checkUserAndStage() {
         window.location.replace('assessment-complete.html');
     }
     else {
-        document.getElementById('waiting-title').textContent = "Waiting for Dashboard";
-        setWaitingFor('The tutoring dashboard');
-        document.getElementById('waiting-desc').textContent = "The tutoring dashboard is currently closed. Please stand by.";
         checkAndListen('stage_dash', 'student-dashboard.html');
     }
 }
