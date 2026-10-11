@@ -585,46 +585,54 @@ const DASH = '/student/html/student-dashboard.html';
       await p.context().close();
     });
   }
-  /* Step 1 (turning a percentage into a decimal): the same bubble, the decimal point hopping two places to the left. */
-  const SHIFT_EXAMPLE = 'Example: 35 / 100. Divide by 100: move the decimal point 2 places to the left (fill an empty place with 0). 35 / 100 = 0.35.';
-  for (const [w, h] of [[1440, 850], [1024, 768], [375, 700]]) {
-    await check(`step 1 example (divide by 100) at ${w}x${h}: in the bubble, nothing moves, the point hops left`, async () => {
-      const p = await open(DASH, { width: w, height: h, motion: 'no-preference' });
-      await start(p);
-      await p.evaluate(ex => { window.__bank.filter(q => q.topic === 1).forEach(q => { q.steps[0].hint2 = ex; }); }, SHIFT_EXAMPLE);
-      await submit(p, '999'); await submit(p, '998');                          // the hint button appears after wrong answers
-      await p.locator('#hint-btn').click(); await p.waitForTimeout(2000);
-      const bubble = await boxOf(p, '#status-msg'), tutor = await boxOf(p, '#agent-img');
-      await p.locator('#hint-btn').click();
-      await p.waitForSelector('#status-msg .hb-inline'); await p.waitForTimeout(1700);
-      assert.ok(same(bubble, await boxOf(p, '#status-msg')), 'the bubble keeps its size and place');
-      assert.ok(same(tutor, await boxOf(p, '#agent-img')), 'the tutor keeps size and place');
-      const frame = () => p.evaluate(() => {
-        const q = s => document.querySelector(s), rc = e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; };
-        const cap = q('.hb-caption'), rg = document.createRange(); rg.selectNodeContents(cap);
-        const wrap = q('.hb-inline'), bub = q('#status-msg').getBoundingClientRect();
-        return { board: rc(q('.hb-board')), caption: rc(cap), controls: rc(q('.hb-controls')), next: rc(q('.hb-next')), line: rg.getClientRects()[0].top,
-          dot: q('.hb-dot').getBoundingClientRect().left, dotOn: getComputedStyle(q('.hb-dot')).opacity,
-          capOverflow: cap.scrollHeight - cap.clientHeight, wrapOverflow: wrap.scrollHeight - wrap.clientHeight, inside: wrap.getBoundingClientRect().bottom <= bub.bottom + 0.5,
-          shown: q('.hb-board').getAttribute('data-shown'), total: Number(q('.hb-progress span:last-child').textContent.match(/of (\d+)/)[1]) };
+  /* Long division in the bracket (Step 1: a percentage divided by 100; also the division step of increase/decrease). */
+  const DIV_EXAMPLES = {
+    '8 / 100': ['Example: 8 / 100. 8 is smaller than 100, so the answer starts with "0." Then: 80 / 100 = 0 (remainder 80), then 800 / 100 = 8. So 8 / 100 = 0.08.', '0.08'],
+    '15 / 60': ['Example: 15 / 60. 15 is smaller than 60, so the answer starts with "0." Then: 150 / 60 = 2 (remainder 30), then 300 / 60 = 5. So 15 / 60 = 0.25.', '0.25'],
+    '13 / 52': ['Example: 13 / 52. 13 is smaller than 52, so the answer starts with "0." Then: 130 / 52 = 2 (remainder 26), then 260 / 52 = 5. So 13 / 52 = 0.25.', '0.25']
+  };
+  for (const [w, h] of [[1440, 850], [1280, 720], [1024, 768], [412, 900], [375, 700]]) {
+    for (const key of Object.keys(DIV_EXAMPLES)) {
+      if (key !== '8 / 100' && w !== 1440 && w !== 375) continue;
+      await check(`long division example ${key} at ${w}x${h}: in the bubble, nothing moves, the answer is written on top`, async () => {
+        const [text, result] = DIV_EXAMPLES[key];
+        const p = await open(DASH, { width: w, height: h, motion: 'no-preference' });
+        await start(p);
+        await p.evaluate(ex => { window.__bank.filter(q => q.topic === 1).forEach(q => { q.steps[0].hint2 = ex; }); }, text);
+        await submit(p, '999'); await submit(p, '998');                        // the hint button appears after wrong answers
+        await p.locator('#hint-btn').click(); await p.waitForTimeout(2000);
+        const bubble = await boxOf(p, '#status-msg'), tutor = await boxOf(p, '#agent-img');
+        await p.locator('#hint-btn').click();
+        await p.waitForSelector('#status-msg .hb-inline'); await p.waitForTimeout(1700);
+        assert.ok(same(bubble, await boxOf(p, '#status-msg')), 'the bubble keeps its size and place');
+        assert.ok(same(tutor, await boxOf(p, '#agent-img')), 'the tutor keeps size and place');
+        const frame = () => p.evaluate(() => {
+          const q = s => document.querySelector(s), rc = e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; };
+          const cap = q('.hb-caption'), rg = document.createRange(); rg.selectNodeContents(cap);
+          const wrap = q('.hb-inline'), bub = q('#status-msg').getBoundingClientRect(), bd = q('.hb-board').getBoundingClientRect(), cp = cap.getBoundingClientRect();
+          return { board: rc(q('.hb-board')), caption: rc(cap), controls: rc(q('.hb-controls')), next: rc(q('.hb-next')), line: rg.getClientRects()[0].top,
+            capOverflow: cap.scrollHeight - cap.clientHeight, wrapOverflow: wrap.scrollHeight - wrap.clientHeight, boardClipped: q('.hb-board').scrollWidth - q('.hb-board').clientWidth + q('.hb-board').scrollHeight - q('.hb-board').clientHeight,
+            inside: wrap.getBoundingClientRect().bottom <= bub.bottom + 0.5 && bd.right <= cp.left + 1, font: parseFloat(getComputedStyle(q('.hb-grid')).fontSize),
+            answer: Array.from(document.querySelectorAll('.hb-qrow .hb-c.is-on')).map(c => c.textContent).join(''), rows: document.querySelectorAll('.hb-dr').length,
+            total: Number(q('.hb-progress span:last-child').textContent.match(/of (\d+)/)[1]) };
+        });
+        const first = await frame(); let moved = 0, last = first;
+        assert.ok(first.font >= 11, 'readable type: ' + first.font);
+        for (let i = 1; i < first.total; i++) {
+          await p.locator('.hb-next').click(); await p.waitForTimeout(330);
+          const f = last = await frame();
+          for (const k of ['board', 'caption', 'controls', 'next']) f[k].forEach((v, j) => { moved = Math.max(moved, Math.abs(v - first[k][j])); });
+          moved = Math.max(moved, Math.abs(f.line - first.line));
+          assert.equal(f.capOverflow, 0, 'the whole caption fits on step ' + (i + 1)); assert.equal(f.wrapOverflow <= 1, true, 'nothing is clipped'); assert.equal(f.boardClipped <= 1, true, 'the work fits its place');
+          assert.equal(f.inside, true, 'the work is inside the bubble and apart from the words');
+        }
+        assert.ok(moved <= 0.6, 'nothing moved between steps: ' + moved + 'px');
+        assert.equal(last.answer, result, 'the answer on top');
+        assert.match(await p.locator('.hb-caption').innerText(), new RegExp(result.replace('.', '\\.')));
+        assert.equal((await p.locator('.hb-next').textContent()).trim(), '\u21bb');
+        await p.context().close();
       });
-      const first = await frame(); let moved = 0; const dots = [];
-      for (let i = 1; i < first.total; i++) {
-        await p.locator('.hb-next').click(); await p.waitForTimeout(900);
-        const f = await frame();
-        for (const k of ['board', 'caption', 'controls', 'next']) f[k].forEach((v, j) => { moved = Math.max(moved, Math.abs(v - first[k][j])); });
-        moved = Math.max(moved, Math.abs(f.line - first.line));
-        assert.equal(f.capOverflow, 0, 'the whole caption fits on step ' + (i + 1)); assert.equal(f.wrapOverflow <= 1, true); assert.equal(f.inside, true);
-        if (f.dotOn === '1') dots.push(Math.round(f.dot));
-      }
-      assert.ok(moved <= 0.6, 'nothing moved between steps: ' + moved + 'px');
-      const hops = dots.filter((v, i) => i === 0 || v !== dots[i - 1]);
-      assert.equal(hops.length, 3, 'the point is at the right, then one place left, then two: ' + dots);
-      assert.ok(hops[0] > hops[1] && hops[1] > hops[2], 'each hop is to the left: ' + hops);
-      assert.match(await p.locator('.hb-caption').innerText(), /35 \u00f7 100 = 0\.35/);
-      assert.equal((await p.locator('.hb-next').textContent()).trim(), '\u21bb');
-      await p.context().close();
-    });
+    }
   }
   await check('worked example in the chat: a wrong answer keeps it, a right answer removes it, the next hint removes it', async () => {
     const p = await open(DASH, { width: 1280, height: 800, motion: 'no-preference' });

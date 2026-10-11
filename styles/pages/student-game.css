@@ -779,7 +779,7 @@ body.is-playing #pia-change-password { display: none; }
     font-family: var(--font-mono);
     /* five rows of figures and two rules in the bubble's full height (the arrows are under the words, not under the
        work), but never wider than about a third of the bubble, so the words keep their room */
-    font-size: clamp(0.7rem, min(calc((100cqh - 12px) / 5.75), 7cqw), 1.5rem);
+    font-size: clamp(0.7rem, min(calc((100cqh - var(--hb-pad, 12px)) / var(--hb-rows, 5.75)), 7cqw), 1.5rem);
     font-weight: 700;
     line-height: 1.15;
 }
@@ -827,7 +827,6 @@ body.is-playing #pia-change-password { display: none; }
 .hb-board[data-shown~="p1"] .hb-p1,
 .hb-board[data-shown~="p2"] .hb-p2,
 .hb-board[data-shown~="p0"] .hb-line1,
-.hb-board[data-shown~="sum"] .hb-line1,
 .hb-board[data-shown~="sum"] .hb-line2,
 .hb-board[data-shown~="sum"] .hb-sum { opacity: 1; }
 
@@ -846,8 +845,21 @@ body.is-playing #pia-change-password { display: none; }
 .hb-board[data-focus~="p1"] .hb-p1,
 .hb-board[data-focus~="p2"] .hb-p2,
 .hb-board[data-focus~="sum"] .hb-sum { background: color-mix(in srgb, var(--volt) 55%, transparent); }
-.hb-board[data-focus~="zeros"] .hb-z { background: color-mix(in srgb, var(--volt) 55%, transparent); }
 .hb-board[data-focus~="done"] .hb-sum { background: color-mix(in srgb, var(--palette-green) 45%, transparent); }
+
+/* Long division: the divisor outside the bracket, the number inside, the answer on top. Every row sits on the same
+   columns (the digits, and a narrow one for the point); what each row shows is switched on by hint-whiteboard.js. */
+.hb-dr { display: flex; justify-content: flex-start; width: 100%; }
+.hb-gut { flex: none; width: var(--hb-gut, 1.7em); padding-inline-end: 0.2em; text-align: end; }
+.hb-cells { display: inline-flex; padding-inline: 0.15em; border-inline-start: 3px solid transparent; }
+.hb-bracket { border-block-start: 3px solid transparent; }
+.hb-bracket.is-on { border-inline-start-color: var(--palette-ink); border-block-start-color: var(--palette-ink); }
+.hb-sub { border-block-start: 3px solid transparent; }
+.hb-sub.is-on { border-block-start-color: var(--palette-ink); }
+.hb-bring { color: var(--palette-violet); }
+.hb-long [data-part] { opacity: 0; transition: opacity 250ms linear, background-color 250ms linear; }
+.hb-long [data-part].is-on { opacity: 1; }
+.hb-long .hb-c.is-focus, .hb-long .hb-gut.is-focus { background: color-mix(in srgb, var(--volt) 55%, transparent); }
 
 @keyframes hbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
 
@@ -902,5 +914,5 @@ body.is-playing #pia-change-password { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
     .hb-board[data-focus~="ghost"] .hb-ghost { animation: none; }
-    .hb-row, .hb-line, .hb-ghost { transition: none; }
+    .hb-row, .hb-line, .hb-ghost, .hb-long [data-part] { transition: none; }
 }

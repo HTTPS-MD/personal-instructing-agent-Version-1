@@ -76,48 +76,66 @@ check('the board never draws the student\'s own numbers (the example is another 
 
 check('text that is not a multiply example is left alone (the game shows the text only)', () => {
   for (const text of ['0.5 * 30', 'Work out 0.5 times 30, then write the result as your final answer.', '', null, undefined,
-    'Example: 15 / 60. 15 is smaller than 60, so the answer starts with "0." Then: 150 / 60 = 2. So 15 / 60 = 0.25.',
+    'Example: 60 / 15. 60 is smaller than 15, so the answer starts with "0." Then: 600 / 15 = 40.', 'Example: 0 / 15. 0 is smaller than 15, so the answer starts with "0." Then: 0.',
+    'Example: 15 / 60. Divide by 60.', '15 / 60',
     'Example: 25 * 55. Ignore the decimal point: 25 * 55 = 1375.', 'Check your calculations carefully.',
     'Example: 0.25 * 55555. Ignore the decimal point: 25 * 55555 = 1388875.']) assert.equal(B.parseExample(text), null, String(text));
 });
 
-/* ---- dividing a percentage by 100: the decimal point moves two places to the left ---- */
-function verifyShift(n) {
-  const m = B.build({ kind: 'shift', number: n });
-  assert.equal(m.dp, 2);
-  assert.equal(m.padded.length, Math.max(3, n.length + 0) , 'a 0 in front, so the point has somewhere to land: ' + m.padded);
-  assert.equal(m.padded, String(n).padStart(3, '0'));
-  assert.ok(Math.abs(Number(m.resultText) - Number(n) / 100) < 1e-9, 'the point lands in the right place: ' + m.resultText);
-  assert.equal(m.resultText.replace('.', ''), m.padded, 'the same digits, the point in the new place');
-  assert.equal(m.steps.length, 7);
-  m.steps.forEach(s => { assert.ok(s.caption.length > 10 && s.caption.length < 140, 'caption length: ' + s.caption); assert.ok(s.parts.length >= 1); });
-  assert.deepEqual(m.steps.filter(s => s.dot !== undefined).map(s => s.dot), [0, 1, 2], 'the point starts at the right and hops twice');
+/* ---- long division of a smaller number by a bigger one (the answer starts "0.") ---- */
+function verifyDivide(top, bottom) {
+  const a = Number(top), b = Number(bottom);
+  const m = B.build({ kind: 'divide', top, bottom });
+  assert.ok(m.turns.length >= 1 && m.turns.length <= 4);
+  let cur = a * 10, digits = '';
+  m.turns.forEach((t, i) => {
+    assert.equal(t.cur, cur, 'the number brought down: ' + cur);
+    assert.equal(t.q, Math.floor(cur / b)); assert.equal(t.product, t.q * b, 'product'); assert.equal(t.rem, cur - t.product, 'remainder');
+    assert.ok(t.rem < b, 'the remainder is smaller than the divisor');
+    digits += t.q; cur = t.rem * 10;
+    if (i < m.turns.length - 1) assert.ok(t.rem > 0, 'continues only while something is left');
+  });
+  assert.equal(m.turns[m.turns.length - 1].rem, 0, 'nothing left over at the end');
+  assert.equal(m.resultText, '0.' + digits);
+  assert.ok(Math.abs(Number(m.resultText) - a / b) < 1e-9, 'the answer is a / b: ' + m.resultText + ' for ' + a + '/' + b);
+  assert.equal(m.steps.length, 4 + 3 * m.turns.length, 'three steps per digit, plus writing it out and the last');
+  m.steps.forEach(s => { assert.ok(s.caption.length > 10 && s.caption.length < 150, 'caption length: ' + s.caption); assert.ok(s.parts.length >= 1); });
+  assert.deepEqual(m.steps.flatMap(s => s.parts), m.allParts);
+  assert.equal(new Set(m.allParts).size, m.allParts.length, 'each part appears once');
   assert.ok(m.steps[m.steps.length - 1].caption.includes(m.resultText));
-  assert.deepEqual(m.steps.flatMap(s => s.parts), m.allParts, 'every part is shown exactly once, in order');
+  assert.equal(m.steps[m.steps.length - 1].caption.includes('Shortcut'), b === 100);
   return m;
 }
 
-check('dividing by 100: every one- and two-digit percentage draws the right hops and answer', () => {
-  for (let n = 1; n <= 99; n++) verifyShift(String(n));
+check('long division: a few known cases are right, step by step', () => {
+  const m = verifyDivide('15', '60');
+  assert.deepEqual(m.turns.map(t => [t.cur, t.q, t.product, t.rem]), [[150, 2, 120, 30], [300, 5, 300, 0]]);
+  const z = verifyDivide('8', '100');
+  assert.deepEqual(z.turns.map(t => [t.cur, t.q, t.product, t.rem]), [[80, 0, 0, 80], [800, 8, 800, 0]]);
+  assert.equal(z.resultText, '0.08');
 });
 
-check('the conversion text the generator writes is understood: every percentage problem parses and draws', () => {
-  const rng = seeded(21); let drawn = 0;
-  for (let i = 0; i < 4000; i++) {
-    const d = G.generate('EASY', 10, ['tens', 'hundreds', 'thousands'][i % 3], rng);
-    const ex = B.parseExample(d.steps[0].hint2);
-    assert.ok(ex && ex.kind === 'shift', 'parses: ' + d.steps[0].hint2);
-    const m = verifyShift(ex.number);
-    assert.ok(d.steps[0].hint2.endsWith(m.resultText + '.'), `board answer ${m.resultText} is the one in: ${d.steps[0].hint2}`);
-    assert.notEqual(Number(ex.number) / 100, Number(d.steps[0].answer), 'the example is not the answer');
-    drawn++;
+check('long division: every percentage over 100 draws the right turns and answer', () => {
+  for (let n = 1; n <= 99; n++) verifyDivide(String(n), '100');
+});
+
+check('the text the generator writes is understood: every conversion and division step of thousands of problems parses and draws', () => {
+  const rng = seeded(31); let conv = 0, div = 0;
+  for (let i = 0; i < 6000; i++) {
+    const diff = ['EASY', 'MEDIUM', 'HARD'][i % 3], range = ['tens', 'hundreds', 'thousands'][(i >> 1) % 3];
+    const d = G.generate(diff, 10, range, rng);
+    const places = [];
+    if (diff === 'EASY') places.push(d.steps[0]);
+    if (diff !== 'EASY') places.push(d.steps[1]);
+    for (const st of places) {
+      const ex = B.parseExample(st.hint2);
+      assert.ok(ex && ex.kind === 'divide', 'parses: ' + st.hint2);
+      const m = verifyDivide(ex.top, ex.bottom);
+      assert.ok(st.hint2.endsWith(m.resultText + '.'), `board answer ${m.resultText} is the one in: ${st.hint2}`);
+      if (diff === 'EASY') conv++; else div++;
+    }
   }
-  assert.equal(drawn, 4000);
-});
-
-check('the other two text forms are still not drawn as a shift', () => {
-  for (const text of ['20 / 100', 'Example: 15 / 60. 15 is smaller than 60, so the answer starts with "0." Then: 150 / 60 = 2.', 'Example: 120 / 100. Divide by 100: x', 'Example: 5 / 10. Divide by 10: x'])
-    assert.equal(B.parseExample(text), null, text);
+  assert.ok(conv > 1000 && div > 1000, conv + ' conversions, ' + div + ' divisions');
 });
 
 const failed = results.filter(r => !r.pass);

@@ -109,8 +109,10 @@
                         [16, 64], [24, 32], [13, 52], [36, 48], [27, 36], [14, 40], [26, 40],
                         [12, 60], [18, 60], [36, 60], [42, 60], [48, 60], [54, 60]];
 
-    /* Whole percentages to practise "divide by 100": one digit and two digits, none ending in 0 (so 0.35, not 0.30). */
-    var SHIFT_EXAMPLES = [[35], [45], [65], [12], [18], [28], [8], [7], [3], [6], [9], [55], [22], [16]];
+    /* Whole percentages to practise "divide by 100", as a long division: one digit and two digits, none ending in 0
+       (so 0.35, not 0.30). */
+    var PCT_EXAMPLES = [[35, 100], [45, 100], [65, 100], [12, 100], [18, 100], [28, 100], [8, 100], [7, 100], [3, 100], [6, 100],
+                        [9, 100], [55, 100], [22, 100], [16, 100]];
 
     function decimalPlaces(x) { var s = String(x), i = s.indexOf('.'); return i === -1 ? 0 : s.length - i - 1; }
     function placePoint(int, dp) {
@@ -129,16 +131,6 @@
             ops: [d, n], res: [prod, Number(result)],
             text: 'Example: ' + d + ' * ' + n + '. Ignore the decimal point: ' + whole + ' * ' + n + ' = ' + prod + '. ' + d + ' has ' +
                 places + ', so put the point back ' + dp + ' place' + (dp === 1 ? '' : 's') + ' from the right: ' + result + '.'
-        };
-    }
-
-    /* Converting a percentage: pct / 100 moves the decimal point two places to the left. */
-    function shiftExample(n) {
-        var result = placePoint(n, 2);
-        return {
-            ops: [n], res: [Number(result)],
-            text: 'Example: ' + n + ' / 100. Divide by 100: move the decimal point 2 places to the left (fill an empty place with 0). ' +
-                n + ' / 100 = ' + result + '.'
         };
     }
 
@@ -189,8 +181,8 @@
     /* Step 1 of the two "percentage of a number" problems. The example has as many digits as the student's
        percentage (so a one-digit percentage sees the extra zero), and is never their percentage or their answers. */
     function convertHints(pct, answers, hint1) {
-        var sameSize = SHIFT_EXAMPLES.filter(function (e) { return String(e[0]).length === String(pct).length; });
-        var ex = pickExample(sameSize, shiftExample, [pct], answers) || pickExample(SHIFT_EXAMPLES, shiftExample, [pct], answers);
+        var sameSize = PCT_EXAMPLES.filter(function (e) { return String(e[0]).length === String(pct).length; });
+        var ex = pickExample(sameSize, divExample, [pct], answers) || pickExample(PCT_EXAMPLES, divExample, [pct], answers);
         return {
             hint1: hint1,
             hint2: ex || pct + ' / 100',
