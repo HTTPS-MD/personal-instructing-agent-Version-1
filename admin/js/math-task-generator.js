@@ -11,7 +11,8 @@
  * increase / decrease the changed value stays inside the same size (a Hundreds question never turns
  * into a Thousands one). Hints guide; they never show the result.
  *
- * The two steps that need real skill -- multiplying by a decimal and dividing into a decimal -- teach the
+ * The steps that need real skill -- turning a percentage into a decimal (divide by 100), multiplying by a
+ * decimal and dividing into a decimal -- teach the
  * METHOD with a worked example that uses OTHER numbers (0.25 * 55, 15 / 60), never the student's own. Hint 1
  * says the method, hint 2 shows the example, hint 3 sends the student back to their own numbers without
  * writing the result. An example is used only if it does not work on the question's own two numbers and
@@ -108,6 +109,9 @@
                         [16, 64], [24, 32], [13, 52], [36, 48], [27, 36], [14, 40], [26, 40],
                         [12, 60], [18, 60], [36, 60], [42, 60], [48, 60], [54, 60]];
 
+    /* Whole percentages to practise "divide by 100": one digit and two digits, none ending in 0 (so 0.35, not 0.30). */
+    var SHIFT_EXAMPLES = [[35], [45], [65], [12], [18], [28], [8], [7], [3], [6], [9], [55], [22], [16]];
+
     function decimalPlaces(x) { var s = String(x), i = s.indexOf('.'); return i === -1 ? 0 : s.length - i - 1; }
     function placePoint(int, dp) {
         var s = String(int);
@@ -125,6 +129,16 @@
             ops: [d, n], res: [prod, Number(result)],
             text: 'Example: ' + d + ' * ' + n + '. Ignore the decimal point: ' + whole + ' * ' + n + ' = ' + prod + '. ' + d + ' has ' +
                 places + ', so put the point back ' + dp + ' place' + (dp === 1 ? '' : 's') + ' from the right: ' + result + '.'
+        };
+    }
+
+    /* Converting a percentage: pct / 100 moves the decimal point two places to the left. */
+    function shiftExample(n) {
+        var result = placePoint(n, 2);
+        return {
+            ops: [n], res: [Number(result)],
+            text: 'Example: ' + n + ' / 100. Divide by 100: move the decimal point 2 places to the left (fill an empty place with 0). ' +
+                n + ' / 100 = ' + result + '.'
         };
     }
 
@@ -172,6 +186,18 @@
         };
     }
 
+    /* Step 1 of the two "percentage of a number" problems. The example has as many digits as the student's
+       percentage (so a one-digit percentage sees the extra zero), and is never their percentage or their answers. */
+    function convertHints(pct, answers, hint1) {
+        var sameSize = SHIFT_EXAMPLES.filter(function (e) { return String(e[0]).length === String(pct).length; });
+        var ex = pickExample(sameSize, shiftExample, [pct], answers) || pickExample(SHIFT_EXAMPLES, shiftExample, [pct], answers);
+        return {
+            hint1: hint1,
+            hint2: ex || pct + ' / 100',
+            hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.'
+        };
+    }
+
     function divideHints(top, bottom, answers) {
         var ex = pickExample(DIV_EXAMPLES, divExample, [top, bottom], answers);
         return {
@@ -185,6 +211,7 @@
         var c = chooseWithValue(rng, range, PCT_FIND, function (v, p) { return v * p / 100 >= 1; });
         var total = c.value, pct = c.pct, result = total * pct / 100;
         var mh = multiplyHints(pct / 100, total, [pct / 100, result]);
+        var ch = convertHints(pct, [pct / 100, result], 'Divide percentage by 100 to convert to decimal.');
         return {
             q: 'In a ' + GROUP[range] + ' of ' + money(total) + ' students, ' + pct + '% joined the ' + pick(rng, ACTIVITIES) +
                 '. How many students joined?',
@@ -192,8 +219,7 @@
             points: pts,
             steps: [
                 { prompt: 'Step 1: Convert ' + pct + '% into a decimal.', answer: String(pct / 100),
-                  hint1: 'Divide percentage by 100 to convert to decimal.',
-                  hint2: pct + ' / 100', hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.' },
+                  hint1: ch.hint1, hint2: ch.hint2, hint3: ch.hint3 },
                 { prompt: 'Step 2: Multiply decimal (' + (pct / 100) + ') by total students (' + total + ').',
                   answer: String(result),
                   hint1: mh.hint1, hint2: mh.hint2, hint3: mh.hint3 }
@@ -205,6 +231,7 @@
         var c = chooseWithValue(rng, range, PCT_DISCOUNT, function (v, p) { return v * p / 100 >= 1; });
         var price = c.value, pct = c.pct, discount = price * pct / 100;
         var mh = multiplyHints(pct / 100, price, [pct / 100, discount]);
+        var ch = convertHints(pct, [pct / 100, discount], 'Divide the rate by 100.');
         return {
             q: 'A ' + pick(rng, ITEMS[range]) + ' originally priced at PHP ' + money(price) + ' is on sale with a ' + pct +
                 '% discount. What is the discount amount in PHP?',
@@ -212,7 +239,7 @@
             points: pts,
             steps: [
                 { prompt: 'Step 1: Convert ' + pct + '% into decimal form.', answer: String(pct / 100),
-                  hint1: 'Divide the rate by 100.', hint2: pct + ' / 100', hint3: 'Work out ' + pct + ' divided by 100 and write it as a decimal.' },
+                  hint1: ch.hint1, hint2: ch.hint2, hint3: ch.hint3 },
                 { prompt: 'Step 2: Calculate discount amount by multiplying ' + price + ' by ' + (pct / 100) + '.',
                   answer: String(discount),
                   hint1: mh.hint1, hint2: mh.hint2, hint3: mh.hint3 }

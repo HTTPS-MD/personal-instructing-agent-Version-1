@@ -827,6 +827,7 @@ body.is-playing #pia-change-password { display: none; }
 .hb-board[data-shown~="p1"] .hb-p1,
 .hb-board[data-shown~="p2"] .hb-p2,
 .hb-board[data-shown~="p0"] .hb-line1,
+.hb-board[data-shown~="sum"] .hb-line1,
 .hb-board[data-shown~="sum"] .hb-line2,
 .hb-board[data-shown~="sum"] .hb-sum { opacity: 1; }
 
@@ -845,6 +846,7 @@ body.is-playing #pia-change-password { display: none; }
 .hb-board[data-focus~="p1"] .hb-p1,
 .hb-board[data-focus~="p2"] .hb-p2,
 .hb-board[data-focus~="sum"] .hb-sum { background: color-mix(in srgb, var(--volt) 55%, transparent); }
+.hb-board[data-focus~="zeros"] .hb-z { background: color-mix(in srgb, var(--volt) 55%, transparent); }
 .hb-board[data-focus~="done"] .hb-sum { background: color-mix(in srgb, var(--palette-green) 45%, transparent); }
 
 @keyframes hbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }

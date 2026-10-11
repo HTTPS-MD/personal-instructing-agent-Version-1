@@ -34,13 +34,38 @@
     /* The multiply example the question generator writes: "Example: 0.25 * 55. Ignore the decimal point: ..." */
     var MULTIPLY = /^Example: (\d+\.\d{1,3}) \* (\d{1,4})\. Ignore the decimal point: /;
 
+    /* The conversion example: "Example: 35 / 100. Divide by 100: move the decimal point 2 places to the left. ..." */
+    var DIVIDE_BY_100 = /^Example: (\d{1,2}) \/ 100\. Divide by 100: /;
+
     function parseExample(text) {
-        var m = MULTIPLY.exec(String(text == null ? '' : text));
-        return m ? { kind: 'multiply', decimal: m[1], whole: m[2] } : null;
+        var t = String(text == null ? '' : text), m = MULTIPLY.exec(t);
+        if (m) { return { kind: 'multiply', decimal: m[1], whole: m[2] }; }
+        m = DIVIDE_BY_100.exec(t);
+        return m ? { kind: 'shift', number: String(Number(m[1])) } : null;
+    }
+
+    /* Dividing a whole number by 100: the decimal point moves two places to the left (zeros fill the gaps).
+       The digits are written again with a 0 in front, so there is always a place for the point to land. */
+    function buildShift(example) {
+        var n = example.number, dp = 2;
+        var padded = placePoint(n, dp).replace('.', '');          // 35 -> "035", 8 -> "008"
+        var resultText = placePoint(n, dp);                       // "0.35", "0.08"
+        var steps = [
+            { parts: ['a', 'b'], caption: 'Write the number and what you divide by: ' + n + ' \u00f7 100.' },
+            { parts: ['ghost'], caption: n + ' is a whole number, so it has a hidden decimal point at the end: ' + n + '.' },
+            { parts: ['zeros'], caption: '100 has 2 zeros. Dividing by 100 moves the decimal point 2 places to the left.' },
+            { parts: ['sum'], dot: 0, caption: 'Write the digits again with a 0 in front for the empty place: ' + padded + '.' },
+            { parts: ['hop1'], dot: 1, caption: 'Move the point 1 place to the left.' },
+            { parts: ['hop2'], dot: 2, caption: 'Move it 1 more place: ' + resultText + '.' },
+            { parts: ['done'], caption: 'So ' + n + ' \u00f7 100 = ' + resultText + '. Now try it with your numbers!' }
+        ];
+        return { kind: 'shift', number: n, dp: dp, padded: padded, resultText: resultText, steps: steps,
+                 allParts: ['a', 'b', 'ghost', 'zeros', 'sum', 'hop1', 'hop2', 'done'] };
     }
 
     /* Everything the board shows, as data. `steps` are in order; each says which parts appear and what to read. */
     function build(example) {
+        if (example.kind === 'shift') { return buildShift(example); }
         var d = example.decimal, n = example.whole;
         var dp = decimalPlaces(d);
         var digits = String(Number(d.replace('.', '')));                  // 0.25 -> "25", 0.05 -> "5"
@@ -70,7 +95,8 @@
         steps.push({ parts: ['point'], caption: 'Start at the right and move the decimal point ' + places + ' to the left: ' + resultText + '.' });
         steps.push({ parts: ['done'], caption: 'So ' + d + ' × ' + n + ' = ' + resultText + '. Now try it with your numbers!' });
 
-        return { decimal: d, whole: n, dp: dp, digits: digits, partial: partial, totalText: totalText, resultText: resultText, steps: steps };
+        return { kind: 'multiply', allParts: ['a', 'b', 'ghost', 'ignore'].concat(partial.map(function (p, k) { return 'p' + k; }), ['sum', 'count', 'point', 'done']),
+                 decimal: d, whole: n, dp: dp, digits: digits, partial: partial, totalText: totalText, resultText: resultText, steps: steps };
     }
 
     /* ---- The board: needs a DOM ------------------------------------------------------------------ */
@@ -117,28 +143,35 @@
         board.setAttribute('aria-hidden', 'true');
         var grid = el('div', 'hb-grid');
 
+        var shift = model.kind === 'shift';
         var rowA = el('div', 'hb-row hb-a');
         var numA = el('span', 'hb-num');
-        numA.appendChild(chars(model.whole));
+        numA.appendChild(chars(shift ? model.number : model.whole));
         numA.appendChild(el('span', 'hb-ghost', '.'));
         rowA.appendChild(numA);
 
         var rowB = el('div', 'hb-row hb-b');
-        rowB.appendChild(el('span', 'hb-times', '×'));
-        var dot = model.decimal.indexOf('.');
-        var seenNonZero = false;
-        rowB.appendChild(chars(model.decimal, function (c, i) {
-            if (i < dot) { return 'hb-ign'; }
-            if (i === dot) { return 'hb-ign hb-point'; }
-            if (c !== '0') { seenNonZero = true; }
-            return 'hb-dec' + (seenNonZero ? '' : ' hb-ign');
-        }));
+        if (shift) {
+            rowB.appendChild(el('span', 'hb-times', '\u00f7'));
+            rowB.appendChild(el('span', 'hb-c'));                   // room for the sign, so it never sits on the 1
+            rowB.appendChild(chars('100', function (c, i) { return i ? 'hb-z' : ''; }));
+        } else {
+            rowB.appendChild(el('span', 'hb-times', '×'));
+            var dot = model.decimal.indexOf('.');
+            var seenNonZero = false;
+            rowB.appendChild(chars(model.decimal, function (c, i) {
+                if (i < dot) { return 'hb-ign'; }
+                if (i === dot) { return 'hb-ign hb-point'; }
+                if (c !== '0') { seenNonZero = true; }
+                return 'hb-dec' + (seenNonZero ? '' : ' hb-ign');
+            }));
+        }
 
         grid.appendChild(rowA);
         grid.appendChild(rowB);
         grid.appendChild(el('div', 'hb-line hb-line1'));
 
-        model.partial.forEach(function (p, k) {
+        (shift ? [] : model.partial).forEach(function (p, k) {
             var row = el('div', 'hb-row hb-p hb-p' + k);
             var text = el('span', 'hb-chars');
             text.appendChild(chars(p.value));
@@ -147,9 +180,9 @@
             grid.appendChild(row);
         });
 
-        grid.appendChild(el('div', 'hb-line hb-line2'));
+        if (!shift) { grid.appendChild(el('div', 'hb-line hb-line2')); }
         var rowSum = el('div', 'hb-row hb-sum');
-        var sumChars = chars(model.totalText);
+        var sumChars = chars(shift ? model.padded : model.totalText);
         rowSum.appendChild(sumChars);
         var dotEl = el('span', 'hb-dot');
         rowSum.appendChild(dotEl);
@@ -196,6 +229,20 @@
             dotEl.style.transform = 'translateX(' + (dotX(slotsFromRight) - dotEl.offsetWidth / 2) + 'px)';
         }
 
+        /* Dividing by 100: the point sits at the right of the new digits, then hops left one place per step. */
+        function shiftDot() {
+            var now = null, before = 0;
+            for (var i = 0; i <= index; i++) {
+                if (steps()[i].dot !== undefined) { before = now === null ? 0 : now; now = steps()[i].dot; }
+            }
+            if (now === null) { dotEl.style.opacity = '0'; return; }
+            dotEl.style.opacity = '1';
+            if (steps()[index].dot !== undefined && before !== now) {
+                setDot(before, false);
+                window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { setDot(now, true); }); });
+            } else { setDot(now, false); }
+        }
+
         function render() {
             var shown = [];
             var focus = steps()[index].parts;
@@ -214,6 +261,7 @@
             countText.textContent = ('00' + (index + 1)).slice(-width) + ' / ' + steps().length;
             countSpoken.textContent = 'Step ' + (index + 1) + ' of ' + steps().length;
 
+            if (shift) { shiftDot(); return; }
             var atPoint = shown.indexOf('point') !== -1;
             if (shown.indexOf('sum') === -1) { dotEl.style.opacity = '0'; }
             else {
@@ -276,7 +324,7 @@
         if (options.root) { options.root.classList.add('has-example'); }
         render();
         if (reduced) {
-            board.setAttribute('data-shown', ['a', 'b', 'ghost', 'ignore'].concat(model.partial.map(function (p, k) { return 'p' + k; }), ['sum', 'count', 'point', 'done']).join(' '));
+            board.setAttribute('data-shown', model.allParts.join(' '));
             dotEl.style.opacity = '1';
             setDot(model.dp, false);
         }

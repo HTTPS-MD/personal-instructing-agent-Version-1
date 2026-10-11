@@ -39,6 +39,20 @@ function workedMult(step, dec, other, answers) {
   assert.equal(/\d\s*=\s*\d/.test(step.hint3), false, 'hint3 writes no result');
 }
 
+/* Step 1 of the two "percentage of a number" problems: a worked example of dividing a whole percentage by 100. */
+function workedShift(step, pct, answers) {
+  const m = step.hint2.match(/^Example: (\d{1,2}) \/ 100\. Divide by 100: move the decimal point 2 places to the left \(fill an empty place with 0\)\. \1 \/ 100 = (0\.\d{2})\.$/);
+  assert.ok(m, 'hint2 of a conversion step is a worked example: "' + step.hint2 + '"');
+  const [, n, result] = m;
+  assert.ok(Math.abs(Number(n) / 100 - Number(result)) < 1e-9, 'the example result is n / 100: ' + step.hint2);
+  assert.notEqual(Number(n), pct, 'the example is the question\'s own percentage: ' + step.hint2);
+  assert.equal(n.length, String(pct).length, 'the example has as many digits as the percentage: ' + step.hint2);
+  assert.equal(n.endsWith('0'), false, 'no trailing zero in the example');
+  assert.equal(answers.some(a => Math.abs(a - Number(result)) < 1e-9), false, 'the example shows an answer of the question: ' + result);
+  assert.ok(step.hint3.includes('Work out ' + pct + ' divided by 100'), 'hint3 sends the student back to their own number: ' + step.hint3);
+  assert.equal(/\d\s*=\s*\d/.test(step.hint3), false, 'hint3 writes no result');
+}
+
 /* The same for a divide step (top / bottom, a decimal below 1). */
 function workedDiv(step, top, bottom, answers) {
   const m = step.hint2.match(/^Example: (\d+) \/ (\d+)\. \1 is smaller than \2, so the answer starts with "0\." Then: (.+)\. So \1 \/ \2 = (0\.\d+)\.$/);
@@ -78,7 +92,7 @@ function verify(d, diff, range) {
       assert.equal(d.steps[1].answer, String(res));
       assert.ok(d.steps[0].prompt.includes(pct + '%'));
       assert.ok(d.steps[1].prompt.includes('(' + (pct / 100) + ')') && d.steps[1].prompt.includes('(' + main + ')'), 'step 2 prompt uses the generated values: ' + d.steps[1].prompt);
-      assert.equal(d.steps[0].hint2, pct + ' / 100');
+      workedShift(d.steps[0], pct, [pct / 100, res]);
       workedMult(d.steps[1], pct / 100, main, [pct / 100, res]);
     } else {
       m = d.q.match(/PHP ([\d,]+) is on sale with a (\d+)% discount/); assert.ok(m, 'a known EASY template: ' + d.q);
@@ -88,6 +102,7 @@ function verify(d, diff, range) {
       assert.equal(d.steps[0].answer, String(pct / 100));
       assert.equal(d.steps[1].answer, String(res));
       assert.ok(d.steps[1].prompt.includes(String(main)) && d.steps[1].prompt.includes(String(pct / 100)));
+      workedShift(d.steps[0], pct, [pct / 100, res]);
       workedMult(d.steps[1], pct / 100, main, [pct / 100, res]);
     }
   } else if (diff === 'MEDIUM') {

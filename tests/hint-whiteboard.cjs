@@ -81,6 +81,45 @@ check('text that is not a multiply example is left alone (the game shows the tex
     'Example: 0.25 * 55555. Ignore the decimal point: 25 * 55555 = 1388875.']) assert.equal(B.parseExample(text), null, String(text));
 });
 
+/* ---- dividing a percentage by 100: the decimal point moves two places to the left ---- */
+function verifyShift(n) {
+  const m = B.build({ kind: 'shift', number: n });
+  assert.equal(m.dp, 2);
+  assert.equal(m.padded.length, Math.max(3, n.length + 0) , 'a 0 in front, so the point has somewhere to land: ' + m.padded);
+  assert.equal(m.padded, String(n).padStart(3, '0'));
+  assert.ok(Math.abs(Number(m.resultText) - Number(n) / 100) < 1e-9, 'the point lands in the right place: ' + m.resultText);
+  assert.equal(m.resultText.replace('.', ''), m.padded, 'the same digits, the point in the new place');
+  assert.equal(m.steps.length, 7);
+  m.steps.forEach(s => { assert.ok(s.caption.length > 10 && s.caption.length < 140, 'caption length: ' + s.caption); assert.ok(s.parts.length >= 1); });
+  assert.deepEqual(m.steps.filter(s => s.dot !== undefined).map(s => s.dot), [0, 1, 2], 'the point starts at the right and hops twice');
+  assert.ok(m.steps[m.steps.length - 1].caption.includes(m.resultText));
+  assert.deepEqual(m.steps.flatMap(s => s.parts), m.allParts, 'every part is shown exactly once, in order');
+  return m;
+}
+
+check('dividing by 100: every one- and two-digit percentage draws the right hops and answer', () => {
+  for (let n = 1; n <= 99; n++) verifyShift(String(n));
+});
+
+check('the conversion text the generator writes is understood: every percentage problem parses and draws', () => {
+  const rng = seeded(21); let drawn = 0;
+  for (let i = 0; i < 4000; i++) {
+    const d = G.generate('EASY', 10, ['tens', 'hundreds', 'thousands'][i % 3], rng);
+    const ex = B.parseExample(d.steps[0].hint2);
+    assert.ok(ex && ex.kind === 'shift', 'parses: ' + d.steps[0].hint2);
+    const m = verifyShift(ex.number);
+    assert.ok(d.steps[0].hint2.endsWith(m.resultText + '.'), `board answer ${m.resultText} is the one in: ${d.steps[0].hint2}`);
+    assert.notEqual(Number(ex.number) / 100, Number(d.steps[0].answer), 'the example is not the answer');
+    drawn++;
+  }
+  assert.equal(drawn, 4000);
+});
+
+check('the other two text forms are still not drawn as a shift', () => {
+  for (const text of ['20 / 100', 'Example: 15 / 60. 15 is smaller than 60, so the answer starts with "0." Then: 150 / 60 = 2.', 'Example: 120 / 100. Divide by 100: x', 'Example: 5 / 10. Divide by 10: x'])
+    assert.equal(B.parseExample(text), null, text);
+});
+
 const failed = results.filter(r => !r.pass);
 console.log(JSON.stringify({ pass: results.length - failed.length, fail: failed.length, total: results.length, failures: failed }, null, 1));
 process.exit(failed.length ? 1 : 0);
