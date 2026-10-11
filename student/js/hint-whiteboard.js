@@ -173,8 +173,8 @@
         var countSpoken = el('span', 'hb-sr');
         count.appendChild(countText);
         count.appendChild(countSpoken);
-        controls.appendChild(back);
         controls.appendChild(count);
+        controls.appendChild(back);
         controls.appendChild(next);
         wrap.appendChild(controls);
 
@@ -206,7 +206,8 @@
 
             back.disabled = index === 0;
             var last = index === steps().length - 1;
-            next.textContent = last ? '\u21bb Replay' : '\u2192';
+            next.textContent = last ? '\u21bb' : '\u2192';
+            next.title = last ? 'Replay' : '';
             next.setAttribute('aria-label', last ? 'Replay the example' : 'Next step');
             /* Padded to the width of the total ("01 / 10"), so the count is the same width on every step. */
             var width = String(steps().length).length;
@@ -224,9 +225,24 @@
             }
         }
 
+        /* The words are centred up and down WITHOUT moving between steps: measure the tallest caption of the example once, and
+           centre a box that tall; every caption then starts at the same height, at the top of that box. */
+        var measure = el('p', 'hb-caption hb-measure');
+        function fitCaption() {
+            if (reduced || !caption.clientHeight) { return; }
+            measure.style.width = caption.clientWidth + 'px';
+            wrap.appendChild(measure);
+            var tallest = 0;
+            steps().forEach(function (s) { measure.textContent = s.caption; tallest = Math.max(tallest, measure.scrollHeight); });
+            wrap.removeChild(measure);
+            caption.style.paddingTop = Math.max(0, Math.floor((caption.clientHeight - tallest) / 2)) + 'px';
+        }
+        var watcher = null;
+
         function go(to) { index = Math.max(0, Math.min(steps().length - 1, to)); render(); }
 
         function close() {
+            if (watcher) { watcher.disconnect(); watcher = null; }
             if (wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
             if (options.root) { options.root.classList.remove('has-example'); }
             if (current && current.wrap === wrap) { current = null; }
@@ -264,6 +280,9 @@
             dotEl.style.opacity = '1';
             setDot(model.dp, false);
         }
+        fitCaption();
+        if (window.ResizeObserver) { watcher = new ResizeObserver(fitCaption); watcher.observe(wrap); }
+        if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fitCaption); }
         /* The page may be scrolled past the chat (a phone): bring it into view. */
         try { host.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' }); } catch (e) { /* old browser: it stays where it is */ }
 

@@ -563,6 +563,13 @@ const DASH = '/student/html/student-dashboard.html';
           inside: wrap.getBoundingClientRect().bottom <= bub.bottom + 0.5 && nx.bottom <= bub.bottom + 0.5, total: Number(q('.hb-progress span:last-child').textContent.match(/of (\d+)/)[1]) };
       });
       const first = await frame(); let moved = 0;
+      // the arrows: square, side by side, at the right-hand end, under the words
+      const [pl, pt, pw, ph] = first.prev, [nl, nt, nw, nh] = first.next, [cl, , cw] = first.controls, [, , , ] = first.caption;
+      assert.ok(Math.abs(pw - ph) <= 0.5 && Math.abs(nw - nh) <= 0.5 && Math.abs(pw - nw) <= 0.5, `square buttons, same size: ${pw}x${ph}, ${nw}x${nh}`);
+      assert.ok(Math.abs(pt - nt) <= 0.5 && nl - (pl + pw) <= 12 && nl > pl, 'back and next side by side');
+      assert.ok(Math.abs((nl + nw) - (cl + cw)) <= 1, 'the arrows end at the right edge of their row');
+      assert.ok(first.count[0] + first.count[2] <= pl + 0.5, 'the step count sits to the left of the arrows');
+      assert.ok(first.caption[1] + first.caption[3] <= pt + 0.5, 'the arrows are under the words');
       for (let i = 1; i < first.total; i++) {
         await p.locator('.hb-next').click(); await p.waitForTimeout(220);
         const f = await frame();
@@ -573,6 +580,8 @@ const DASH = '/student/html/student-dashboard.html';
         assert.equal(f.inside, true, 'the arrows are inside the bubble');
       }
       assert.ok(moved <= 0.6, 'nothing moved between steps: ' + moved + 'px');
+      assert.equal((await p.locator('.hb-next').textContent()).trim(), '\u21bb', 'on the last step the button is a repeat arrow');
+      assert.equal(await p.locator('.hb-next').getAttribute('aria-label'), 'Replay the example');
       await p.context().close();
     });
   }
