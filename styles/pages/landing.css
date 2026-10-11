@@ -917,8 +917,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .hero-spine {
     display: none;
     position: absolute;
-    inset-block: calc(var(--topbar-h) + var(--sp-7)) auto;
-    inset-inline-end: calc(var(--gutter) / 2 - 0.5rem);
+    /* Physical offsets on purpose: with vertical-rl the logical inset-* names
+       point the other way. Centred over the play button, never beside it. */
+    right: calc(var(--gutter) + 0.8rem);
+    bottom: calc(var(--sp-6) + 3rem + var(--sp-4));
     writing-mode: vertical-rl;
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
@@ -1269,36 +1271,31 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     .cast-tag { display: none; }
 }
 
-/* Desktop collage. Cards overlap SHOULDER to shoulder — each slot is
-   widened past its track by a negative margin — and each row stacks left to
-   right, so the card on top always covers its neighbour's right edge, never
-   the left-aligned name. The rows stay clear of each other vertically: the
-   captions sit at the bottom of every card and must stay readable. Each card
-   then gets its own tilt and drift. */
+/* Desktop: two rows of three, each card on its own tilt. The cards do not
+   overlap, so every name and tagline stays readable. */
 @media (min-width: 60rem) {
     .cast {
-        gap: 1.75rem 0;
+        gap: 1.75rem 1rem;
         max-width: 36rem;
         justify-self: end;
         padding-inline: 0.5rem var(--hard-lg);
     }
 
-    .cast-slot { margin-inline: -0.4rem; }
-
     .cast-slot:nth-child(3n + 1) { z-index: 1; }
     .cast-slot:nth-child(3n + 2) { z-index: 2; }
     .cast-slot:nth-child(3n + 3) { z-index: 3; }
 
-    .cast-slot:nth-child(1) .cast-card { --tilt: -5deg; --nudge-y: 0.5rem; }
-    .cast-slot:nth-child(2) .cast-card { --tilt: 3deg; --nudge-y: 1.75rem; }
-    .cast-slot:nth-child(3) .cast-card { --tilt: -2deg; --nudge-y: -0.25rem; }
-    .cast-slot:nth-child(4) .cast-card { --tilt: 4deg; --nudge-x: 1rem; --nudge-y: 0.75rem; }
-    .cast-slot:nth-child(5) .cast-card { --tilt: -3deg; --nudge-x: 0.625rem; --nudge-y: 2rem; }
-    .cast-slot:nth-child(6) .cast-card { --tilt: 5deg; --nudge-x: -0.5rem; --nudge-y: 0.5rem; }
+    .cast-slot:nth-child(1) .cast-card { --tilt: -3deg; --nudge-y: 0.25rem; }
+    .cast-slot:nth-child(2) .cast-card { --tilt: 2deg; --nudge-y: 1.25rem; }
+    .cast-slot:nth-child(3) .cast-card { --tilt: -1.5deg; }
+    .cast-slot:nth-child(4) .cast-card { --tilt: 2.5deg; --nudge-y: 0.5rem; }
+    .cast-slot:nth-child(5) .cast-card { --tilt: -2deg; --nudge-y: 1.25rem; }
+    .cast-slot:nth-child(6) .cast-card { --tilt: 3deg; --nudge-y: 0.25rem; }
 
     /* A hovered card clears every neighbour. */
     .cast-slot:has(.cast-card:hover),
     .cast-slot:has(.cast-card:focus-visible) { z-index: 10; }
+}
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1366,8 +1363,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
    so it is never stretched over a tall section. */
 @media (min-width: 56rem) {
     .act-select {
-        background: url("../../assets/images/landing-tutor-bg.webp") center bottom / cover no-repeat;
+        background: url("../../assets/images/classroom-bg-light.webp") center bottom / cover no-repeat;
     }
+
+    :root[data-theme="dark"] .act-select { background-image: url("../../assets/images/classroom-bg-dark.webp"); }
 
     .act-select::before {
         content: "";
@@ -1376,6 +1375,11 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
         z-index: -1;
         background: linear-gradient(to right, rgba(255, 249, 234, 0.92) 0, rgba(255, 249, 234, 0.78) 32%, rgba(255, 249, 234, 0) 62%);
         pointer-events: none;
+    }
+
+    /* The dark room gets an ink veil, not a cream one. */
+    :root[data-theme="dark"] .act-select::before {
+        background: linear-gradient(to right, rgba(11, 18, 51, 0.92) 0, rgba(11, 18, 51, 0.78) 32%, rgba(11, 18, 51, 0) 62%);
     }
 }
 
@@ -1445,6 +1449,14 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .act-select .select-note { color: var(--palette-ink); }
 
 .act-select .mono-tag { color: color-mix(in srgb, var(--palette-ink) 75%, transparent); }
+
+/* In the dark theme the room is dark, so the type is cream (on a phone the section keeps its cream paper, so it stays navy there). */
+@media (min-width: 56rem) {
+    :root[data-theme="dark"] .act-select .select-title,
+    :root[data-theme="dark"] .act-select .select-lede,
+    :root[data-theme="dark"] .act-select .select-note { color: var(--palette-paper); }
+    :root[data-theme="dark"] .act-select .mono-tag { color: color-mix(in srgb, var(--palette-paper) 75%, transparent); }
+}
 
 /* ---- 8.1 Header: left-aligned, the counterweight to the centred board. */
 .select-head {
@@ -1609,8 +1621,11 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     margin-inline: auto;
     overflow: hidden;
     border: var(--edge-w) solid var(--palette-ink);
-    background: var(--palette-paper) url("../../assets/images/landing-tutor-bg.webp") 62% bottom / cover no-repeat;
+    background: var(--palette-paper) url("../../assets/images/classroom-bg-light.webp") 62% bottom / cover no-repeat;
     box-shadow: var(--hard) var(--hard) 0 var(--palette-ink);
+}
+@media (max-width: 55.99rem) {
+    :root[data-theme="dark"] .select-board { background-image: url("../../assets/images/classroom-bg-dark.webp"); }
 }
 
 @media (min-width: 56rem) {

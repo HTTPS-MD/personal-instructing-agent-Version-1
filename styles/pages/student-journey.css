@@ -56,17 +56,23 @@ body.opacity-0 { opacity: 0; }
 
 .journey > *:not(.journey-ambient) { position: relative; z-index: 1; }
 
-/* The classroom from the landing page behind the questionnaire, under a heavy wash of the page colour: the
+/* The classroom from the landing page (its light or dark version, to match the theme) behind the questionnaire, under a heavy wash of the page colour: the
    room is there to be felt, not to compete with the questions. The wash follows the theme, so light and dark
    both keep their reading contrast. */
 .journey-ambient--classroom {
     background-image:
         var(--grain),
         linear-gradient(color-mix(in srgb, var(--bg) 84%, transparent), color-mix(in srgb, var(--bg) 92%, transparent)),
-        url("../../assets/images/landing-tutor-bg.webp");
+        url("../../assets/images/classroom-bg-light.webp");
     background-size: 11.25rem 11.25rem, cover, cover;
     background-position: 0 0, center, center bottom;
     background-repeat: repeat, no-repeat, no-repeat;
+}
+:root[data-theme="dark"] .journey-ambient--classroom {
+    background-image:
+        var(--grain),
+        linear-gradient(color-mix(in srgb, var(--bg) 84%, transparent), color-mix(in srgb, var(--bg) 92%, transparent)),
+        url("../../assets/images/classroom-bg-dark.webp");
 }
 
 /* The rule above outranks .journey-bar's own position: sticky, so the bar
