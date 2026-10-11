@@ -678,6 +678,17 @@ function fixture() {
     assert.equal(await p.locator('#confirm-modal [data-action="close"]').count(), 1);
     await p.context().close();
   });
+  await check('choose a tutor: if the bubble picture cannot load, the words are still readable on a white card', async () => {
+    const p = await pageFor('/student/html/character-selection.html', { account: 'pick-noart', initial: { profile: { group_type: 'Non-Assigned', selected_character: null, is_ocean_done: true } } });
+    await p.context().route('**/landing-tutor-bubble.svg', r => r.abort());          // a blocker, say
+    await p.reload();
+    await p.waitForSelector('.persona-card');
+    await p.locator('.persona-card').first().click();
+    await p.waitForSelector('#pick-bubble.no-art');
+    const look = await p.evaluate(() => { const b = document.querySelector('#pick-bubble'), t = document.querySelector('#preview-desc'); return { bg: getComputedStyle(b).backgroundColor, color: getComputedStyle(t).color, shown: t.getBoundingClientRect().width > 50 && t.textContent.length > 10 }; });
+    assert.deepEqual(look, { bg: 'rgb(255, 255, 255)', color: 'rgb(11, 18, 51)', shown: true });
+    await p.context().close();
+  });
   await check('welcome: "Hi, name!" for a new student, "Welcome back, name!" and the count for one who has answered', async () => {
     let p = await pageFor('/student/html/student-dashboard.html', { account: 'wel-new', initial: { profile: { selected_character: 'pia-extravert' } } });
     await p.waitForSelector('#start-btn'); await p.keyboard.press('Escape');
@@ -1086,7 +1097,7 @@ function fixture() {
     /* The standing tutor is BIG: most of the height of the room (a regression guard for browsers that cannot size the picture). */
     const size = await p.evaluate(() => ({ img: document.querySelector('#preview-bg-img').getBoundingClientRect().height, stage: document.querySelector('#preview-card').getBoundingClientRect().height }));
     assert.ok(size.img >= size.stage * 0.55, 'the tutor is small: ' + JSON.stringify(size));
-    assert.match(await p.evaluate(() => getComputedStyle(document.querySelector('#pick-bubble')).backgroundImage), /landing-tutor-bubble\.svg/, 'the bubble picture is one that is in the repository');
+    assert.equal(await p.evaluate(() => { const im = document.querySelector('#pick-bubble-art'); return im.complete && im.naturalWidth > 0 && /landing-tutor-bubble\.svg$/.test(im.getAttribute('src')); }), true, 'the bubble is a picture that is in the repository, and it loaded');
     await p.locator('#pick-big').click();
     const b = await look();
     assert.notEqual(a.src, b.src, 'a new expression'); assert.notEqual(a.line, b.line, 'a new line');

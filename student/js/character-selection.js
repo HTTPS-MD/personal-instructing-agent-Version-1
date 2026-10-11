@@ -274,6 +274,13 @@ document.addEventListener('click', (event) => {
 
     /* The big picture: if a pose is missing, the card's other illustration stands in; if that fails too, the tutor's
        line is still there in the bubble. */
+    /* The bubble picture: if it cannot load, the words sit on a plain white card instead. */
+    var bubble = document.getElementById('pick-bubble');
+    var bubbleArt = document.getElementById('pick-bubble-art');
+    function bubbleWithoutArt() { bubble.classList.add('no-art'); }
+    bubbleArt.addEventListener('error', bubbleWithoutArt);
+    if (bubbleArt.complete && bubbleArt.naturalWidth === 0 && bubbleArt.getAttribute('src')) { bubbleWithoutArt(); }
+
     var previewImg = document.getElementById('preview-bg-img');
     previewImg.addEventListener('error', function () {
         var chosen = document.querySelector('.persona-card.selected');
