@@ -396,6 +396,20 @@ function fixture() {
       await p.context().close();
     });
   }
+  await check('ocean: the questionnaire sits on the classroom, under a heavy wash; the other stages do not', async () => {
+    const bg = p => p.locator('.journey-ambient').evaluate(el => ({ img: getComputedStyle(el).backgroundImage, cls: el.className }));
+    const o = await pageFor(ocean, { initial: { profile: { is_ocean_done: false } } });
+    await o.waitForSelector('.gate-wrap');
+    const ob = await bg(o);
+    assert.match(ob.img, /landing-tutor-bg\.webp/, 'the classroom is the background');
+    assert.match(ob.img, /linear-gradient/, 'under a wash of the page colour');
+    await o.context().close();
+    const w = await pageFor('/student/html/waiting-room.html', { initial: { stageOpen: false, profile: { is_ocean_done: false } } });
+    await w.waitForSelector('.journey-ambient', { state: 'attached' });
+    assert.match(w.url(), /waiting-room/, 'still on the waiting room');
+    assert.doesNotMatch((await bg(w)).img, /landing-tutor-bg/, 'the waiting room keeps its plain page');
+    await w.context().close();
+  });
   await check('audit: OCEAN quit dialog is plain text, no glyph/hero; behaviour unchanged', async () => {
     const p = await startOcean({ width: 375 });
     await p.locator('#ocean-answer-list button[data-score="3"]').click();
