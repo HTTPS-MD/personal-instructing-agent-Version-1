@@ -103,13 +103,14 @@
         if (current) { current.close(); }
 
         var model = build(example);
+        /* The tutor's introduction is the first screen (an empty board), so nothing needs its own room in the bubble. */
+        var allSteps = (options.intro ? [{ parts: [], caption: options.intro }] : []).concat(model.steps);
         var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
         var index = 0;
 
         var wrap = el('div', 'hb-inline');
         wrap.setAttribute('role', 'group');
         wrap.setAttribute('aria-label', 'Worked example');
-        if (options.intro) { wrap.appendChild(el('p', 'hb-intro', options.intro)); }
 
         /* The written work. Every row is right-aligned so the last digits line up. */
         var board = el('div', 'hb-board');
@@ -156,10 +157,12 @@
         board.appendChild(grid);
         wrap.appendChild(board);
 
+        /* The words and the buttons sit beside the work, so the whole example fits the bubble's own height. */
+        var side = el('div', 'hb-side');
         var caption = el('p', 'hb-caption');
         caption.setAttribute('role', 'status');
         caption.setAttribute('aria-live', 'polite');
-        wrap.appendChild(caption);
+        side.appendChild(caption);
 
         var controls = el('div', 'hb-controls');
         var back = el('button', 'hb-btn hb-back', 'Back'); back.type = 'button';
@@ -168,9 +171,10 @@
         controls.appendChild(back);
         controls.appendChild(dots);
         controls.appendChild(next);
-        wrap.appendChild(controls);
+        side.appendChild(controls);
+        wrap.appendChild(side);
 
-        function steps() { return model.steps; }
+        function steps() { return allSteps; }
 
         /* Where the decimal point goes: just left of the digit `dp` places from the right. It starts at the far
            right, then slides there. */
@@ -222,6 +226,11 @@
 
         back.addEventListener('click', function () { go(index - 1); });
         next.addEventListener('click', function () { go(index === steps().length - 1 ? 0 : index + 1); });
+        /* Tapping anywhere on the example goes to the next step (the buttons do their own thing). */
+        wrap.addEventListener('click', function (e) {
+            if (reduced || (e.target.closest && e.target.closest('.hb-btn'))) { return; }
+            next.click();
+        });
         /* Arrow keys only while focus is on the example: in the answer box they move the caret. */
         wrap.addEventListener('keydown', function (e) {
             if (e.key === 'ArrowRight') { e.preventDefault(); next.click(); }
@@ -235,7 +244,7 @@
             index = steps().length - 1;
             var list = el('ol', 'hb-all');
             steps().forEach(function (s) { list.appendChild(el('li', '', s.caption)); });
-            wrap.insertBefore(list, caption);
+            side.insertBefore(list, caption);
         }
 
         host.appendChild(wrap);
