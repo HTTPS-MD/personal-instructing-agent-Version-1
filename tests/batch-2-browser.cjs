@@ -1083,6 +1083,10 @@ function fixture() {
     await p.locator('.persona-card').first().click();          // Ava: three poses, three lines
     const look = () => p.evaluate(() => ({ src: document.querySelector('#preview-bg-img').getAttribute('src'), line: document.querySelector('#preview-desc').textContent }));
     const a = await look();
+    /* The standing tutor is BIG: most of the height of the room (a regression guard for browsers that cannot size the picture). */
+    const size = await p.evaluate(() => ({ img: document.querySelector('#preview-bg-img').getBoundingClientRect().height, stage: document.querySelector('#preview-card').getBoundingClientRect().height }));
+    assert.ok(size.img >= size.stage * 0.55, 'the tutor is small: ' + JSON.stringify(size));
+    assert.match(await p.evaluate(() => getComputedStyle(document.querySelector('#pick-bubble')).backgroundImage), /landing-tutor-bubble\.svg/, 'the bubble picture is one that is in the repository');
     await p.locator('#pick-big').click();
     const b = await look();
     assert.notEqual(a.src, b.src, 'a new expression'); assert.notEqual(a.line, b.line, 'a new line');
