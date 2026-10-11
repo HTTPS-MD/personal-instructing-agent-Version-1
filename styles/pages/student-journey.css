@@ -62,7 +62,7 @@ body.opacity-0 { opacity: 0; }
 .journey-ambient--classroom {
     background-image:
         var(--grain),
-        linear-gradient(color-mix(in srgb, var(--bg) 84%, transparent), color-mix(in srgb, var(--bg) 92%, transparent)),
+        linear-gradient(color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 64%, transparent)),
         url("../../assets/images/classroom-bg-light.webp");
     background-size: 11.25rem 11.25rem, cover, cover;
     background-position: 0 0, center, center bottom;
@@ -71,7 +71,7 @@ body.opacity-0 { opacity: 0; }
 :root[data-theme="dark"] .journey-ambient--classroom {
     background-image:
         var(--grain),
-        linear-gradient(color-mix(in srgb, var(--bg) 84%, transparent), color-mix(in srgb, var(--bg) 92%, transparent)),
+        linear-gradient(color-mix(in srgb, var(--bg) 56%, transparent), color-mix(in srgb, var(--bg) 64%, transparent)),
         url("../../assets/images/classroom-bg-dark.webp");
 }
 
@@ -771,4 +771,113 @@ body.opacity-0 { opacity: 0; }
 @media (max-width: 480px) {
     .journey-bar-right .pick-status { display: none; }
     .journey-bar-right .btn-signout { flex: 0 0 auto; }
+}
+
+
+/* ============================================ 4.9 QUESTIONNAIRE LOOK ====
+   The questionnaire (body.quiz) is one paper-coloured card on the classroom: a thick outline, flat buttons,
+   a yellow highlighter on the picked answer. It follows the light / dark switch in the header. Nothing here
+   says which stage the student is in. */
+:root[data-theme="dark"] .quiz  { --q-paper: #111A47; --q-ink: #FFF9EA; --q-soft: #B9C0E0; --q-field: #17225C; }
+:root[data-theme="light"] .quiz { --q-paper: #FFF9EA; --q-ink: #0B1233; --q-soft: #4A5170; --q-field: #FFFFFF; }
+
+.quiz .journey-main,
+.quiz .journey-main:has(#test-container:not(.hidden)) { align-items: center; padding: var(--sp-5) 0; }
+
+.quiz .gate-wrap.gate-open,
+.quiz .question-card {
+    width: 100%;
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 2.4rem 2.5rem 2rem;
+    border: 3px solid var(--q-ink);
+    border-radius: 0;
+    background: var(--q-paper);
+    color: var(--q-ink);
+    box-shadow: none;
+}
+
+/* The header buttons: Quit and the theme switch, the same square outline as the landing page. */
+.quiz .btn-theme { width: 44px; padding: 0; display: inline-grid; place-items: center; }
+.btn-theme svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-theme="dark"] .btn-theme .theme-moon,
+:root[data-theme="light"] .btn-theme .theme-sun { display: none; }
+.quiz .journey-bar-right { gap: 10px; }
+
+/* ---- consent screen ---- */
+.quiz .gate-title { margin: 0 0 .6rem; font-size: clamp(2rem, 4.4vw, 2.8rem); letter-spacing: -.04em; line-height: 1.12; text-wrap: auto; }
+.quiz .gate-title mark { padding: .08em .2em; background: #FFD83D; color: #0B1233; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.quiz .gate-lede { max-width: none; margin: 0 0 1.2rem; color: var(--q-soft); font-size: 1.0625rem; line-height: 1.5; }
+
+ul.gate-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 1.5rem; padding: 0; list-style: none; }
+.gate-chips li { padding: .35rem .7rem; border: 2px solid var(--q-ink); background: var(--q-field); color: var(--q-ink); font-size: .9rem; font-weight: 700; }
+
+.quiz .privacy-note {
+    margin: 0 0 2rem;
+    padding: .9rem 1rem .9rem 1.1rem;
+    border-left: 4px solid var(--green);
+    background: var(--q-field);
+}
+.quiz .privacy-title { margin: 0; font-size: .9rem; font-weight: 700; color: var(--q-ink); }
+.quiz .privacy-text { margin: 0; font-size: .9rem; line-height: 1.5; color: var(--q-soft); }
+
+.quiz .gate-actions { flex-direction: row; justify-content: flex-end; gap: 1rem; }
+
+/* ---- buttons inside the card: flat rectangles, an even outline on every side, no shadow ---- */
+.quiz .gate-wrap .btn,
+.quiz .question-card .btn {
+    height: 50px;
+    padding: 0 1.4rem;
+    border: 3px solid var(--q-ink);
+    border-radius: 0;
+    background: transparent;
+    color: var(--q-ink);
+    box-shadow: none;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.quiz .gate-wrap .btn-primary,
+.quiz .question-card .btn-primary { background: #3A8DFF; color: #0B1233; }
+.quiz .question-card .btn:disabled { border-style: dashed; background: transparent; color: var(--q-soft); opacity: .7; cursor: not-allowed; }
+
+/* ---- the question ---- */
+.quiz .question-counter { margin: 0 0 1.6rem; text-align: center; font-family: var(--font-mono); font-size: .85rem; font-weight: 700; letter-spacing: .04em; text-transform: none; color: var(--q-ink); }
+.quiz .question-text { min-height: 3em; margin: 0 0 1.8rem; font-size: clamp(1.5rem, 3.4vw, 2.2rem); line-height: 1.2; letter-spacing: -.03em; color: var(--q-ink); }
+
+.quiz .answer-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; max-width: none; margin: 0 0 1.6rem; }
+.quiz .ocean-answer-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 4.4rem;
+    padding: .6rem .4rem;
+    border: 2px solid var(--q-ink);
+    border-radius: 0;
+    background: var(--q-field);
+    box-shadow: none;
+    color: var(--q-ink);
+    font-size: .875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+}
+.quiz .ocean-answer-btn .dial { display: none; }
+.quiz .ocean-answer-btn:not(.is-selected):hover { background: var(--q-field); border-color: #3A8DFF; }
+/* The picked answer: yellow highlighter, a heavier edge made with an inset ring so the box never changes size. */
+.quiz .ocean-answer-btn.is-selected { background: #FFD83D; color: #0B1233; border-color: #0B1233; box-shadow: inset 0 0 0 1px #0B1233; }
+
+.quiz .test-nav { max-width: none; margin: 0; justify-content: space-between; }
+.quiz .submit-hint { margin: .9rem 0 0; text-align: center; font-size: .8rem; color: var(--q-soft); }
+.quiz .submit-hint:empty { display: none; }
+
+@media (max-width: 40rem) {
+    .quiz .gate-wrap.gate-open,
+    .quiz .question-card { padding: 2.6rem 1.1rem 1.2rem; }
+    .quiz .privacy-note { padding: .8rem .9rem .8rem 1rem; margin-bottom: 1.5rem; }
+    .quiz .gate-actions { flex-direction: column-reverse; align-items: stretch; }
+    .quiz .gate-actions .btn { width: 100%; }
+    .quiz .answer-list { grid-template-columns: minmax(0, 1fr); gap: .4rem; margin-bottom: 1.2rem; }
+    .quiz .ocean-answer-btn { justify-content: flex-start; min-height: 0; padding: .7rem .9rem; text-align: left; }
+    .quiz .question-text { min-height: 4.8em; margin-bottom: 1rem; font-size: 1.45rem; }
+    .quiz .question-counter { margin-bottom: 1rem; }
 }

@@ -140,49 +140,110 @@ function fixture() {
     await p.screenshot({ path: path.join(out, 'ocean-q1-dark-1280.png') });
     await p.context().close();
   });
-  await check('ocean: Question 50 offers review when answers are missing', async () => {
+  const pick = (p, n = 4) => p.locator(`#ocean-answer-list button[data-score="${n}"]`).click();
+  await check('ocean: Next stays disabled until the question is answered (button, arrow key), then becomes the primary action', async () => {
     const p = await startOcean();
-    const submit = p.locator('#btn-submit-ocean');
-    assert.equal(await submit.isVisible(), false);
+    const next = p.locator('#btn-next');
+    assert.equal(await next.isDisabled(), true, 'disabled before an answer');
     assert.equal(await p.locator('#btn-prev').isDisabled(), true);
-    assert.equal(await p.locator('.test-nav button:visible').count(), 2);
-    for (let i = 0; i < 49; i++) { assert.equal(await submit.isVisible(), false, 'q' + (i + 1)); await p.locator('#btn-next').click(); }
-    assert.match(await p.locator('#question-counter').innerText(), /50 of 50/i);
-    assert.equal(await submit.isVisible(), false);
-    assert.equal(await p.locator('#btn-next-label').innerText(), 'Review 50');
-    await p.locator('#btn-next').click();
-    assert.match(await p.locator('#question-counter').innerText(), /1 of 50/i);
-    assert.equal(await p.locator('#btn-next-label').innerText(), 'Next missing');
-    assert.equal(await p.locator('#btn-next').isDisabled(), true);
-    assert.equal(await submit.isVisible(), false);
+    await p.keyboard.press('ArrowRight');
+    assert.match(await p.locator('#question-counter').innerText(), /^1 of 50$/, 'the arrow key does not skip');
+    await pick(p, 3);
+    assert.equal(await next.isDisabled(), false, 'enabled once answered');
+    assert.match(await next.getAttribute('class'), /btn-primary/, 'highlighted as the primary action');
+    await next.click();
+    assert.match(await p.locator('#question-counter').innerText(), /^2 of 50$/);
+    assert.equal(await next.isDisabled(), true, 'disabled again on the next question');
+    assert.match(await next.getAttribute('class'), /btn-secondary/);
+    await p.keyboard.press('4');                                         // number keys answer
+    assert.equal(await p.locator('#ocean-answer-list .is-selected').getAttribute('data-score'), '4');
+    assert.equal(await next.isDisabled(), false);
+    await p.locator('#btn-prev').click();                                // an answered question can be revisited and left again
+    assert.equal(await next.isDisabled(), false, 'an answered question needs no new answer');
     await p.context().close();
   });
-  await check('ocean: skipped questions return in order, then Submit appears', async () => {
-    const p = await startOcean({ width: 375, theme: 'dark' });
-    const submit = p.locator('#btn-submit-ocean');
-    for (let i = 0; i < 50; i++) {
-      if (i !== 2 && i !== 16) await p.locator('#ocean-answer-list button[data-score="4"]').click();
-      if (i < 49) await p.locator('#btn-next').click();
-    }
-    assert.equal(await submit.isVisible(), false);
-    assert.equal(await p.locator('#btn-next-label').innerText(), 'Review 2');
-    assert.match(await p.locator('#submit-hint').innerText(), /2 unanswered/i);
-    await p.screenshot({ path: path.join(out, 'ocean-review-missing-375.png') });
-    await p.locator('#btn-next').click();
-    assert.match(await p.locator('#question-counter').innerText(), /3 of 50/i);
+  await check('ocean: only one progress indicator ("n of 50"), and the statement reads "I… ..."', async () => {
+    const p = await startOcean();
+    assert.equal(await p.locator('#progress-lbl, #answered-tally, .test-progress, #ocean-progress-fill').count(), 0);
+    const text = await p.evaluate(() => document.body.innerText);
+    assert.equal(/\bof 50\b/g.test(text), true);
+    assert.equal((text.match(/\bof 50\b/g) || []).length, 1, 'one place says where they are');
+    assert.equal(/questions? left|answered|completed/i.test(text), false, 'no second kind of progress');
+    assert.match(await p.locator('#question-text').innerText(), /^I… am the life of the party\.$/);
+    await p.context().close();
+  });
+  await check('ocean: an older save with a gap still ends at Submit (the student answers the gap first)', async () => {
+    const p = await startOcean();
+    await pick(p);                                                      // so a save exists (it carries the email)
+    await p.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('pia_ocean_progress'));
+      saved.responses = new Array(50).fill(4); saved.responses[2] = null; saved.index = 49;
+      localStorage.setItem('pia_ocean_progress', JSON.stringify(saved));
+    });
+    await p.reload();
+    await p.waitForSelector('#test-container:not(.hidden)');
+    assert.match(await p.locator('#question-counter').innerText(), /^3 of 50$/, 'back to the gap');
     assert.equal(await p.locator('#btn-next').isDisabled(), true);
-    await p.locator('#ocean-answer-list button[data-score="4"]').click();
-    assert.equal(await p.locator('#btn-next-label').innerText(), 'Next missing');
-    await p.locator('#btn-next').click();
-    assert.match(await p.locator('#question-counter').innerText(), /17 of 50/i);
-    await p.locator('#ocean-answer-list button[data-score="4"]').click();
+    await pick(p);
+    for (let i = 2; i < 49; i++) await p.locator('#btn-next').click();
+    const submit = p.locator('#btn-submit-ocean');
     assert.equal(await submit.isVisible(), true);
-    assert.equal(await submit.isEnabled(), true);
     await submit.click();
     await p.waitForURL(/assessment-complete/);
     assert.deepEqual(submitted, { p_responses: new Array(50).fill(4) });
     await p.context().close();
   });
+  await check('ocean header: only the logo, Quit and the light/dark switch; no name, no stage, the logo is not a link', async () => {
+    const p = await pageFor(ocean, { initial: { profile: { is_ocean_done: false } } });
+    await p.waitForSelector('.gate-wrap');
+    await p.waitForTimeout(700);
+    const head = await p.locator('header.journey-bar').innerText();
+    assert.equal(/Signed in|Fixture Learner|Sign out|Change password|stage/i.test(head), false, 'header says: ' + head);
+    assert.deepEqual(await p.locator('header.journey-bar button').evaluateAll(b => b.map(x => (x.innerText || x.getAttribute('aria-label')).trim().toLowerCase())), ['quit', 'switch to light theme']);
+    assert.equal(await p.locator('header.journey-bar a').count(), 0);
+    await p.context().close();
+  });
+  await check('ocean: Quit asks first (Keep going stays), then signs the student out', async () => {
+    const p = await pageFor(ocean, { initial: { profile: { is_ocean_done: false } } });
+    await p.waitForSelector('.gate-wrap');
+    await p.locator('#signout-btn').click();
+    await p.waitForSelector('#quit-modal.modal-active');
+    assert.equal((await calls(p)).some(c => c.method === 'signout'), false, 'nothing signed out yet');
+    await p.locator('#quit-modal-stay').click();
+    await p.waitForFunction(() => !document.querySelector('#quit-modal.modal-active'));
+    assert.equal((await calls(p)).some(c => c.method === 'signout'), false, 'Keep going keeps them here');
+    await p.locator('#signout-btn').click();
+    await p.waitForSelector('#quit-modal.modal-active');
+    await p.locator('#quit-modal-leave').click();
+    await p.waitForURL(u => /\/index\.html$|\/$/.test(u.pathname), { timeout: 8000 });     // signed out: back to the front page
+    await p.context().close();
+  });
+  await check('ocean: the light/dark switch changes the theme and the classroom, and stores the choice (pia_theme, read before first paint by theme-boot.js)', async () => {
+    const p = await pageFor(ocean, { theme: 'dark', initial: { profile: { is_ocean_done: false } } });
+    await p.waitForSelector('.gate-wrap');
+    const state = () => p.evaluate(() => ({ theme: document.documentElement.dataset.theme, img: getComputedStyle(document.querySelector('.journey-ambient')).backgroundImage, saved: localStorage.getItem('pia_theme') }));
+    let st = await state();
+    assert.equal(st.theme, 'dark'); assert.match(st.img, /classroom-bg-dark/);
+    await p.locator('#theme-toggle').click();
+    st = await state();
+    assert.equal(st.theme, 'light'); assert.match(st.img, /classroom-bg-light/); assert.equal(st.saved, 'light');
+    assert.equal(await p.locator('#theme-toggle').getAttribute('aria-label'), 'Switch to dark theme');
+    await p.context().close();
+  });
+  for (const [w, h] of [[1440, 850], [1280, 720], [375, 700]]) {
+    await check(`ocean: the consent screen and a question both fit one screen, no scrolling (${w}x${h})`, async () => {
+      const p = await pageFor(ocean, { width: w, height: h, initial: { profile: { is_ocean_done: false } } });
+      await p.waitForSelector('.gate-wrap');
+      const fits = () => p.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, wide: document.documentElement.scrollWidth - innerWidth }));
+      let f = await fits();
+      assert.ok(f.scroll <= 1 && f.wide <= 0, 'consent screen scrolls: ' + JSON.stringify(f));
+      await p.locator('[data-action="start"]').click();
+      await p.waitForSelector('#test-container:not(.hidden)');
+      f = await fits();
+      assert.ok(f.scroll <= 1 && f.wide <= 0, 'question screen scrolls: ' + JSON.stringify(f));
+      await p.context().close();
+    });
+  }
   await check('ocean: Submit works only when all answered; answers reach the existing RPC', async () => {
     const p = await startOcean();
     for (let i = 0; i < 50; i++) {
@@ -216,7 +277,7 @@ function fixture() {
       await p.locator('#ocean-answer-list button[data-score="3"]').click();
       assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
       await p.screenshot({ path: path.join(out, `ocean-${w}-${t}.png`) });
-      for (let i = 0; i < 49; i++) await p.locator('#btn-next').click();
+      for (let i = 0; i < 49; i++) { await p.locator('#ocean-answer-list button[data-score="3"]').click(); await p.locator('#btn-next').click(); }
       assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
       await p.context().close();
     });
@@ -381,8 +442,9 @@ function fixture() {
       await p.waitForSelector('.gate-wrap');
       assert.equal(await p.locator('.gate-glyph, .privacy-box, .modal-hero, svg.icon-lg').count(), 0);
       assert.deepEqual(await iconsOf(p), ['#i-logout'].filter(() => false));
-      assert.ok(isFlat(await flat(p, '.gate-wrap')));
-      assert.match(await p.locator('.privacy-note').innerText(), /Your answers are private[\s\S]*not graded/);
+      assert.equal((await flat(p, '.gate-wrap')).shadow, 'none', 'a flat card: an outline, no shadow');
+      assert.match(await p.locator('.privacy-note').innerText(), /Your answers are private[\s\S]*researchers/);
+      assert.equal(/stage/i.test(await p.evaluate(() => document.body.innerText)), false, 'the page never names a stage');
       await p.screenshot({ path: path.join(out, `audit-ocean-consent-${w}-${t}.png`) });
       await p.context().close();
     });
@@ -391,7 +453,8 @@ function fixture() {
       await p.locator('#ocean-answer-list button[data-score="3"]').click();
       await p.locator('#btn-next').click();
       assert.deepEqual(await iconsOf(p), ['#i-chev-left', '#i-chev-right']);
-      assert.ok(isFlat(await flat(p, '.test-progress')));
+      assert.equal((await flat(p, '.question-card')).shadow, 'none');
+      await p.waitForTimeout(400);                                   // let the colours finish changing
       await p.screenshot({ path: path.join(out, `audit-ocean-question-${w}-${t}.png`) });
       await p.context().close();
     });
@@ -820,7 +883,7 @@ function fixture() {
       const bad = [];
       let p = await startOcean({ theme: t });
       await p.locator('#ocean-answer-list button[data-score="3"]').click();
-      for (const c of await contrast(p, ['#question-counter', '#question-text', '.answer-label', '#btn-prev', '#btn-next', '#submit-hint', '#progress-lbl', '#answered-tally'])) if (c.missing || c.ratio < 4.5) bad.push('ocean ' + JSON.stringify(c));
+      for (const c of await contrast(p, ['#question-counter', '#question-text', '.answer-label', '#btn-prev', '#btn-next'])) if (c.missing || c.ratio < 4.5) bad.push('ocean ' + JSON.stringify(c));
       await p.context().close();
       p = await pageFor(dash, { theme: t, account: 'contrast-' + t });
       await dlg(p).waitFor();
@@ -886,7 +949,7 @@ function fixture() {
         const y = selector => document.querySelector(selector).getBoundingClientRect().top + scrollY;
         return [y('.answer-list'), y('.test-nav')];
       }));
-      if (i < 49) await p.locator('#btn-next').click();
+      if (i < 49) { await p.locator('#ocean-answer-list button[data-score="3"]').click(); await p.locator('#btn-next').click(); }
     }
     for (const col of [0, 1]) {
       const values = positions.map(row => row[col]);

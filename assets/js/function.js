@@ -515,7 +515,7 @@ function renderSignOutControl(profile) {
     // #who-name, kaya wala nang idinadagdag doon.
     const own = document.querySelector('[data-signout], #signout-btn');
     if (own) {
-        if (!document.getElementById('who-name') && !document.getElementById('pia-signout-who')) {
+        if (!document.getElementById('who-name') && !document.getElementById('pia-signout-who') && !own.hasAttribute('data-no-who')) {
             const who = document.createElement('span');
             who.id = 'pia-signout-who';
             who.className = 'pia-signout-inline';

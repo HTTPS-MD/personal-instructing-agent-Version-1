@@ -146,7 +146,6 @@ function renderGatekeeper() {
     if (isTestAllowed) {
         gatekeeperScreen.innerHTML = `
             <div class="gate-wrap gate-open">
-                <p class="journey-kicker">STAGE 02 / QUESTIONNAIRE</p>
                 <div id="step-container"></div>
             </div>
         `;
@@ -205,31 +204,30 @@ function setupRealtimeListener() {
     }
 }
 
+// What the student is told about who can see their answers. It has to stay true of the study
+// (who really has access) and match the consent form; change it here, in one place.
+const PRIVACY_TEXT = 'Only the researchers see them. Never your classmates or teachers.';
+
 function showPrivacyStep() {
     const container = document.getElementById('step-container');
     if (!container) return;
     container.innerHTML = `
-        <h1 class="gate-title">A few questions about you</h1>
-        <p class="gate-lede">
-            There are 50 short statements, and there are no right or wrong answers —
-            read each one as starting with "I…" and choose how much you agree or
-            disagree. It takes about ten minutes, and you can go back and change any
-            answer before you submit.
-        </p>
+        <h1 class="gate-title">Hi! Let’s get to <mark>know you.</mark></h1>
+        <p class="gate-lede">50 quick statements. Pick how much each one sounds like you.</p>
+
+        <ul class="gate-chips" aria-label="What to expect">
+            <li>50 statements</li>
+            <li>No right or wrong answers</li>
+        </ul>
 
         <section class="privacy-note" aria-labelledby="privacy-title">
             <h2 class="privacy-title" id="privacy-title">Your answers are private</h2>
-            <p class="privacy-text">
-                They are used only to set up your tutor. Your classmates never see them,
-                and this is not graded — it does not affect your marks in any way.
-            </p>
+            <p class="privacy-text">${PRIVACY_TEXT}</p>
         </section>
 
         <div class="gate-actions">
-            <button type="button" data-action="start" class="btn btn-primary btn-block">
-                I understand — start
-            </button>
-            <a href="waiting-room.html" class="btn btn-secondary btn-block">Not right now</a>
+            <a href="waiting-room.html" class="btn btn-secondary">Not right now</a>
+            <button type="button" data-action="start" class="btn btn-primary">I understand — start</button>
         </div>
     `;
 }
@@ -291,6 +289,7 @@ function initTestUI() {
         if (document.getElementById('quit-modal')?.classList.contains('modal-active')) return;
         if (e.key === 'ArrowLeft') goToQuestion(currentQuestionIndex - 1);
         if (e.key === 'ArrowRight') goToNextQuestion();
+        if (/^[1-5]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.('input, textarea')) handleAnswer(Number(e.key));
     });
 
 }
@@ -303,6 +302,9 @@ function goToQuestion(index) {
 }
 
 function goToNextQuestion() {
+    // Nothing moves on until this question has an answer (the Next button is disabled too; this keeps
+    // the arrow key honest).
+    if (userResponses[currentQuestionIndex] === null) return;
     const firstGap = userResponses.indexOf(null);
     if (reviewingUnanswered) {
         // Keep the learner on an unanswered question until they choose an
@@ -331,21 +333,13 @@ function loadQuestion() {
     const total = questions.length;
     const i = currentQuestionIndex;
 
-    document.getElementById('question-counter').textContent = `Question ${i + 1} of ${total}`;
-    document.getElementById('question-text').textContent = `I... "${questions[i]}"`;
+    // One place says where they are: "12 of 50". The statement is shown as "I… am the life of the party."
+    // (the same words as the sheet; only the first letter is lowered to follow "I…").
+    document.getElementById('question-counter').textContent = `${i + 1} of ${total}`;
+    const statement = questions[i];
+    document.getElementById('question-text').textContent = `I… ${statement.charAt(0).toLowerCase()}${statement.slice(1)}`;
 
-    // Ang progreso ay batay na sa BILANG NG NASAGOT, hindi sa posisyon --
-    // ngayong makakagalaw na sila nang malaya, ang posisyon ay walang sinasabi
-    // tungkol sa kung gaano na sila katapos.
     const done = answeredCount();
-    const pctDone = Math.round((done / total) * 100);
-    document.getElementById('progress-lbl').textContent = `${pctDone}% completed`;
-
-    const fill = document.getElementById('ocean-progress-fill');
-    if (fill) fill.style.width = `${pctDone}%`;
-
-    const tally = document.getElementById('answered-tally');
-    if (tally) tally.textContent = `${done} of ${total} answered`;
 
     // I-highlight ang naunang sagot kapag binalikan nila ang tanong.
     // aria-pressed: sinasabi rin sa screen reader kung alin ang napili.
@@ -365,7 +359,7 @@ function loadQuestion() {
     const canReviewFromLast = isLast && firstGap !== -1 && firstGap < i;
     if (nextBtn) {
         nextBtn.hidden = showSubmit || (isLast && !canReviewFromLast && !reviewingUnanswered);
-        nextBtn.disabled = reviewingUnanswered && userResponses[i] === null;
+        nextBtn.disabled = userResponses[i] === null;
         const nextLabel = document.getElementById('btn-next-label');
         if (nextLabel) nextLabel.textContent = reviewingUnanswered
             ? 'Next missing'
@@ -383,15 +377,12 @@ function loadQuestion() {
         submitBtn.disabled = !isComplete();
     }
     if (hint) {
-        hint.textContent = isComplete()
-            ? 'All questions answered -- ready to submit.'
-            : reviewingUnanswered && userResponses[i] === null
-                ? `${remaining} unanswered. Answer this question to continue.`
-                : canReviewFromLast
-                    ? `${remaining} unanswered. Review them before submitting.`
-                    : isLast && userResponses[i] === null
-                        ? 'Answer this question to submit.'
-                        : `${remaining} question${remaining === 1 ? '' : 's'} left.`;
+        // Only for the older case of questions left behind; the normal flow needs no extra words.
+        hint.textContent = reviewingUnanswered && userResponses[i] === null
+            ? `${remaining} unanswered. Answer this question to continue.`
+            : canReviewFromLast
+                ? `${remaining} unanswered. Review them before submitting.`
+                : '';
     }
 }
 
@@ -578,6 +569,43 @@ function setupExitGuard() {
         e.returnValue = '';
     });
 }
+
+// ==========================================
+// HEADER: Quit and the light / dark switch
+// Quit asks first (their answers so far are saved), then signs the student out, so the next person at a
+// shared computer starts clean. It listens in the capture phase, ahead of the page-wide Sign out wiring
+// in function.js, which would otherwise sign out at once.
+// ==========================================
+document.addEventListener('click', (e) => {
+    const quit = e.target.closest && e.target.closest('#signout-btn');
+    if (!quit) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    confirmQuit().then((leave) => {
+        if (!leave) return;
+        isQuittingDeliberately = true;
+        quit.disabled = true;
+        if (typeof executeForceLogout === 'function') executeForceLogout();
+    });
+}, true);
+
+// The theme is the same one the landing page uses (stored as pia_theme, read before first paint by theme-boot.js).
+(function setupThemeToggle() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    const root = document.documentElement;
+    const sync = () => {
+        const light = root.getAttribute('data-theme') === 'light';
+        btn.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
+    };
+    btn.addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('pia_theme', next); } catch (err) { /* private mode: it just will not be remembered */ }
+        sync();
+    });
+    sync();
+})();
 
 checkAccessAndInit();
 
