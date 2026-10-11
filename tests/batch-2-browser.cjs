@@ -415,7 +415,8 @@ function fixture() {
   await check('audit: OCEAN quit dialog is plain text, no glyph/hero; behaviour unchanged', async () => {
     const p = await startOcean({ width: 375 });
     await p.locator('#ocean-answer-list button[data-score="3"]').click();
-    await p.locator('.brand-link').click();
+    /* The header no longer has a link out of the questionnaire, so the guard's dialog is asked for directly. */
+    await p.evaluate(() => { window.__quit = confirmQuit(); });
     await p.waitForSelector('#quit-modal.modal-active');
     assert.equal(await p.locator('#quit-modal .modal-hero, #quit-modal svg').count(), 0);
     assert.match(await p.locator('#quit-modal .modal-text').innerText(), /come back and carry on/);
@@ -644,50 +645,27 @@ function fixture() {
   }
   const PW = ['/student/html/set-new-password.html', { profile: { must_change_password: true } }];
   const pwPage = (o = {}) => pageFor(PW[0], Object.assign({ account: 'pw' }, o, { initial: Object.assign({}, PW[1], o.initial || {}) }));
-  await check('student header: optional change-password link is visible', async () => {
-    const p = await pageFor(dash, { account: 'pw-link' });
-    await p.waitForSelector('#pia-change-password');
-    assert.equal(await p.locator('#pia-change-password').isVisible(), true);
-    assert.equal(new URL(await p.locator('#pia-change-password').getAttribute('href'), p.url()).pathname,
-      '/student/html/set-new-password.html');
-    await p.context().close();
+  await check('student header: only who is signed in and Sign out; no Change password, and the logo is not a link', async () => {
+    const pages = [[dash, {}], ['/student/html/ocean-test.html', { is_ocean_done: false }], ['/student/html/assessment-complete.html', {}], ['/student/html/waiting-room.html', {}], ['/student/html/character-selection.html', {}]];
+    for (const w of [1280, 375]) for (const [u, prof] of pages) {
+      const p = await pageFor(u, { account: 'hdr', width: w, initial: { stageOpen: u.includes('waiting-room') ? false : true, profile: Object.assign({ must_change_password: false, group_type: 'Non-Assigned' }, prof) } });
+      await p.waitForSelector('[data-signout], #signout-btn', { state: 'attached' });
+      await p.waitForTimeout(900);
+      if (!/\/(student-dashboard|ocean-test|assessment-complete|waiting-room|character-selection)\.html/.test(p.url())) { await p.context().close(); continue; }
+      assert.equal(await p.locator('#pia-change-password').count(), 0, `no Change password on ${u} at ${w}px`);
+      assert.equal(await p.locator('header a[href]').count(), 0, `nothing in the header of ${u} links anywhere (the logo is not a link)`);
+      assert.equal(await p.locator('header .site-logo').count(), 1, 'the logo is still shown');
+      assert.equal(await p.locator('[data-signout], #signout-btn').first().isVisible(), true, `Sign out is visible on ${u} at ${w}px`);
+      await p.context().close();
+    }
   });
-  await check('password change, OPTIONAL (flag off): OCEAN page -> Change password link -> the page opens and stays, back link returns to OCEAN', async () => {
-    const oceanUrl = '/student/html/ocean-test.html';
-    const p = await pageFor(oceanUrl, { account: 'pw-opt', initial: { profile: { is_ocean_done: false, must_change_password: false } } });
-    await p.waitForSelector('#pia-change-password');
-    assert.equal(new URL(p.url()).pathname, oceanUrl);
-    await p.click('#pia-change-password');
-    await p.waitForURL(u => u.pathname === '/student/html/set-new-password.html');
+  await check('password change: the page still opens by its address and works (a temporary password is changed there)', async () => {
+    const p = await pwPage({ initial: { profile: { must_change_password: false } } });
     await p.waitForFunction(() => !document.body.classList.contains('opacity-0'));
-    await p.waitForTimeout(1200);                                   // long enough for any redirect to fire
+    await p.waitForTimeout(800);
     assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
-    assert.match(await p.locator('h1').innerText(), /Change your password/);
-    assert.match(await p.locator('label[for="pw-current"]').innerText(), /Current password/);
-    assert.equal(await p.locator('#pw-back').isVisible(), true);
-    assert.equal(new URL(await p.locator('#pw-back').getAttribute('href'), p.url()).pathname, oceanUrl);
-    assert.equal(await p.locator('#pia-change-password').count(), 0, 'no change-password link on the change-password page itself');
+    assert.equal(await p.locator('#pia-change-password').count(), 0);
     await p.context().close();
-  });
-  await check('password change, OPTIONAL: also reachable from the thank-you screen and the waiting room without bouncing', async () => {
-    for (const u of ['/student/html/assessment-complete.html', '/student/html/waiting-room.html']) {
-      const p = await pageFor(u, { account: 'pw-opt2', initial: { stageOpen: false, profile: { must_change_password: false } } });
-      await p.waitForSelector('#pia-change-password');
-      await p.click('#pia-change-password');
-      await p.waitForURL(x => x.pathname === '/student/html/set-new-password.html');
-      await p.waitForTimeout(1000);
-      assert.equal(new URL(p.url()).pathname, '/student/html/set-new-password.html');
-      await p.context().close();
-    }
-  });
-  await check('password change, OPTIONAL: the link is reachable on a phone (375px) from the dashboard and OCEAN', async () => {
-    for (const [u, prof] of [[dash, {}], ['/student/html/ocean-test.html', { is_ocean_done: false }]]) {
-      const p = await pageFor(u, { account: 'pw-opt3', width: 375, initial: { profile: Object.assign({ must_change_password: false }, prof) } });
-      await p.waitForSelector('#pia-change-password');
-      await p.keyboard.press('Escape');
-      assert.equal(await p.locator('#pia-change-password').isVisible(), true, u);
-      await p.context().close();
-    }
   });
   await check('password change, REQUIRED (flag on): any student page sends the student to the password page, which has no way around it', async () => {
     for (const u of ['/student/html/ocean-test.html', dash, '/student/html/assessment-complete.html']) {
@@ -865,10 +843,11 @@ function fixture() {
     assert.deepEqual(clipped, [], 'text clipped inside its box');
     await p.context().close();
   });
-  await check('keyboard: quit dialog traps focus, Escape keeps the test, focus returns to the link', async () => {
+  await check('keyboard: quit dialog traps focus, Escape keeps the test, focus returns to where it was', async () => {
     const p = await startOcean({ width: 1280 });
     await p.locator('#ocean-answer-list button[data-score="3"]').click();
-    await p.locator('.brand-link').focus(); await p.keyboard.press('Enter');
+    await p.locator('#signout-btn').focus();
+    await p.evaluate(() => { window.__quit = confirmQuit(); });                // the header has no link out any more
     await p.waitForSelector('#quit-modal.modal-active');
     for (let i = 0; i < 4; i++) { await p.keyboard.press('Tab'); assert.equal(await p.evaluate(() => !!document.activeElement.closest('#quit-modal')), true); }
     await p.keyboard.press('Escape');

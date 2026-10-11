@@ -500,19 +500,8 @@ function renderSignOutControl(profile) {
             white-space:nowrap; max-width:42vw; overflow:hidden; text-overflow:ellipsis; }
         #pia-signout-who.pia-signout-inline { max-width:26vw; text-align:right; }
         #pia-signout-who small { display:block; color:var(--text-faint); font-size:var(--fs-xs); }
-        #pia-change-password { display:block; color:var(--accent-text, var(--accent, #a855f7)); font-size:var(--fs-xs);
-            line-height:1.25; white-space:nowrap; }
-        #pia-change-password .pw-short { display:none; }
-        .learn-bar-right > #pia-change-password, .journey-bar-right > #pia-change-password { display:inline-flex; align-items:center; min-height:44px;
-            padding:0 var(--sp-2); font-weight:600; text-decoration:underline; text-underline-offset:3px; }
-        @media (max-width: 400px) {
-            .learn-bar-right:has(> #pia-change-password), .journey-bar-right:has(> #pia-change-password) { gap:4px; }
-            .learn-bar-right > #pia-change-password, .journey-bar-right > #pia-change-password { padding:0 4px; }
-        }
         @media (max-width: 720px) {
             .learn-bar-right > .who { display:none; }
-            #pia-change-password .pw-long { display:none; }
-            #pia-change-password .pw-short { display:inline; }
         }
     `;
     document.head.appendChild(style);
@@ -533,21 +522,8 @@ function renderSignOutControl(profile) {
             who.innerHTML = `<small>Signed in as:</small>${escapeHTML(name)}`;
             own.parentNode.insertBefore(who, own);
         }
-        if (!document.getElementById('pia-change-password') &&
-            !isOnPage('set-new-password.html')) {
-            const link = document.createElement('a');
-            link.id = 'pia-change-password';
-            link.href = SET_NEW_PASSWORD_URL;
-            link.setAttribute('aria-label', 'Change password');
-            // Short wording on a phone, where the header has no room for more.
-            link.innerHTML = '<span class="pw-long">Change password</span><span class="pw-short" aria-hidden="true">Password</span>';
-            // A sibling of the page's own Sign out button, never inside the name
-            // block: that block is hidden on phones, and a link inside it could
-            // not be reached there.
-            const bar = document.querySelector('.learn-bar-right');
-            if (bar) bar.insertBefore(link, bar.firstChild);
-            else own.parentNode.insertBefore(link, own);
-        }
+        // No "Change password" link: the header offers only who is signed in and Sign out.
+        // (A temporary password is still changed on the forced page, see SET_NEW_PASSWORD_URL.)
         return;
     }
 
@@ -555,7 +531,6 @@ function renderSignOutControl(profile) {
     wrap.id = 'pia-signout-control';
     wrap.innerHTML = `
         <span id="pia-signout-who"><small>Signed in as:</small>${escapeHTML(name)}</span>
-        <a id="pia-change-password" href="${SET_NEW_PASSWORD_URL}">Change password</a>
         <button id="pia-signout-btn" class="btn btn-signout" type="button">Sign out</button>
     `;
 

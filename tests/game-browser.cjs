@@ -663,16 +663,15 @@ const DASH = '/student/html/student-dashboard.html';
     await p.context().close();
   });
 
-  /* ---------------- no Change password inside the game ---------------- */
-  await check('Change password: offered on the start screen, gone while playing, back on the start screen after a refresh', async () => {
+  /* ---------------- the header: who is signed in and Sign out, nothing else ---------------- */
+  await check('game header: no Change password on the start screen or while playing, the logo is not a link, Sign out stays', async () => {
     const p = await open(DASH);
     await p.waitForSelector('#start-btn');
-    await p.waitForSelector('#pia-change-password', { state: 'visible', timeout: 8000 });
+    await p.waitForTimeout(800);
+    const bar = async () => ({ pw: await p.locator('#pia-change-password').count(), links: await p.locator('header a[href]').count(), out: await p.locator('#signout-btn').isVisible() });
+    assert.deepEqual(await bar(), { pw: 0, links: 0, out: true }, 'start screen');
     await start(p);
-    assert.equal(await p.locator('#pia-change-password').isVisible(), false, 'not shown inside the game');
-    assert.equal(await p.locator('#signout-btn').isVisible(), true, 'sign out is still there');
-    await p.reload();
-    await p.waitForSelector('#pia-change-password', { state: 'visible', timeout: 8000 });
+    assert.deepEqual(await bar(), { pw: 0, links: 0, out: true }, 'while playing');
     await p.context().close();
   });
 
