@@ -742,31 +742,29 @@ body.is-playing #pia-change-password { display: none; }
 
 /* ---- Worked example in the chat -----------------------------------------------
    A worked example is drawn step by step INSIDE the tutor's chat bubble (student/js/hint-whiteboard.js); there is
-   no separate board. It fits the bubble's own reserved height, so neither the bubble nor the tutor changes size:
-   the written work is on the left and the words and buttons are beside it. The type is sized from the bubble's
-   height (container units), so it fits whichever height the bubble has on this screen. Tapping anywhere on the
-   example goes to the next step. It goes as soon as the tutor says anything else, like any other hint. Every row
-   of the work exists from the start and only fades in, so nothing inside changes size as the steps go by. */
-.video-copy-layer.has-example .prompt-box { container-type: size; padding: 6px 10px; }
+   no separate board and no box of its own. It fits the bubble's own reserved height, so neither the bubble nor the
+   tutor changes size. Three fixed places, and nothing in them moves from one step to the next:
+       the written work (left) | the words (right, the first line always at the same height)
+       the arrows and the step count (one row along the bottom, fixed widths)
+   The type is sized from the bubble's height (container units) so it fits whichever height the bubble has on this
+   screen. Tapping anywhere on the example goes to the next step. It goes as soon as the tutor says anything else,
+   like any other hint. Every row of the work exists from the start and only fades in. */
+.video-copy-layer.has-example .prompt-box { container-type: size; padding: 4px 10px; }
 .video-copy-layer.has-example .tutor-speech { display: none; }
 
 .hb-inline {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 0.5rem;
+    grid-template-rows: minmax(0, 1fr) auto;
+    column-gap: 0.5rem;
+    row-gap: 0.25rem;
     width: 100%;
     height: 100%;
     text-align: start;
     cursor: pointer;
 }
 
-.hb-board {
-    padding: 0.125rem 0.375rem 0.125rem 0.875rem;
-    border: 2px dashed color-mix(in srgb, var(--palette-ink) 35%, transparent);
-    background: #fff;
-    overflow: hidden;
-}
+.hb-board { align-self: center; padding: 0 0.25rem 0 0.75rem; overflow: hidden; }
 
 .hb-grid {
     display: flex;
@@ -775,8 +773,8 @@ body.is-playing #pia-change-password { display: none; }
     gap: 0;
     padding-inline-end: 0.6em;      /* room for the hidden point hanging off the right edge */
     font-family: var(--font-mono);
-    /* five rows of figures and two rules must fit the bubble's height */
-    font-size: clamp(0.7rem, calc((100cqh - 16px) / 5.75), 1.05rem);
+    /* five rows of figures and two rules, in the height left above the arrows */
+    font-size: clamp(0.7rem, calc((100cqh - 34px) / 5.75), 1.05rem);
     font-weight: 700;
     line-height: 1.15;
 }
@@ -831,8 +829,10 @@ body.is-playing #pia-change-password { display: none; }
 .hb-board[data-shown~="ignore"] .hb-ign { opacity: 0.28; text-decoration: line-through; }
 .hb-board[data-shown~="ignore"] .hb-ghost { opacity: 0.28; }
 
-/* The places that count, underlined. */
-.hb-board[data-shown~="count"] .hb-dec { border-block-end: 4px solid var(--palette-green); }
+/* The places that count, underlined. The line is always there (transparent) and only takes its colour, so the
+   row never changes height. */
+.hb-dec { border-block-end: 4px solid transparent; }
+.hb-board[data-shown~="count"] .hb-dec { border-block-end-color: var(--palette-green); }
 
 /* What the caption is talking about right now. */
 .hb-board[data-focus~="ghost"] .hb-ghost { animation: hbPulse 700ms ease-in-out 2; background: color-mix(in srgb, var(--volt) 70%, transparent); }
@@ -844,32 +844,45 @@ body.is-playing #pia-change-password { display: none; }
 
 @keyframes hbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
 
-.hb-side { display: flex; flex-direction: column; justify-content: center; gap: 0.25rem; min-width: 0; min-height: 0; }
-
+/* The words: a box of fixed size, the text always starting at its top. */
 .hb-caption {
+    align-self: stretch;
     margin: 0;
-    font-size: 0.75rem;
+    height: 100%;
+    overflow: hidden;
+    font-size: 0.8125rem;
     font-weight: 600;
     line-height: 1.3;
 }
 
-.hb-controls { display: flex; align-items: center; gap: 0.375rem; }
-.hb-progress { margin-inline: auto; font-family: var(--font-mono); font-size: 0.6875rem; }
+/* The arrows and the step count: one slim row, three fixed slots (so Replay does not widen it). */
+.hb-controls {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr) 5rem;
+    align-items: center;
+    column-gap: 0.25rem;
+}
+.hb-progress { justify-self: center; text-align: center; font-family: var(--font-mono); font-size: 0.6875rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hb-btn {
-    min-height: 1.75rem;            /* 28px, and the whole example is a tap target for Next */
-    padding: 0 0.625rem;
-    font-size: 0.75rem;
+    width: 100%;
+    height: 1.5rem;                 /* 24px; the whole example is also a tap target for the next step */
+    padding: 0;
     border: 2px solid var(--palette-ink);
     background: #fff;
     color: var(--palette-ink);
     font: inherit;
+    font-size: 0.8125rem;
     font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
     cursor: pointer;
 }
 .hb-next { background: var(--palette-violet); }
 .hb-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .hb-btn:focus-visible { outline: 3px solid var(--palette-ink); outline-offset: 2px; }
-.hb-all { margin: 0; padding-inline-start: 1rem; font-size: 0.6875rem; line-height: 1.3; overflow-y: auto; max-height: 100%; }
+.hb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hb-all { align-self: stretch; margin: 0; padding-inline-start: 1rem; font-size: 0.6875rem; line-height: 1.3; overflow-y: auto; height: 100%; }
 .hb-inline [hidden] { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {

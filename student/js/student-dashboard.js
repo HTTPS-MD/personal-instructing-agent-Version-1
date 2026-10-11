@@ -124,7 +124,7 @@
         return 'number';
     }
 
-    var EXAMPLE_INTRO = 'Let me show you with a different problem.';
+    var EXAMPLE_INTRO = 'Let me show you with a different problem. Tap the arrow to go on.';
 
     var FAST_CORRECT_MS = 12000;      /* wording only: picks a "that was quick" line */
     var STREAK_FOR_PRAISE = 3;
@@ -582,6 +582,13 @@
                 }
             });
         });
+    }
+
+    /* A wrong answer. While a worked example is open in the chat it stays (the student needs it most now): the
+       tutor only looks sad, and the step card already says it was wrong. Otherwise the tutor says so. */
+    function reactToWrong(text) {
+        if (window.PIAHintBoard && window.PIAHintBoard.isOpen()) { setMood('sad'); }
+        else { speak(text, 'sad'); }
     }
 
     function setMood(mood) {
@@ -1169,11 +1176,11 @@
 
             if (outcome === 'format_error') {
                 setStepFeedback(CONFIRM[kind].error, 'wrong');
-                speak(reaction('finalFormatError', 'wrong'), 'sad');
+                reactToWrong(reaction('finalFormatError', 'wrong'));
                 state.errors.push('Step ' + stepNo + ': Final-answer error on "' + raw + '"');
             } else {
                 setStepFeedback('Incorrect answer. Try again.', 'wrong');
-                speak(reaction(Number(d.state.wrong_streak) >= 2 ? 'wrongRepeated' : 'wrongFirst', 'wrong'), 'sad');
+                reactToWrong(reaction(Number(d.state.wrong_streak) >= 2 ? 'wrongRepeated' : 'wrongFirst', 'wrong'));
                 state.errors.push('Step ' + stepNo + ': Error on "' + raw + '"');
             }
             paintErrors();

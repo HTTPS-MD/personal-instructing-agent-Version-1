@@ -34,8 +34,8 @@ const DASH = '/student/html/student-dashboard.html';
   const results = [];
   const leaked = [];
 
-  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, block = null, poll = null, ctx } = {}) {
-    const context = ctx || await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', serviceWorkers: 'block' });
+  async function open(url, { width = 1280, height = 900, profile = { group_type: 'Assigned', selected_character: 'pia-open' }, theme = 'dark', limit = 600, block = null, poll = null, motion = 'reduce', ctx } = {}) {
+    const context = ctx || await browser.newContext({ viewport: { width, height }, reducedMotion: motion, serviceWorkers: 'block' });
     if (!ctx) {
       await context.addInitScript(([p, t, l, pm]) => { if (pm) window.PIA_TUTORING_POLL_MS = pm; if (!sessionStorage.getItem('__limit_set')) { localStorage.setItem('__mock_limit', String(l)); sessionStorage.setItem('__limit_set', '1'); } localStorage.setItem('__mock_profile', JSON.stringify(p)); localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'student@example.test'); localStorage.setItem('pia_user_role', 'student'); }, [profile, theme, limit, poll]);
       await context.route('**/*', route => {
@@ -524,6 +524,84 @@ const DASH = '/student/html/student-dashboard.html';
     assert.equal(await p.locator('#start-lede').innerText(), lede, 'the original text is back');
     await p.evaluate(() => window.__mockExpireNow());
     await p.waitForFunction(() => document.querySelector('#start-btn').disabled, null, { timeout: 4000 });
+    await p.context().close();
+  });
+
+  /* ---------------- the worked example, drawn in the chat bubble ---------------- */
+  const EXAMPLE = 'Example: 0.25 * 55. Ignore the decimal point: 25 * 55 = 1375. 0.25 has 2 decimal places, so put the point back 2 places from the right: 13.75.';
+  /* Position in the PAGE, not the screen: on a phone the page scrolls on purpose to bring the example into view. */
+  const boxOf = async (p, sel) => { const b = await p.locator(sel).first().boundingBox(); const y = await p.evaluate(() => window.scrollY); return b && { x: b.x, y: b.y + y, width: b.width, height: b.height }; };
+  const same = (a, b, tol = 0.6) => a && b && ['x', 'y', 'width', 'height'].every(k => Math.abs(a[k] - b[k]) <= tol);
+  /* Gets a topic-1 question to the Tier 2 hint of its multiply step, whose text is a worked example. */
+  async function openExample(p) {
+    await start(p);
+    await p.evaluate(ex => { window.__bank.filter(q => q.topic === 1).forEach(q => { q.steps[1].hint2 = ex; }); }, EXAMPLE);
+    const q = await p.locator('#problem-expression').innerText();
+    const b = (await bank(p)).find(x => x.question === q);
+    await submit(p, b.steps[0].answer);
+    if (await p.locator('.conversion-confirmation').count()) await submit(p, b.steps[0].answer);
+    await submit(p, '999'); await submit(p, '998');
+    await p.locator('#hint-btn').click(); await p.waitForTimeout(300);          // tier 1: plain text
+    await p.waitForTimeout(1700);                                              // the talking animation is over
+    return { b, bubble: await boxOf(p, '#status-msg'), tutor: await boxOf(p, '#agent-img') };
+  }
+  for (const [w, h] of [[1440, 850], [1280, 720], [1024, 768], [412, 900], [375, 700]]) {
+    await check(`worked example in the chat at ${w}x${h}: inside the bubble, bubble and tutor unchanged, nothing moves from step to step`, async () => {
+      const p = await open(DASH, { width: w, height: h, motion: 'no-preference' });
+      const before = await openExample(p);
+      await p.locator('#hint-btn').click();                                    // tier 2: the example
+      await p.waitForSelector('#status-msg .hb-inline'); await p.waitForTimeout(1700);
+      assert.equal(await p.locator('.hint-board').count(), 0, 'no separate board');
+      assert.ok(same(before.bubble, await boxOf(p, '#status-msg')), 'the bubble keeps its size and place');
+      assert.ok(same(before.tutor, await boxOf(p, '#agent-img')), 'the tutor keeps size and place');
+      const frame = () => p.evaluate(() => {
+        const q = s => document.querySelector(s), rc = e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; };
+        const cap = q('.hb-caption'), rg = document.createRange(); rg.selectNodeContents(cap);
+        const wrap = q('.hb-inline'), bub = q('#status-msg').getBoundingClientRect(), nx = q('.hb-next').getBoundingClientRect();
+        return { board: rc(q('.hb-board')), caption: rc(cap), controls: rc(q('.hb-controls')), prev: rc(q('.hb-back')), next: rc(q('.hb-next')), count: rc(q('.hb-progress')),
+          line: rg.getClientRects()[0].top, capOverflow: cap.scrollHeight - cap.clientHeight, wrapOverflow: wrap.scrollHeight - wrap.clientHeight,
+          inside: wrap.getBoundingClientRect().bottom <= bub.bottom + 0.5 && nx.bottom <= bub.bottom + 0.5, total: Number(q('.hb-progress span:last-child').textContent.match(/of (\d+)/)[1]) };
+      });
+      const first = await frame(); let moved = 0;
+      for (let i = 1; i < first.total; i++) {
+        await p.locator('.hb-next').click(); await p.waitForTimeout(220);
+        const f = await frame();
+        for (const k of ['board', 'caption', 'controls', 'prev', 'next', 'count']) f[k].forEach((v, j) => { moved = Math.max(moved, Math.abs(v - first[k][j])); });
+        moved = Math.max(moved, Math.abs(f.line - first.line));
+        assert.equal(f.capOverflow, 0, 'the whole caption fits its box on step ' + (i + 1));
+        assert.equal(f.wrapOverflow <= 1, true, 'nothing is clipped');
+        assert.equal(f.inside, true, 'the arrows are inside the bubble');
+      }
+      assert.ok(moved <= 0.6, 'nothing moved between steps: ' + moved + 'px');
+      await p.context().close();
+    });
+  }
+  await check('worked example in the chat: a wrong answer keeps it, a right answer removes it, the next hint removes it', async () => {
+    const p = await open(DASH, { width: 1280, height: 800, motion: 'no-preference' });
+    const { b } = await openExample(p);
+    await p.locator('#hint-btn').click(); await p.waitForSelector('#status-msg .hb-inline');
+    await submit(p, '777');
+    assert.equal(await p.locator('#status-msg .hb-inline').count(), 1, 'still there after a wrong answer');
+    assert.match(await p.locator('#step-feedback').innerText(), /incorrect|try again/i);
+    await submit(p, '776');
+    assert.equal(await p.locator('#status-msg .hb-inline').count(), 1, 'still there after another wrong answer');
+    await p.locator('#hint-btn').click(); await p.waitForTimeout(300);          // tier 3: the tutor speaks again
+    assert.equal(await p.locator('#status-msg .hb-inline').count(), 0, 'the next hint replaces it');
+    assert.equal(await p.locator('#status-msg').evaluate(e => e.closest('.has-example') === null), true);
+    await p.locator('#hint-btn').click(); await p.waitForTimeout(300);
+    await submit(p, b.steps[1].answer); if (await p.locator('.conversion-confirmation').count()) await submit(p, b.steps[1].answer);
+    await p.waitForTimeout(300);
+    assert.equal(await p.locator('#status-msg .hb-inline').count(), 0, 'gone after the right answer');
+    await p.context().close();
+  });
+  await check('worked example in the chat, reduced motion: all of it at once, no buttons, every explanation listed', async () => {
+    const p = await open(DASH, { width: 1280, height: 800 });                  // the suite default is reduced motion
+    await openExample(p);
+    await p.locator('#hint-btn').click(); await p.waitForSelector('#status-msg .hb-inline');
+    assert.equal(await p.locator('.hb-controls').isVisible(), false, 'no arrows needed');
+    assert.ok(await p.locator('.hb-all li').count() >= 8, 'every explanation is listed');
+    assert.match(await p.locator('.hb-board').getAttribute('data-shown'), /point/);
+    assert.equal(await p.locator('.hb-inline').evaluate(e => e.scrollHeight <= e.clientHeight + 1), true, 'fits the bubble');
     await p.context().close();
   });
 

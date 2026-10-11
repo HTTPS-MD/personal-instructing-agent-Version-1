@@ -157,22 +157,26 @@
         board.appendChild(grid);
         wrap.appendChild(board);
 
-        /* The words and the buttons sit beside the work, so the whole example fits the bubble's own height. */
-        var side = el('div', 'hb-side');
+        /* The words sit beside the work; the arrows and the step count are one row along the bottom. Every one of
+           these has a fixed place and size, so nothing moves from one step to the next. */
         var caption = el('p', 'hb-caption');
         caption.setAttribute('role', 'status');
         caption.setAttribute('aria-live', 'polite');
-        side.appendChild(caption);
+        wrap.appendChild(caption);
 
         var controls = el('div', 'hb-controls');
-        var back = el('button', 'hb-btn hb-back', 'Back'); back.type = 'button';
-        var next = el('button', 'hb-btn hb-next', 'Next'); next.type = 'button';
-        var dots = el('span', 'hb-progress');
+        var back = el('button', 'hb-btn hb-back', '\u2190'); back.type = 'button';
+        back.setAttribute('aria-label', 'Previous step');
+        var next = el('button', 'hb-btn hb-next'); next.type = 'button';
+        var count = el('span', 'hb-progress');
+        var countText = el('span'); countText.setAttribute('aria-hidden', 'true');
+        var countSpoken = el('span', 'hb-sr');
+        count.appendChild(countText);
+        count.appendChild(countSpoken);
         controls.appendChild(back);
-        controls.appendChild(dots);
+        controls.appendChild(count);
         controls.appendChild(next);
-        side.appendChild(controls);
-        wrap.appendChild(side);
+        wrap.appendChild(controls);
 
         function steps() { return allSteps; }
 
@@ -201,8 +205,13 @@
             if (!reduced) { caption.textContent = steps()[index].caption; }
 
             back.disabled = index === 0;
-            next.textContent = index === steps().length - 1 ? 'Replay' : 'Next';
-            dots.textContent = (index + 1) + ' / ' + steps().length;
+            var last = index === steps().length - 1;
+            next.textContent = last ? '\u21bb Replay' : '\u2192';
+            next.setAttribute('aria-label', last ? 'Replay the example' : 'Next step');
+            /* Padded to the width of the total ("01 / 10"), so the count is the same width on every step. */
+            var width = String(steps().length).length;
+            countText.textContent = ('00' + (index + 1)).slice(-width) + ' / ' + steps().length;
+            countSpoken.textContent = 'Step ' + (index + 1) + ' of ' + steps().length;
 
             var atPoint = shown.indexOf('point') !== -1;
             if (shown.indexOf('sum') === -1) { dotEl.style.opacity = '0'; }
@@ -244,7 +253,7 @@
             index = steps().length - 1;
             var list = el('ol', 'hb-all');
             steps().forEach(function (s) { list.appendChild(el('li', '', s.caption)); });
-            side.insertBefore(list, caption);
+            wrap.insertBefore(list, caption);
         }
 
         host.appendChild(wrap);
@@ -263,6 +272,7 @@
     }
 
     function closeAll() { if (current) { current.close(); } }
+    function isOpen() { return !!current; }
 
-    return { parseExample: parseExample, build: build, open: open, close: closeAll };
+    return { parseExample: parseExample, build: build, open: open, close: closeAll, isOpen: isOpen };
 }));
