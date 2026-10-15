@@ -30,18 +30,21 @@ const profileOf = (email) => {
   return s ? { email: s.email, full_name: s.full_name, role: s.role, section: s.section, group_type: 'Assigned',
     is_ocean_done: false, current_stage: '', parental_consent: true, student_assent: true, must_change_password: false } : null;
 };
-const classId = (section) => 'cls-' + section;
-const sectionOf = (id) => String(id).replace(/^cls-/, '');
+
+const sections = () => [...new Set(store.students.filter((s) => s.role === 'student').map((s) => s.section))].sort();
+// The page counts down in real time; translate the simulated clock to "now".
+const realIso = (simMs) => new Date(Date.now() + (simMs - store.clock)).toISOString();
 
 function overview() {
-  const sections = [...new Set(store.students.filter((s) => s.role === 'student').map((s) => s.section))].sort();
   return {
-    sections: sections.map((section) => ({ section, students: store.students.filter((s) => s.role === 'student' && s.section === section).length })),
-    open: [...store.classes.entries()].filter(([, closes]) => closes > store.clock).map(([section, closes]) => ({
-      id: classId(section), section, closes_at: new Date(closes - (Date.now() - store.clock) * 0).toISOString(),
-      students: store.students.filter((s) => s.role === 'student' && s.section === section).map((s) => ({
-        email: s.email, full_name: s.full_name, number: s.number, present: !store.absent.has(section + '|' + s.email) })),
-    })),
+    sections: sections().map((section) => {
+      const list = store.students.filter((s) => s.role === 'student' && s.section === section);
+      return { section, students: list.length, without_number: list.filter((s) => !s.number).length };
+    }),
+    open: [...store.checkins.entries()].filter(([, ends]) => ends > store.clock)
+      .map(([section, ends]) => ({ section, ends_at: realIso(ends) })),
+    waiting: store.waiting().filter((w) => store.isOpen(w.section))
+      .map((w) => ({ id: w.id, section: w.section, full_name: w.name, created_at: realIso(w.createdMs), duplicate: w.duplicate })),
   };
 }
 
@@ -49,15 +52,10 @@ function rpc(name, args, who) {
   const isAdmin = who === ADMIN.email;
   if (name.startsWith('admin_') && !isAdmin) return { error: { message: 'PIA: only an administrator can do this.', code: '42501' } };
   switch (name) {
-    case 'admin_class_overview': {
-      const o = overview();
-      // Real clock for the page's "closes in N min": translate the sim clock to now.
-      o.open.forEach((c) => { c.closes_at = new Date(Date.now() + (store.classes.get(c.section) - store.clock)).toISOString(); });
-      return { data: o };
-    }
-    case 'admin_open_class': store.openClass(args.p_section, args.p_minutes); return { data: classId(args.p_section) };
-    case 'admin_close_class': store.closeClass(args.p_section); return { data: null };
-    case 'admin_set_attendance': store.setPresent(sectionOf(args.p_class), args.p_email, args.p_present); return { data: null };
+    case 'admin_checkin_overview': return { data: overview() };
+    case 'admin_start_checkin': store.startCheckin(args.p_section, args.p_minutes); return { data: 'checkin-' + args.p_section };
+    case 'admin_stop_checkin': store.stopCheckin(args.p_section); return { data: null };
+    case 'admin_let_in': return { data: store.letIn(args.p_ids || []) };
     case 'admin_import_student_numbers': {
       let n = 0;
       for (const r of args.p_rows || []) {
@@ -103,9 +101,10 @@ http.createServer(async (req, res) => {
   if (p === '/__sim/state') {
     return json(res, 200, {
       clock: new Date(store.clock).toISOString(),
-      classes: Object.fromEntries([...store.classes].map(([s, c]) => [s, c > store.clock ? 'open until ' + new Date(c).toISOString().slice(11, 16) + ' UTC' : 'closed'])),
-      absent: [...store.absent], sessions: Object.fromEntries([...store.sessions].map(([e, s]) => [e, s.device])),
-      attempts: store.attempts.length, log: store.log.slice(-12),
+      checkins: Object.fromEntries(sections().map((s) => [s, store.isOpen(s) ? 'open until ' + new Date(store.checkins.get(s)).toISOString().slice(11, 16) + ' UTC' : 'closed'])),
+      waiting: store.waiting().map((w) => `${w.name} (${w.section})${w.duplicate ? ' DUPLICATE' : ''}`),
+      sessions: Object.fromEntries([...store.sessions].map(([e, s]) => [e, s.device])),
+      failedTries: store.attempts.filter((a) => !a.ok).length, log: store.log.slice(-12),
       students: store.students.filter((s) => s.role === 'student').map((s) => ({ number: s.number, name: s.full_name, section: s.section })),
     });
   }

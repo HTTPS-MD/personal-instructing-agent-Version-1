@@ -565,17 +565,20 @@
         return slots.allowed ? slots : { allowed: false, reason: slots.reason, deviceLimit: true };
     }
 
-    /* ---- 3a. Student door: student number, confirmed by name ------------
-       Step 1 asks the join-with-number Edge Function to look the number up.
-       It answers only if the number is on the roster, the admin has opened
-       the student's class, and the admin has not marked the student absent;
-       otherwise one wording for every refusal. Step 2 shows the name on the
-       class list: "Is this you?". Yes asks for a one-time token for THEIR
-       existing account and verifyOtp turns it into a session. From there it
-       is the same pipeline as a password sign-in: profile lookup -> area
-       check -> claimSeat -> routeAfterSignIn. */
+    /* ---- 3a. Student door: student number, confirm, wait to be let in ----
+       Typing a number NEVER opens a session. The join-with-number Edge Function
+       answers only while an admin has a check-in open for the student's section;
+       the student confirms the name and section ("Is this you?"), then asks to
+       be let in with a secret this browser makes and keeps. The admin, who can
+       see the lab, ticks the students they see. This browser polls; when the
+       admin has let it in, the function hands over a one-time token for the
+       student's EXISTING account, once, and verifyOtp turns it into a session.
+       From there it is the same pipeline as a password sign-in: profile lookup
+       -> area check -> claimSeat -> routeAfterSignIn. */
 
-    var join = { step: 'number', number: '', pending: false };
+    var join = { step: 'number', number: '', name: '', section: '', pending: false, polling: false, requestId: '', secret: '', timer: null };
+    var WAIT_KEY = 'pia_join_wait';
+    var POLL_MS = 2500;
 
     function joinCall(payload) {
         return sb.functions.invoke('join-with-number', { body: payload }).then(async function (res) {
@@ -586,41 +589,155 @@
         });
     }
 
+    function randomHex(bytes) {
+        var a = new Uint8Array(bytes);
+        crypto.getRandomValues(a);
+        return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    }
+
     function setJoinStep(step) {
         join.step = step;
         var confirm = step === 'confirm';
-        $('#join-step-code').hidden = confirm;
+        var waiting = step === 'wait';
+        $('#join-step-code').hidden = confirm || waiting;
         $('#join-step-name').hidden = !confirm;
-        $('#join-back').hidden = !confirm;
+        $('#join-step-wait').hidden = !waiting;
+        $('#join-back').hidden = !(confirm || waiting);
+        $('#join-back').textContent = waiting ? 'Cancel' : 'No, that is not me';
+        $('#si-submit').hidden = waiting;
         $('#si-submit').textContent = confirm ? 'Yes, that is me' : 'Next';
-        $('#signin-title').textContent = confirm ? 'Is this you?' : 'Enter your student number';
+        $('#signin-title').textContent = confirm ? 'Is this you?' : waiting ? 'Waiting to be let in' : 'Enter your student number';
         $('#signin-sub').textContent = confirm
-            ? 'Check the name before you continue.'
-            : 'Type the number on your school ID.';
+            ? 'Check the name and section before you continue.'
+            : waiting ? 'Do not close this page.' : 'Type the number on your school ID.';
+    }
+
+    function stopWaiting() {
+        if (join.timer) { clearInterval(join.timer); join.timer = null; }
+        join.requestId = '';
+        join.secret = '';
+        try { sessionStorage.removeItem(WAIT_KEY); } catch (err) { /* private mode */ }
     }
 
     function resetJoin() {
         if (!$('#join-step-code')) { return; }
+        stopWaiting();
         join.number = '';
         join.pending = false;
+        join.polling = false;
         $('#join-number').value = '';
         $('#join-who').textContent = '';
+        $('#join-section').textContent = '';
         setJoinStep('number');
         clearFormErrors('signin-form');
         clearStatus('signin-status');
     }
 
-    function backToNumber() {
+    function backToNumber(message) {
+        stopWaiting();
         setJoinStep('number');
         $('#join-number').value = '';
         clearFormErrors('signin-form');
         clearStatus('signin-status');
+        if (typeof message === 'string' && message) { setStatus('signin-status', message, 'error'); }
         $('#join-number').focus();
+    }
+
+    function startWaiting(requestId, secret, name, section) {
+        join.requestId = requestId;
+        join.secret = secret;
+        try { sessionStorage.setItem(WAIT_KEY, JSON.stringify({ requestId: requestId, secret: secret, name: name, section: section })); } catch (err) { /* private mode */ }
+        $('#join-wait-name').textContent = (name || '') + (section ? ' · ' + section : '');
+        setJoinStep('wait');
+        clearStatus('signin-status');
+        if (join.timer) { clearInterval(join.timer); }
+        join.timer = setInterval(pollOnce, POLL_MS);
+        setTimeout(pollOnce, 800);
+    }
+
+    async function pollOnce() {
+        if (join.polling || !join.requestId) { return; }
+        var overlay = $('#modal-signin');
+        if (!overlay.classList.contains('is-open')) { return; }
+        var id = join.requestId;
+        var secret = join.secret;
+        join.polling = true;
+        try {
+            var res = await joinCall({ action: 'poll', request_id: id, secret: secret });
+            if (id !== join.requestId) { return; }                 // cancelled meanwhile
+            if (!res.ok) { return; }                               // network blip: try again next tick
+            var status = res.data.status;
+            if (status === 'waiting') { return; }
+            if (status === 'let_in') {
+                stopWaiting();
+                await enterWithToken(res.data.token_hash);
+                return;
+            }
+            if (status === 'closed') { backToNumber('Check-in is closed. Tell your admin.'); return; }
+            backToNumber('You were not let in. Type your number again.');
+        } catch (err) {
+            /* offline: keep waiting */
+        } finally {
+            join.polling = false;
+        }
+    }
+
+    async function enterWithToken(tokenHash) {
+        var overlay = $('#modal-signin');
+        var version = overlay.dataset.authVersion || '0';
+        var current = function () { return overlay.classList.contains('is-open') && (overlay.dataset.authVersion || '0') === version; };
+        var fail = function (message) { backToNumber(message); };
+
+        /* This tab is a student's: the session lives in the tab, not in the
+           browser, so closing the tab ends it on this PC (function.js). Set
+           BEFORE the session is created. */
+        try { sessionStorage.setItem('pia_student_tab', '1'); } catch (err) { /* private mode */ }
+
+        var session = await sb.auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' });
+        if (session.error) { session = await sb.auth.verifyOtp({ token_hash: tokenHash, type: 'email' }); }
+        if (!current()) { if (!session.error) { await sb.auth.signOut({ scope: 'local' }); } return; }
+        if (session.error || !session.data || !session.data.user) { fail('Could not open your session. Please try again.'); return; }
+
+        var email = session.data.user.email;
+        var profileRes = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
+        if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
+        if (profileRes.error || !profileRes.data) {
+            await sb.auth.signOut({ scope: 'local' });
+            fail('This account is not set up yet. Please tell your admin.');
+            return;
+        }
+
+        var profile = profileRes.data;
+        var role = normalizeRole(profile.role);
+        if (role !== 'student') {
+            await sb.auth.signOut({ scope: 'local' });
+            fail(areaMismatch('student', role) || 'This door is for students.');
+            return;
+        }
+
+        try {
+            localStorage.setItem('pia_user_email', email);
+            localStorage.setItem('pia_user_role', role);
+        } catch (err) { /* private mode */ }
+
+        var check = await claimSeat(email, profile, role);
+        if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
+        if (!check.allowed) {
+            await sb.auth.signOut({ scope: 'local' });
+            try {
+                localStorage.removeItem('pia_user_email');
+                localStorage.removeItem('pia_user_role');
+            } catch (err) { /* private mode */ }
+            fail(check.reason);
+            return;
+        }
+
+        await routeAfterSignIn(profile, role, function (text, tone) { setStatus('signin-status', text, tone); });
     }
 
     async function handleStudentJoin(event) {
         event.preventDefault();
-        if (join.pending || $('#si-submit').disabled) { return; }
+        if (join.pending || $('#si-submit').disabled || join.step === 'wait') { return; }
         clearFormErrors('signin-form');
         clearStatus('signin-status');
 
@@ -635,7 +752,7 @@
                 return;
             }
             join.pending = true;
-            var release = setBusy($('#si-submit'), 'Checking\u2026');
+            var release = setBusy($('#si-submit'), 'Checking…');
             try {
                 var found = await joinCall({ action: 'lookup', number: number });
                 if (!current()) { return; }
@@ -645,10 +762,13 @@
                     return;
                 }
                 join.number = number;
-                $('#join-who').textContent = found.data.name || '';
+                join.name = found.data.name || '';
+                join.section = found.data.section || '';
+                $('#join-who').textContent = join.name;
+                $('#join-section').textContent = join.section ? 'Section ' + join.section : '';
                 setJoinStep('confirm');
             } catch (err) {
-                if (current()) { setStatus('signin-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error'); }
+                if (current()) { setStatus('signin-status', 'Can’t reach the server. Check your Wi-Fi, then try again.', 'error'); }
             } finally {
                 join.pending = false;
                 release();
@@ -657,66 +777,36 @@
             return;
         }
 
+        /* Confirmed: ask to be let in. Nothing is opened yet. */
         join.pending = true;
-        var releaseJoin = setBusy($('#si-submit'), 'Joining\u2026');
+        var releaseAsk = setBusy($('#si-submit'), 'Asking…');
         try {
-            var joined = await joinCall({ action: 'join', number: join.number });
+            var secret = randomHex(16);
+            var asked = await joinCall({ action: 'request', number: join.number, secret: secret });
             if (!current()) { return; }
-            if (!joined.ok) {
-                setStatus('signin-status', (joined.data && joined.data.error) || 'Could not join. Try again.', 'error');
+            if (!asked.ok) {
+                setStatus('signin-status', (asked.data && asked.data.error) || 'Could not ask to be let in. Try again.', 'error');
                 return;
             }
-
-            var session = await sb.auth.verifyOtp({ token_hash: joined.data.token_hash, type: 'magiclink' });
-            if (session.error) { session = await sb.auth.verifyOtp({ token_hash: joined.data.token_hash, type: 'email' }); }
-            if (!current()) { if (!session.error) { await sb.auth.signOut({ scope: 'local' }); } return; }
-            if (session.error || !session.data || !session.data.user) {
-                setStatus('signin-status', 'Could not open your session. Please try again.', 'error');
-                return;
-            }
-
-            var email = session.data.user.email;
-            var profileRes = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
-            if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
-            if (profileRes.error || !profileRes.data) {
-                await sb.auth.signOut({ scope: 'local' });
-                setStatus('signin-status', 'This account is not set up yet. Please tell your admin.', 'error');
-                return;
-            }
-
-            var profile = profileRes.data;
-            var role = normalizeRole(profile.role);
-            if (role !== 'student') {
-                await sb.auth.signOut({ scope: 'local' });
-                setStatus('signin-status', areaMismatch('student', role) || 'This door is for students.', 'error');
-                return;
-            }
-
-            try {
-                localStorage.setItem('pia_user_email', email);
-                localStorage.setItem('pia_user_role', role);
-            } catch (err) { /* private mode */ }
-
-            var check = await claimSeat(email, profile, role);
-            if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
-            if (!check.allowed) {
-                await sb.auth.signOut({ scope: 'local' });
-                try {
-                    localStorage.removeItem('pia_user_email');
-                    localStorage.removeItem('pia_user_role');
-                } catch (err) { /* private mode */ }
-                setStatus('signin-status', check.reason, 'error');
-                return;
-            }
-
-            await routeAfterSignIn(profile, role, function (text, tone) { setStatus('signin-status', text, tone); });
+            startWaiting(asked.data.request_id, secret, join.name, join.section);
         } catch (err) {
-            if (current()) { setStatus('signin-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error'); }
+            if (current()) { setStatus('signin-status', 'Can’t reach the server. Check your Wi-Fi, then try again.', 'error'); }
         } finally {
             join.pending = false;
-            releaseJoin();
-            if (join.step === 'confirm') { $('#si-submit').textContent = 'Yes, that is me'; }
+            releaseAsk();
+            $('#si-submit').textContent = join.step === 'confirm' ? 'Yes, that is me' : 'Next';
         }
+    }
+
+    /* A refresh while waiting must not lose the request: the secret is kept in
+       this tab, so the dialog comes back and polling carries on. */
+    function resumeWaiting() {
+        if (document.documentElement.getAttribute('data-session') === 'in') { return; }
+        var saved = null;
+        try { saved = JSON.parse(sessionStorage.getItem(WAIT_KEY) || 'null'); } catch (err) { saved = null; }
+        if (!saved || !saved.requestId || !saved.secret) { return; }
+        openAuth('signin');
+        startWaiting(saved.requestId, saved.secret, saved.name, saved.section);
     }
 
     /* One door for teachers and admins. The redirect below the area check
@@ -1378,7 +1468,7 @@
            usual welcome for a visitor who is already signed in. */
         handleDeviceResetLink().then(function (handled) {
             if (handled) { document.documentElement.removeAttribute('data-session'); return; }
-            return offerResume().then(handleEntryIntent);
+            return offerResume().then(handleEntryIntent).then(resumeWaiting);
         });
     }
 

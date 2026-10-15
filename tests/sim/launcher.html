@@ -19,14 +19,14 @@
 <p>Runs the real student-number door against an in-memory class. Each tab is one lab PC. Nothing leaves this machine.</p>
 <div class="grid">
   <div class="card"><h2>1 · Admin</h2>
-    <a class="btn" target="_blank" href="/admin/html/open-class.html?as=admin&pc=ADMIN">Open admin page</a>
-    <p style="font-size:13px">Open a section's class, untick the absent.</p></div>
+    <a class="btn" target="_blank" href="/admin/html/checkin.html?as=admin&pc=ADMIN">Open check-in page</a>
+    <p style="font-size:13px">Start check-in, then tick who you see and let them in.</p></div>
   <div class="card"><h2>2 · Lab PCs (students)</h2>
     <a class="btn" target="_blank" href="/index.html?pc=PC-01">PC-01</a><a class="btn" target="_blank" href="/index.html?pc=PC-02">PC-02</a>
     <a class="btn" target="_blank" href="/index.html?pc=PC-03">PC-03</a><a class="btn" target="_blank" href="/index.html?pc=PC-09">PC-09</a>
     <p style="font-size:13px">Click "Enter student number" on the page.</p></div>
   <div class="card"><h2>3 · Time</h2>
-    <button data-adv="1800000">+30 min</button><button data-adv="3600000">+1 h</button><button data-adv="7500000">+2 h 5 min</button>
+    <button data-adv="600000">+10 min</button><button data-adv="1260000">+21 min</button><button data-adv="3600000">+1 h</button>
     <button id="reset">Reset everything</button></div>
 </div>
 <div class="grid" style="margin-top:14px">
@@ -38,8 +38,8 @@
     const s = await (await fetch('/__sim/state')).json();
     document.getElementById('nums').innerHTML = s.students.map(x => `<tr><td><code>${x.number}</code></td><td>${x.name}</td><td>${x.section}</td></tr>`).join('');
     document.getElementById('state').textContent =
-      'clock: ' + s.clock + '\nclasses: ' + (JSON.stringify(s.classes, null, 1)) + '\nabsent: ' + JSON.stringify(s.absent) +
-      '\nsigned in: ' + JSON.stringify(s.sessions, null, 1) + '\nfailed tries logged: ' + s.attempts + '\n\n' + s.log.join('\n');
+      'clock: ' + s.clock + '\ncheck-in: ' + JSON.stringify(s.checkins, null, 1) + '\nwaiting: ' + JSON.stringify(s.waiting) +
+      '\nsigned in: ' + JSON.stringify(s.sessions, null, 1) + '\nfailed tries logged: ' + s.failedTries + '\n\n' + s.log.join('\n');
   }
   document.querySelectorAll('[data-adv]').forEach(b => b.onclick = async () => { await fetch('/__sim/advance', { method: 'POST', body: JSON.stringify({ ms: Number(b.dataset.adv) }) }); refresh(); });
   document.getElementById('reset').onclick = async () => { await fetch('/__sim/reset', { method: 'POST', body: '{}' }); refresh(); };

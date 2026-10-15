@@ -1,27 +1,28 @@
 // ============================================================================
 // PIA -- join-with-number  (Supabase Edge Function, Deno)
 // ============================================================================
-// The student door for the computer lab: a student number, confirmed by name.
-// The rules live in handler.ts (and are rehearsed in tests/sim); this file only
-// connects them to Supabase.
+// The student door for the computer lab: a student number, confirmed by name,
+// then an admin lets the student in. The rules live in handler.ts (and are
+// rehearsed in tests/sim); this file only connects them to Supabase.
 //
-// HOW A SESSION IS OPENED: for the matched student's EXISTING account the Auth
-// Admin API makes a one-time sign-in token; the browser redeems it with
-// verifyOtp. Everything after that (profile lookup, claim_student_session,
-// routing) is the normal pipeline, so RLS, stages and the one-device rule
-// behave as after a password sign-in.
+// HOW A SESSION IS OPENED: when the admin has let a request in, the student's
+// own browser (the one holding the request's secret) polls; the Auth Admin API
+// then makes a one-time sign-in token for the EXISTING account and hands it to
+// that browser once; the browser redeems it with verifyOtp. Everything after
+// that (profile lookup, claim_student_session, routing) is the normal pipeline,
+// so RLS, stages and the one-device rule behave as after a password sign-in.
 //
 // WHY AN EDGE FUNCTION: minting a session for another user needs the
 // service-role key, which must never reach a browser.
 //
 // WHAT THIS DOES NOT PROVE: who is typing. A student number is known to a
-// student's classmates. The door is therefore only open while an ADMIN has
-// opened the section's class, only for students the admin has not marked
-// absent, and a second sign-in takes the account over and signs the first one
-// out, so a stolen entry is noticed.
+// student's classmates, which is why typing it opens nothing: an admin who can
+// see the lab lets people in, and a second entry takes the account over and
+// signs the first one out, so a stolen entry is noticed.
 //
 // A student who never activated has a profile but no auth user: the function
-// creates it (email confirmed, a random password nobody knows) on first entry.
+// creates it (email confirmed, a random password nobody knows) the first time
+// they are let in.
 //
 // DEPLOY (once; needs migration 0052)
 //   supabase functions deploy join-with-number --no-verify-jwt
@@ -39,6 +40,8 @@ const CORS: Record<string, string> = {
 function send(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
+
+const like = (value: string) => value.replace(/[\\%_]/g, (c) => '\\' + c);
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -58,6 +61,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const ip = req.headers.get('cf-connecting-ip') ?? forwarded[forwarded.length - 1] ?? 'unknown';
   const nowIso = () => new Date().toISOString();
 
+  const openCount = async (section?: string) => {
+    let q = admin.from('checkins').select('id', { count: 'exact', head: true }).is('stopped_at', null).gt('ends_at', nowIso());
+    if (section) q = q.eq('section', section);
+    const { count } = await q;
+    return count ?? 0;
+  };
+
   const deps: Deps = {
     now: () => Date.now(),
 
@@ -72,28 +82,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { data: row } = await admin.from('student_numbers').select('email').eq('number_key', numberKey).maybeSingle();
       if (!row) return null;
       const { data: p } = await admin.from('profiles').select('email, full_name, section, role')
-        .ilike('email', String(row.email).replace(/[\\%_]/g, (c) => '\\' + c)).maybeSingle();
+        .ilike('email', like(String(row.email))).maybeSingle();
       return p ? { email: p.email, full_name: p.full_name, section: String(p.section ?? '').trim(), role: p.role } : null;
     },
 
-    async anyClassOpen() {
-      const { count } = await admin.from('class_sessions').select('id', { count: 'exact', head: true })
-        .is('closed_at', null).gt('closes_at', nowIso());
-      return (count ?? 0) > 0;
+    anyCheckinOpen: async () => (await openCount()) > 0,
+    checkinOpenFor: async (section) => (await openCount(section)) > 0,
+
+    async countWaiting(email, sinceMs) {
+      let q = admin.from('join_requests').select('id', { count: 'exact', head: true })
+        .eq('status', 'waiting').gte('created_at', new Date(sinceMs).toISOString());
+      if (email) q = q.eq('email', email);
+      const { count } = await q;
+      return count ?? 0;
     },
-    async classOpenFor(section) {
-      const { count } = await admin.from('class_sessions').select('id', { count: 'exact', head: true })
-        .eq('section', section).is('closed_at', null).gt('closes_at', nowIso());
-      return (count ?? 0) > 0;
+    async createRequest({ email, section, secretHash }) {
+      const { data, error } = await admin.from('join_requests')
+        .insert({ email, section, secret_hash: secretHash }).select('id').single();
+      if (error || !data) throw error ?? new Error('no request');
+      return String(data.id);
     },
-    async isPresent(section, email) {
-      const { data: c } = await admin.from('class_sessions').select('id')
-        .eq('section', section).is('closed_at', null).gt('closes_at', nowIso()).maybeSingle();
-      if (!c) return false;
-      const { data: a } = await admin.from('class_attendance').select('present')
-        .eq('class_id', c.id).eq('email', email.trim().toLowerCase()).maybeSingle();
-      return a ? a.present === true : true;     // no row: present by default
+    async getRequest(id) {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+      const { data } = await admin.from('join_requests')
+        .select('id, email, section, secret_hash, status, created_at, let_in_at, delivered').eq('id', id).maybeSingle();
+      if (!data) return null;
+      return {
+        id: String(data.id), email: data.email, section: data.section, secretHash: data.secret_hash,
+        status: data.status, createdMs: Date.parse(data.created_at),
+        letInMs: data.let_in_at ? Date.parse(data.let_in_at) : null, delivered: data.delivered === true,
+      };
     },
+    async markDelivered(id) { await admin.from('join_requests').update({ delivered: true }).eq('id', id); },
 
     async ensureAccount(email) {
       const { data: id, error } = await admin.rpc('pia_auth_user_id', { p_email: email });

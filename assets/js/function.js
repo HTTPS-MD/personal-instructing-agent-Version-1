@@ -29,12 +29,28 @@ window.PIA_ENTRY_URL = window.location.href;
 window.supabaseClient = null;
 window.sb = null;
 
+// WHERE THE SESSION LIVES. A student who is let in at the lab door (index.html,
+// the join-with-number function) sets sessionStorage 'pia_student_tab' first. From
+// then on this tab keeps the session in the TAB, not in the browser: closing the
+// tab or the browser ends it on that PC, so the next child to sit down is never
+// offered "Continue to dashboard" for the previous child's account. A refresh
+// keeps it. Everyone else (staff, and a student who signed in the old way) is
+// untouched: their session stays in localStorage as before.
+function isStudentTab() {
+    try { return sessionStorage.getItem('pia_student_tab') === '1'; } catch (e) { return false; }
+}
+const piaAuthStorage = {
+    getItem(key) { try { return (isStudentTab() ? sessionStorage : localStorage).getItem(key); } catch (e) { return null; } },
+    setItem(key, value) { try { (isStudentTab() ? sessionStorage : localStorage).setItem(key, value); } catch (e) { /* private mode */ } },
+    removeItem(key) { try { sessionStorage.removeItem(key); localStorage.removeItem(key); } catch (e) { /* private mode */ } }
+};
+
 if (window.supabase) {
     window.supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey, {
         // auth-callback.js raises this on the landing page while it hands an
         // email link on to the set-password page: the one-time tokens belong
         // to that page and must not be spent here on the way through.
-        auth: { detectSessionInUrl: !window.PIA_AUTH_FORWARDING }
+        auth: { detectSessionInUrl: !window.PIA_AUTH_FORWARDING, storage: piaAuthStorage }
     });
     window.sb = window.supabaseClient;
     window.SUPABASE_URL = supabaseUrl;

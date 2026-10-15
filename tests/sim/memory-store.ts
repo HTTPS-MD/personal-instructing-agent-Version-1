@@ -6,24 +6,27 @@
 // It reimplements, in a few lines, what the SQL and Supabase Auth do:
 //   * a student has ONE active session: the newest sign-in takes over and the
 //     older browser is signed out (claim_student_session, migration 0027);
-//   * a class is open for a section until its closing time;
-//   * attendance defaults to everyone present, and the admin unmarks the absent.
-import type { Deps, Student } from '../../supabase/functions/join-with-number/handler.ts';
+//   * a check-in is open for a section until its end time or until it is stopped;
+//   * the admin lets in the requests they tick (admin_let_in).
+import type { Deps, RequestRow, Student } from '../../supabase/functions/join-with-number/handler.ts';
 import { normalizeNumber } from '../../supabase/functions/join-with-number/handler.ts';
 
 export interface SimStudent extends Student { number: string }
+interface SimRequest extends RequestRow { name: string }
 
 export class MemoryStore {
   clock = Date.UTC(2026, 9, 14, 1, 0, 0);       // 14 Oct 2026, 09:00 in Manila
   students: SimStudent[] = [];
-  classes = new Map<string, number>();          // section -> closes at (ms)
-  absent = new Set<string>();                   // "section|email"
+  checkins = new Map<string, number>();         // section -> ends at (ms)
+  requests = new Map<string, SimRequest>();
   attempts: { key: string; ok: boolean; at: number }[] = [];
   accounts = new Set<string>();                 // emails that have an auth user
   tokens = new Map<string, string>();           // one-time token -> email
   sessions = new Map<string, { id: number; device: string }>();   // email -> active
   log: string[] = [];
   private nextSession = 1;
+  private nextRequest = 1;
+  private nextToken = 1;
 
   constructor(students: SimStudent[], activated: string[] = []) {
     this.students = students;
@@ -31,21 +34,31 @@ export class MemoryStore {
   }
 
   // ---- admin actions ------------------------------------------------------
-  openClass(section: string, minutes = 120) {
-    this.classes.set(section, this.clock + minutes * 60_000);
-    for (const key of [...this.absent]) if (key.startsWith(section + '|')) this.absent.delete(key);
-    this.log.push(`admin opened ${section} for ${minutes} min, everyone present`);
+  startCheckin(section: string, minutes = 15) {
+    this.checkins.set(section, this.clock + minutes * 60_000);
+    this.log.push(`admin started check-in for ${section}, ${minutes} min`);
   }
-  closeClass(section: string) { this.classes.delete(section); this.log.push(`admin closed ${section}`); }
-  setPresent(section: string, email: string, present: boolean) {
-    const k = section + '|' + email;
-    if (present) this.absent.delete(k); else this.absent.add(k);
-    this.log.push(`admin marked ${email} ${present ? 'present' : 'absent'}`);
+  stopCheckin(section: string) { this.checkins.delete(section); this.log.push(`admin stopped check-in for ${section}`); }
+  /** The admin ticks these requests and lets them in. */
+  letIn(ids: string[]): number {
+    let n = 0;
+    for (const id of ids) {
+      const r = this.requests.get(id);
+      if (r && r.status === 'waiting' && this.clock - r.createdMs <= 20 * 60_000 && this.isOpen(r.section)) {
+        r.status = 'let_in'; r.letInMs = this.clock; n++;
+        this.log.push(`admin let in ${r.email}`);
+      }
+    }
+    return n;
+  }
+  waiting(): (SimRequest & { duplicate: boolean })[] {
+    const live = [...this.requests.values()].filter((r) => r.status === 'waiting' && this.clock - r.createdMs <= 20 * 60_000);
+    return live.map((r) => ({ ...r, duplicate: live.filter((x) => x.email === r.email).length > 1 }));
   }
   advance(ms: number) { this.clock += ms; }
 
   // ---- the browser's side of verifyOtp -------------------------------------
-  /** Redeem a one-time token on a browser. Returns who got in and who was kicked out. */
+  /** Redeem a one-time token on a browser. Returns who got in and which browser was kicked out. */
   redeem(token: string, device: string): { email: string; kickedDevice: string | null } | null {
     const email = this.tokens.get(token);
     if (!email) return null;
@@ -58,7 +71,7 @@ export class MemoryStore {
   signOut(email: string) { this.sessions.delete(email); }
 
   // ---- what the Edge Function sees -----------------------------------------
-  private openNow(section: string) { const c = this.classes.get(section); return c !== undefined && c > this.clock; }
+  isOpen(section: string) { const c = this.checkins.get(section); return c !== undefined && c > this.clock; }
 
   deps(): Deps {
     return {
@@ -70,14 +83,23 @@ export class MemoryStore {
         const s = this.students.find((x) => normalizeNumber(x.number) === numberKey);
         return s ? { email: s.email, full_name: s.full_name, section: s.section, role: s.role } : null;
       },
-      anyClassOpen: async () => [...this.classes.keys()].some((s) => this.openNow(s)),
-      classOpenFor: async (section) => this.openNow(section),
-      isPresent: async (section, email) => !this.absent.has(section + '|' + email),
+      anyCheckinOpen: async () => [...this.checkins.keys()].some((s) => this.isOpen(s)),
+      checkinOpenFor: async (section) => this.isOpen(section),
+      countWaiting: async (email, since) =>
+        [...this.requests.values()].filter((r) => r.status === 'waiting' && r.createdMs >= since && (email === null || r.email === email)).length,
+      createRequest: async ({ email, section, secretHash }) => {
+        const id = 'req-' + this.nextRequest++;
+        const s = this.students.find((x) => x.email === email);
+        this.requests.set(id, { id, email, section, secretHash, status: 'waiting', createdMs: this.clock, letInMs: null, delivered: false, name: s?.full_name ?? '' });
+        return id;
+      },
+      getRequest: async (id) => { const r = this.requests.get(id); return r ? { ...r } : null; },
+      markDelivered: async (id) => { const r = this.requests.get(id); if (r) r.delivered = true; },
       ensureAccount: async (email) => {
         if (!this.accounts.has(email)) { this.accounts.add(email); this.log.push(`account created for ${email}`); }
       },
       mintToken: async (email) => {
-        const t = 'tok-' + this.tokens.size + '-' + email;
+        const t = 'tok-' + this.nextToken++ + '-' + email;
         this.tokens.set(t, email);
         return t;
       },

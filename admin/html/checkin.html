@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>PIA · Open class</title>
+    <title>PIA · Check-in</title>
     <script src="/assets/js/vendor/supabase.js"></script>
     <style>
         :root { --bg: #f6f5f1; --card: #fff; --ink: #1d2433; --mute: #5f6675; --line: #d8d6cf; --ok: #1d7a4d; --warn: #a15c07; --bad: #b3261e; --acc: #2f5fd0; }
@@ -25,36 +25,38 @@
         select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
         textarea { width: 100%; min-height: 96px; font-family: ui-monospace, monospace; font-size: 13px; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 15px; }
-        th, td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--line); }
+        th, td { text-align: left; padding: 8px; border-top: 1px solid var(--line); }
         th { color: var(--mute); font-weight: 500; font-size: 13px; }
+        td.pick { width: 56px; } td.pick input { width: 22px; height: 22px; }
         .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--mute); }
         .pill.open { color: var(--ok); border-color: var(--ok); } .pill.warn { color: var(--warn); border-color: var(--warn); }
-        .absent td { color: var(--mute); text-decoration: line-through; }
-        .absent td.keep { text-decoration: none; }
         #status { min-height: 1.4em; color: var(--mute); margin-bottom: 8px; } #status.err { color: var(--bad); }
         .hint { color: var(--mute); font-size: 14px; margin: 8px 0 0; }
+        .empty { color: var(--mute); margin: 12px 0 0; }
     </style>
 </head>
 
 <body>
     <main>
-        <h1>Open class</h1>
-        <p class="sub">Students can enter with their student number only while their section's class is open here. Everyone is
-            present by default: untick the ones who are absent.</p>
+        <h1>Check-in</h1>
+        <p class="sub">Start check-in for a section. Students type their student number and wait here. Tick only the
+            students you can see in the lab, then let them in. Stop check-in when everyone is in: people already in keep going.</p>
         <p id="status" role="status"></p>
 
         <section id="sections" aria-label="Sections"></section>
 
         <section class="card" aria-labelledby="num-title">
             <h2 id="num-title">Student numbers</h2>
-            <p class="hint">Paste one student per line as <code>email, student number</code>. Existing numbers are replaced.</p>
-            <textarea id="numbers" spellcheck="false" placeholder="maria.santos@student.ue.edu.ph, 2023-0102"></textarea>
+            <p class="hint">Paste one student per line as <code>email, student number</code> (11 digits). Existing numbers are replaced.</p>
+            <textarea id="numbers" spellcheck="false" placeholder="maria.santos@student.ue.edu.ph, 2023-1230102"></textarea>
             <p class="row" style="margin-top:8px"><span id="num-result" class="hint"></span><button id="num-save" type="button">Save numbers</button></p>
         </section>
+
+        <p class="hint">The tutoring closing time is a separate setting in the admin console. It is not changed here.</p>
     </main>
 
     <script defer src="../../assets/js/function.js"></script>
-    <script defer src="../js/open-class.js"></script>
+    <script defer src="../js/checkin.js"></script>
 </body>
 
 </html>
