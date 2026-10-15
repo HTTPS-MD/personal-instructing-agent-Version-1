@@ -629,8 +629,8 @@
         var current = function () { return overlay.classList.contains('is-open') && (overlay.dataset.authVersion || '0') === version; };
 
         if (join.step === 'number') {
-            var number = $('#join-number').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            if (!setFieldError('join-number', number.length >= 4 ? '' : 'Type your student number.')) {
+            var number = $('#join-number').value.replace(/\D/g, '');
+            if (!setFieldError('join-number', number.length === 11 ? '' : 'Type your 11-digit student number.')) {
                 $('#join-number').focus();
                 return;
             }

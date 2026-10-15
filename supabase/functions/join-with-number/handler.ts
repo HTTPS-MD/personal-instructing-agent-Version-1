@@ -49,14 +49,16 @@ export const MESSAGES = {
   notReady: 'Class has not started yet. Please wait.',
   notFound: 'We could not find you in today’s class. Tell your admin.',
   throttled: 'Too many tries. Please wait a few minutes, or tell your admin.',
-  badNumber: 'Type your student number.',
+  badNumber: 'Type your 11-digit student number.',
   server: 'Something went wrong. Please try again.',
 } as const;
 
-/** Letters and digits only, upper case: "2023-0142" and "20230142" are one number. */
+/** Digits only: "2023-1230142" and "20231230142" are one number. A student number has 11 digits. */
 export function normalizeNumber(raw: unknown): string {
-  return String(raw ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 24);
+  return String(raw ?? '').replace(/\D/g, '').slice(0, 24);
 }
+
+export const NUMBER_PATTERN = /^\d{11}$/;
 
 export async function handleJoin(
   body: Record<string, unknown>,
@@ -67,7 +69,7 @@ export async function handleJoin(
   if (action !== 'lookup' && action !== 'join') return { status: 400, body: { error: 'Unknown action.' } };
 
   const key = normalizeNumber(body.number);
-  if (key.length < 4) return { status: 422, body: { error: MESSAGES.badNumber } };
+  if (!NUMBER_PATTERN.test(key)) return { status: 422, body: { error: MESSAGES.badNumber } };
 
   const since = deps.now() - WINDOW_MS;
   const [byNumber, byIp] = await Promise.all([

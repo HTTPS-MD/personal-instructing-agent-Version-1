@@ -45,7 +45,7 @@ $$;
 
 create table if not exists public.student_numbers (
   email      text primary key,
-  number_key text not null unique check (number_key ~ '^[A-Z0-9]{4,24}$'),
+  number_key text not null unique check (number_key ~ '^[0-9]{11}$'),
   number     text not null,
   updated_at timestamptz not null default now()
 );
@@ -91,7 +91,7 @@ returns text
 language sql
 immutable
 set search_path = public
-as $$ select upper(regexp_replace(coalesce(p_number, ''), '[^A-Za-z0-9]', '', 'g')) $$;
+as $$ select regexp_replace(coalesce(p_number, ''), '[^0-9]', '', 'g') $$;
 revoke all on function public.pia_number_key(text) from public, anon;
 grant execute on function public.pia_number_key(text) to authenticated, service_role;
 
@@ -184,8 +184,8 @@ declare
   v_key text := public.pia_number_key(p_number);
 begin
   perform public.pia_require_admin();
-  if v_key !~ '^[A-Z0-9]{4,24}$' then
-    raise exception 'PIA: a student number has 4 to 24 letters and digits.' using errcode = 'P0001';
+  if v_key !~ '^[0-9]{11}$' then
+    raise exception 'PIA: a student number has 11 digits.' using errcode = 'P0001';
   end if;
   if not exists (select 1 from public.profiles where lower(email) = lower(trim(p_email))) then
     raise exception 'PIA: no student is registered with that email.' using errcode = 'P0002';

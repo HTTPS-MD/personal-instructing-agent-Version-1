@@ -87,16 +87,16 @@ export class MemoryStore {
 
 export function sampleRoster(): SimStudent[] {
   const rows: [string, string, string, string][] = [
-    ['2023-0101', 'Dela Cruz, Juan P.', '7-A', 'juan'],
-    ['2023-0102', 'Santos, Maria C.', '7-A', 'maria'],
-    ['2023-0103', 'Reyes, Ana', '7-A', 'ana'],
-    ['2023-0104', 'Garcia, Pedro L.', '7-A', 'pedro'],
-    ['2023-0201', 'Bautista, Luis M.', '7-B', 'luis'],
-    ['2023-0202', 'Mendoza, Rica', '7-B', 'rica'],
-    ['2023-0301', 'Navarro, Ella S.', '7-C', 'ella'],
+    ['2023-1230101', 'Dela Cruz, Juan P.', '7-A', 'juan'],
+    ['2023-1230102', 'Santos, Maria C.', '7-A', 'maria'],
+    ['2023-1230103', 'Reyes, Ana', '7-A', 'ana'],
+    ['2023-1230104', 'Garcia, Pedro L.', '7-A', 'pedro'],
+    ['2023-1230201', 'Bautista, Luis M.', '7-B', 'luis'],
+    ['2023-1230202', 'Mendoza, Rica', '7-B', 'rica'],
+    ['2023-1230301', 'Navarro, Ella S.', '7-C', 'ella'],
   ];
   const roster: SimStudent[] = rows.map(([number, full_name, section, id]) => (
     { number, full_name, section, email: id + '@student.test', role: 'student' }));
-  roster.push({ number: 'T-0001', full_name: 'Lopez, Teacher', section: '7-A', email: 'teacher@school.test', role: 'teacher' });
+  roster.push({ number: '2019-4560001', full_name: 'Lopez, Teacher', section: '7-A', email: 'teacher@school.test', role: 'teacher' });
   return roster;
 }
