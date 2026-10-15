@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>PIA · Open class</title>
+    <script src="/assets/js/vendor/supabase.js"></script>
+    <style>
+        :root { --bg: #f6f5f1; --card: #fff; --ink: #1d2433; --mute: #5f6675; --line: #d8d6cf; --ok: #1d7a4d; --warn: #a15c07; --bad: #b3261e; --acc: #2f5fd0; }
+        @media (prefers-color-scheme: dark) { :root { --bg: #11151f; --card: #1a2030; --ink: #eef1f8; --mute: #a3abc0; --line: #2d364b; --ok: #5bd29a; --warn: #f0b14a; --bad: #ff8b82; --acc: #8fb0ff; } }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+        main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+        h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 17px; margin: 0; }
+        p.sub { color: var(--mute); margin: 0 0 20px; }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+        .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+        button, select, textarea { font: inherit; color: inherit; }
+        button { background: var(--acc); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+        button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+        button.danger { background: var(--bad); color: #fff; }
+        button:disabled { opacity: .5; cursor: default; }
+        select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+        textarea { width: 100%; min-height: 96px; font-family: ui-monospace, monospace; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 15px; }
+        th, td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--line); }
+        th { color: var(--mute); font-weight: 500; font-size: 13px; }
+        .pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--mute); }
+        .pill.open { color: var(--ok); border-color: var(--ok); } .pill.warn { color: var(--warn); border-color: var(--warn); }
+        .absent td { color: var(--mute); text-decoration: line-through; }
+        .absent td.keep { text-decoration: none; }
+        #status { min-height: 1.4em; color: var(--mute); margin-bottom: 8px; } #status.err { color: var(--bad); }
+        .hint { color: var(--mute); font-size: 14px; margin: 8px 0 0; }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>Open class</h1>
+        <p class="sub">Students can enter with their student number only while their section's class is open here. Everyone is
+            present by default: untick the ones who are absent.</p>
+        <p id="status" role="status"></p>
+
+        <section id="sections" aria-label="Sections"></section>
+
+        <section class="card" aria-labelledby="num-title">
+            <h2 id="num-title">Student numbers</h2>
+            <p class="hint">Paste one student per line as <code>email, student number</code>. Existing numbers are replaced.</p>
+            <textarea id="numbers" spellcheck="false" placeholder="maria.santos@student.ue.edu.ph, 2023-0102"></textarea>
+            <p class="row" style="margin-top:8px"><span id="num-result" class="hint"></span><button id="num-save" type="button">Save numbers</button></p>
+        </section>
+    </main>
+
+    <script defer src="../../assets/js/function.js"></script>
+    <script defer src="../js/open-class.js"></script>
+</body>
+
+</html>

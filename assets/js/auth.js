@@ -5,10 +5,11 @@
  * Vanilla JavaScript. Uses the shared `sb` client from assets/js/function.js.
  *
  * Three flows, all against the real backend:
- *   1. Sign in            — two doors: the student form, and "Teacher / Admin sign in"
+ *   1. Sign in            — two doors: students type their STUDENT NUMBER and confirm
+ *                           their name (join-with-number Edge Function, section
+ *                           3a), only while an admin has opened the class; "Teacher / Admin sign in" stays email + password
  *                           for every staff account (teachers AND admins).
- *                           Each accepts only its own kind of account; the
- *                           redirect then routes by role
+ *                           The redirect then routes by role
  *   2. Activate account   — signInWithOtp (magic link), never creates a user
  *   3. Reset password     — resetPasswordForEmail
  *
@@ -99,6 +100,7 @@
         overlay = overlay || openLayers[openLayers.length - 1];
         if (!overlay) { return; }
         invalidateEmailView(overlay.id);
+        if (overlay.id === 'modal-signin') { resetJoin(); }
         overlay.dataset.authVersion = String(Number(overlay.dataset.authVersion || 0) + 1);
         overlay.classList.remove('is-open', 'is-mounted');
         overlay.inert = true;
@@ -563,16 +565,158 @@
         return slots.allowed ? slots : { allowed: false, reason: slots.reason, deviceLimit: true };
     }
 
-    function handleStudentSignIn(event) {
-        event.preventDefault();
-        return signIn({
-            area: 'student',
-            formId: 'signin-form',
-            emailId: 'si-email',
-            passwordId: 'si-password',
-            submitId: 'si-submit',
-            statusId: 'signin-status'
+    /* ---- 3a. Student door: student number, confirmed by name ------------
+       Step 1 asks the join-with-number Edge Function to look the number up.
+       It answers only if the number is on the roster, the admin has opened
+       the student's class, and the admin has not marked the student absent;
+       otherwise one wording for every refusal. Step 2 shows the name on the
+       class list: "Is this you?". Yes asks for a one-time token for THEIR
+       existing account and verifyOtp turns it into a session. From there it
+       is the same pipeline as a password sign-in: profile lookup -> area
+       check -> claimSeat -> routeAfterSignIn. */
+
+    var join = { step: 'number', number: '', pending: false };
+
+    function joinCall(payload) {
+        return sb.functions.invoke('join-with-number', { body: payload }).then(async function (res) {
+            if (!res.error) { return { ok: true, data: res.data || {} }; }
+            var data = {};
+            try { data = await res.error.context.json(); } catch (err) { /* not JSON */ }
+            return { ok: false, status: (res.error.context && res.error.context.status) || 0, data: data };
         });
+    }
+
+    function setJoinStep(step) {
+        join.step = step;
+        var confirm = step === 'confirm';
+        $('#join-step-code').hidden = confirm;
+        $('#join-step-name').hidden = !confirm;
+        $('#join-back').hidden = !confirm;
+        $('#si-submit').textContent = confirm ? 'Yes, that is me' : 'Next';
+        $('#signin-title').textContent = confirm ? 'Is this you?' : 'Enter your student number';
+        $('#signin-sub').textContent = confirm
+            ? 'Check the name before you continue.'
+            : 'Type the number on your school ID.';
+    }
+
+    function resetJoin() {
+        if (!$('#join-step-code')) { return; }
+        join.number = '';
+        join.pending = false;
+        $('#join-number').value = '';
+        $('#join-who').textContent = '';
+        setJoinStep('number');
+        clearFormErrors('signin-form');
+        clearStatus('signin-status');
+    }
+
+    function backToNumber() {
+        setJoinStep('number');
+        $('#join-number').value = '';
+        clearFormErrors('signin-form');
+        clearStatus('signin-status');
+        $('#join-number').focus();
+    }
+
+    async function handleStudentJoin(event) {
+        event.preventDefault();
+        if (join.pending || $('#si-submit').disabled) { return; }
+        clearFormErrors('signin-form');
+        clearStatus('signin-status');
+
+        var overlay = $('#modal-signin');
+        var version = overlay.dataset.authVersion || '0';
+        var current = function () { return overlay.classList.contains('is-open') && (overlay.dataset.authVersion || '0') === version; };
+
+        if (join.step === 'number') {
+            var number = $('#join-number').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (!setFieldError('join-number', number.length >= 4 ? '' : 'Type your student number.')) {
+                $('#join-number').focus();
+                return;
+            }
+            join.pending = true;
+            var release = setBusy($('#si-submit'), 'Checking\u2026');
+            try {
+                var found = await joinCall({ action: 'lookup', number: number });
+                if (!current()) { return; }
+                if (!found.ok) {
+                    setStatus('signin-status', (found.data && found.data.error) || 'Could not check the number. Try again.', 'error');
+                    $('#join-number').focus();
+                    return;
+                }
+                join.number = number;
+                $('#join-who').textContent = found.data.name || '';
+                setJoinStep('confirm');
+            } catch (err) {
+                if (current()) { setStatus('signin-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error'); }
+            } finally {
+                join.pending = false;
+                release();
+                $('#si-submit').textContent = join.step === 'confirm' ? 'Yes, that is me' : 'Next';
+            }
+            return;
+        }
+
+        join.pending = true;
+        var releaseJoin = setBusy($('#si-submit'), 'Joining\u2026');
+        try {
+            var joined = await joinCall({ action: 'join', number: join.number });
+            if (!current()) { return; }
+            if (!joined.ok) {
+                setStatus('signin-status', (joined.data && joined.data.error) || 'Could not join. Try again.', 'error');
+                return;
+            }
+
+            var session = await sb.auth.verifyOtp({ token_hash: joined.data.token_hash, type: 'magiclink' });
+            if (session.error) { session = await sb.auth.verifyOtp({ token_hash: joined.data.token_hash, type: 'email' }); }
+            if (!current()) { if (!session.error) { await sb.auth.signOut({ scope: 'local' }); } return; }
+            if (session.error || !session.data || !session.data.user) {
+                setStatus('signin-status', 'Could not open your session. Please try again.', 'error');
+                return;
+            }
+
+            var email = session.data.user.email;
+            var profileRes = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
+            if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
+            if (profileRes.error || !profileRes.data) {
+                await sb.auth.signOut({ scope: 'local' });
+                setStatus('signin-status', 'This account is not set up yet. Please tell your admin.', 'error');
+                return;
+            }
+
+            var profile = profileRes.data;
+            var role = normalizeRole(profile.role);
+            if (role !== 'student') {
+                await sb.auth.signOut({ scope: 'local' });
+                setStatus('signin-status', areaMismatch('student', role) || 'This door is for students.', 'error');
+                return;
+            }
+
+            try {
+                localStorage.setItem('pia_user_email', email);
+                localStorage.setItem('pia_user_role', role);
+            } catch (err) { /* private mode */ }
+
+            var check = await claimSeat(email, profile, role);
+            if (!current()) { await sb.auth.signOut({ scope: 'local' }); return; }
+            if (!check.allowed) {
+                await sb.auth.signOut({ scope: 'local' });
+                try {
+                    localStorage.removeItem('pia_user_email');
+                    localStorage.removeItem('pia_user_role');
+                } catch (err) { /* private mode */ }
+                setStatus('signin-status', check.reason, 'error');
+                return;
+            }
+
+            await routeAfterSignIn(profile, role, function (text, tone) { setStatus('signin-status', text, tone); });
+        } catch (err) {
+            if (current()) { setStatus('signin-status', 'Can\u2019t reach the server. Check your Wi-Fi, then try again.', 'error'); }
+        } finally {
+            join.pending = false;
+            releaseJoin();
+            if (join.step === 'confirm') { $('#si-submit').textContent = 'Yes, that is me'; }
+        }
     }
 
     /* One door for teachers and admins. The redirect below the area check
@@ -1208,7 +1352,8 @@
             return;
         }
 
-        $('#signin-form').addEventListener('submit', handleStudentSignIn);
+        $('#signin-form').addEventListener('submit', handleStudentJoin);
+        $('#join-back').addEventListener('click', backToNumber);
         $('#staff-form').addEventListener('submit', handleStaffSignIn);
         initEmailRequests();
         $('#device-reset-form').addEventListener('submit', handleDeviceResetCode);

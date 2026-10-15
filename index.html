@@ -271,9 +271,7 @@
                 <div class="nav-menu-extra">
                     <!-- Both account actions stay discoverable in the mobile menu. -->
                     <div class="nav-menu-group nav-menu-student">
-                        <button type="button" class="tap btn-pop" data-auth-open="signin">Sign in</button>
-                        <button type="button" class="tap btn-pop-ghost" data-auth-open="activate">Activate
-                            account</button>
+                        <button type="button" class="tap btn-pop" data-auth-open="signin">Enter student number</button>
                     </div>
 
                     <!-- One staff door for teachers and admins alike, as the
@@ -302,14 +300,7 @@
                      label for a returning session, and "Continue to dashboard"
                      does not fit a phone bar. -->
                 <button type="button" class="tap btn-pop nav-signin nav-auth" data-auth-open="signin"
-                    data-resume-label="Dashboard">Sign in</button>
-                <!-- The tail is visually hidden on small phones but stays in the
-                     accessible name, so the name still contains the visible
-                     label (WCAG 2.5.3). Wrapped in one span so the button's
-                     flex gap is not inserted between "Activate" and the tail. -->
-                <button type="button" class="tap btn-pop-ghost nav-activate nav-auth" data-auth-open="activate">
-                    <span>Activate<span class="nav-activate-tail"> account</span></span>
-                </button>
+                    data-resume-label="Dashboard">Enter student number</button>
                 <!-- Last before the hamburger: while the two buttons above are
                      standing down (they keep their space), the toggle holds the
                      far edge instead of floating beside an empty gap. -->
@@ -408,7 +399,7 @@
 
                             <p class="drop-sub" data-reveal>
                                 Practise Grade 7 percentages step by step. Explore teaching styles,
-                                then sign in to continue the activities available to your account.
+                                then type your student number to start.
                             </p>
 
                             <!-- The page's two account actions. While these are on
@@ -416,27 +407,16 @@
                                  those back once #hero-cta scrolls away. -->
                             <div class="hero-cta" id="hero-cta" data-reveal>
                                 <button type="button" class="tap cta cta-primary" data-auth-open="signin">
-                                    <span class="cta-label">Sign in</span>
+                                    <span class="cta-label">Enter student number</span>
                                     <span class="cta-orb" aria-hidden="true">
                                         <svg class="icon">
                                             <use href="#i-login"></use>
                                         </svg>
                                     </span>
                                 </button>
-                                <button type="button" class="tap cta cta-quiet" data-auth-open="activate">
-                                    <span class="cta-label">Activate account</span>
-                                    <span class="cta-orb" aria-hidden="true">
-                                        <svg class="icon cta-arrow">
-                                            <use href="#i-arrow-right"></use>
-                                        </svg>
-                                        <svg class="icon cta-arrow cta-arrow-next">
-                                            <use href="#i-arrow-right"></use>
-                                        </svg>
-                                    </span>
-                                </button>
                             </div>
-                            <p class="account-guidance signed-out-copy">Use your school email to sign in.<br>First time
-                                here? Activate the account created by your admin.</p>
+                            <p class="account-guidance signed-out-copy">Type the student number on your ID.<br>Your
+                                class must be open first.</p>
                         </div>
 
                         <!-- THE CAST. Six persona cutouts, dealt onto the cover.
@@ -805,7 +785,7 @@
 
                         <div class="select-foot" data-reveal>
                             <button type="button" class="tap cta cta-primary" data-auth-open="signin">
-                                <span class="cta-label">Sign in to get started</span>
+                                <span class="cta-label">Enter your student number to start</span>
                                 <span class="cta-orb" aria-hidden="true">
                                     <svg class="icon cta-arrow">
                                         <use href="#i-arrow-right"></use>
@@ -815,7 +795,7 @@
                                     </svg>
                                 </span>
                             </button>
-                            <p class="select-note">After signing in, continue from your saved stage. Activities and
+                            <p class="select-note">After you join, continue from your saved stage. Activities and
                                 tutor choices depend on your study group and the stages opened by your admin.</p>
                         </div>
                     </div>
@@ -984,32 +964,19 @@
                 </h2>
 
                 <p class="finale-sub" data-reveal>
-                    Your admin creates your account. Sign in with your school email, or activate your account if this is
-                    your first visit.
+                    Type your student number in the computer lab. Your progress is saved to your name.
                 </p>
 
-                <p class="account-guidance signed-out-copy">If your account has not been created yet, contact your
-                    admin.</p>
+                <p class="account-guidance signed-out-copy">If your number does not work, tell your admin.</p>
 
                 <!-- The same pair as the hero, in the same style: one design for
                      one pair of actions, wherever it appears. -->
                 <div class="finale-actions" data-reveal>
                     <button type="button" class="tap cta cta-primary" data-auth-open="signin">
-                        <span class="cta-label">Sign in</span>
+                        <span class="cta-label">Enter student number</span>
                         <span class="cta-orb" aria-hidden="true">
                             <svg class="icon">
                                 <use href="#i-login"></use>
-                            </svg>
-                        </span>
-                    </button>
-                    <button type="button" class="tap cta cta-quiet" data-auth-open="activate">
-                        <span class="cta-label">Activate account</span>
-                        <span class="cta-orb" aria-hidden="true">
-                            <svg class="icon cta-arrow">
-                                <use href="#i-arrow-right"></use>
-                            </svg>
-                            <svg class="icon cta-arrow cta-arrow-next">
-                                <use href="#i-arrow-right"></use>
                             </svg>
                         </span>
                     </button>
@@ -1057,8 +1024,8 @@
         <div class="modal modal-sm">
             <header class="modal-head">
                 <div class="modal-head-text">
-                    <h2 class="modal-title" id="signin-title">Sign in</h2>
-                    <p class="modal-sub" id="signin-sub">Use the school email your account was created with.</p>
+                    <h2 class="modal-title" id="signin-title">Enter your student number</h2>
+                    <p class="modal-sub" id="signin-sub">Type the number on your school ID.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon">
@@ -1068,41 +1035,26 @@
             </header>
 
             <div class="modal-body">
+                <!-- Student-number door (auth.js, join-with-number Edge Function):
+                     step 1 the student number, step 2 "Is this you?" with the
+                     name on the class list. Only works while an admin has
+                     opened the class. -->
                 <form id="signin-form" class="portal-form" novalidate>
-                    <div class="form-grid">
+                    <div class="form-grid" id="join-step-code">
                         <div class="field">
-                            <label class="label" for="si-email">School email</label>
-                            <input class="input" type="email" id="si-email" name="email" autocomplete="username"
-                                inputmode="email" autocapitalize="off" spellcheck="false"
-                                placeholder="maria.santos@student.ue.edu.ph" aria-describedby="si-email-msg"
-                                data-autofocus>
-                            <p class="field-msg" id="si-email-msg" data-msg-for="si-email"></p>
-                        </div>
-                        <div class="field">
-                            <div class="label-row">
-                                <label class="label" for="si-password">Password</label>
-                                <button type="button" class="link-btn" data-auth-open="forgot">Forgot
-                                    password?</button>
-                            </div>
-                            <div class="pw-wrap">
-                                <input class="input" type="password" id="si-password" name="password"
-                                    autocomplete="current-password" enterkeyhint="go" placeholder="••••••••"
-                                    aria-describedby="si-password-msg">
-                                <button type="button" class="pw-toggle" data-pw-toggle="si-password"
-                                    aria-label="Show password" aria-pressed="false">
-                                    <svg class="icon icon-eye" aria-hidden="true">
-                                        <use href="#i-eye"></use>
-                                    </svg>
-                                    <svg class="icon icon-eye-off" aria-hidden="true">
-                                        <use href="#i-eye-off"></use>
-                                    </svg>
-                                </button>
-                            </div>
-                            <p class="field-msg" id="si-password-msg" data-msg-for="si-password"></p>
+                            <label class="label" for="join-number">Student number</label>
+                            <input class="input" type="text" id="join-number" name="number" autocomplete="off"
+                                autocapitalize="characters" spellcheck="false" maxlength="24" inputmode="text"
+                                enterkeyhint="go" aria-describedby="join-number-msg" data-autofocus>
+                            <p class="field-msg" id="join-number-msg" data-msg-for="join-number"></p>
                         </div>
                     </div>
 
-                    <button class="btn btn-primary portal-submit" type="submit" id="si-submit">Sign in</button>
+                    <div class="form-grid" id="join-step-name" hidden>
+                        <p class="modal-title" id="join-who" role="status"></p>
+                    </div>
+
+                    <button class="btn btn-primary portal-submit" type="submit" id="si-submit">Next</button>
 
                     <p class="auth-status" id="signin-status" role="status">
                         <svg class="icon">
@@ -1111,21 +1063,11 @@
                         <span data-status-text></span>
                     </p>
 
-                    <!-- Only after a sign-in is refused at the device limit
-                         (auth.js): the way out that does not need an admin. -->
-                    <button type="button" class="btn btn-secondary portal-submit device-offer" data-device-reset hidden>
-                        <svg class="icon">
-                            <use href="#i-mail"></use>
-                        </svg>
-                        Sign out of other devices
+                    <button type="button" class="btn btn-secondary portal-submit" id="join-back" hidden>
+                        No, that is not me
                     </button>
 
                     <div class="portal-links">
-                        <p class="portal-note">
-                            First time here?
-                            <button type="button" class="link-btn" data-auth-open="activate">Activate your
-                                account</button>
-                        </p>
                         <p class="portal-note">
                             Teacher or admin?
                             <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign
