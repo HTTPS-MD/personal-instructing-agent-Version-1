@@ -1,7 +1,7 @@
 // Use-case rehearsal for the student-number door. Runs the REAL handler.ts
 // against the in-memory store: no database, no network.
 //   deno test tests/sim/join-usecases.test.ts
-import { handleJoin, MESSAGES, MAX_FAILURES_PER_NUMBER, WINDOW_MS } from '../../supabase/functions/join-with-number/handler.ts';
+import { handleJoin, MESSAGES, MAX_FAILURES_PER_NUMBER, MAX_FAILURES_ALL, WINDOW_MS } from '../../supabase/functions/join-with-number/handler.ts';
 import { MemoryStore, sampleRoster } from './memory-store.ts';
 
 function eq(actual: unknown, expected: unknown, msg: string) {
@@ -127,4 +127,14 @@ Deno.test('15. junk input is rejected before anything is looked up', async () =>
   eq((await join(s, '2023-12301011')).status, 422, '12 digits');
   eq((await join(s, 'abcdefghijk')).status, 422, 'letters only');
   eq(s.attempts.length, 0, 'not counted as guesses');
+});
+
+Deno.test('16. faking the IP address cannot beat the brake: all failures together are capped', async () => {
+  const s = fresh(); s.openClass('7-A');
+  for (let i = 0; i < MAX_FAILURES_ALL; i++) {
+    await join(s, '20239' + String(i).padStart(6, '0'), '203.0.113.' + (i % 250) + '.' + i);   // a new fake address every time
+  }
+  eq((await join(s, '2023-1230101', '198.51.100.1')).status, 429, 'even a real student waits');
+  s.advance(WINDOW_MS + 1000);
+  eq((await join(s, '2023-1230101', '198.51.100.1')).status, 200, 'and is let in once the window passes');
 });

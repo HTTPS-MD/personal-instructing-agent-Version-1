@@ -52,7 +52,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try { body = await req.json(); } catch { return send(400, { error: 'The request body must be JSON.' }); }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const ip = (req.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0].trim() || 'unknown';
+  // Prefer the address the edge itself saw. The FIRST x-forwarded-for entry can be written by the
+  // caller, so fall back to the LAST one, which the platform's own proxy appended.
+  const forwarded = (req.headers.get('x-forwarded-for') ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  const ip = req.headers.get('cf-connecting-ip') ?? forwarded[forwarded.length - 1] ?? 'unknown';
   const nowIso = () => new Date().toISOString();
 
   const deps: Deps = {

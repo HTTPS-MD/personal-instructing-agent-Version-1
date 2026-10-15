@@ -43,6 +43,10 @@ export interface Reply { status: number; body: Record<string, unknown> }
 
 export const MAX_FAILURES_PER_NUMBER = 5;
 export const MAX_FAILURES_PER_IP = 60;      // a whole lab shares one address
+// The address can be faked, so it cannot be the only brake: this caps ALL failed tries
+// together. A lab of 40 children making typos stays far below it; a script guessing
+// numbers does not.
+export const MAX_FAILURES_ALL = 200;
 export const WINDOW_MS = 10 * 60_000;
 
 export const MESSAGES = {
@@ -72,16 +76,17 @@ export async function handleJoin(
   if (!NUMBER_PATTERN.test(key)) return { status: 422, body: { error: MESSAGES.badNumber } };
 
   const since = deps.now() - WINDOW_MS;
-  const [byNumber, byIp] = await Promise.all([
+  const [byNumber, byIp, byAll] = await Promise.all([
     deps.countFailures('n:' + key, since),
     deps.countFailures('ip:' + ip, since),
+    deps.countFailures('all', since),
   ]);
-  if (byNumber >= MAX_FAILURES_PER_NUMBER || byIp >= MAX_FAILURES_PER_IP) {
+  if (byNumber >= MAX_FAILURES_PER_NUMBER || byIp >= MAX_FAILURES_PER_IP || byAll >= MAX_FAILURES_ALL) {
     return { status: 429, body: { error: MESSAGES.throttled } };
   }
 
   const fail = async (reply: Reply): Promise<Reply> => {
-    await Promise.all([deps.record('n:' + key, false), deps.record('ip:' + ip, false)]);
+    await Promise.all([deps.record('n:' + key, false), deps.record('ip:' + ip, false), deps.record('all', false)]);
     return reply;
   };
 
