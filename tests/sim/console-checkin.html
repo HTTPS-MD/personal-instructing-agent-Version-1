@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-surface="admin">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check-in view inside the console styles (simulation)</title>
+    <script src="/assets/js/vendor/supabase.js"></script>
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/pages/admin.css">
+    <link rel="stylesheet" href="../../styles/pages/admin-console.css">
+</head>
+<body>
+    <!-- SIMULATION ONLY: the check-in view alone, in the console's own styles, so it can be looked at
+         without the rest of the console. The real page is admin/html/admin-dashboard.html#checkin. -->
+    <main class="main" style="max-width:980px;margin:0 auto;padding:24px 16px">
+        <section class="page" id="view-checkin" data-view-panel="checkin">
+            <div class="page-head"><h1 class="page-title">Check-in</h1></div>
+            <div class="stack-lg" id="checkin-root"></div>
+        </section>
+    </main>
+    <script src="../../assets/js/function.js"></script>
+    <script src="../../admin/js/checkin-view.js"></script>
+    <script>window.addEventListener('load', function () { window.PIACheckin.show(); });</script>
+</body>
+</html>

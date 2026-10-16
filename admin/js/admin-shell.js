@@ -39,6 +39,7 @@
     var ROUTES = {
         overview: { trail: ['Overview'] },
         live: { trail: ['Live Sessions'] },
+        checkin: { trail: ['Check-in'] },
         students: { trail: ['People', 'Students'] },
         faculty: { trail: ['People', 'Faculty'] },
         controls: { trail: ['Stage Controls'] },
@@ -212,6 +213,7 @@
         return [
             { label: 'Overview', run: function () { host.go('overview'); } },
             { label: 'Live Sessions', run: function () { host.go('live'); } },
+            { label: 'Check-in', run: function () { host.go('checkin'); } },
             { label: 'Students', run: function () { host.go('students'); } },
             { label: 'Faculty', run: function () { host.go('faculty'); } },
             { label: 'Stage Controls', run: function () { host.go('controls'); } },
