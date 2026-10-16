@@ -41,6 +41,7 @@
         state.sections = (data && data.sections) || [];
         state.open = (data && data.open) || [];
         state.waiting = (data && data.waiting) || [];
+        fillSectionPicker();
         var live = {};
         state.waiting.forEach(function (w) { live[w.id] = true; });
         Object.keys(ticked).forEach(function (id) { if (!live[id]) { delete ticked[id]; } });
@@ -92,6 +93,68 @@
         try { await work(); await refresh(); } catch (error) { say(failure(error), true); button.disabled = false; }
     }
 
+    /* ---- Student numbers, one by one ----------------------------------------
+       Lives OUTSIDE render(): the list refreshes every few seconds and must not
+       wipe a number that is half typed. */
+    var handSection = '';
+
+    function fillSectionPicker() {
+        var picker = $('#hand-section');
+        var names = state.sections.map(function (s) { return s.section; });
+        if (picker.getAttribute('data-filled') === names.join('|')) { return; }
+        picker.setAttribute('data-filled', names.join('|'));
+        picker.innerHTML = '<option value="">Choose a section</option>' +
+            names.map(function (n) { return '<option value="' + esc(n) + '"' + (n === handSection ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('');
+    }
+
+    async function loadHandList() {
+        var box = $('#hand-list');
+        if (!handSection) { box.innerHTML = ''; return; }
+        box.innerHTML = '<p class="empty">Loading\u2026</p>';
+        try {
+            var rows = await call('admin_students_with_numbers', { p_section: handSection });
+            box.innerHTML = rows.length
+                ? '<table><thead><tr><th>Name</th><th>Student number</th><th></th></tr></thead><tbody>' +
+                  rows.map(function (r) {
+                      return '<tr data-email="' + esc(r.email) + '"><td>' + esc(r.full_name || r.email) + '</td>' +
+                          '<td><input type="text" inputmode="numeric" maxlength="14" autocomplete="off" data-number value="' + esc(r.number || '') +
+                          '" placeholder="11 digits" aria-label="Student number of ' + esc(r.full_name || r.email) + '"></td>' +
+                          '<td><button type="button" class="ghost" data-save-number>Save</button></td></tr>';
+                  }).join('') + '</tbody></table>'
+                : '<p class="empty">No students in this section yet.</p>';
+        } catch (error) {
+            box.innerHTML = '';
+            $('#hand-status').textContent = failure(error);
+        }
+    }
+
+    function wireHand() {
+        $('#hand-section').addEventListener('change', function (event) {
+            handSection = event.target.value;
+            $('#hand-status').textContent = '';
+            loadHandList();
+        });
+        $('#hand-list').addEventListener('click', async function (event) {
+            if (!event.target.matches('[data-save-number]')) { return; }
+            var row = event.target.closest('tr');
+            var input = row.querySelector('[data-number]');
+            var digits = input.value.replace(/\D/g, '');
+            var status = $('#hand-status');
+            if (digits.length !== 11) { status.textContent = 'A student number has 11 digits.'; input.focus(); return; }
+            event.target.disabled = true;
+            try {
+                await call('admin_set_student_number', { p_email: row.getAttribute('data-email'), p_number: digits });
+                status.textContent = 'Saved.';
+                input.value = digits.slice(0, 4) + '-' + digits.slice(4);
+                refresh().catch(function () {});
+            } catch (error) {
+                status.textContent = failure(error);
+            } finally {
+                event.target.disabled = false;
+            }
+        });
+    }
+
     function wire() {
         $('#sections').addEventListener('click', function (event) {
             var card = event.target.closest('[data-section]');
@@ -138,6 +201,7 @@
         var session = (await sb.auth.getSession()).data.session;
         if (!session) { window.location.replace('../../index.html?signin=staff'); return; }
         wire();
+        wireHand();
         try { await refresh(); } catch (error) { say(failure(error), true); }
         setInterval(function () { if (!document.hidden) { refresh().catch(function () {}); } }, REFRESH_MS);
     }

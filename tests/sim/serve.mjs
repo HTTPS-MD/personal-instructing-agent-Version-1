@@ -64,6 +64,19 @@ function rpc(name, args, who) {
       }
       return { data: n };
     }
+    case 'admin_students_with_numbers':
+      return { data: store.students.filter((s) => s.role === 'student' && s.section === args.p_section)
+        .map((s) => ({ email: s.email, full_name: s.full_name, number: s.number || null })) };
+    case 'admin_set_student_number': {
+      const key = String(args.p_number).replace(/\D/g, '');
+      if (!/^\d{11}$/.test(key)) return { error: { message: 'PIA: a student number has 11 digits.' } };
+      const other = store.students.find((x) => x.email !== args.p_email && String(x.number).replace(/\D/g, '') === key);
+      if (other) return { error: { message: 'PIA: that number already belongs to another student (' + other.email + ').' } };
+      const s = store.students.find((x) => x.email === args.p_email);
+      if (!s) return { error: { message: 'PIA: no student is registered with that email.' } };
+      s.number = args.p_number;
+      return { data: null };
+    }
     case 'claim_student_session': return { data: null };
     case 'jwt_is_current': return { data: true };
     default: return { data: null };

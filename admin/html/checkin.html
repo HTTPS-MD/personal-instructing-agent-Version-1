@@ -45,8 +45,18 @@
 
         <section id="sections" aria-label="Sections"></section>
 
+        <section class="card" aria-labelledby="by-hand-title">
+            <div class="row">
+                <h2 id="by-hand-title">Student numbers, one by one</h2>
+                <select id="hand-section" aria-label="Section"></select>
+            </div>
+            <p class="hint">Type each student's 11-digit number and press Save. Add a student in the admin console first.</p>
+            <p id="hand-status" class="hint" role="status"></p>
+            <div id="hand-list"></div>
+        </section>
+
         <section class="card" aria-labelledby="num-title">
-            <h2 id="num-title">Student numbers</h2>
+            <h2 id="num-title">Student numbers, many at once</h2>
             <p class="hint">Paste one student per line as <code>email, student number</code> (11 digits). Existing numbers are replaced.</p>
             <textarea id="numbers" spellcheck="false" placeholder="maria.santos@student.ue.edu.ph, 2023-1230102"></textarea>
             <p class="row" style="margin-top:8px"><span id="num-result" class="hint"></span><button id="num-save" type="button">Save numbers</button></p>
