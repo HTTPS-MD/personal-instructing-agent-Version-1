@@ -565,20 +565,17 @@
         return slots.allowed ? slots : { allowed: false, reason: slots.reason, deviceLimit: true };
     }
 
-    /* ---- 3a. Student door: student number, confirm, wait to be let in ----
-       Typing a number NEVER opens a session. The join-with-number Edge Function
+    /* ---- 3a. Student door: student number, confirm, walk in ----
+       Typing a number alone opens nothing. The join-with-number Edge Function
        answers only while an admin has attendance open for the student's section;
-       the student confirms the name and section ("Is this you?"), then asks to
-       be let in with a secret this browser makes and keeps. The admin, who can
-       see the lab, ticks the students they see. This browser polls; when the
-       admin has let it in, the function hands over a one-time token for the
-       student's EXISTING account, once, and verifyOtp turns it into a session.
-       From there it is the same pipeline as a password sign-in: profile lookup
+       the student confirms the name and section ("Is this you?"), then enters.
+       The admin has already called the roll: a student marked present gets a
+       one-time token for their EXISTING account, once, and verifyOtp turns it
+       into a session. Anyone not marked present is told to see the admin. From
+       there it is the same pipeline as a password sign-in: profile lookup
        -> area check -> claimSeat -> routeAfterSignIn. */
 
-    var join = { step: 'number', number: '', name: '', section: '', pending: false, polling: false, requestId: '', secret: '', timer: null };
-    var WAIT_KEY = 'pia_join_wait';
-    var POLL_MS = 2500;
+    var join = { step: 'number', number: '', name: '', section: '', pending: false };
 
     function joinCall(payload) {
         return sb.functions.invoke('join-with-number', { body: payload }).then(async function (res) {
@@ -589,42 +586,26 @@
         });
     }
 
-    function randomHex(bytes) {
-        var a = new Uint8Array(bytes);
-        crypto.getRandomValues(a);
-        return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-    }
-
     function setJoinStep(step) {
         join.step = step;
         var confirm = step === 'confirm';
-        var waiting = step === 'wait';
-        $('#join-step-code').hidden = confirm || waiting;
+        $('#join-step-code').hidden = confirm;
         $('#join-step-name').hidden = !confirm;
-        $('#join-step-wait').hidden = !waiting;
-        $('#join-back').hidden = !(confirm || waiting);
-        $('#join-back').textContent = waiting ? 'Cancel' : 'No, that is not me';
-        $('#si-submit').hidden = waiting;
+        
+        $('#join-back').hidden = !confirm;
+        $('#join-back').textContent = 'No, that is not me';
+        $('#si-submit').hidden = false;
         $('#si-submit').textContent = confirm ? 'Yes, that is me' : 'Next';
-        $('#signin-title').textContent = confirm ? 'Is this you?' : waiting ? 'Waiting to be let in' : 'Enter your student number';
+        $('#signin-title').textContent = confirm ? 'Is this you?' : 'Enter your student number';
         $('#signin-sub').textContent = confirm
             ? 'Check the name and section before you continue.'
-            : waiting ? 'Do not close this page.' : 'Type the number on your school ID.';
-    }
-
-    function stopWaiting() {
-        if (join.timer) { clearInterval(join.timer); join.timer = null; }
-        join.requestId = '';
-        join.secret = '';
-        try { sessionStorage.removeItem(WAIT_KEY); } catch (err) { /* private mode */ }
+            : 'Type the number on your school ID.';
     }
 
     function resetJoin() {
         if (!$('#join-step-code')) { return; }
-        stopWaiting();
         join.number = '';
         join.pending = false;
-        join.polling = false;
         $('#join-number').value = '';
         $('#join-who').textContent = '';
         $('#join-section').textContent = '';
@@ -634,52 +615,12 @@
     }
 
     function backToNumber(message) {
-        stopWaiting();
         setJoinStep('number');
         $('#join-number').value = '';
         clearFormErrors('signin-form');
         clearStatus('signin-status');
         if (typeof message === 'string' && message) { setStatus('signin-status', message, 'error'); }
         $('#join-number').focus();
-    }
-
-    function startWaiting(requestId, secret, name, section) {
-        join.requestId = requestId;
-        join.secret = secret;
-        try { sessionStorage.setItem(WAIT_KEY, JSON.stringify({ requestId: requestId, secret: secret, name: name, section: section })); } catch (err) { /* private mode */ }
-        $('#join-wait-name').textContent = (name || '') + (section ? ' · ' + section : '');
-        setJoinStep('wait');
-        clearStatus('signin-status');
-        if (join.timer) { clearInterval(join.timer); }
-        join.timer = setInterval(pollOnce, POLL_MS);
-        setTimeout(pollOnce, 800);
-    }
-
-    async function pollOnce() {
-        if (join.polling || !join.requestId) { return; }
-        var overlay = $('#modal-signin');
-        if (!overlay.classList.contains('is-open')) { return; }
-        var id = join.requestId;
-        var secret = join.secret;
-        join.polling = true;
-        try {
-            var res = await joinCall({ action: 'poll', request_id: id, secret: secret });
-            if (id !== join.requestId) { return; }                 // cancelled meanwhile
-            if (!res.ok) { return; }                               // network blip: try again next tick
-            var status = res.data.status;
-            if (status === 'waiting') { return; }
-            if (status === 'let_in') {
-                stopWaiting();
-                await enterWithToken(res.data.token_hash);
-                return;
-            }
-            if (status === 'closed') { backToNumber('Attendance is closed. Tell your admin.'); return; }
-            backToNumber('You were not let in. Type your number again.');
-        } catch (err) {
-            /* offline: keep waiting */
-        } finally {
-            join.polling = false;
-        }
     }
 
     async function enterWithToken(tokenHash) {
@@ -737,7 +678,7 @@
 
     async function handleStudentJoin(event) {
         event.preventDefault();
-        if (join.pending || $('#si-submit').disabled || join.step === 'wait') { return; }
+        if (join.pending || $('#si-submit').disabled) { return; }
         clearFormErrors('signin-form');
         clearStatus('signin-status');
 
@@ -777,36 +718,24 @@
             return;
         }
 
-        /* Confirmed: ask to be let in. Nothing is opened yet. */
+        /* Confirmed: walk in. Only a student the admin marked present gets a token. */
         join.pending = true;
-        var releaseAsk = setBusy($('#si-submit'), 'Asking…');
+        var releaseEnter = setBusy($('#si-submit'), 'Entering…');
         try {
-            var secret = randomHex(16);
-            var asked = await joinCall({ action: 'request', number: join.number, secret: secret });
+            var entered = await joinCall({ action: 'enter', number: join.number });
             if (!current()) { return; }
-            if (!asked.ok) {
-                setStatus('signin-status', (asked.data && asked.data.error) || 'Could not ask to be let in. Try again.', 'error');
+            if (!entered.ok) {
+                setStatus('signin-status', (entered.data && entered.data.error) || 'Could not let you in. Try again.', 'error');
                 return;
             }
-            startWaiting(asked.data.request_id, secret, join.name, join.section);
+            await enterWithToken(entered.data.token_hash);
         } catch (err) {
             if (current()) { setStatus('signin-status', 'Can’t reach the server. Check your Wi-Fi, then try again.', 'error'); }
         } finally {
             join.pending = false;
-            releaseAsk();
+            releaseEnter();
             $('#si-submit').textContent = join.step === 'confirm' ? 'Yes, that is me' : 'Next';
         }
-    }
-
-    /* A refresh while waiting must not lose the request: the secret is kept in
-       this tab, so the dialog comes back and polling carries on. */
-    function resumeWaiting() {
-        if (document.documentElement.getAttribute('data-session') === 'in') { return; }
-        var saved = null;
-        try { saved = JSON.parse(sessionStorage.getItem(WAIT_KEY) || 'null'); } catch (err) { saved = null; }
-        if (!saved || !saved.requestId || !saved.secret) { return; }
-        openAuth('signin');
-        startWaiting(saved.requestId, saved.secret, saved.name, saved.section);
     }
 
     /* One door for teachers and admins. The redirect below the area check
@@ -1468,7 +1397,7 @@
            usual welcome for a visitor who is already signed in. */
         handleDeviceResetLink().then(function (handled) {
             if (handled) { document.documentElement.removeAttribute('data-session'); return; }
-            return offerResume().then(handleEntryIntent).then(resumeWaiting);
+            return offerResume().then(handleEntryIntent);
         });
     }
 

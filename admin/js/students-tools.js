@@ -6,18 +6,19 @@
    1. A row of SECTION CHIPS above the table (All, Earth, Jupiter, ...). A chip sets the
       page's own Section filter, so the table, the counts and Input scores follow it. The
       dropdown that used to do this is hidden: one way to choose a section, not two.
-   2. ATTENDANCE for the chosen section, above the table: start it, see who is waiting,
-      tick the students you can see in the lab and let them in. It appears only once a
-      section is chosen.
+   2. ATTENDANCE for the chosen section: a small bar (start, stop, the count) and, while it is
+      open, a check / cross on every row. The admin calls the names and marks who is in the
+      lab; a student marked present who types their number walks straight in. It appears only
+      once a section is chosen.
    3. A STUDENT NUMBER column: plain text with Edit (Add number when there is none).
 
    admin-dashboard.js calls PIACheckin.decorateRoster() every time it has drawn the table,
    and PIACheckin.saveNumberFor() is kept for older callers. Everything talks to the
-   admin_* functions of migrations 0052-0056; each one refuses anyone who is not a signed-in
+   admin_* functions of migrations 0052-0058; each one refuses anyone who is not a signed-in
    admin, so this file is a convenience, not the boundary.
 
-   NOBODY IS TICKED BY DEFAULT. Ticking is the admin's way of saying "I can see this
-   student in the lab", and there is deliberately no "select all".
+   NOBODY IS MARKED BY DEFAULT, and there is deliberately no "mark everyone": a check is
+   the admin saying "I can see this student in the lab".
    ========================================================================== */
 (function () {
     'use strict';
@@ -25,8 +26,8 @@
     var MINUTES = [15, 30, 45, 60];
     var REFRESH_MS = 4000;
 
-    var overview = { sections: [], open: [], waiting: [] };
-    var ticked = {};              /* request id -> true; survives the refresh */
+    var overview = { sections: [], open: [] };
+    var marks = {};               /* email -> { present, entered, refused } for the chosen section */
     var built = false;
     var polling = false;
 
@@ -169,59 +170,127 @@
         select.dispatchEvent(new Event('change', { bubbles: true }));   /* the page's own handler does the rest */
         renderChips();
         renderAttendance();
+        refreshOverview().catch(function () {});
     }
 
     /* ---- attendance for the chosen section ------------------------------------ */
+    function openFor(section) { return overview.open.filter(function (c) { return c.section === section; })[0]; }
+
     function renderAttendance() {
         var panel = $('#att-panel');
         if (!panel) { return; }
         var section = chosen();
-        if (!section) { panel.hidden = true; panel.innerHTML = ''; return; }
+        if (!section) { panel.hidden = true; panel.innerHTML = ''; paintMarks(); return; }
         panel.hidden = false;
 
         var meta = overview.sections.filter(function (s) { return s.section === section; })[0];
-        var open = overview.open.filter(function (c) { return c.section === section; })[0];
-        var mine = overview.waiting.filter(function (w) { return w.section === section; });
-        var picked = mine.filter(function (w) { return ticked[w.id]; }).length;
+        var open = openFor(section);
         var missing = meta && meta.without_number ? ' · <span class="badge badge-warn">' + meta.without_number + ' without a number</span>' : '';
 
-        var head;
         if (!open) {
-            head = '<div class="panel-bar"><div><h2 class="panel-title">Attendance · ' + esc(section) + '</h2>' +
-                '<p class="scope-line"><span class="badge">Closed</span> Students can’t check in yet.' + missing + '</p></div>' +
+            panel.innerHTML = '<div class="panel-bar"><div><h2 class="panel-title">Attendance · ' + esc(section) + '</h2>' +
+                '<p class="scope-line"><span class="badge">Closed</span> Students can’t enter yet.' + missing + '</p></div>' +
                 '<div class="panel-tools"><select class="input input-sm" data-ci-minutes aria-label="Stay open for">' +
                 MINUTES.map(function (m) { return '<option value="' + m + '"' + (m === 15 ? ' selected' : '') + '>' + m + ' min</option>'; }).join('') +
                 '</select><button type="button" class="btn btn-primary btn-sm" data-ci-start>Start attendance</button></div></div>';
         } else {
-            head = '<div class="panel-bar"><div><h2 class="panel-title">Attendance · ' + esc(section) + '</h2>' +
-                '<p class="scope-line"><span class="badge badge-accent">Open</span> ' + minutesLeft(open.ends_at) + ' min left · ' + mine.length + ' waiting' + missing + '</p></div>' +
+            var all = Object.keys(marks).map(function (k) { return marks[k]; });
+            var present = all.filter(function (m) { return m.present; }).length;
+            var absent = all.length - present;
+            var inside = all.filter(function (m) { return m.entered; }).length;
+            var alerts = all.filter(function (m) { return m.refused > 0; }).length;
+            panel.innerHTML = '<div class="panel-bar"><div><h2 class="panel-title">Attendance · ' + esc(section) + '</h2>' +
+                '<p class="scope-line"><span class="badge badge-accent">Open</span> ' + minutesLeft(open.ends_at) + ' min left · ' +
+                present + ' present · ' + absent + ' absent · ' + inside + ' in' +
+                (alerts ? ' · <span class="badge badge-warn">' + alerts + ' to check</span>' : '') + missing + '</p></div>' +
                 '<div class="panel-tools"><button type="button" class="btn btn-danger btn-sm" data-ci-stop>Stop attendance</button></div></div>';
         }
+        paintMarks();
+    }
 
-        var body = '';
-        if (open && mine.length) {
-            body = '<div class="table-wrap"><table class="table"><thead><tr><th scope="col">Let in</th><th scope="col">Name</th><th scope="col">Asked at</th></tr></thead><tbody>' +
-                mine.map(function (w) {
-                    return '<tr><td><input type="checkbox" data-ci-id="' + esc(w.id) + '"' + (ticked[w.id] ? ' checked' : '') +
-                        ' style="width:20px;height:20px" aria-label="Let in ' + esc(w.full_name) + '"></td><td>' + esc(w.full_name || 'Unknown') +
-                        (w.duplicate ? ' <span class="badge badge-warn">Asked more than once</span>' : '') + '</td><td class="mono">' + esc(clock(w.created_at)) + '</td></tr>';
-                }).join('') + '</tbody></table></div>' +
-                '<div class="panel-bar" style="border-top:1px solid var(--line);border-bottom:0"><span class="scope-line">Tick the students you can see in the lab.</span>' +
-                '<button type="button" class="btn btn-primary btn-sm" data-ci-letin' + (picked ? '' : ' disabled') + '>Let in ' + (picked ? picked + ' ' : '') + 'selected</button></div>';
-        } else if (open) {
-            body = '<div class="panel-pad"><p class="scope-line">Nobody is waiting. Names appear here as students type their number.</p></div>';
+    /* The check / cross column, while attendance is open for the chosen section. It sits right
+       after the student number, so a name, its number and its mark read as one line. */
+    function markCell(email) {
+        var m = marks[email] || null;
+        var state = m ? (m.present ? 'present' : 'absent') : 'none';
+        var html = '<span class="mk-pair" role="group" aria-label="Attendance">' +
+            '<button type="button" class="btn btn-sm ' + (state === 'present' ? 'btn-primary' : 'btn-secondary') + '" data-mk="present" aria-pressed="' + (state === 'present') + '" aria-label="Present" title="Present">✓</button> ' +
+            '<button type="button" class="btn btn-sm ' + (state === 'absent' ? 'btn-danger' : 'btn-secondary') + '" data-mk="absent" aria-pressed="' + (state === 'absent') + '" aria-label="Absent" title="Absent">✗</button></span>';
+        if (m && m.entered) { html += ' <span class="badge badge-accent">In</span>'; }
+        if (m && m.refused > 0) {
+            html += ' <span class="badge badge-warn" title="Another computer tried this number">Tried again ×' + m.refused + '</span>' +
+                ' <button type="button" class="btn btn-secondary btn-sm" data-mk="back">Let back in</button>';
         }
-        panel.innerHTML = head + body;
+        return html;
+    }
+
+    function paintMarks() {
+        var section = chosen();
+        var on = !!section && !!openFor(section);
+        document.documentElement.classList.toggle('pia-att-on', on);
+        var headRow = $('#roster-thead tr');
+        var th = headRow && headRow.querySelector('[data-mk-th]');
+        if (on && headRow && !th) {
+            th = document.createElement('th');
+            th.scope = 'col';
+            th.setAttribute('data-mk-th', '');
+            th.textContent = 'Attendance';
+            var numberTh = headRow.querySelector('[data-ci-th]');
+            headRow.insertBefore(th, numberTh ? numberTh.nextSibling : (headRow.children[1] || null));
+        } else if (!on && th) { th.remove(); }
+        Array.prototype.slice.call(document.querySelectorAll('#student-tbody tr[data-student]')).forEach(function (tr) {
+            var cell = tr.querySelector('[data-mk-cell]');
+            if (!on) { if (cell) { cell.remove(); } return; }
+            if (!cell) {
+                cell = document.createElement('td');
+                cell.setAttribute('data-mk-cell', '');
+                ['click', 'keydown', 'keyup', 'dblclick'].forEach(function (type) {
+                    cell.addEventListener(type, function (event) { event.stopPropagation(); });
+                });
+                cell.addEventListener('click', function (event) { onMark(event, tr.getAttribute('data-student')); });
+                var numberCell = tr.querySelector('[data-ci-cell]');
+                tr.insertBefore(cell, numberCell ? numberCell.nextSibling : (tr.children[1] || null));
+            }
+            var html = markCell(String(tr.getAttribute('data-student')).toLowerCase());
+            if (cell._html !== html) { cell._html = html; cell.innerHTML = html; }
+        });
+    }
+
+    async function onMark(event, rawEmail) {
+        var btn = event.target.closest('[data-mk]');
+        if (!btn) { return; }
+        var section = chosen();
+        var email = String(rawEmail).toLowerCase();
+        var kind = btn.getAttribute('data-mk');
+        try {
+            if (kind === 'back') {
+                await call('admin_let_back_in', { p_section: section, p_email: email });
+                if (marks[email]) { marks[email].entered = false; marks[email].refused = 0; }
+            } else {
+                var want = kind === 'present';
+                var now = marks[email];
+                var next = now && now.present === want ? null : want;          /* tap again to clear */
+                await call('admin_set_attendance', { p_section: section, p_email: email, p_present: next });
+                if (next === null) { delete marks[email]; }
+                else { marks[email] = { present: next, entered: now ? now.entered : false, refused: now ? now.refused : 0 }; }
+            }
+            say('');
+        } catch (error) { say(failure(error), true); }
+        renderAttendance();
     }
 
     async function refreshOverview() {
         var data = await call('admin_checkin_overview');
         overview.sections = (data && data.sections) || [];
         overview.open = (data && data.open) || [];
-        overview.waiting = (data && data.waiting) || [];
-        var live = {};
-        overview.waiting.forEach(function (w) { live[w.id] = true; });
-        Object.keys(ticked).forEach(function (id) { if (!live[id]) { delete ticked[id]; } });
+        var section = chosen();
+        marks = {};
+        if (section && openFor(section)) {
+            var rows = await call('admin_attendance', { p_section: section });
+            (rows || []).forEach(function (r) {
+                marks[String(r.email).toLowerCase()] = { present: !!r.present, entered: !!r.entered, refused: Number(r.refused) || 0 };
+            });
+        }
         renderChips();
         renderAttendance();
     }
@@ -254,7 +323,7 @@
             + sel('::after') + '{content:"********";position:absolute;inset:0;display:flex;align-items:center;padding:inherit;box-sizing:border-box;color:var(--text);letter-spacing:2px;font-size:14px}'
             + H + '#drawer-initials{position:relative;color:transparent!important}'
             + H + '#drawer-initials::after{content:"**";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text)}'
-            + '.pia-section-picked #roster-thead th:nth-child(3),.pia-section-picked #student-tbody td:nth-child(3){display:none}';
+            + '.pia-section-picked:not(.pia-att-on) #roster-thead th:nth-child(3),.pia-section-picked:not(.pia-att-on) #student-tbody td:nth-child(3),.pia-section-picked.pia-att-on #roster-thead th:nth-child(4),.pia-section-picked.pia-att-on #student-tbody td:nth-child(4){display:none}';
         document.head.appendChild(st);
         var bar = $('#stage-tabs') && $('#stage-tabs').parentNode;
         if (!bar) { return; }
@@ -295,22 +364,7 @@
                 });
             } else if (event.target.matches('[data-ci-stop]')) {
                 act(event.target, function () { return call('admin_stop_checkin', { p_section: section }); });
-            } else if (event.target.matches('[data-ci-letin]')) {
-                var ids = overview.waiting.filter(function (w) { return w.section === section && ticked[w.id]; }).map(function (w) { return w.id; });
-                if (!ids.length) { return; }
-                act(event.target, async function () {
-                    var n = await call('admin_let_in', { p_ids: ids });
-                    ids.forEach(function (id) { delete ticked[id]; });
-                    say(n + ' student' + (n === 1 ? '' : 's') + ' let in.');
-                });
             }
-        });
-
-        att.addEventListener('change', function (event) {
-            if (!event.target.matches('[data-ci-id]')) { return; }
-            var id = event.target.getAttribute('data-ci-id');
-            if (event.target.checked) { ticked[id] = true; } else { delete ticked[id]; }
-            renderAttendance();
         });
 
         document.addEventListener('pia:students-added', function () { refreshOverview().catch(function () {}); });
@@ -323,6 +377,7 @@
         document.documentElement.classList.toggle('pia-section-picked', picked);
         renderChips();
         renderAttendance();
+        paintMarks();
         if (!polling && typeof sb !== 'undefined' && sb) {
             polling = true;
             refreshOverview().catch(function (error) { say(failure(error), true); });

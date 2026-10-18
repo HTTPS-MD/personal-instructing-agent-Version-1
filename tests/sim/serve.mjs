@@ -44,8 +44,7 @@ function overview() {
     }),
     open: [...store.checkins.entries()].filter(([, ends]) => ends > store.clock)
       .map(([section, ends]) => ({ section, ends_at: realIso(ends) })),
-    waiting: store.waiting().filter((w) => store.isOpen(w.section))
-      .map((w) => ({ id: w.id, section: w.section, full_name: w.name, created_at: realIso(w.createdMs), duplicate: w.duplicate })),
+    waiting: [],
   };
 }
 
@@ -56,7 +55,15 @@ function rpc(name, args, who) {
     case 'admin_checkin_overview': return { data: overview() };
     case 'admin_start_checkin': store.startCheckin(args.p_section, args.p_minutes); return { data: 'checkin-' + args.p_section };
     case 'admin_stop_checkin': store.stopCheckin(args.p_section); return { data: null };
-    case 'admin_let_in': return { data: store.letIn(args.p_ids || []) };
+    case 'admin_set_attendance': {
+      if (!store.mark(args.p_section, String(args.p_email).toLowerCase(), args.p_present)) return { error: { message: 'Attendance is not open for this section.' } };
+      return { data: null };
+    }
+    case 'admin_attendance':
+      return { data: !store.isOpen(args.p_section) ? [] : store.students.filter((x) => x.role === 'student' && x.section === args.p_section)
+        .map((x) => ({ email: x.email, m: store.markOf(args.p_section, x.email) })).filter((x) => x.m)
+        .map((x) => ({ email: x.email, present: x.m.present, entered: x.m.entered, refused: x.m.refused })) };
+    case 'admin_let_back_in': store.letBackIn(args.p_section, String(args.p_email).toLowerCase()); return { data: null };
     case 'admin_import_student_numbers': {
       let n = 0;
       for (const r of args.p_rows || []) {
@@ -134,7 +141,7 @@ http.createServer(async (req, res) => {
     return json(res, 200, {
       clock: new Date(store.clock).toISOString(),
       checkins: Object.fromEntries(sections().map((s) => [s, store.isOpen(s) ? 'open until ' + new Date(store.checkins.get(s)).toISOString().slice(11, 16) + ' UTC' : 'closed'])),
-      waiting: store.waiting().map((w) => `${w.name} (${w.section})${w.duplicate ? ' DUPLICATE' : ''}`),
+      marks: Object.fromEntries([...store.marks].map(([k, m]) => [k, (m.present ? 'present' : 'absent') + (m.entered ? ' · in' : '') + (m.refused ? ' · refused ' + m.refused : '')])),
       sessions: Object.fromEntries([...store.sessions].map(([e, s]) => [e, s.device])),
       failedTries: store.attempts.filter((a) => !a.ok).length, log: store.log.slice(-12),
       students: store.students.filter((s) => s.role === 'student').map((s) => ({ number: s.number, name: s.full_name, section: s.section })),

@@ -38,7 +38,7 @@
     const s = await (await fetch('/__sim/state')).json();
     document.getElementById('nums').innerHTML = s.students.map(x => `<tr><td><code>${x.number}</code></td><td>${x.name}</td><td>${x.section}</td></tr>`).join('');
     document.getElementById('state').textContent =
-      'clock: ' + s.clock + '\ncheck-in: ' + JSON.stringify(s.checkins, null, 1) + '\nwaiting: ' + JSON.stringify(s.waiting) +
+      'clock: ' + s.clock + '\ncheck-in: ' + JSON.stringify(s.checkins, null, 1) + '\nmarks: ' + JSON.stringify(s.marks) +
       '\nsigned in: ' + JSON.stringify(s.sessions, null, 1) + '\nfailed tries logged: ' + s.failedTries + '\n\n' + s.log.join('\n');
   }
   document.querySelectorAll('[data-adv]').forEach(b => b.onclick = async () => { await fetch('/__sim/advance', { method: 'POST', body: JSON.stringify({ ms: Number(b.dataset.adv) }) }); refresh(); });
