@@ -231,7 +231,7 @@
         try { await work(); await refreshOverview(); } catch (error) { say(failure(error), true); button.disabled = false; }
     }
 
-    // Hide details: blurs names and student numbers in the table, for a screen others can see.
+    // Hide details: masks what identifies a child (name, email, student number) in the table, for a screen others can see.
     function setHidden(on) {
         document.documentElement.classList.toggle('pia-hide-details', on);
         var b = $('#hide-details');
@@ -243,7 +243,7 @@
         if ($('#hide-details')) { return; }
         var st = document.createElement('style');
         var H = '.pia-hide-details ';
-        var masked = H + '#student-tbody td, ' + H + '#drawer-student :is(#drawer-student-name,#drawer-email,#drawer-condition,#drawer-section,#drawer-stage,#drawer-tutor,#drawer-status,#drawer-assent,#drawer-pre,#drawer-post,#drawer-pre-detail,#drawer-post-detail,#drawer-traits,#drawer-tutorial-performance)';
+        var masked = H + '#student-tbody td:first-child, ' + H + '#student-tbody td[data-ci-cell], ' + H + '#drawer-student :is(#drawer-student-name,#drawer-email)';
         st.textContent = masked + '{font-size:0!important;line-height:1.4}'
             + masked.split(', ').map(function (x) { return x + ' *'; }).join(', ') + '{display:none!important}'
             + masked.split(', ').map(function (x) { return x + '::after'; }).join(', ') + '{content:"********";font-size:14px;letter-spacing:2px}'
