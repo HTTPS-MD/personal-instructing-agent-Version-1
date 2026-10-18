@@ -448,7 +448,7 @@
             + '#view-students .page-actions .btn{min-height:40px;box-sizing:border-box}'
             + '[data-section-menu] button:hover{background:var(--line-soft)!important}'
             + '#att-toggle{min-width:10rem;text-align:center}'
-            + '#roster-thead th[data-mk-th],#student-tbody td[data-mk-cell]{min-width:22rem;white-space:nowrap}'
+            + '#roster-thead th[data-mk-th],#student-tbody td[data-mk-cell]{min-width:14rem}'
             + masked + '{position:relative;color:transparent!important}'
             + sel(' *') + '{visibility:hidden!important}'
             + sel('::after') + '{content:"********";position:absolute;inset:0;display:flex;align-items:center;padding:inherit;box-sizing:border-box;color:var(--text);letter-spacing:2px;font-size:14px}'
