@@ -3,11 +3,12 @@
    ============================================================================
    One page, one table. Three things are added to it:
 
-   1. A row of SECTION CHIPS above the table (All, Earth, Jupiter, ...). A chip sets the
+   1. The page title is a SECTION DROPDOWN (All students, Earth, Jupiter, ...). It sets the
       page's own Section filter, so the table, the counts and Input scores follow it. The
-      dropdown that used to do this is hidden: one way to choose a section, not two.
-   2. ATTENDANCE for the chosen section: a small bar (start, stop, the count) and, while it is
-      open, a check / cross on every row. The admin calls the names and marks who is in the
+      filter that used to do this is hidden: one way to choose a section, not two.
+   2. ATTENDANCE for the chosen section: a Start / Stop button beside Show details and, while
+      it is open, a check / cross on every row, in the last column. No timer is shown; the
+      attendance closes by itself after 2 hours if it is left open. The admin calls the names and marks who is in the
       lab; a student marked present who types their number walks straight in. It appears only
       once a section is chosen.
    3. A STUDENT NUMBER column: plain text with Edit (Add number when there is none).
@@ -23,7 +24,6 @@
 (function () {
     'use strict';
 
-    var MINUTES = [15, 30, 45, 60];
     var REFRESH_MS = 4000;
 
     var overview = { sections: [], open: [] };
@@ -66,10 +66,9 @@
     function prettyNumber(s) { var d = digitsOf(s).slice(0, 11); return d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d; }
 
     function say(message, isError) {
-        var el = $('#att-status');
-        if (!el) { return; }
-        el.textContent = message || '';
-        el.style.color = isError ? 'var(--danger)' : '';
+        if (!message) { return; }
+        var admin = window.PIAAdmin;
+        if (admin) { (isError ? admin.toastErr : admin.toastOk)(isError ? 'Attendance' : 'Done', message); }
     }
 
     /* ---- the student number cell: plain text, Edit, Save, Cancel ----------------- */
@@ -146,21 +145,28 @@
     /* ---- the section chips ---------------------------------------------------- */
     function isOpen(name) { return overview.open.some(function (c) { return c.section === name; }); }
 
+    function titleHost() { return $('#view-students .page-head .page-title'); }
+
     function renderChips() {
-        var host = $('#section-chips');
-        if (!host) { return; }
+        var h1 = titleHost();
+        if (!h1) { return; }
+        var chips = $('#section-chips'); if (chips) { chips.style.display = 'none'; }
         var now = chosen();
-        var total = overview.sections.reduce(function (n, s) { return n + s.students; }, 0);
-        var chip = function (value, label, count, dot) {
-            return '<button type="button" class="btn btn-sm ' + (now === value ? 'btn-primary' : 'btn-secondary') + '" data-chip="' + esc(value) + '" aria-pressed="' + (now === value ? 'true' : 'false') + '">' +
-                esc(label) + ' <span class="mono">' + count + '</span>' + (dot ? ' <span class="badge badge-accent" title="Attendance is open">Open</span>' : '') + '</button>';
+        var total = overview.sections.reduce(function (n, x) { return n + x.students; }, 0);
+        var label = now ? now : 'All students';
+        var row = function (value, name, count, open) {
+            return '<button type="button" role="menuitemradio" aria-checked="' + (now === value) + '" data-chip="' + esc(value) + '" style="display:flex;width:100%;justify-content:space-between;gap:16px;align-items:center;padding:8px 12px;border:0;background:' + (now === value ? 'var(--fill-ghost-selected, rgba(128,128,128,.18))' : 'transparent') + ';color:inherit;font:inherit;text-align:left;cursor:pointer">' +
+                '<span>' + esc(name) + (open ? ' <span class="badge badge-accent">Open</span>' : '') + '</span><span class="mono" style="opacity:.7">' + count + '</span></button>';
         };
-        host.innerHTML = overview.sections.length
-            ? '<div role="group" aria-label="Section" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
-              chip('', 'All', total, false) +
-              overview.sections.map(function (s) { return chip(s.section, s.section, s.students, isOpen(s.section)); }).join('') +
-              '<button type="button" class="btn btn-sm btn-secondary" data-chip-manage title="Add, rename or delete a section">+ Sections</button></div>'
-            : '';
+        var menu = '<div data-section-menu role="menu" hidden style="position:absolute;z-index:30;top:100%;left:0;margin-top:6px;min-width:240px;max-height:60vh;overflow:auto;background:var(--panel, #111842);border:1px solid var(--line, #2a3470);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:14px;font-weight:400">' +
+            row('', 'All students', total, false) +
+            overview.sections.map(function (x) { return row(x.section, x.section, x.students, isOpen(x.section)); }).join('') +
+            '<button type="button" data-chip-manage style="display:block;width:100%;padding:8px 12px;border:0;border-top:1px solid var(--line, #2a3470);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer">+ Sections</button></div>';
+        var wasOpen = h1.querySelector('[data-section-menu]') && !h1.querySelector('[data-section-menu]').hidden;
+        h1.style.position = 'relative';
+        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px">' +
+            esc(label) + ' <span aria-hidden="true" style="font-size:.6em;opacity:.7">▾</span></button>' + menu;
+        if (wasOpen) { h1.querySelector('[data-section-menu]').hidden = false; }
     }
 
     function pickSection(name) {
@@ -177,33 +183,14 @@
     function openFor(section) { return overview.open.filter(function (c) { return c.section === section; })[0]; }
 
     function renderAttendance() {
-        var panel = $('#att-panel');
-        if (!panel) { return; }
         var section = chosen();
-        if (!section) { panel.hidden = true; panel.innerHTML = ''; paintMarks(); return; }
-        panel.hidden = false;
-
-        var meta = overview.sections.filter(function (s) { return s.section === section; })[0];
-        var open = openFor(section);
-        var missing = meta && meta.without_number ? ' · <span class="badge badge-warn">' + meta.without_number + ' without a number</span>' : '';
-
-        if (!open) {
-            panel.innerHTML = '<div class="panel-bar"><div><h2 class="panel-title">Attendance · ' + esc(section) + '</h2>' +
-                '<p class="scope-line"><span class="badge">Closed</span> Students can’t enter yet.' + missing + '</p></div>' +
-                '<div class="panel-tools"><select class="input input-sm" data-ci-minutes aria-label="Stay open for">' +
-                MINUTES.map(function (m) { return '<option value="' + m + '"' + (m === 15 ? ' selected' : '') + '>' + m + ' min</option>'; }).join('') +
-                '</select><button type="button" class="btn btn-primary btn-sm" data-ci-start>Start attendance</button></div></div>';
-        } else {
-            var all = Object.keys(marks).map(function (k) { return marks[k]; });
-            var present = all.filter(function (m) { return m.present; }).length;
-            var absent = all.length - present;
-            var inside = all.filter(function (m) { return m.entered; }).length;
-            var alerts = all.filter(function (m) { return m.refused > 0; }).length;
-            panel.innerHTML = '<div class="panel-bar"><div><h2 class="panel-title">Attendance · ' + esc(section) + '</h2>' +
-                '<p class="scope-line"><span class="badge badge-accent">Open</span> ' + minutesLeft(open.ends_at) + ' min left · ' +
-                present + ' present · ' + absent + ' absent · ' + inside + ' in' +
-                (alerts ? ' · <span class="badge badge-warn">' + alerts + ' to check</span>' : '') + missing + '</p></div>' +
-                '<div class="panel-tools"><button type="button" class="btn btn-danger btn-sm" data-ci-stop>Stop attendance</button></div></div>';
+        var btn = $('#att-toggle');
+        if (btn) {
+            btn.hidden = !section;
+            var open = !!section && !!openFor(section);
+            btn.textContent = open ? 'Stop attendance' : 'Start attendance';
+            btn.setAttribute('data-ci', open ? 'stop' : 'start');
+            btn.className = 'btn btn-sm ' + (open ? 'btn-secondary' : 'btn-primary');
         }
         paintMarks();
     }
@@ -235,8 +222,7 @@
             th.scope = 'col';
             th.setAttribute('data-mk-th', '');
             th.textContent = 'Attendance';
-            var numberTh = headRow.querySelector('[data-ci-th]');
-            headRow.insertBefore(th, numberTh ? numberTh.nextSibling : (headRow.children[1] || null));
+            headRow.appendChild(th);
         } else if (!on && th) { th.remove(); }
         Array.prototype.slice.call(document.querySelectorAll('#student-tbody tr[data-student]')).forEach(function (tr) {
             var cell = tr.querySelector('[data-mk-cell]');
@@ -248,8 +234,7 @@
                     cell.addEventListener(type, function (event) { event.stopPropagation(); });
                 });
                 cell.addEventListener('click', function (event) { onMark(event, tr.getAttribute('data-student')); });
-                var numberCell = tr.querySelector('[data-ci-cell]');
-                tr.insertBefore(cell, numberCell ? numberCell.nextSibling : (tr.children[1] || null));
+                tr.appendChild(cell);
             }
             var html = markCell(String(tr.getAttribute('data-student')).toLowerCase());
             if (cell._html !== html) { cell._html = html; cell.innerHTML = html; }
@@ -297,8 +282,8 @@
 
     async function act(button, work) {
         button.disabled = true;
-        say('');
-        try { await work(); await refreshOverview(); } catch (error) { say(failure(error), true); button.disabled = false; }
+        try { await work(); await refreshOverview(); } catch (error) { say(failure(error), true); }
+        button.disabled = false;
     }
 
     // Hide details: masks what identifies a child (name, email, student number) in the table, for a screen others can see.
@@ -323,7 +308,7 @@
             + sel('::after') + '{content:"********";position:absolute;inset:0;display:flex;align-items:center;padding:inherit;box-sizing:border-box;color:var(--text);letter-spacing:2px;font-size:14px}'
             + H + '#drawer-initials{position:relative;color:transparent!important}'
             + H + '#drawer-initials::after{content:"**";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text)}'
-            + '.pia-section-picked:not(.pia-att-on) #roster-thead th:nth-child(3),.pia-section-picked:not(.pia-att-on) #student-tbody td:nth-child(3),.pia-section-picked.pia-att-on #roster-thead th:nth-child(4),.pia-section-picked.pia-att-on #student-tbody td:nth-child(4){display:none}';
+            + '.pia-section-picked #roster-thead th:nth-child(3),.pia-section-picked #student-tbody td:nth-child(3){display:none}';
         document.head.appendChild(st);
         var bar = $('#stage-tabs') && $('#stage-tabs').parentNode;
         if (!bar) { return; }
@@ -332,6 +317,24 @@
         label.innerHTML = '<input type="checkbox" id="hide-details" checked> Show details';
         bar.appendChild(label);
         label.firstChild.addEventListener('change', function (e) { setHidden(!e.target.checked); });
+        label.style.marginLeft = 'auto';
+        var toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.id = 'att-toggle';
+        toggle.hidden = true;
+        toggle.className = 'btn btn-sm btn-primary';
+        toggle.textContent = 'Start attendance';
+        toggle.style.marginLeft = '12px';
+        bar.appendChild(toggle);
+        toggle.addEventListener('click', function () {
+            var section = chosen();
+            if (!section) { return; }
+            var starting = toggle.getAttribute('data-ci') !== 'stop';
+            act(toggle, function () {
+                return starting ? call('admin_start_checkin', { p_section: section, p_minutes: 120 })
+                                : call('admin_stop_checkin', { p_section: section });
+            });
+        });
         var was = false;
         try { was = sessionStorage.getItem('pia_hide_details') === '1'; } catch (e) {}
         setHidden(was);
@@ -340,32 +343,38 @@
     function build() {
         if (built) { return; }
         buildHideToggle();
-        var chips = $('#section-chips');
+        var h1 = titleHost();
         var att = $('#attendance-bar');
-        if (!chips || !att) { return; }
+        if (att) { att.style.display = 'none'; }
+        if (!h1) { return; }
         built = true;
-        att.innerHTML = '<p class="scope-line" id="att-status" role="status" aria-live="polite"></p><section class="panel" id="att-panel" hidden></section>';
 
-        chips.addEventListener('click', function (event) {
+        var closeMenu = function () {
+            var m = h1.querySelector('[data-section-menu]');
+            if (m) { m.hidden = true; }
+            var t = h1.querySelector('[data-section-toggle]');
+            if (t) { t.setAttribute('aria-expanded', 'false'); }
+        };
+        h1.addEventListener('click', function (event) {
+            if (event.target.closest('[data-section-toggle]')) {
+                var m = h1.querySelector('[data-section-menu]');
+                if (m) {
+                    m.hidden = !m.hidden;
+                    h1.querySelector('[data-section-toggle]').setAttribute('aria-expanded', String(!m.hidden));
+                }
+                return;
+            }
             if (event.target.closest('[data-chip-manage]')) {
+                closeMenu();
                 var opener = document.querySelector('[data-modal-open="modal-manage-sections"]');
                 if (opener) { opener.click(); }
                 return;
             }
             var chip = event.target.closest('[data-chip]');
-            if (chip) { pickSection(chip.getAttribute('data-chip')); }
+            if (chip) { closeMenu(); pickSection(chip.getAttribute('data-chip')); }
         });
-
-        att.addEventListener('click', function (event) {
-            var section = chosen();
-            if (event.target.matches('[data-ci-start]')) {
-                act(event.target, function () {
-                    return call('admin_start_checkin', { p_section: section, p_minutes: Number($('[data-ci-minutes]', att).value) });
-                });
-            } else if (event.target.matches('[data-ci-stop]')) {
-                act(event.target, function () { return call('admin_stop_checkin', { p_section: section }); });
-            }
-        });
+        document.addEventListener('click', function (event) { if (!h1.contains(event.target)) { closeMenu(); } });
+        document.addEventListener('keydown', function (event) { if (event.key === 'Escape') { closeMenu(); } });
 
         document.addEventListener('pia:students-added', function () { refreshOverview().catch(function () {}); });
     }
