@@ -242,8 +242,12 @@
     function buildHideToggle() {
         if ($('#hide-details')) { return; }
         var st = document.createElement('style');
-        st.textContent = '.pia-hide-details #student-tbody td{filter:blur(6px);user-select:none}'
-            + '.pia-hide-details #student-tbody td button{pointer-events:none}';
+        var H = '.pia-hide-details ';
+        var masked = H + '#student-tbody td, ' + H + '#drawer-student :is(#drawer-student-name,#drawer-email,#drawer-condition,#drawer-section,#drawer-stage,#drawer-tutor,#drawer-status,#drawer-assent,#drawer-pre,#drawer-post,#drawer-pre-detail,#drawer-post-detail,#drawer-traits,#drawer-tutorial-performance)';
+        st.textContent = masked + '{font-size:0!important;line-height:1.4}'
+            + masked.split(', ').map(function (x) { return x + ' *'; }).join(', ') + '{display:none!important}'
+            + masked.split(', ').map(function (x) { return x + '::after'; }).join(', ') + '{content:"********";font-size:14px;letter-spacing:2px}'
+            + H + '#drawer-initials{font-size:0!important}' + H + '#drawer-initials::after{content:"**";font-size:14px}';
         document.head.appendChild(st);
         var chips = $('#section-chips');
         if (!chips) { return; }
