@@ -312,7 +312,6 @@
     var VIEWS = ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
-        if (view === 'sections') { view = 'students'; }     /* the old Class Sections address */
         if (VIEWS.indexOf(view) === -1) { view = 'overview'; }
 
         $$('[data-view-panel]').forEach(function (panel) {
