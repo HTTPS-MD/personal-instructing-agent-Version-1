@@ -217,10 +217,10 @@
         var section = chosen();
         if (!section) { el.innerHTML = ''; return; }
         var list = profsOf(section);
-        el.innerHTML = (list.length
-            ? 'Professor: ' + list.map(function (f) { return '<button type="button" class="cell-link" data-prof="' + esc(f.email) + '">' + esc(f.name || f.email) + '</button>'; }).join(', ')
-            : 'No professor yet') +
-            ' · <button type="button" class="cell-link" data-prof-add>Add professor</button>';
+        /* One professor per section: once there is one, there is nothing to add here. */
+        el.innerHTML = list.length
+            ? 'Professor: <button type="button" class="cell-link" data-prof="' + esc(list[0].email) + '">' + esc(list[0].name || list[0].email) + '</button>'
+            : 'No professor yet · <button type="button" class="cell-link" data-prof-add>Add professor</button>';
     }
 
     var LAST_KEY = 'pia_students_section';
