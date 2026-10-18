@@ -1640,63 +1640,47 @@
         if (!tbody) { return; }
 
         if (!state.sectionsLoaded || !state.cohortLoaded) {
-            tbody.innerHTML = skeletonRows(5, 4);
+            tbody.innerHTML = skeletonRows(3, 4);
             return;
         }
 
         if (!state.sections.length) {
-            tbody.innerHTML = '<tr><td colspan="5"><div class="state-block">' +
+            tbody.innerHTML = '<tr><td colspan="3"><div class="state-block">' +
                 '<p class="state-title">No sections yet</p></div></td></tr>';
             return;
         }
 
         tbody.innerHTML = state.sections.map(function (section) {
             var members = state.cohort.filter(function (s) { return s.section === section.name; });
-            var done = members.filter(hasCurrentResult).length;
-            var status = sectionStatus(members);
-            var statusCell = status === null
-                ? '<span class="muted status-na" title="Status unavailable">—<span class="sr-only">Status unavailable</span></span>'
-                : '<span class="presence"><span class="dot ' + (status.online ? 'dot-on' : 'dot-off') +
-                  '" aria-hidden="true"></span>' + (status.online ? 'Online' : 'Offline') + '</span>';
             var prof = state.faculty.filter(function (f) { return f.assigned_section === section.name; })[0];
-
-            return '' +
-                '<tr>' +
-                '<td><button type="button" class="cell-link" data-section-open="' + esc(section.name) + '">' +
-                esc(section.name) + '</button></td>' +
-                '<td>' + (prof ? esc(prof.name) : '<span class="muted">—</span>') + '</td>' +
+            var name = esc(section.name);
+            var cell;
+            var actions;
+            if (sectionEdit.rename === section.name) {
+                cell = '<input class="input input-sm" data-section-input maxlength="40" value="' + name + '" aria-label="New name for ' + name + '">' +
+                    (sectionEdit.error ? '<p class="field-error" role="alert">' + esc(sectionEdit.error) + '</p>' : '');
+                actions = '<button type="button" class="btn btn-primary btn-sm" data-section-save="' + name + '">Save</button> ' +
+                    '<button type="button" class="btn btn-secondary btn-sm" data-section-cancel>Cancel</button>';
+            } else if (sectionEdit.remove === section.name) {
+                cell = name + (sectionEdit.error ? '<p class="field-error" role="alert">' + esc(sectionEdit.error) + '</p>' : '<p class="scope-line">Delete this section? This cannot be undone.</p>');
+                actions = '<button type="button" class="btn btn-danger btn-sm" data-section-confirm="' + name + '">Delete</button> ' +
+                    '<button type="button" class="btn btn-secondary btn-sm" data-section-cancel>Keep</button>';
+            } else {
+                var why = members.length ? 'Has students' : (prof ? 'Has a professor' : '');
+                cell = name;
+                actions = '<button type="button" class="btn btn-secondary btn-sm" data-section-rename="' + name + '">Rename</button> ' +
+                    '<button type="button" class="btn btn-secondary btn-sm" data-section-remove="' + name + '"' +
+                    (why ? ' disabled title="' + why + ': only an empty section can be deleted."' : '') + '>Delete</button>';
+            }
+            return '<tr><td>' + cell + '</td>' +
                 '<td class="col-right mono">' + members.length + '</td>' +
-                '<td class="col-right mono">' + esc(oceanFraction(done, members.length)) + '</td>' +
-                '<td>' + statusCell + '</td>' +
-                '</tr>';
+                '<td class="col-right">' + actions + '</td></tr>';
         }).join('');
+        var input = tbody.querySelector('[data-section-input]');
+        if (input && !sectionEdit.focused) { sectionEdit.focused = true; input.focus(); input.select(); }
     }
 
-    /* The one line above the Students table: which section it is showing and
-       the figures that are real for it. OCEAN completed is the only completion
-       the database records; the other stages are where students are now. */
-    function renderScope() {
-        var line = $('#scope-line');
-        if (!line) { return; }
-        var section = state.filters.section;
-        var scores = $('#section-scores-open');
-        if (scores) { scores.classList.toggle('is-hidden', !section); }
-        var search = $('#student-search');
-        if (search) { search.placeholder = 'Name or email, in ' + (section || 'all sections'); }
-
-        if (!state.cohortLoaded) { line.textContent = 'Loading…'; return; }
-
-        var members = section
-            ? state.cohort.filter(function (s) { return s.section === section; })
-            : state.cohort;
-        var done = members.filter(hasCurrentResult).length;
-        var parts = section ? [] : ['All sections'];     /* the chosen chip already says which section */
-        var prof = section && state.faculty.filter(function (f) { return f.assigned_section === section; })[0];
-        if (prof) { parts.push('Professor ' + prof.name); }
-        parts.push(members.length + (members.length === 1 ? ' student' : ' students'));
-        if (members.length) { parts.push('OCEAN completed ' + oceanFraction(done, members.length)); }
-        line.textContent = parts.join(' · ');
-    }
+    var sectionEdit = { rename: null, remove: null, error: '', focused: false };
 
     /* Shows one section in the Students view (from the sections dialog, the
        Faculty table or the quick find), clearing the other filters so the
@@ -1717,13 +1701,46 @@
     }
 
     function initSectionsTable() {
-        $('#sections-tbody').addEventListener('click', function (event) {
-            var btn = event.target.closest('[data-section-open]');
-            if (!btn) { return; }
-            var name = btn.getAttribute('data-section-open');
-            closeModal('modal-manage-sections');
-            showSection(name);
+        var tbody = $('#sections-tbody');
+        function reset() { sectionEdit = { rename: null, remove: null, error: '', focused: false }; renderSections(); }
+        async function run(button, call, done) {
+            button.disabled = true;
+            var res = await call;
+            if (res.error) {
+                sectionEdit.error = (res.error.message || 'Something went wrong.').replace(/^PIA:\s*/, '');
+                renderSections();
+                return;
+            }
+            reset();
+            toastOk(done[0], done[1]);
+            refreshAll();
+        }
+        function save(button) {
+            var input = tbody.querySelector('[data-section-input]');
+            var old = button.getAttribute('data-section-save');
+            var next = input ? input.value.trim() : '';
+            if (!next || next === old) { reset(); return; }
+            run(button, sb.rpc('admin_rename_section', { p_old: old, p_new: next }), ['Section renamed', old + ' is now ' + next + '.']);
+        }
+        tbody.addEventListener('click', function (event) {
+            var t = function (sel) { return event.target.closest(sel); };
+            var b;
+            if ((b = t('[data-section-rename]'))) { sectionEdit = { rename: b.getAttribute('data-section-rename'), remove: null, error: '', focused: false }; renderSections(); }
+            else if ((b = t('[data-section-remove]'))) { sectionEdit = { rename: null, remove: b.getAttribute('data-section-remove'), error: '', focused: false }; renderSections(); }
+            else if (t('[data-section-cancel]')) { reset(); }
+            else if ((b = t('[data-section-save]'))) { save(b); }
+            else if ((b = t('[data-section-confirm]'))) {
+                var name = b.getAttribute('data-section-confirm');
+                run(b, sb.rpc('admin_delete_section', { p_name: name }), ['Section deleted', name + ' was removed.']);
+            }
         });
+        tbody.addEventListener('keydown', function (event) {
+            if (!event.target.matches('[data-section-input]')) { return; }
+            if (event.key === 'Enter') { event.preventDefault(); var b = tbody.querySelector('[data-section-save]'); if (b) { save(b); } }
+            else if (event.key === 'Escape') { event.preventDefault(); reset(); }
+        });
+        var dialog = $('#modal-manage-sections');
+        if (dialog) { new MutationObserver(function () { if (!dialog.classList.contains('is-open')) { reset(); } }).observe(dialog, { attributes: true, attributeFilter: ['class'] }); }
     }
 
     /* ============================================== 7. ALL STUDENTS ===== */

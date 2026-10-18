@@ -157,7 +157,8 @@
         host.innerHTML = overview.sections.length
             ? '<div role="group" aria-label="Section" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
               chip('', 'All', total, false) +
-              overview.sections.map(function (s) { return chip(s.section, s.section, s.students, isOpen(s.section)); }).join('') + '</div>'
+              overview.sections.map(function (s) { return chip(s.section, s.section, s.students, isOpen(s.section)); }).join('') +
+              '<button type="button" class="btn btn-sm btn-secondary" data-chip-manage title="Add, rename or delete a section">+ Sections</button></div>'
             : '';
     }
 
@@ -272,6 +273,11 @@
         att.innerHTML = '<p class="scope-line" id="att-status" role="status" aria-live="polite"></p><section class="panel" id="att-panel" hidden></section>';
 
         chips.addEventListener('click', function (event) {
+            if (event.target.closest('[data-chip-manage]')) {
+                var opener = document.querySelector('[data-modal-open="modal-manage-sections"]');
+                if (opener) { opener.click(); }
+                return;
+            }
             var chip = event.target.closest('[data-chip]');
             if (chip) { pickSection(chip.getAttribute('data-chip')); }
         });

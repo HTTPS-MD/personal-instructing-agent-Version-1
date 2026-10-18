@@ -253,7 +253,7 @@
                     <div class="page-head">
                         <h1 class="page-title">Students</h1>
                         <div class="page-actions">
-                            <button type="button" class="btn btn-secondary" data-modal-open="modal-manage-sections">Manage sections</button>
+                            <button type="button" class="btn btn-secondary is-hidden" data-modal-open="modal-manage-sections">Manage sections</button>
                             <button type="button" class="btn btn-primary" data-modal-open="modal-add-students">Add students</button>
                         </div>
                     </div>
@@ -1050,8 +1050,8 @@
         <div class="modal modal-lg">
             <header class="modal-head">
                 <div class="modal-head-text">
-                    <h2 class="modal-title" id="manage-sections-title">Manage sections</h2>
-                    <p class="modal-sub">Choose a section to see its students.</p>
+                    <h2 class="modal-title" id="manage-sections-title">Sections</h2>
+                    <p class="modal-sub">Rename a section, or delete one that is empty.</p>
                 </div>
                 <button class="modal-close" data-modal-close aria-label="Close dialog">
                     <svg class="icon"><use href="#i-x"></use></svg>
@@ -1067,10 +1067,8 @@
                         <thead>
                             <tr>
                                 <th scope="col">Section</th>
-                                <th scope="col">Professor</th>
                                 <th scope="col" class="col-right">Students</th>
-                                <th scope="col" class="col-right">OCEAN completed</th>
-                                <th scope="col">Status</th>
+                                <th scope="col"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody id="sections-tbody"></tbody>
@@ -1706,7 +1704,7 @@
     <script src="../js/math-task-generator.js"></script>
     <script src="../js/students-tools.js?v=20261019c"></script>
     <script src="../js/add-students.js?v=20261019c"></script>
-    <script src="../js/admin-dashboard.js?v=20261019d"></script>
+    <script src="../js/admin-dashboard.js?v=20261020a"></script>
 </body>
 
 </html>
