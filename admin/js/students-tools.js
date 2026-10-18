@@ -27,6 +27,8 @@
     var REFRESH_MS = 4000;
 
     var overview = { sections: [], open: [] };
+    var profs = [];               /* professors: { name, email, assigned_section } */
+    var confirmDelete = false;    /* the delete row of the section menu is asking "are you sure" */
     var marks = {};               /* email -> { present, entered, refused } for the chosen section */
     var built = false;
     var polling = false;
@@ -147,24 +149,78 @@
 
     function titleHost() { return $('#view-students .page-head .page-title'); }
 
+    function profsOf(section) { return profs.filter(function (f) { return f.assigned_section === section; }); }
+
     function renderChips() {
         var h1 = titleHost();
         if (!h1) { return; }
         var chips = $('#section-chips'); if (chips) { chips.style.display = 'none'; }
         var now = chosen();
         var label = now ? now : 'Choose a section';
+        var item = 'display:block;width:100%;padding:8px 12px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer';
         var row = function (value, name, count, open) {
             return '<button type="button" role="menuitemradio" aria-checked="' + (now === value) + '" data-chip="' + esc(value) + '" style="display:flex;width:100%;justify-content:space-between;gap:16px;align-items:center;padding:8px 12px;border:0;background:' + (now === value ? 'var(--line-soft)' : 'transparent') + ';color:var(--text);font:inherit;font-weight:' + (now === value ? '600' : '400') + ';text-align:left;cursor:pointer">' +
                 '<span>' + esc(name) + (open ? ' <span class="badge badge-accent">Open</span>' : '') + '</span><span class="mono" style="opacity:.7">' + count + '</span></button>';
         };
+
+        /* Delete only works on an empty section: no student and no professor. */
+        var meta = overview.sections.filter(function (x) { return x.section === now; })[0];
+        var why = !now ? '' : (meta && meta.students ? 'Has students' : (profsOf(now).length ? 'Has a professor' : ''));
+        var remove = '';
+        if (now && confirmDelete && !why) {
+            remove = '<div style="padding:8px 12px;border-top:1px solid var(--line)"><div style="margin-bottom:8px">Delete ' + esc(now) + '? This cannot be undone.</div>' +
+                '<button type="button" class="btn btn-danger btn-sm" data-section-confirm>Yes, delete</button> <button type="button" class="btn btn-secondary btn-sm" data-section-keep>Keep</button></div>';
+        } else if (now) {
+            remove = '<button type="button" data-section-delete ' + (why ? 'disabled title="' + why + ': only an empty section can be deleted." ' : '') +
+                'style="' + item + ';border-top:1px solid var(--line);' + (why ? 'opacity:.5;cursor:not-allowed' : 'color:var(--danger)') + '">Delete ' + esc(now) + '</button>';
+        }
+
         var menu = '<div data-section-menu role="menu" hidden style="position:absolute;z-index:30;top:100%;left:0;margin-top:6px;min-width:240px;max-height:60vh;overflow:auto;background:var(--bg-surface);color:var(--text);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:14px;font-weight:400">' +
             overview.sections.map(function (x) { return row(x.section, x.section, x.students, isOpen(x.section)); }).join('') +
-            '<button type="button" data-chip-manage style="display:block;width:100%;padding:8px 12px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer">+ Sections</button></div>';
+            '<button type="button" data-section-new style="' + item + ';border-top:1px solid var(--line)">+ New section</button>' + remove + '</div>';
         var wasOpen = h1.querySelector('[data-section-menu]') && !h1.querySelector('[data-section-menu]').hidden;
         h1.style.position = 'relative';
         h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px">' +
             esc(label) + ' <span aria-hidden="true" style="font-size:.6em;opacity:.7">▾</span></button>' + menu;
         if (wasOpen) { h1.querySelector('[data-section-menu]').hidden = false; }
+        renderProfLine();
+    }
+
+    /* The professor of the chosen section, under the title: open their account (reset the
+       password, sign out, remove) or add one. This is the old Faculty page, one section at a time. */
+    function renderProfLine() {
+        var scope = $('#view-students .scope-row');
+        if (!scope) { return; }
+        var el = $('#prof-line');
+        if (!el) {
+            el = document.createElement('p');
+            el.id = 'prof-line';
+            el.className = 'scope-line';
+            scope.parentNode.insertBefore(el, scope.nextSibling);
+            el.addEventListener('click', function (event) {
+                var open = event.target.closest('[data-prof]');
+                var add = event.target.closest('[data-prof-add]');
+                if (open) {
+                    var email = open.getAttribute('data-prof');
+                    var rowEl = Array.prototype.slice.call(document.querySelectorAll('#faculty-tbody [data-faculty]')).filter(function (r) { return r.getAttribute('data-faculty') === email; })[0];
+                    if (rowEl) { rowEl.click(); } else { say('Could not open that professor. Reload the page.', true); }
+                } else if (add) {
+                    var opener = document.querySelector('[data-modal-open="modal-add-professor"]');
+                    var section = chosen();
+                    if (opener) {
+                        opener.click();
+                        setTimeout(function () { var sel = $('#ap-section'); if (sel && section) { sel.value = section; } }, 60);
+                    }
+                }
+            });
+        }
+        var section = chosen();
+        if (!section) { el.innerHTML = ''; return; }
+        var list = profsOf(section);
+        el.innerHTML = (list.length
+            ? 'Professor: ' + list.map(function (f) { return '<button type="button" class="cell-link" data-prof="' + esc(f.email) + '">' + esc(f.name || f.email) + '</button>'; }).join(', ')
+            : 'No professor yet') +
+            ' · <button type="button" class="cell-link" data-prof-add>Add professor</button>';
     }
 
     var LAST_KEY = 'pia_students_section';
@@ -181,6 +237,7 @@
     }
 
     function pickSection(name) {
+        confirmDelete = false;
         var select = $('#section-filter');
         if (!name) { return; }
         try { localStorage.setItem(LAST_KEY, name); } catch (e) { /* private mode */ }
@@ -282,6 +339,10 @@
         var data = await call('admin_checkin_overview');
         overview.sections = (data && data.sections) || [];
         overview.open = (data && data.open) || [];
+        try {
+            var pr = await sb.from('professors').select('name, email, assigned_section');
+            profs = pr.error ? profs : (pr.data || []);
+        } catch (e) { /* keep the last list */ }
         var section = chosen();
         marks = {};
         if (section && openFor(section)) {
@@ -392,10 +453,33 @@
                 }
                 return;
             }
-            if (event.target.closest('[data-chip-manage]')) {
+            if (event.target.closest('[data-section-new]')) {
                 closeMenu();
-                var opener = document.querySelector('[data-modal-open="modal-manage-sections"]');
+                var opener = document.querySelector('[data-modal-open="modal-new-section"]');
                 if (opener) { opener.click(); }
+                return;
+            }
+            if (event.target.closest('[data-section-delete]')) {
+                if (event.target.closest('[data-section-delete]').disabled) { return; }
+                confirmDelete = true;
+                renderChips();
+                return;
+            }
+            if (event.target.closest('[data-section-keep]')) { confirmDelete = false; renderChips(); return; }
+            if (event.target.closest('[data-section-confirm]')) {
+                var doomed = chosen();
+                confirmDelete = false;
+                (async function () {
+                    try {
+                        await call('admin_delete_section', { p_name: doomed });
+                        var filter = $('#section-filter');
+                        if (filter) { filter.value = ''; }
+                        say(doomed + ' was deleted.');
+                        closeMenu();
+                        if (window.PIAAdmin && window.PIAAdmin.refreshAll) { window.PIAAdmin.refreshAll(); }
+                        await refreshOverview();
+                    } catch (error) { say(failure(error), true); renderChips(); }
+                }());
                 return;
             }
             var chip = event.target.closest('[data-chip]');

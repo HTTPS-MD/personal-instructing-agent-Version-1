@@ -16,6 +16,7 @@
         <section class="page" id="view-students" data-view-panel="students">
             <div class="page-head"><h1 class="page-title">Students</h1>
                 <div class="page-actions"><button type="button" class="btn btn-primary" id="open-add" data-modal-open="modal-add-students">Add students</button></div></div>
+            <div class="scope-row"><p class="scope-line" id="scope-line">7 students</p></div>
             <div id="section-chips" style="margin-bottom:12px"></div>
             <div id="attendance-bar" style="margin-bottom:16px"></div>
             <div class="panel"><div class="panel-bar"><div class="tabs" id="stage-tabs"><button type="button" class="tab is-active">All</button></div></div>
@@ -27,6 +28,9 @@
                 </table></div>
             </div>
             <p class="scope-line" id="opened-profile"></p>
+            <table hidden><tbody id="faculty-tbody"><tr data-faculty="roy@school.test"></tr></tbody></table>
+            <button type="button" hidden data-modal-open="modal-add-professor" id="fake-add-prof"></button><select id="ap-section"><option value="">None</option><option value="7-A">7-A</option><option value="7-B">7-B</option></select>
+            <button type="button" hidden data-modal-open="modal-new-section" id="fake-new-section"></button>
         </section>
     </main>
     <script src="../../assets/js/function.js"></script>
@@ -50,6 +54,9 @@
         document.getElementById('student-tbody').addEventListener('click', function (e) {
             var row = e.target.closest('[data-student]'); if (row) { document.getElementById('opened-profile').textContent = 'PROFILE OPENED: ' + row.getAttribute('data-student'); }
         });
+        document.getElementById('faculty-tbody').addEventListener('click', function (e) { var r = e.target.closest('[data-faculty]'); if (r) { document.getElementById('opened-profile').textContent = 'PROFESSOR MODAL: ' + r.getAttribute('data-faculty'); } });
+        document.getElementById('fake-add-prof').addEventListener('click', function () { document.getElementById('opened-profile').textContent = 'ADD PROFESSOR OPENED'; });
+        document.getElementById('fake-new-section').addEventListener('click', function () { document.getElementById('opened-profile').textContent = 'NEW SECTION OPENED'; });
         document.getElementById('section-filter').addEventListener('change', renderRoster);   /* the console's own handler does this */
         (function () {
             var overlay = document.getElementById('modal-add-students');

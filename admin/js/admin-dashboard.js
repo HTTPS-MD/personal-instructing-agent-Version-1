@@ -312,7 +312,7 @@
     var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
-        if (view === 'sections') { view = 'students'; }     /* the old Class Sections address */
+        if (view === 'sections' || view === 'faculty') { view = 'students'; }     /* the old Class Sections and Faculty addresses: both are on the Students page now */
         if (VIEWS.indexOf(view) === -1) { view = 'overview'; }
 
         $$('[data-view-panel]').forEach(function (panel) {
@@ -1701,8 +1701,6 @@
             : state.cohort;
         var done = members.filter(hasCurrentResult).length;
         var parts = section ? [] : ['All sections'];     /* the chosen chip already says which section */
-        var prof = section && state.faculty.filter(function (f) { return f.assigned_section === section; })[0];
-        if (prof) { parts.push('Professor ' + prof.name); }
         parts.push(members.length + (members.length === 1 ? ' student' : ' students'));
         if (members.length) { parts.push('OCEAN completed ' + oceanFraction(done, members.length)); }
         line.textContent = parts.join(' · ');

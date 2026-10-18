@@ -63,6 +63,10 @@ function rpc(name, args, who) {
       return { data: !store.isOpen(args.p_section) ? [] : store.students.filter((x) => x.role === 'student' && x.section === args.p_section)
         .map((x) => ({ email: x.email, m: store.markOf(args.p_section, x.email) })).filter((x) => x.m)
         .map((x) => ({ email: x.email, present: x.m.present, entered: x.m.entered, refused: x.m.refused })) };
+    case 'admin_delete_section': {
+      if (store.students.some((x) => x.section === args.p_name)) return { error: { message: 'This section still has students. Move them first.' } };
+      return { data: null };
+    }
     case 'admin_let_back_in': store.letBackIn(args.p_section, String(args.p_email).toLowerCase()); return { data: null };
     case 'admin_import_student_numbers': {
       let n = 0;

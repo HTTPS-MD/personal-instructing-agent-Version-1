@@ -213,7 +213,6 @@
             { label: 'Overview', run: function () { host.go('overview'); } },
             { label: 'Live Sessions', run: function () { host.go('live'); } },
             { label: 'Students', run: function () { host.go('students'); } },
-            { label: 'Faculty', run: function () { host.go('faculty'); } },
             { label: 'Stage Controls', run: function () { host.go('controls'); } },
             { label: 'Math Task', run: function () { host.go('mathtask'); } }
         ];
