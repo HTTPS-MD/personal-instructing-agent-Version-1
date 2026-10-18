@@ -187,7 +187,7 @@
     function fillCell(cell, email, number) {
         cell.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
             '<input class="input input-sm mono" type="text" inputmode="numeric" maxlength="14" autocomplete="off" data-ci-number ' +
-            'style="width:10.5rem" value="' + esc(number || '') + '" placeholder="11 digits" aria-label="Student number">' +
+            'style="width:10.5rem" value="' + esc(number ? prettyNumber(String(number).replace(/\D/g, '')) : '') + '" placeholder="11 digits" aria-label="Student number">' +
             '<button type="button" class="btn btn-secondary btn-sm" data-ci-save>Save</button></div>' +
             '<p class="field-hint" data-ci-note style="margin-top:4px"></p>';
         cell.setAttribute('data-email', email);
