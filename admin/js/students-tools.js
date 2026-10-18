@@ -155,16 +155,16 @@
         var total = overview.sections.reduce(function (n, x) { return n + x.students; }, 0);
         var label = now ? now : 'All students';
         var row = function (value, name, count, open) {
-            return '<button type="button" role="menuitemradio" aria-checked="' + (now === value) + '" data-chip="' + esc(value) + '" style="display:flex;width:100%;justify-content:space-between;gap:16px;align-items:center;padding:8px 12px;border:0;background:' + (now === value ? 'var(--fill-ghost-selected, rgba(128,128,128,.18))' : 'transparent') + ';color:inherit;font:inherit;text-align:left;cursor:pointer">' +
+            return '<button type="button" role="menuitemradio" aria-checked="' + (now === value) + '" data-chip="' + esc(value) + '" style="display:flex;width:100%;justify-content:space-between;gap:16px;align-items:center;padding:8px 12px;border:0;background:' + (now === value ? 'var(--line-soft)' : 'transparent') + ';color:var(--text);font:inherit;font-weight:' + (now === value ? '600' : '400') + ';text-align:left;cursor:pointer">' +
                 '<span>' + esc(name) + (open ? ' <span class="badge badge-accent">Open</span>' : '') + '</span><span class="mono" style="opacity:.7">' + count + '</span></button>';
         };
-        var menu = '<div data-section-menu role="menu" hidden style="position:absolute;z-index:30;top:100%;left:0;margin-top:6px;min-width:240px;max-height:60vh;overflow:auto;background:var(--panel, #111842);border:1px solid var(--line, #2a3470);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:14px;font-weight:400">' +
+        var menu = '<div data-section-menu role="menu" hidden style="position:absolute;z-index:30;top:100%;left:0;margin-top:6px;min-width:240px;max-height:60vh;overflow:auto;background:var(--bg-surface);color:var(--text);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:14px;font-weight:400">' +
             row('', 'All students', total, false) +
             overview.sections.map(function (x) { return row(x.section, x.section, x.students, isOpen(x.section)); }).join('') +
-            '<button type="button" data-chip-manage style="display:block;width:100%;padding:8px 12px;border:0;border-top:1px solid var(--line, #2a3470);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer">+ Sections</button></div>';
+            '<button type="button" data-chip-manage style="display:block;width:100%;padding:8px 12px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer">+ Sections</button></div>';
         var wasOpen = h1.querySelector('[data-section-menu]') && !h1.querySelector('[data-section-menu]').hidden;
         h1.style.position = 'relative';
-        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px">' +
+        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;min-width:11rem">' +
             esc(label) + ' <span aria-hidden="true" style="font-size:.6em;opacity:.7">▾</span></button>' + menu;
         if (wasOpen) { h1.querySelector('[data-section-menu]').hidden = false; }
     }
@@ -213,8 +213,9 @@
 
     function paintMarks() {
         var section = chosen();
-        var on = !!section && !!openFor(section);
-        document.documentElement.classList.toggle('pia-att-on', on);
+        var on = !!section;                                    /* the column is reserved once a section is chosen, so starting or stopping moves nothing */
+        var live = on && !!openFor(section);
+        document.documentElement.classList.toggle('pia-att-on', live);
         var headRow = $('#roster-thead tr');
         var th = headRow && headRow.querySelector('[data-mk-th]');
         if (on && headRow && !th) {
@@ -236,7 +237,7 @@
                 cell.addEventListener('click', function (event) { onMark(event, tr.getAttribute('data-student')); });
                 tr.appendChild(cell);
             }
-            var html = markCell(String(tr.getAttribute('data-student')).toLowerCase());
+            var html = live ? markCell(String(tr.getAttribute('data-student')).toLowerCase()) : '<span class="scope-line">—</span>';
             if (cell._html !== html) { cell._html = html; cell.innerHTML = html; }
         });
     }
@@ -303,7 +304,10 @@
            children invisible (they still take their room), and the asterisks are painted
            over the same cell, so nothing moves when the box is ticked. */
         var sel = function (suffix) { return masked.split(', ').map(function (x) { return x + suffix; }).join(', '); };
-        st.textContent = masked + '{position:relative;color:transparent!important}'
+        st.textContent = '[data-section-menu] button:hover{background:var(--line-soft)!important}'
+            + '#att-toggle{min-width:10rem;text-align:center}'
+            + '#roster-thead th[data-mk-th],#student-tbody td[data-mk-cell]{min-width:22rem;white-space:nowrap}'
+            + masked + '{position:relative;color:transparent!important}'
             + sel(' *') + '{visibility:hidden!important}'
             + sel('::after') + '{content:"********";position:absolute;inset:0;display:flex;align-items:center;padding:inherit;box-sizing:border-box;color:var(--text);letter-spacing:2px;font-size:14px}'
             + H + '#drawer-initials{position:relative;color:transparent!important}'
