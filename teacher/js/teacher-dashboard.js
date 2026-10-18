@@ -450,6 +450,36 @@
         }
     }
 
+    /* A professor with more than one section picks which one to look at. The choice is kept on
+       the server (teacher_set_section), so the class list below follows it and a reload keeps it. */
+    async function offerSectionSwitch() {
+        try {
+            var res = await sb.rpc('teacher_my_sections');
+            if (res.error || !res.data || res.data.length < 2) { return; }
+            var host = $('#mast-section');
+            if (!host || $('#section-switch')) { return; }
+            var select = document.createElement('select');
+            select.id = 'section-switch';
+            select.className = 'input input-sm';
+            select.setAttribute('aria-label', 'Switch section');
+            select.style.marginLeft = '12px';
+            res.data.forEach(function (row) {
+                var option = document.createElement('option');
+                option.value = row.section;
+                option.textContent = row.section;
+                option.selected = !!row.in_use;
+                select.appendChild(option);
+            });
+            select.addEventListener('change', async function () {
+                select.disabled = true;
+                var done = await sb.rpc('teacher_set_section', { p_section: select.value });
+                if (done.error) { select.disabled = false; return; }
+                window.location.reload();
+            });
+            host.parentNode.appendChild(select);
+        } catch (e) { /* the switch is a convenience; the class still loads */ }
+    }
+
     function paintIdentity() {
         var shown = state.name || state.email.split('@')[0];
         setText($('#teacher-name'), shown);
@@ -1085,6 +1115,7 @@
         bindControls();
         bindNetwork();
         paintIdentity();
+        offerSectionSwitch();
 
         /* Show the page now and let the skeletons carry the wait: the
            frame is already the right shape, so nothing jumps when the

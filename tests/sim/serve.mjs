@@ -18,6 +18,7 @@ const PORT = Number(process.env.PORT || 5599);
 const ADMIN = { email: 'admin@school.test', full_name: 'Admin (simulated)', role: 'admin', section: '' };
 
 let store;
+let holder = { '7-A': 'roy@school.test' };       // section -> professor (one each)
 function reset() { store = new MemoryStore(sampleRoster(), ['juan@student.test', 'maria@student.test']); }
 reset();
 
@@ -63,6 +64,11 @@ function rpc(name, args, who) {
       return { data: !store.isOpen(args.p_section) ? [] : store.students.filter((x) => x.role === 'student' && x.section === args.p_section)
         .map((x) => ({ email: x.email, m: store.markOf(args.p_section, x.email) })).filter((x) => x.m)
         .map((x) => ({ email: x.email, present: x.m.present, entered: x.m.entered, refused: x.m.refused })) };
+    case 'admin_professor_sections': return { data: Object.entries(holder).map(([section, email]) => ({ email, section })) };
+    case 'admin_set_section_professor': {
+      if (args.p_email) holder[args.p_section] = args.p_email; else delete holder[args.p_section];
+      return { data: null };
+    }
     case 'admin_delete_section': {
       if (store.students.some((x) => x.section === args.p_name)) return { error: { message: 'This section still has students. Move them first.' } };
       return { data: null };

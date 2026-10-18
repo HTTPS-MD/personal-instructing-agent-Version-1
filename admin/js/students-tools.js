@@ -28,6 +28,7 @@
 
     var overview = { sections: [], open: [] };
     var profs = [];               /* professors: { name, email, assigned_section } */
+    var holder = {};              /* section -> email of its professor (one per section) */
     var confirmDelete = false;    /* the delete row of the section menu is asking "are you sure" */
     var marks = {};               /* email -> { present, entered, refused } for the chosen section */
     var built = false;
@@ -149,7 +150,13 @@
 
     function titleHost() { return $('#view-students .page-head .page-title'); }
 
-    function profsOf(section) { return profs.filter(function (f) { return f.assigned_section === section; }); }
+    function profsOf(section) {
+        var email = holder[section];
+        return profs.filter(function (f) { return String(f.email).toLowerCase() === email; });
+    }
+    function sectionsOf(email) {
+        return Object.keys(holder).filter(function (name) { return holder[name] === String(email).toLowerCase(); }).sort();
+    }
 
     function renderChips() {
         var h1 = titleHost();
@@ -186,8 +193,34 @@
         renderProfLine();
     }
 
-    /* The professor of the chosen section, under the title: open their account (reset the
-       password, sign out, remove) or add one. This is the old Faculty page, one section at a time. */
+    /* The professor of the chosen section, under the title: their name opens the account (reset
+       the password, sign out, remove); Change gives the section to another professor; a section
+       with none offers Assign. One professor per section; a professor can hold several sections. */
+    function closeProfMenu() { var m = $('#prof-menu'); if (m) { m.remove(); } }
+
+    function openProfMenu(anchor) {
+        closeProfMenu();
+        var section = chosen();
+        var current = holder[section] || '';
+        var item = 'display:block;width:100%;padding:8px 12px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer';
+        var rows = profs.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); }).map(function (f) {
+            var email = String(f.email).toLowerCase();
+            var theirs = sectionsOf(email);
+            return '<button type="button" data-assign="' + esc(email) + '" style="' + item + (email === current ? ';font-weight:600;background:var(--line-soft)' : '') + '">' +
+                esc(f.name || f.email) + (theirs.length ? ' <span style="opacity:.65;font-weight:400">· ' + esc(theirs.join(', ')) + '</span>' : ' <span style="opacity:.65;font-weight:400">· no section</span>') +
+                (email === current ? ' ✓' : '') + '</button>';
+        }).join('');
+        var menu = document.createElement('div');
+        menu.id = 'prof-menu';
+        menu.setAttribute('role', 'menu');
+        menu.style.cssText = 'position:absolute;z-index:30;margin-top:6px;min-width:280px;max-height:50vh;overflow:auto;background:var(--bg-surface);color:var(--text);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:14px';
+        menu.innerHTML = rows +
+            (current ? '<button type="button" data-assign="" style="' + item + ';border-top:1px solid var(--line);color:var(--danger)">Remove professor from ' + esc(section) + '</button>' : '') +
+            '<button type="button" data-prof-add style="' + item + ';border-top:1px solid var(--line)">+ Add new professor</button>';
+        anchor.parentNode.style.position = 'relative';
+        anchor.parentNode.appendChild(menu);
+    }
+
     function renderProfLine() {
         var scope = $('#view-students .scope-row');
         if (!scope) { return; }
@@ -199,28 +232,50 @@
             scope.parentNode.insertBefore(el, scope.nextSibling);
             el.addEventListener('click', function (event) {
                 var open = event.target.closest('[data-prof]');
+                var change = event.target.closest('[data-prof-change]');
                 var add = event.target.closest('[data-prof-add]');
+                var assign = event.target.closest('[data-assign]');
                 if (open) {
                     var email = open.getAttribute('data-prof');
                     var rowEl = Array.prototype.slice.call(document.querySelectorAll('#faculty-tbody [data-faculty]')).filter(function (r) { return r.getAttribute('data-faculty') === email; })[0];
                     if (rowEl) { rowEl.click(); } else { say('Could not open that professor. Reload the page.', true); }
+                } else if (change) {
+                    if ($('#prof-menu')) { closeProfMenu(); } else { openProfMenu(change); }
                 } else if (add) {
+                    closeProfMenu();
                     var opener = document.querySelector('[data-modal-open="modal-add-professor"]');
                     var section = chosen();
                     if (opener) {
                         opener.click();
-                        setTimeout(function () { var sel = $('#ap-section'); if (sel && section) { sel.value = section; } }, 60);
+                        setTimeout(function () {
+                            var sel = $('#ap-section');
+                            if (!sel) { return; }
+                            Array.prototype.slice.call(sel.options).forEach(function (o) { if (o.value) { o.disabled = !!holder[o.value]; } });
+                            if (section && !holder[section]) { sel.value = section; }
+                        }, 60);
                     }
+                } else if (assign) {
+                    var wanted = assign.getAttribute('data-assign');
+                    var target = chosen();
+                    closeProfMenu();
+                    call('admin_set_section_professor', { p_section: target, p_email: wanted || null })
+                        .then(function () { say(wanted ? 'Professor assigned.' : 'Professor removed.'); return refreshOverview(); })
+                        .catch(function (error) { say(failure(error), true); });
                 }
             });
+            document.addEventListener('click', function (event) { if (!el.contains(event.target)) { closeProfMenu(); } });
         }
         var section = chosen();
-        if (!section) { el.innerHTML = ''; return; }
+        if (!section) { el.innerHTML = ''; el._sig = ''; return; }
         var list = profsOf(section);
-        /* One professor per section: once there is one, there is nothing to add here. */
+        /* The page refreshes every few seconds: leave the line (and an open menu) alone unless it changed. */
+        var sig = section + '|' + (list.length ? list[0].email + '|' + list[0].name : '');
+        if (el._sig === sig) { return; }
+        el._sig = sig;
+        closeProfMenu();
         el.innerHTML = list.length
-            ? 'Professor: <button type="button" class="cell-link" data-prof="' + esc(list[0].email) + '">' + esc(list[0].name || list[0].email) + '</button>'
-            : 'No professor yet · <button type="button" class="cell-link" data-prof-add>Add professor</button>';
+            ? 'Professor: <button type="button" class="cell-link" data-prof="' + esc(list[0].email) + '">' + esc(list[0].name || list[0].email) + '</button> · <button type="button" class="cell-link" data-prof-change>Change</button>'
+            : 'No professor yet · <button type="button" class="cell-link" data-prof-change>Assign professor</button>';
     }
 
     var LAST_KEY = 'pia_students_section';
@@ -342,6 +397,15 @@
         try {
             var pr = await sb.from('professors').select('name, email, assigned_section');
             profs = pr.error ? profs : (pr.data || []);
+            var map = {};
+            var pairs = await sb.rpc('admin_professor_sections');
+            if (!pairs.error && pairs.data) {
+                pairs.data.forEach(function (r) { map[r.section] = String(r.email).toLowerCase(); });
+            } else {
+                /* Before migration 0059: the professor's single section. */
+                profs.forEach(function (f) { if (f.assigned_section) { map[f.assigned_section] = String(f.email).toLowerCase(); } });
+            }
+            holder = map;
         } catch (e) { /* keep the last list */ }
         var section = chosen();
         marks = {};

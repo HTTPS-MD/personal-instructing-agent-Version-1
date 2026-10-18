@@ -32,7 +32,7 @@
       if (table === 'profiles' && f.email) {
         return get('profile?email=' + encodeURIComponent(f.email)).then(function (r) { return { data: one ? r.data : (r.data ? [r.data] : []), error: null }; });
       }
-      if (table === 'professors') { return Promise.resolve({ data: [{ name: 'Roy Callope', email: 'roy@school.test', assigned_section: '7-A' }], error: null }); }
+      if (table === 'professors') { return Promise.resolve({ data: [{ name: 'Roy Callope', email: 'roy@school.test', assigned_section: '7-A' }, { name: 'Ana Prof', email: 'ana@school.test', assigned_section: null }], error: null }); }
       return Promise.resolve({ data: one ? null : [], error: null });
     }
     return q;
