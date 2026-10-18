@@ -7,25 +7,24 @@
 //   * a student has ONE active session: the newest sign-in takes over and the
 //     older browser is signed out (claim_student_session, migration 0027);
 //   * a check-in is open for a section until its end time or until it is stopped;
-//   * the admin lets in the requests they tick (admin_let_in).
-import type { Deps, RequestRow, Student } from '../../supabase/functions/join-with-number/handler.ts';
+//   * the admin marks each student present or absent, and a number gets in once.
+import type { Deps, Student } from '../../supabase/functions/join-with-number/handler.ts';
 import { normalizeNumber } from '../../supabase/functions/join-with-number/handler.ts';
 
 export interface SimStudent extends Student { number: string }
-interface SimRequest extends RequestRow { name: string }
+interface Mark { present: boolean; entered: boolean; refused: number }
 
 export class MemoryStore {
   clock = Date.UTC(2026, 9, 14, 1, 0, 0);       // 14 Oct 2026, 09:00 in Manila
   students: SimStudent[] = [];
   checkins = new Map<string, number>();         // section -> ends at (ms)
-  requests = new Map<string, SimRequest>();
+  marks = new Map<string, Mark>();              // `${section}|${email}` for the open attendance
   attempts: { key: string; ok: boolean; at: number }[] = [];
   accounts = new Set<string>();                 // emails that have an auth user
   tokens = new Map<string, string>();           // one-time token -> email
   sessions = new Map<string, { id: number; device: string }>();   // email -> active
   log: string[] = [];
   private nextSession = 1;
-  private nextRequest = 1;
   private nextToken = 1;
 
   constructor(students: SimStudent[], activated: string[] = []) {
@@ -36,25 +35,25 @@ export class MemoryStore {
   // ---- admin actions ------------------------------------------------------
   startCheckin(section: string, minutes = 15) {
     this.checkins.set(section, this.clock + minutes * 60_000);
-    this.log.push(`admin started check-in for ${section}, ${minutes} min`);
+    for (const k of [...this.marks.keys()]) if (k.startsWith(section + '|')) this.marks.delete(k);   // a new attendance starts clean
+    this.log.push(`admin started attendance for ${section}, ${minutes} min`);
   }
   stopCheckin(section: string) { this.checkins.delete(section); this.log.push(`admin stopped check-in for ${section}`); }
-  /** The admin ticks these requests and lets them in. */
-  letIn(ids: string[]): number {
-    let n = 0;
-    for (const id of ids) {
-      const r = this.requests.get(id);
-      if (r && r.status === 'waiting' && this.clock - r.createdMs <= 20 * 60_000 && this.isOpen(r.section)) {
-        r.status = 'let_in'; r.letInMs = this.clock; n++;
-        this.log.push(`admin let in ${r.email}`);
-      }
-    }
-    return n;
+  /** The admin marks a student present (true), absent (false) or clears the mark (null). */
+  mark(section: string, email: string, present: boolean | null): boolean {
+    if (!this.isOpen(section)) return false;
+    const key = section + '|' + email;
+    if (present === null) { this.marks.delete(key); return true; }
+    const was = this.marks.get(key);
+    this.marks.set(key, { present, entered: was?.entered ?? false, refused: was?.refused ?? 0 });
+    this.log.push(`admin marked ${email} ${present ? 'present' : 'absent'}`);
+    return true;
   }
-  waiting(): (SimRequest & { duplicate: boolean })[] {
-    const live = [...this.requests.values()].filter((r) => r.status === 'waiting' && this.clock - r.createdMs <= 20 * 60_000);
-    return live.map((r) => ({ ...r, duplicate: live.filter((x) => x.email === r.email).length > 1 }));
+  letBackIn(section: string, email: string) {
+    const m = this.marks.get(section + '|' + email);
+    if (m) { m.entered = false; m.refused = 0; this.log.push(`admin let ${email} back in`); }
   }
+  markOf(section: string, email: string): Mark | undefined { return this.marks.get(section + '|' + email); }
   advance(ms: number) { this.clock += ms; }
 
   // ---- the browser's side of verifyOtp -------------------------------------
@@ -85,16 +84,17 @@ export class MemoryStore {
       },
       anyCheckinOpen: async () => [...this.checkins.keys()].some((s) => this.isOpen(s)),
       checkinOpenFor: async (section) => this.isOpen(section),
-      countWaiting: async (email, since) =>
-        [...this.requests.values()].filter((r) => r.status === 'waiting' && r.createdMs >= since && (email === null || r.email === email)).length,
-      createRequest: async ({ email, section, secretHash }) => {
-        const id = 'req-' + this.nextRequest++;
-        const s = this.students.find((x) => x.email === email);
-        this.requests.set(id, { id, email, section, secretHash, status: 'waiting', createdMs: this.clock, letInMs: null, delivered: false, name: s?.full_name ?? '' });
-        return id;
+      attendanceFor: async (section, email) => {
+        const m = this.marks.get(section + '|' + email);
+        return !m ? 'none' : !m.present ? 'absent' : m.entered ? 'entered' : 'present';
       },
-      getRequest: async (id) => { const r = this.requests.get(id); return r ? { ...r } : null; },
-      markDelivered: async (id) => { const r = this.requests.get(id); if (r) r.delivered = true; },
+      claimEntry: async (section, email) => {
+        const m = this.marks.get(section + '|' + email);
+        if (!m || !m.present || m.entered) return false;
+        m.entered = true; return true;
+      },
+      releaseEntry: async (section, email) => { const m = this.marks.get(section + '|' + email); if (m) m.entered = false; },
+      noteRefusal: async (section, email) => { const m = this.marks.get(section + '|' + email); if (m) m.refused++; },
       ensureAccount: async (email) => {
         if (!this.accounts.has(email)) { this.accounts.add(email); this.log.push(`account created for ${email}`); }
       },

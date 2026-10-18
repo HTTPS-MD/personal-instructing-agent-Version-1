@@ -3,17 +3,16 @@
 // index.ts wires Deps to Supabase; tests/sim wires the same handler to an
 // in-memory store, so the use cases can be rehearsed without a database.
 //
-//   { action: 'lookup',  number }                -> { ok, name, section }
-//   { action: 'request', number, secret }        -> { ok, request_id }
-//   { action: 'poll',    request_id, secret }    -> { status: waiting | let_in | expired | closed | gone, ... }
+//   { action: 'lookup', number }   -> { ok, name, section }
+//   { action: 'enter',  number }   -> { ok, status: 'let_in', email, token_hash }
 //
-// The flow: the student types a number and confirms the name (lookup), then
-// asks to be let in (request). Typing the number NEVER opens a session. The
-// admin, who can see the lab, ticks the students they see and lets them in. The
-// student's browser polls with the secret it made itself; only that browser can
-// collect the one-time sign-in token, and only once.
+// The flow: while an attendance is open the admin calls the names and marks each
+// student present or absent. A student types the number and confirms the name
+// (lookup), then enters. Only a student marked present gets a one-time sign-in
+// token, and a number gets in ONCE per attendance: a second computer is refused
+// and the admin sees it on that student's row.
 //
-// A number is accepted only while an admin has a check-in open for the
+// A number is accepted only while an admin has an attendance open for the
 // student's section. While nothing is open, the answer is the same for every
 // number and no name is read, so nothing about the roster leaks.
 
@@ -22,17 +21,6 @@ export interface Student {
   full_name: string | null;
   section: string;
   role: string | null;
-}
-
-export interface RequestRow {
-  id: string;
-  email: string;
-  section: string;
-  secretHash: string;
-  status: 'waiting' | 'let_in';
-  createdMs: number;
-  letInMs: number | null;
-  delivered: boolean;
 }
 
 export interface Deps {
@@ -45,11 +33,14 @@ export interface Deps {
   anyCheckinOpen(): Promise<boolean>;
   /** The section has a check-in open right now. */
   checkinOpenFor(section: string): Promise<boolean>;
-  /** Waiting, unexpired requests: for one student, or for everyone when email is null. */
-  countWaiting(email: string | null, sinceMs: number): Promise<number>;
-  createRequest(r: { email: string; section: string; secretHash: string }): Promise<string>;
-  getRequest(id: string): Promise<RequestRow | null>;
-  markDelivered(id: string): Promise<void>;
+  /** The admin's mark for this student in the open attendance of the section. */
+  attendanceFor(section: string, email: string): Promise<'none' | 'absent' | 'present' | 'entered'>;
+  /** Present and not yet in: take the one place. False when someone else already took it. */
+  claimEntry(section: string, email: string): Promise<boolean>;
+  /** Give the place back (the token could not be made). */
+  releaseEntry(section: string, email: string): Promise<void>;
+  /** A second try on a number that is already in: the admin sees it. */
+  noteRefusal(section: string, email: string): Promise<void>;
   /** Make sure an auth user exists for the email. */
   ensureAccount(email: string): Promise<void>;
   /** One-time sign-in token for that account's browser to redeem. */
@@ -65,17 +56,14 @@ export const MAX_FAILURES_PER_IP = 60;      // a whole lab shares one address
 // numbers does not.
 export const MAX_FAILURES_ALL = 200;
 export const WINDOW_MS = 10 * 60_000;
-export const REQUEST_TTL_MS = 20 * 60_000;      // a request not let in by then is dead
-export const LET_IN_GRACE_MS = 5 * 60_000;      // time to collect the token after being let in
-export const MAX_WAITING_PER_STUDENT = 3;
-export const MAX_WAITING_ALL = 300;
 
 export const MESSAGES = {
   notReady: 'Attendance has not started yet. Please wait.',
   notFound: 'We could not find you in today’s attendance. Tell your admin.',
   throttled: 'Too many tries. Please wait a few minutes, or tell your admin.',
   badNumber: 'Type your 11-digit student number.',
-  tooMany: 'Too many are waiting for this number. Tell your admin.',
+  notMarked: 'Your admin has not marked you present. Tell your admin.',
+  alreadyIn: 'This number is already in on another computer. Tell your admin.',
   server: 'Something went wrong. Please try again.',
 } as const;
 
@@ -85,13 +73,6 @@ export function normalizeNumber(raw: unknown): string {
 }
 
 export const NUMBER_PATTERN = /^\d{11}$/;
-const SECRET_PATTERN = /^[0-9a-f]{32,64}$/;
-
-export async function sha256Hex(text: string): Promise<string> {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 export async function handleJoin(
   body: Record<string, unknown>,
@@ -99,8 +80,7 @@ export async function handleJoin(
   deps: Deps,
 ): Promise<Reply> {
   const action = String(body.action ?? '');
-  if (action === 'poll') return poll(body, deps);
-  if (action !== 'lookup' && action !== 'request') return { status: 400, body: { error: 'Unknown action.' } };
+  if (action !== 'lookup' && action !== 'enter') return { status: 400, body: { error: 'Unknown action.' } };
 
   const key = normalizeNumber(body.number);
   if (!NUMBER_PATTERN.test(key)) return { status: 422, body: { error: MESSAGES.badNumber } };
@@ -132,51 +112,27 @@ export async function handleJoin(
     return { status: 200, body: { ok: true, name: student.full_name ?? '', section: student.section } };
   }
 
-  // ---- request -------------------------------------------------------------
-  const secret = String(body.secret ?? '');
-  if (!SECRET_PATTERN.test(secret)) return { status: 400, body: { error: MESSAGES.server } };
-
+  // ---- enter ----------------------------------------------------------------
   const email = student.email.trim().toLowerCase();
-  const waitingSince = deps.now() - REQUEST_TTL_MS;
-  if ((await deps.countWaiting(email, waitingSince)) >= MAX_WAITING_PER_STUDENT
-    || (await deps.countWaiting(null, waitingSince)) >= MAX_WAITING_ALL) {
-    return { status: 429, body: { error: MESSAGES.tooMany } };
+  const mark = await deps.attendanceFor(student.section, email);
+  if (mark === 'none' || mark === 'absent') return { status: 403, body: { error: MESSAGES.notMarked } };
+  if (mark === 'entered') {
+    await deps.noteRefusal(student.section, email);
+    return { status: 409, body: { error: MESSAGES.alreadyIn } };
   }
 
+  // present: the place is taken first, so two computers typing at once cannot both get in.
+  if (!(await deps.claimEntry(student.section, email))) {
+    await deps.noteRefusal(student.section, email);
+    return { status: 409, body: { error: MESSAGES.alreadyIn } };
+  }
   try {
-    const id = await deps.createRequest({ email, section: student.section, secretHash: await sha256Hex(secret) });
-    return { status: 200, body: { ok: true, request_id: id } };
+    await deps.ensureAccount(email);
+    const tokenHash = await deps.mintToken(email);
+    if (!tokenHash) { await deps.releaseEntry(student.section, email); return { status: 500, body: { error: MESSAGES.server } }; }
+    return { status: 200, body: { ok: true, status: 'let_in', email, token_hash: tokenHash } };
   } catch {
+    await deps.releaseEntry(student.section, email);
     return { status: 500, body: { error: MESSAGES.server } };
   }
-}
-
-async function poll(body: Record<string, unknown>, deps: Deps): Promise<Reply> {
-  const id = String(body.request_id ?? '');
-  const secret = String(body.secret ?? '');
-  if (!id || id.length > 64 || !SECRET_PATTERN.test(secret)) return { status: 200, body: { status: 'gone' } };
-
-  const row = await deps.getRequest(id);
-  // Same answer for "no such request" and "not your request": a stranger learns nothing.
-  if (!row || row.secretHash !== await sha256Hex(secret)) return { status: 200, body: { status: 'gone' } };
-
-  const now = deps.now();
-  if (row.delivered) return { status: 200, body: { status: 'gone' } };
-
-  if (row.status === 'let_in') {
-    if (row.letInMs === null || now - row.letInMs > LET_IN_GRACE_MS) return { status: 200, body: { status: 'expired' } };
-    try {
-      await deps.ensureAccount(row.email);
-      const tokenHash = await deps.mintToken(row.email);
-      if (!tokenHash) return { status: 500, body: { error: MESSAGES.server } };
-      await deps.markDelivered(row.id);        // one time: the next poll finds nothing
-      return { status: 200, body: { status: 'let_in', email: row.email, token_hash: tokenHash } };
-    } catch {
-      return { status: 500, body: { error: MESSAGES.server } };
-    }
-  }
-
-  if (now - row.createdMs > REQUEST_TTL_MS) return { status: 200, body: { status: 'expired' } };
-  if (!(await deps.checkinOpenFor(row.section))) return { status: 200, body: { status: 'closed' } };
-  return { status: 200, body: { status: 'waiting' } };
 }
