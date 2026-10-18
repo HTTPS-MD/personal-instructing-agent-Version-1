@@ -235,7 +235,7 @@
     function setHidden(on) {
         document.documentElement.classList.toggle('pia-hide-details', on);
         var b = $('#hide-details');
-        if (b) { b.textContent = on ? 'Show details' : 'Hide details'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+        if (b) { b.checked = !on; }
         try { sessionStorage.setItem('pia_hide_details', on ? '1' : '0'); } catch (e) {}
     }
 
@@ -251,13 +251,16 @@
         document.head.appendChild(st);
         var chips = $('#section-chips');
         if (!chips) { return; }
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.id = 'hide-details';
-        b.className = 'btn btn-secondary btn-sm';
-        b.style.marginBottom = '12px';
-        b.addEventListener('click', function () { setHidden(!document.documentElement.classList.contains('pia-hide-details')); });
-        chips.parentNode.insertBefore(b, chips);
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:12px';
+        chips.parentNode.insertBefore(row, chips);
+        row.appendChild(chips);
+        chips.style.marginBottom = '0';
+        var label = document.createElement('label');
+        label.style.cssText = 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px';
+        label.innerHTML = '<input type="checkbox" id="hide-details" checked> Show details';
+        row.appendChild(label);
+        label.firstChild.addEventListener('change', function (e) { setHidden(!e.target.checked); });
         var was = false;
         try { was = sessionStorage.getItem('pia_hide_details') === '1'; } catch (e) {}
         setHidden(was);
