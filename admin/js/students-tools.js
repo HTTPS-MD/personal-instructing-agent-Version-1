@@ -245,11 +245,16 @@
         var st = document.createElement('style');
         var H = '.pia-hide-details ';
         var masked = H + '#student-tbody td:first-child, ' + H + '#student-tbody td[data-ci-cell], ' + H + '#drawer-student :is(#drawer-student-name,#drawer-email)';
-        st.textContent = masked + '{font-size:0!important;line-height:1.4}'
-            + masked.split(', ').map(function (x) { return x + ' *'; }).join(', ') + '{display:none!important}'
-            + masked.split(', ').map(function (x) { return x + '::after'; }).join(', ') + '{content:"********";font-size:14px;letter-spacing:2px}'
-            + H + '#drawer-initials{font-size:0!important}' + H + '#drawer-initials::after{content:"**";font-size:14px}';
-        st.textContent += '.pia-section-picked #roster-thead th:nth-child(2),.pia-section-picked #student-tbody td:nth-child(2){display:none}';
+        /* Masking keeps every box where it was: the real text goes transparent and its
+           children invisible (they still take their room), and the asterisks are painted
+           over the same cell, so nothing moves when the box is ticked. */
+        var sel = function (suffix) { return masked.split(', ').map(function (x) { return x + suffix; }).join(', '); };
+        st.textContent = masked + '{position:relative;color:transparent!important}'
+            + sel(' *') + '{visibility:hidden!important}'
+            + sel('::after') + '{content:"********";position:absolute;inset:0;display:flex;align-items:center;padding:inherit;box-sizing:border-box;color:var(--text);letter-spacing:2px;font-size:14px}'
+            + H + '#drawer-initials{position:relative;color:transparent!important}'
+            + H + '#drawer-initials::after{content:"**";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text)}'
+            + '.pia-section-picked #roster-thead th:nth-child(3),.pia-section-picked #student-tbody td:nth-child(3){display:none}';
         document.head.appendChild(st);
         var bar = $('#stage-tabs') && $('#stage-tabs').parentNode;
         if (!bar) { return; }
@@ -330,7 +335,7 @@
             th.scope = 'col';
             th.setAttribute('data-ci-th', '');
             th.textContent = 'Student number';
-            headRow.appendChild(th);
+            headRow.insertBefore(th, headRow.children[1] || null);     /* right beside Student */
         }
 
         var rows = Array.prototype.slice.call(document.querySelectorAll('#student-tbody tr[data-student]'));
@@ -340,7 +345,7 @@
                 cell = document.createElement('td');
                 cell.setAttribute('data-ci-cell', '');
                 cell.innerHTML = '<span class="scope-line">…</span>';
-                tr.appendChild(cell);
+                tr.insertBefore(cell, tr.children[1] || null);
             }
             return { tr: tr, cell: cell, email: tr.getAttribute('data-student') };
         });
