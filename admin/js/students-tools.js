@@ -231,8 +231,37 @@
         try { await work(); await refreshOverview(); } catch (error) { say(failure(error), true); button.disabled = false; }
     }
 
+    // Hide details: blurs names and student numbers in the table, for a screen others can see.
+    function setHidden(on) {
+        document.documentElement.classList.toggle('pia-hide-details', on);
+        var b = $('#hide-details');
+        if (b) { b.textContent = on ? 'Show details' : 'Hide details'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+        try { sessionStorage.setItem('pia_hide_details', on ? '1' : '0'); } catch (e) {}
+    }
+
+    function buildHideToggle() {
+        if ($('#hide-details')) { return; }
+        var st = document.createElement('style');
+        st.textContent = '.pia-hide-details #student-tbody td{filter:blur(6px);user-select:none}'
+            + '.pia-hide-details #student-tbody td button{pointer-events:none}';
+        document.head.appendChild(st);
+        var chips = $('#section-chips');
+        if (!chips) { return; }
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.id = 'hide-details';
+        b.className = 'btn btn-secondary btn-sm';
+        b.style.marginBottom = '12px';
+        b.addEventListener('click', function () { setHidden(!document.documentElement.classList.contains('pia-hide-details')); });
+        chips.parentNode.insertBefore(b, chips);
+        var was = false;
+        try { was = sessionStorage.getItem('pia_hide_details') === '1'; } catch (e) {}
+        setHidden(was);
+    }
+
     function build() {
         if (built) { return; }
+        buildHideToggle();
         var chips = $('#section-chips');
         var att = $('#attendance-bar');
         if (!chips || !att) { return; }
