@@ -567,7 +567,7 @@
 
     /* ---- 3a. Student door: student number, confirm, wait to be let in ----
        Typing a number NEVER opens a session. The join-with-number Edge Function
-       answers only while an admin has a check-in open for the student's section;
+       answers only while an admin has attendance open for the student's section;
        the student confirms the name and section ("Is this you?"), then asks to
        be let in with a secret this browser makes and keeps. The admin, who can
        see the lab, ticks the students they see. This browser polls; when the
@@ -673,7 +673,7 @@
                 await enterWithToken(res.data.token_hash);
                 return;
             }
-            if (status === 'closed') { backToNumber('Check-in is closed. Tell your admin.'); return; }
+            if (status === 'closed') { backToNumber('Attendance is closed. Tell your admin.'); return; }
             backToNumber('You were not let in. Type your number again.');
         } catch (err) {
             /* offline: keep waiting */

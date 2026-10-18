@@ -1,9 +1,9 @@
 /* ============================================================================
-   PIA ADMIN CONSOLE -- CHECK-IN AND STUDENT NUMBERS, INSIDE THE STUDENTS PAGE
+   PIA ADMIN CONSOLE -- ATTENDANCE AND STUDENT NUMBERS, INSIDE THE STUDENTS PAGE
    ============================================================================
    Two things on the Students page, both following the Section filter:
 
-   1. A Check-in panel above the table: start or stop check-in for the chosen
+   1. An Attendance panel above the table: start or stop attendance for the chosen
       section, see who is waiting, tick the students you can see in the lab and
       let them in.
    2. A "Student number" column in the table: one box per student.
@@ -37,7 +37,7 @@
     function failure(error) {
         var raw = String((error && error.message) || '');
         if (/only an administrator|42501/i.test(raw)) { return 'Only an administrator can do this. Sign in as admin.'; }
-        if (/PGRST202|42883|could not find the function/i.test(raw)) { return 'The check-in update is not applied to the database yet.'; }
+        if (/PGRST202|42883|could not find the function/i.test(raw)) { return 'The attendance update is not applied to the database yet.'; }
         return raw.replace(/^PIA:\s*/, '') || 'Something went wrong. Try again.';
     }
 
@@ -77,7 +77,7 @@
 
         if (!section) {
             host.innerHTML = '<p class="scope-line" id="ci-status" role="status" aria-live="polite"></p>' +
-                '<div class="panel panel-pad"><p class="scope-line">Choose a section to start check-in and to see who is waiting.</p></div>';
+                '<div class="panel panel-pad"><p class="scope-line">Choose a section to start attendance and to see who is waiting.</p></div>';
             return;
         }
 
@@ -91,16 +91,16 @@
 
         var head;
         if (!open) {
-            head = '<div class="panel-bar"><div><h2 class="panel-title">Check-in</h2>' +
+            head = '<div class="panel-bar"><div><h2 class="panel-title">Attendance</h2>' +
                 '<p class="scope-line"><span class="badge">Closed</span> ' + esc(section) + missing + '</p></div>' +
                 '<div class="panel-tools"><select class="input input-sm" data-ci-minutes aria-label="Stay open for">' +
                 MINUTES.map(function (m) { return '<option value="' + m + '"' + (m === 15 ? ' selected' : '') + '>' + m + ' min</option>'; }).join('') +
-                '</select><button type="button" class="btn btn-primary btn-sm" data-ci-start>Start check-in</button></div></div>';
+                '</select><button type="button" class="btn btn-primary btn-sm" data-ci-start>Start attendance</button></div></div>';
         } else {
-            head = '<div class="panel-bar"><div><h2 class="panel-title">Check-in</h2>' +
+            head = '<div class="panel-bar"><div><h2 class="panel-title">Attendance</h2>' +
                 '<p class="scope-line"><span class="badge badge-accent">Open</span> ' + esc(section) + ' · ' + minutesLeft(open.ends_at) +
                 ' min left · ' + mine.length + ' waiting' + missing + '</p></div>' +
-                '<div class="panel-tools"><button type="button" class="btn btn-danger btn-sm" data-ci-stop>Stop check-in</button></div></div>';
+                '<div class="panel-tools"><button type="button" class="btn btn-danger btn-sm" data-ci-stop>Stop attendance</button></div></div>';
         }
 
         var body = '';

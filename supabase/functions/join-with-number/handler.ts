@@ -71,8 +71,8 @@ export const MAX_WAITING_PER_STUDENT = 3;
 export const MAX_WAITING_ALL = 300;
 
 export const MESSAGES = {
-  notReady: 'Check-in has not started yet. Please wait.',
-  notFound: 'We could not find you in today’s check-in. Tell your admin.',
+  notReady: 'Attendance has not started yet. Please wait.',
+  notFound: 'We could not find you in today’s attendance. Tell your admin.',
   throttled: 'Too many tries. Please wait a few minutes, or tell your admin.',
   badNumber: 'Type your 11-digit student number.',
   tooMany: 'Too many are waiting for this number. Tell your admin.',
