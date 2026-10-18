@@ -319,6 +319,8 @@
            over the same cell, so nothing moves when the box is ticked. */
         var sel = function (suffix) { return masked.split(', ').map(function (x) { return x + suffix; }).join(', '); };
         st.textContent = '#roster-thead th{background:var(--line-soft)}'
+            + '#view-students .filter-row .input{height:40px;min-height:40px;box-sizing:border-box}'
+            + '#view-students .page-actions .btn{min-height:40px;box-sizing:border-box}'
             + '[data-section-menu] button:hover{background:var(--line-soft)!important}'
             + '#att-toggle{min-width:10rem;text-align:center}'
             + '#roster-thead th[data-mk-th],#student-tbody td[data-mk-cell]{min-width:22rem;white-space:nowrap}'
@@ -337,7 +339,7 @@
         var filterRow = bar.parentNode.querySelector('.filter-row');
         if (filterRow) {
             label.style.alignSelf = 'flex-end';
-            label.style.marginBottom = '10px';
+            label.style.height = '40px';
             filterRow.appendChild(label);
         } else { bar.appendChild(label); }
         label.firstChild.addEventListener('change', function (e) { setHidden(!e.target.checked); });
