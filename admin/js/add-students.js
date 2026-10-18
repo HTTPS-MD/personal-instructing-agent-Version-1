@@ -454,6 +454,7 @@
 
             rows = rows.filter(function (r) { return !r.done; });
             if (window.PIAAdmin && window.PIAAdmin.refreshAll) { window.PIAAdmin.refreshAll(); }
+            if (done) { document.dispatchEvent(new CustomEvent('pia:students-added')); }
             if (!failed.length) {
                 if (window.PIAAdmin && window.PIAAdmin.toastOk) { window.PIAAdmin.toastOk(MSG.added(done) + ' to ' + section, ''); }
                 var close = $('[data-modal-close]', root);
@@ -488,11 +489,20 @@
         clearMessages();
         $('#as-consent').checked = false;
         $('#as-group').value = '';
-        var filter = $('#section-filter');
         var section = $('#as-section');
         if (!section.querySelector('option[value=""]')) { section.insertBefore(new Option('Choose a section', ''), section.firstChild); }
-        var known = !!(filter && filter.value && section.querySelector('option[value="' + filter.value.replace(/"/g, '') + '"]'));
-        section.value = known ? filter.value : '';
+        /* Which section is the admin looking at? On the Sections page, the one that is open;
+           on All students, the one chosen in the filter. */
+        var wanted = '';
+        var sectionsView = $('#view-sections');
+        if (sectionsView && !sectionsView.classList.contains('is-hidden')) {
+            wanted = (window.PIASections && window.PIASections.current()) || '';
+        } else {
+            var filter = $('#section-filter');
+            wanted = filter ? filter.value : '';
+        }
+        var known = !!(wanted && section.querySelector('option[value="' + wanted.replace(/"/g, '') + '"]'));
+        section.value = known ? wanted : '';
         /* A section chosen on the Students page is not asked again: it is in the title, with a way to change it. */
         $('#as-section-field').hidden = known;
         $('#as-change').hidden = !known;

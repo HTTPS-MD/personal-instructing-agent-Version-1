@@ -137,8 +137,10 @@
                             <svg class="icon nav-chevron" aria-hidden="true"><use href="#i-chev-down"></use></svg>
                         </button>
                         <ul class="nav-sub" id="nav-people-list" hidden>
+                            <li><button type="button" class="nav-item" data-view="sections">
+                                <span>Sections</span></button></li>
                             <li><button type="button" class="nav-item" data-view="students">
-                                <span>Students</span><span class="nav-count mono" id="nav-count-students">—</span></button></li>
+                                <span>All students</span><span class="nav-count mono" id="nav-count-students">—</span></button></li>
                             <li><button type="button" class="nav-item" data-view="faculty">
                                 <span>Faculty</span><span class="nav-count mono" id="nav-count-faculty">—</span></button></li>
                         </ul>
@@ -249,9 +251,22 @@
                 </section>
 
                 <!-- ============================== VIEW 3 · STUDENTS ====== -->
+                <!-- ============================== VIEW · SECTIONS ======== -->
+                <!-- One card per section; open one for its attendance and its students.
+                     admin/js/sections.js draws everything inside #sections-root. -->
+                <section class="page is-hidden" id="view-sections" data-view-panel="sections">
+                    <div class="page-head">
+                        <h1 class="page-title">Sections</h1>
+                        <div class="page-actions">
+                            <button type="button" class="btn btn-primary" id="sections-add" data-modal-open="modal-add-students">Add students</button>
+                        </div>
+                    </div>
+                    <div class="stack-lg" id="sections-root"></div>
+                </section>
+
                 <section class="page is-hidden" id="view-students" data-view-panel="students">
                     <div class="page-head">
-                        <h1 class="page-title">Students</h1>
+                        <h1 class="page-title">All students</h1>
                         <div class="page-actions">
                             <button type="button" class="btn btn-secondary" data-modal-open="modal-manage-sections">Manage sections</button>
                             <button type="button" class="btn btn-primary" data-modal-open="modal-add-students">Add students</button>
@@ -268,11 +283,7 @@
                         <button type="button" class="btn btn-secondary btn-sm is-hidden" id="section-scores-open">Input scores</button>
                     </div>
 
-                    <!-- Check-in for the section chosen in the filter below: start and stop it,
-                         see who is waiting, tick the students you can see in the lab and let
-                         them in. admin/js/students-checkin.js draws it and the Student number
-                         column of the table. -->
-                    <div id="checkin-bar" style="margin-bottom:16px"></div>
+
 
                     <div class="panel" data-region="roster stages">
                         <div class="panel-bar">
@@ -1699,13 +1710,13 @@
     <!-- Shared client + helpers (defines `sb`, escapeHTML, getOrCreateDeviceId,
          registerChannel, executeForceLogout, normalizeOceanScore …) -->
     <script src="../../assets/js/function.js"></script>
-    <script src="../js/admin-shell.js?v=20261018a"></script>
+    <script src="../js/admin-shell.js?v=20261019a"></script>
     <!-- The 50 statements and the 1-5 scale, for the drawer's answer list. -->
     <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/math-task-generator.js"></script>
-    <script src="../js/students-checkin.js?v=20261018c"></script>
-    <script src="../js/add-students.js?v=20261018b"></script>
-    <script src="../js/admin-dashboard.js?v=20261018d"></script>
+    <script src="../js/sections.js?v=20261019a"></script>
+    <script src="../js/add-students.js?v=20261019a"></script>
+    <script src="../js/admin-dashboard.js?v=20261019a"></script>
 </body>
 
 </html>

@@ -309,7 +309,7 @@
 
     /* ---- 3.3 View router ---- */
 
-    var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
+    var VIEWS = ['overview', 'live', 'sections', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
         if (view === 'sections') { view = 'students'; }     /* the old Class Sections address */
@@ -330,6 +330,7 @@
         if (view === 'students') { loadStageCounters(); }
         if (view === 'mathtask' && qb.status !== 'ready' && qb.status !== 'loading') { loadMathTask(); }
         if (view === 'live') { renderLiveSessions(); }
+        if (view === 'sections' && window.PIASections) { window.PIASections.show(); }
 
         closeMobileNav();
         window.scrollTo({ top: 0, behavior: 'auto' });

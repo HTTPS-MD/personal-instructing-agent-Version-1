@@ -39,7 +39,8 @@ function overview() {
   return {
     sections: sections().map((section) => {
       const list = store.students.filter((s) => s.role === 'student' && s.section === section);
-      return { section, students: list.length, without_number: list.filter((s) => !s.number).length };
+      return { section, students: list.length, without_number: list.filter((s) => !s.number).length,
+        ocean_done: list.filter((s, i) => i % 2 === 0).length };
     }),
     open: [...store.checkins.entries()].filter(([, ends]) => ends > store.clock)
       .map(([section, ends]) => ({ section, ends_at: realIso(ends) })),
@@ -74,6 +75,10 @@ function rpc(name, args, who) {
       store.students.push({ number: '', full_name: args.fullName, section: args.section, email: args.email, role: 'student' });
       return { data: { status: 'created' } };
     }
+    case 'admin_section_students':
+      return { data: store.students.filter((x) => x.role === 'student' && x.section === args.p_section)
+        .map((x, i) => ({ email: x.email, full_name: x.full_name, number: x.number || null,
+          group_type: ['assigned', 'non-assigned', 'neutral', 'control'][i % 4], current_stage: i % 2 ? 'Waiting Room' : '', status: 'inactive', is_ocean_done: i % 2 === 0 })) };
     case 'admin_numbers_for': {
       const wanted = new Set((args.p_emails || []).map((e) => String(e).toLowerCase()));
       return { data: store.students.filter((x) => wanted.has(x.email) && x.number).map((x) => ({ email: x.email, number: x.number })) };
