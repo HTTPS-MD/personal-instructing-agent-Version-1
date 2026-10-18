@@ -1682,6 +1682,32 @@
 
     var sectionEdit = { rename: null, remove: null, error: '', focused: false };
 
+    /* The one line above the Students table: which section it is showing and
+       the figures that are real for it. OCEAN completed is the only completion
+       the database records; the other stages are where students are now. */
+    function renderScope() {
+        var line = $('#scope-line');
+        if (!line) { return; }
+        var section = state.filters.section;
+        var scores = $('#section-scores-open');
+        if (scores) { scores.classList.toggle('is-hidden', !section); }
+        var search = $('#student-search');
+        if (search) { search.placeholder = 'Name or email, in ' + (section || 'all sections'); }
+
+        if (!state.cohortLoaded) { line.textContent = 'Loading…'; return; }
+
+        var members = section
+            ? state.cohort.filter(function (s) { return s.section === section; })
+            : state.cohort;
+        var done = members.filter(hasCurrentResult).length;
+        var parts = section ? [] : ['All sections'];     /* the chosen chip already says which section */
+        var prof = section && state.faculty.filter(function (f) { return f.assigned_section === section; })[0];
+        if (prof) { parts.push('Professor ' + prof.name); }
+        parts.push(members.length + (members.length === 1 ? ' student' : ' students'));
+        if (members.length) { parts.push('OCEAN completed ' + oceanFraction(done, members.length)); }
+        line.textContent = parts.join(' · ');
+    }
+
     /* Shows one section in the Students view (from the sections dialog, the
        Faculty table or the quick find), clearing the other filters so the
        table is that whole section. */
