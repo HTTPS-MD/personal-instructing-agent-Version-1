@@ -318,7 +318,8 @@
            children invisible (they still take their room), and the asterisks are painted
            over the same cell, so nothing moves when the box is ticked. */
         var sel = function (suffix) { return masked.split(', ').map(function (x) { return x + suffix; }).join(', '); };
-        st.textContent = '[data-section-menu] button:hover{background:var(--line-soft)!important}'
+        st.textContent = '#roster-thead th{background:var(--line-soft)}'
+            + '[data-section-menu] button:hover{background:var(--line-soft)!important}'
             + '#att-toggle{min-width:10rem;text-align:center}'
             + '#roster-thead th[data-mk-th],#student-tbody td[data-mk-cell]{min-width:22rem;white-space:nowrap}'
             + masked + '{position:relative;color:transparent!important}'
@@ -333,16 +334,20 @@
         var label = document.createElement('label');
         label.style.cssText = 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-left:auto;white-space:nowrap';
         label.innerHTML = '<input type="checkbox" id="hide-details" checked> Show details';
-        bar.appendChild(label);
+        var filterRow = bar.parentNode.querySelector('.filter-row');
+        if (filterRow) {
+            label.style.alignSelf = 'flex-end';
+            label.style.marginBottom = '10px';
+            filterRow.appendChild(label);
+        } else { bar.appendChild(label); }
         label.firstChild.addEventListener('change', function (e) { setHidden(!e.target.checked); });
-        label.style.marginLeft = 'auto';
         var toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.id = 'att-toggle';
         toggle.hidden = true;
         toggle.className = 'btn btn-sm btn-primary';
         toggle.textContent = 'Start attendance';
-        toggle.style.marginLeft = '12px';
+        toggle.style.marginLeft = 'auto';
         bar.appendChild(toggle);
         toggle.addEventListener('click', function () {
             var section = chosen();
@@ -362,15 +367,9 @@
         if (built) { return; }
         buildHideToggle();
         var h1 = titleHost();
-        if (h1 && !h1.parentNode.classList.contains('title-group')) {
-            var group = document.createElement('div');
-            group.className = 'title-group';
-            group.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap';
-            h1.parentNode.insertBefore(group, h1);
-            group.appendChild(h1);
-            var scores = $('#section-scores-open');
-            if (scores) { group.appendChild(scores); }
-        }
+        var scores = $('#section-scores-open');
+        var actions = $('#view-students .page-actions');
+        if (scores && actions && scores.parentNode !== actions) { actions.insertBefore(scores, actions.firstChild); }
         var att = $('#attendance-bar');
         if (att) { att.style.display = 'none'; }
         if (!h1) { return; }
