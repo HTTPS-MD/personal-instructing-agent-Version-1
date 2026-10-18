@@ -1690,7 +1690,7 @@
             ? state.cohort.filter(function (s) { return s.section === section; })
             : state.cohort;
         var done = members.filter(hasCurrentResult).length;
-        var parts = [section || 'All sections'];
+        var parts = section ? [] : ['All sections'];     /* the chosen chip already says which section */
         var prof = section && state.faculty.filter(function (f) { return f.assigned_section === section; })[0];
         if (prof) { parts.push('Professor ' + prof.name); }
         parts.push(members.length + (members.length === 1 ? ' student' : ' students'));
@@ -1769,8 +1769,7 @@
             return rosterRow(s,
                 '<td>' + esc(s.section || '—') + '</td>' +
                 conditionCell(s) +
-                '<td>' + stageBadge(stageOf(s)) + '</td>' +
-                '<td>' + activationBadge(s) + '</td>');
+                '<td>' + stageBadge(stageOf(s)) + '</td>');
         }).join('');
 
         var pages = Math.max(1, Math.ceil(state.totalStudents / PAGE_SIZE));
@@ -2045,7 +2044,7 @@
         /* Clearing a tutor to re-pick only makes sense where the student picks one. */
         var reselect = $('[data-student-action="retake-character"]');
         if (reselect) { reselect.classList.toggle('is-hidden', s.group_type !== 'non-assigned'); }
-        $('#drawer-status').textContent = ((s.status || '') === 'active' ? 'Activated' : 'Not activated') +
+        $('#drawer-status').textContent = ((s.status || '') === 'active' ? 'Has signed in' : 'Has not signed in yet') +
             (s.must_change_password === true ? ' · Must change temporary password' : '');
         $('#drawer-assent').textContent = consentLabel(s.student_assent);
         ['pre', 'post'].forEach(function (test) {

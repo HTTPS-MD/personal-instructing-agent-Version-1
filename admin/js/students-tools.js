@@ -248,18 +248,14 @@
             + masked.split(', ').map(function (x) { return x + ' *'; }).join(', ') + '{display:none!important}'
             + masked.split(', ').map(function (x) { return x + '::after'; }).join(', ') + '{content:"********";font-size:14px;letter-spacing:2px}'
             + H + '#drawer-initials{font-size:0!important}' + H + '#drawer-initials::after{content:"**";font-size:14px}';
+        st.textContent += '.pia-section-picked #roster-thead th:nth-child(2),.pia-section-picked #student-tbody td:nth-child(2){display:none}';
         document.head.appendChild(st);
-        var chips = $('#section-chips');
-        if (!chips) { return; }
-        var row = document.createElement('div');
-        row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:12px';
-        chips.parentNode.insertBefore(row, chips);
-        row.appendChild(chips);
-        chips.style.marginBottom = '0';
+        var bar = $('#stage-tabs') && $('#stage-tabs').parentNode;
+        if (!bar) { return; }
         var label = document.createElement('label');
-        label.style.cssText = 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px';
+        label.style.cssText = 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-left:auto;white-space:nowrap';
         label.innerHTML = '<input type="checkbox" id="hide-details" checked> Show details';
-        row.appendChild(label);
+        bar.appendChild(label);
         label.firstChild.addEventListener('change', function (e) { setHidden(!e.target.checked); });
         var was = false;
         try { was = sessionStorage.getItem('pia_hide_details') === '1'; } catch (e) {}
@@ -312,6 +308,8 @@
     /* ---- called by the console after it has drawn the table -------------------- */
     async function decorateRoster() {
         build();
+        var picked = !!($('#section-filter') && $('#section-filter').value);
+        document.documentElement.classList.toggle('pia-section-picked', picked);
         renderChips();
         renderAttendance();
         if (!polling && typeof sb !== 'undefined' && sb) {
