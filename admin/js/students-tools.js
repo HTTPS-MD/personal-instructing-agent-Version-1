@@ -3,7 +3,7 @@
    ============================================================================
    One page, one table. Three things are added to it:
 
-   1. The page title is a SECTION DROPDOWN (All students, Earth, Jupiter, ...). It sets the
+   1. The page title is a SECTION DROPDOWN (Earth, Jupiter, ...; a section is always chosen). It sets the
       page's own Section filter, so the table, the counts and Input scores follow it. The
       filter that used to do this is hidden: one way to choose a section, not two.
    2. ATTENDANCE for the chosen section: a Start / Stop button beside Show details and, while
@@ -152,25 +152,38 @@
         if (!h1) { return; }
         var chips = $('#section-chips'); if (chips) { chips.style.display = 'none'; }
         var now = chosen();
-        var total = overview.sections.reduce(function (n, x) { return n + x.students; }, 0);
-        var label = now ? now : 'All students';
+        var label = now ? now : 'Choose a section';
         var row = function (value, name, count, open) {
             return '<button type="button" role="menuitemradio" aria-checked="' + (now === value) + '" data-chip="' + esc(value) + '" style="display:flex;width:100%;justify-content:space-between;gap:16px;align-items:center;padding:8px 12px;border:0;background:' + (now === value ? 'var(--line-soft)' : 'transparent') + ';color:var(--text);font:inherit;font-weight:' + (now === value ? '600' : '400') + ';text-align:left;cursor:pointer">' +
                 '<span>' + esc(name) + (open ? ' <span class="badge badge-accent">Open</span>' : '') + '</span><span class="mono" style="opacity:.7">' + count + '</span></button>';
         };
         var menu = '<div data-section-menu role="menu" hidden style="position:absolute;z-index:30;top:100%;left:0;margin-top:6px;min-width:240px;max-height:60vh;overflow:auto;background:var(--bg-surface);color:var(--text);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:14px;font-weight:400">' +
-            row('', 'All students', total, false) +
             overview.sections.map(function (x) { return row(x.section, x.section, x.students, isOpen(x.section)); }).join('') +
             '<button type="button" data-chip-manage style="display:block;width:100%;padding:8px 12px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer">+ Sections</button></div>';
         var wasOpen = h1.querySelector('[data-section-menu]') && !h1.querySelector('[data-section-menu]').hidden;
         h1.style.position = 'relative';
-        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;min-width:11rem">' +
+        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px">' +
             esc(label) + ' <span aria-hidden="true" style="font-size:.6em;opacity:.7">▾</span></button>' + menu;
         if (wasOpen) { h1.querySelector('[data-section-menu]').hidden = false; }
     }
 
+    var LAST_KEY = 'pia_students_section';
+
+    /* A section is always chosen: the one with attendance open, else the last one used, else the first. */
+    function ensureSection() {
+        if (chosen() || !overview.sections.length) { return; }
+        var names = overview.sections.map(function (x) { return x.section; });
+        var last = '';
+        try { last = localStorage.getItem(LAST_KEY) || ''; } catch (e) { last = ''; }
+        var open = overview.open.length ? overview.open[0].section : '';
+        var pick = names.indexOf(open) >= 0 ? open : (names.indexOf(last) >= 0 ? last : names[0]);
+        pickSection(pick);
+    }
+
     function pickSection(name) {
         var select = $('#section-filter');
+        if (!name) { return; }
+        try { localStorage.setItem(LAST_KEY, name); } catch (e) { /* private mode */ }
         if (!select || select.value === name) { return; }
         select.value = name;
         select.dispatchEvent(new Event('change', { bubbles: true }));   /* the page's own handler does the rest */
@@ -237,7 +250,7 @@
                 cell.addEventListener('click', function (event) { onMark(event, tr.getAttribute('data-student')); });
                 tr.appendChild(cell);
             }
-            var html = live ? markCell(String(tr.getAttribute('data-student')).toLowerCase()) : '<span class="scope-line">—</span>';
+            var html = live ? markCell(String(tr.getAttribute('data-student')).toLowerCase()) : '<span class="scope-line">Not started</span>';
             if (cell._html !== html) { cell._html = html; cell.innerHTML = html; }
         });
     }
@@ -277,6 +290,7 @@
                 marks[String(r.email).toLowerCase()] = { present: !!r.present, entered: !!r.entered, refused: Number(r.refused) || 0 };
             });
         }
+        ensureSection();
         renderChips();
         renderAttendance();
     }
@@ -348,6 +362,15 @@
         if (built) { return; }
         buildHideToggle();
         var h1 = titleHost();
+        if (h1 && !h1.parentNode.classList.contains('title-group')) {
+            var group = document.createElement('div');
+            group.className = 'title-group';
+            group.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap';
+            h1.parentNode.insertBefore(group, h1);
+            group.appendChild(h1);
+            var scores = $('#section-scores-open');
+            if (scores) { group.appendChild(scores); }
+        }
         var att = $('#attendance-bar');
         if (att) { att.style.display = 'none'; }
         if (!h1) { return; }
