@@ -130,7 +130,6 @@
                 <ul class="nav-list">
                     <li><button type="button" class="nav-item" data-view="overview">Overview</button></li>
                     <li><button type="button" class="nav-item" data-view="live">Live Sessions</button></li>
-                    <li><button type="button" class="nav-item" data-view="checkin">Check-in</button></li>
                     <li class="nav-parent" id="nav-people">
                         <button type="button" class="nav-item nav-toggle" id="nav-people-toggle"
                             aria-expanded="false" aria-controls="nav-people-list">
@@ -250,22 +249,6 @@
                 </section>
 
                 <!-- ============================== VIEW 3 · STUDENTS ====== -->
-                <!-- ============================== VIEW · CHECK-IN ======== -->
-                <!-- Students type their student number at a lab PC and wait; the admin
-                     ticks the ones they can see and lets them in. admin/js/checkin-view.js
-                     draws everything inside #checkin-root. -->
-                <section class="page is-hidden" id="view-checkin" data-view-panel="checkin">
-                    <div class="page-head">
-                        <div class="page-head-text">
-                            <div class="with-tip">
-                                <h1 class="page-title">Check-in</h1>
-                                <button type="button" class="info-tip" data-tip="Start check-in for a section. Students type their student number and wait here. Tick only the students you can see in the lab, then let them in. Stop check-in when everyone is in: people already in keep going." aria-label="About check-in"><svg class="icon"><use href="#i-info"></use></svg></button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="stack-lg" id="checkin-root"></div>
-                </section>
-
                 <section class="page is-hidden" id="view-students" data-view-panel="students">
                     <div class="page-head">
                         <h1 class="page-title">Students</h1>
@@ -284,6 +267,12 @@
                         <p class="scope-line" id="scope-line" aria-live="polite">Loading…</p>
                         <button type="button" class="btn btn-secondary btn-sm is-hidden" id="section-scores-open">Input scores</button>
                     </div>
+
+                    <!-- Check-in for the section chosen in the filter below: start and stop it,
+                         see who is waiting, tick the students you can see in the lab and let
+                         them in. admin/js/students-checkin.js draws it and the Student number
+                         column of the table. -->
+                    <div id="checkin-bar" style="margin-bottom:16px"></div>
 
                     <div class="panel" data-region="roster stages">
                         <div class="panel-bar">
@@ -699,6 +688,16 @@
                                 <input class="input" type="email" id="rs-email"
                                     placeholder="maria.santos@student.ue.edu.ph" autocomplete="off">
                                 <p class="field-msg" data-msg-for="rs-email"></p>
+                            </div>
+                        </div>
+
+                        <div class="form-grid" style="margin-top:16px">
+                            <div class="field">
+                                <label class="label" for="rs-number">Student number <span class="req">*</span></label>
+                                <input class="input" type="text" id="rs-number" inputmode="numeric" maxlength="14"
+                                    placeholder="2023-1230142" autocomplete="off">
+                                <p class="field-hint muted">11 digits, from the school ID. Students type it to get in.</p>
+                                <p class="field-msg" data-msg-for="rs-number"></p>
                             </div>
                         </div>
                     </div>
@@ -1704,7 +1703,7 @@
     <!-- The 50 statements and the 1-5 scale, for the drawer's answer list. -->
     <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/math-task-generator.js"></script>
-    <script src="../js/checkin-view.js?v=20261014c"></script>
+    <script src="../js/students-checkin.js?v=20261018a"></script>
     <script src="../js/admin-dashboard.js?v=20261014c"></script>
 </body>
 

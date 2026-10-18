@@ -309,7 +309,7 @@
 
     /* ---- 3.3 View router ---- */
 
-    var VIEWS = ['overview', 'live', 'checkin', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
+    var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
         if (view === 'sections') { view = 'students'; }     /* the old Class Sections address */
@@ -330,7 +330,6 @@
         if (view === 'students') { loadStageCounters(); }
         if (view === 'mathtask' && qb.status !== 'ready' && qb.status !== 'loading') { loadMathTask(); }
         if (view === 'live') { renderLiveSessions(); }
-        if (view === 'checkin' && window.PIACheckin) { window.PIACheckin.show(); }
 
         closeMobileNav();
         window.scrollTo({ top: 0, behavior: 'auto' });
@@ -1780,6 +1779,9 @@
             : 'No students to show';
         $('#page-prev').disabled = state.page <= 1;
         $('#page-next').disabled = state.page >= pages;
+
+        /* Student number column and the Check-in panel (admin/js/students-checkin.js). */
+        if (window.PIACheckin) { window.PIACheckin.decorateRoster(); }
     }
 
     function setStageTab(key) {
@@ -2576,6 +2578,8 @@
         valid = setFieldError('rs-last', last ? '' : 'Last name is required.') && valid;
         valid = setFieldError('rs-email', isEmail(email) ? '' : 'Enter a valid school email address.') && valid;
         valid = setFieldError('rs-section', section ? '' : 'Create a section first.') && valid;
+        var number = ($('#rs-number').value || '').replace(/\D/g, '');
+        valid = setFieldError('rs-number', number.length === 11 ? '' : 'Enter the 11-digit student number.') && valid;
         /* Both are required, not just consent: nobody is registered without
            the parent's consent AND the student's own assent. The database
            refuses the row without both as well (migration 0037). */
@@ -2651,6 +2655,8 @@
             clearFormErrors('register-student-form');
 
             toastOk('Student registered', fullName + ' is on the roster, inactive until they use the activation link.');
+            var savedNumber = window.PIACheckin ? await window.PIACheckin.saveNumberFor(email, number) : { ok: false, message: 'Student numbers are not available.' };
+            if (!savedNumber.ok) { toastErr('Student number not saved', savedNumber.message + ' Add it from the Student number column.'); }
             refreshAll();
         } finally {
             release();

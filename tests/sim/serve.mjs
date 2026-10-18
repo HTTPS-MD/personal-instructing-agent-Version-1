@@ -64,6 +64,10 @@ function rpc(name, args, who) {
       }
       return { data: n };
     }
+    case 'admin_numbers_for': {
+      const wanted = new Set((args.p_emails || []).map((e) => String(e).toLowerCase()));
+      return { data: store.students.filter((x) => wanted.has(x.email) && x.number).map((x) => ({ email: x.email, number: x.number })) };
+    }
     case 'admin_students_with_numbers':
       return { data: store.students.filter((s) => s.role === 'student' && s.section === args.p_section)
         .map((s) => ({ email: s.email, full_name: s.full_name, number: s.number || null })) };
