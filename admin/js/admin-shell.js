@@ -221,7 +221,7 @@
 
     function paletteCommands() {
         return [
-            { label: 'Register student', run: function () { host.openModal('modal-register-student'); } },
+            { label: 'Add students', run: function () { host.openModal('modal-add-students'); } },
             { label: 'Manage sections', run: function () { host.openModal('modal-manage-sections'); } },
             { label: 'Go to Settings', run: function () { host.go('settings'); } },
             { label: 'New section', run: function () { host.openModal('modal-new-section'); } },

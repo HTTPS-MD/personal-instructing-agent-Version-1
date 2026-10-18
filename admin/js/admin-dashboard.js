@@ -515,6 +515,9 @@
     function toastOk(title, description) { toast(title, description, 'accent'); }
     function toastErr(title, description) { toast(title, description, 'danger'); }
 
+    /* Lent to the Add students dialog (admin/js/add-students.js). */
+    window.PIAAdmin = { refreshAll: function () { return refreshAll(); }, toastOk: toastOk, toastErr: toastErr };
+
     /* ---- 3.6 Confirm and notice dialogs ---- */
 
     /* Returns a promise so callers can `await confirmAction(...)` instead of

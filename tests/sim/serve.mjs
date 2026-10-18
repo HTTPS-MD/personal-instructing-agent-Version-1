@@ -64,6 +64,16 @@ function rpc(name, args, who) {
       }
       return { data: n };
     }
+    case 'admin_numbers_taken': {
+      const keys = new Set((args.p_numbers || []).map((n) => String(n).replace(/\D/g, '')));
+      return { data: store.students.filter((x) => x.number && keys.has(String(x.number).replace(/\D/g, '')))
+        .map((x) => ({ number_key: String(x.number).replace(/\D/g, ''), full_name: x.full_name, email: x.email })) };
+    }
+    case 'sim_add_student': {
+      if (store.students.some((x) => x.email === args.email)) return { data: { status: 'duplicate' } };
+      store.students.push({ number: '', full_name: args.fullName, section: args.section, email: args.email, role: 'student' });
+      return { data: { status: 'created' } };
+    }
     case 'admin_numbers_for': {
       const wanted = new Set((args.p_emails || []).map((e) => String(e).toLowerCase()));
       return { data: store.students.filter((x) => wanted.has(x.email) && x.number).map((x) => ({ email: x.email, number: x.number })) };
