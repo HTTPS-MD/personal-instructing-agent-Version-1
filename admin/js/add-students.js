@@ -33,7 +33,7 @@
         ['control', 'CTRL · Traditional']
     ];
     var FIELDS = ['last', 'first', 'mid', 'num'];
-    var START_ROWS = 3;
+    var START_ROWS = 1;
 
     /* Every message a person can read, in one place. */
     var MSG = {
@@ -166,24 +166,23 @@
         overlay.innerHTML =
             '<div class="modal modal-xl">' +
             '<header class="modal-head"><div class="modal-head-text"><h2 class="modal-title" id="as-title">Add students</h2>' +
-            '<p class="muted">One row per student. Add one, or paste a whole class from a spreadsheet.</p></div></header>' +
+            '<p class="muted">One row per student. <button type="button" class="btn btn-ghost btn-sm" id="as-change" hidden>Change section</button></p></div></header>' +
             '<div class="modal-body"><form id="as-form" novalidate>' +
                 '<p class="field-msg" id="as-summary" role="alert" tabindex="-1"></p>' +
                 '<div class="form-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px">' +
-                    '<div class="field"><label class="label" for="as-section">Section <span class="req">*</span></label>' +
+                    '<div class="field" id="as-section-field"><label class="label" for="as-section">Section <span class="req">*</span></label>' +
                     '<select class="select" id="as-section" data-section-select aria-describedby="as-section-msg"></select>' +
                     '<p class="field-msg" id="as-section-msg"></p></div>' +
                     '<div class="field"><label class="label" for="as-group">Condition for everyone <span class="req">*</span></label>' +
-                    '<select class="select" id="as-group" aria-describedby="as-group-msg"><option value="">Choose…</option>' +
+                    '<select class="select" id="as-group" aria-describedby="as-group-msg"><option value="">Choose\u2026</option>' +
                     GROUPS.map(function (g) { return '<option value="' + g[0] + '">' + esc(g[1]) + '</option>'; }).join('') +
-                    '</select><p class="field-msg" id="as-group-msg"></p></div>' +
+                    '</select><p class="field-hint muted">Applies to every student in this dialog.</p><p class="field-msg" id="as-group-msg"></p></div>' +
                 '</div>' +
                 '<div id="as-grid" role="group" aria-label="Students"></div>' +
-                '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">' +
+                '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px">' +
                     '<button type="button" class="btn btn-secondary btn-sm" id="as-add">' +
                     '<svg class="icon"><use href="#i-plus"></use></svg> Add row</button>' +
-                    '<button type="button" class="btn btn-secondary btn-sm" id="as-add5">Add 5 rows</button>' +
-                    '<span class="field-hint muted">Paste four spreadsheet columns (last, first, middle, number) into the first box to fill many rows at once.</span>' +
+                    '<span class="field-hint muted">Have a list? Paste four spreadsheet columns into the first box.</span>' +
                 '</div>' +
             '</form></div>' +
             '<footer class="modal-foot modal-foot-split">' +
@@ -200,11 +199,11 @@
     }
 
     /* ---- drawing the grid -------------------------------------------------- */
-    var GRID_COLS = '28px minmax(0,1.5fr) minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1.3fr) 36px';
+    var GRID_COLS = 'minmax(0,1.5fr) minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1.3fr) 36px';
 
     function headRow() {
         return '<div style="display:grid;grid-template-columns:' + GRID_COLS + ';gap:8px;margin-bottom:4px" class="muted" aria-hidden="true">' +
-            '<span></span><span class="label">Last name <span class="req">*</span></span><span class="label">First name <span class="req">*</span></span>' +
+            '<span class="label">Last name <span class="req">*</span></span><span class="label">First name <span class="req">*</span></span>' +
             '<span class="label">Middle name</span><span class="label">Student number <span class="req">*</span></span><span></span></div>';
     }
 
@@ -212,16 +211,15 @@
         var html = headRow();
         rows.forEach(function (r, i) {
             html += '<div data-row="' + r.id + '" style="margin-bottom:8px"><div style="display:grid;grid-template-columns:' + GRID_COLS + ';gap:8px;align-items:center">' +
-                '<span data-status style="display:flex;justify-content:center"></span>' +
                 FIELDS.map(function (f) {
                     var label = { last: 'Last name', first: 'First name', mid: 'Middle name', num: 'Student number' }[f];
                     return '<input class="input" type="text" data-f="' + f + '" value="' + esc(r[f]) + '" autocomplete="off" ' +
-                        (f === 'num' ? 'inputmode="numeric" maxlength="13" placeholder="2023-1230142" ' : 'spellcheck="false" ') +
+                        (f === 'num' ? 'inputmode="numeric" maxlength="13" placeholder="11 digits" ' : 'spellcheck="false" ') +
                         'aria-label="' + label + ', row ' + (i + 1) + '" aria-describedby="as-msg-' + r.id + '">';
                 }).join('') +
                 '<button type="button" class="btn btn-ghost btn-sm" data-del="' + r.id + '" aria-label="Remove row ' + (i + 1) + '">' +
                 '<svg class="icon"><use href="#i-trash"></use></svg></button></div>' +
-                '<p class="field-msg" id="as-msg-' + r.id + '" style="margin:4px 0 0 36px"></p></div>';
+                '<p class="field-msg" id="as-msg-' + r.id + '" style="margin:4px 0 0"></p></div>';
         });
         $('#as-grid').innerHTML = html;
         rows.forEach(function (r, i) { paintRow(i); });
@@ -236,7 +234,7 @@
         var el = rowEl(r.id);
         if (!el) { return; }
         var msg = $('.field-msg', el);
-        /* Quiet = someone is typing in this row: update the icon, and only touch the message
+        /* Quiet = someone is typing in this row: only touch the message
            if one is already showing (so a fixed problem clears, a new one does not appear). */
         var shown = quiet && !msg.textContent ? [] : visible(r, i);
         if (!(quiet && !msg.textContent)) { msg.textContent = shown.length ? shown[0].text : ''; }
@@ -245,10 +243,7 @@
             var bad = shown.some(function (p) { return p.field === f; });
             if (bad) { input.setAttribute('aria-invalid', 'true'); } else { input.removeAttribute('aria-invalid'); }
         });
-        var icon = '';
-        if (shown.length) { icon = '<svg class="icon" style="color:var(--danger)" role="img" aria-label="Needs attention"><use href="#i-alert"></use></svg>'; }
-        else if (ready(r, i)) { icon = '<svg class="icon" style="color:var(--success)" role="img" aria-label="Ready"><use href="#i-check"></use></svg>'; }
-        $('[data-status]', el).innerHTML = icon;
+
     }
 
     function paintAll() { rows.forEach(function (_, i) { paintRow(i); }); paintButton(); }
@@ -257,7 +252,20 @@
         var n = rows.filter(function (r, i) { return ready(r, i); }).length;
         var filled = rows.filter(function (r) { return !isBlank(r); }).length;
         var count = n || filled;
-        $('#as-submit').textContent = count ? (count === 1 ? 'Add 1 student' : 'Add ' + count + ' students') : 'Add students';
+        var where = sectionName() ? ' to ' + sectionName() : '';
+        $('#as-submit').textContent = count ? (count === 1 ? 'Add 1 student' : 'Add ' + count + ' students') + where : 'Add students';
+    }
+
+    function sectionName() {
+        var select = $('#as-section');
+        return select && select.value ? select.value : '';
+    }
+
+    /* The title and the Add button always say which section the students are going to. */
+    function paintContext() {
+        var name = sectionName();
+        $('#as-title').textContent = name ? 'Add students to ' + name : 'Add students';
+        paintButton();
     }
 
     function goTo(id, f) {
@@ -369,12 +377,12 @@
             rows.push(blankRow());
             drawGrid({ id: rows[rows.length - 1].id, f: 'last' });
         });
-        $('#as-add5', root).addEventListener('click', function () {
-            for (var k = 0; k < 5; k++) { rows.push(blankRow()); }
-            drawGrid({ id: rows[rows.length - 5].id, f: 'last' });
+        $('#as-section', root).addEventListener('change', function () { $('#as-section-msg').textContent = ''; paintContext(); });
+        $('#as-change', root).addEventListener('click', function (event) {
+            $('#as-section-field').hidden = false;
+            event.currentTarget.hidden = true;
+            $('#as-section').focus();
         });
-
-        $('#as-section', root).addEventListener('change', function () { $('#as-section-msg').textContent = ''; });
         $('#as-group', root).addEventListener('change', function () { $('#as-group-msg').textContent = ''; });
         $('#as-consent', root).addEventListener('change', function () { $('#as-consent-msg').textContent = ''; });
         $('#as-form', root).addEventListener('submit', submit);
@@ -447,7 +455,7 @@
             rows = rows.filter(function (r) { return !r.done; });
             if (window.PIAAdmin && window.PIAAdmin.refreshAll) { window.PIAAdmin.refreshAll(); }
             if (!failed.length) {
-                if (window.PIAAdmin && window.PIAAdmin.toastOk) { window.PIAAdmin.toastOk(MSG.added(done), 'In ' + section + '.'); }
+                if (window.PIAAdmin && window.PIAAdmin.toastOk) { window.PIAAdmin.toastOk(MSG.added(done) + ' to ' + section, ''); }
                 var close = $('[data-modal-close]', root);
                 if (close) { close.click(); }
                 return;
@@ -458,9 +466,8 @@
                 var el = rowEl(f.row.id);
                 if (!el) { return; }
                 $('.field-msg', el).textContent = f.reason;
-                $('[data-status]', el).innerHTML = '<svg class="icon" style="color:var(--danger)" role="img" aria-label="Needs attention"><use href="#i-alert"></use></svg>';
             });
-            $('#as-summary').textContent = (done ? MSG.added(done) + '. ' : '') +
+            $('#as-summary').textContent = (done ? MSG.added(done) + ' to ' + section + '. ' : '') +
                 (failed.length === 1 ? '1 student wasn\u2019t added: see the message under their row.' : failed.length + ' students weren\u2019t added: see the message under each row.');
             $('#as-summary').focus();
         } finally {
@@ -483,7 +490,13 @@
         $('#as-group').value = '';
         var filter = $('#section-filter');
         var section = $('#as-section');
-        if (filter && filter.value && section.querySelector('option[value="' + filter.value.replace(/"/g, '') + '"]')) { section.value = filter.value; }
+        if (!section.querySelector('option[value=""]')) { section.insertBefore(new Option('Choose a section', ''), section.firstChild); }
+        var known = !!(filter && filter.value && section.querySelector('option[value="' + filter.value.replace(/"/g, '') + '"]'));
+        section.value = known ? filter.value : '';
+        /* A section chosen on the Students page is not asked again: it is in the title, with a way to change it. */
+        $('#as-section-field').hidden = known;
+        $('#as-change').hidden = !known;
+        paintContext();
         drawGrid({ id: rows[0].id, f: 'last' });
     }
 
