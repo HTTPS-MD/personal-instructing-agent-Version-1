@@ -39,15 +39,14 @@
     var ROUTES = {
         overview: { trail: ['Overview'] },
         live: { trail: ['Live Sessions'] },
-        sections: { trail: ['People', 'Sections'] },
-        students: { trail: ['People', 'All students'] },
+        students: { trail: ['People', 'Students'] },
         faculty: { trail: ['People', 'Faculty'] },
         controls: { trail: ['Stage Controls'] },
         mathtask: { trail: ['Math Task'] },
         profile: { trail: ['Profile'] },
         settings: { trail: ['Settings'] }
     };
-    var PEOPLE_CHILDREN = { sections: 1, students: 1, faculty: 1 };
+    var PEOPLE_CHILDREN = { students: 1, faculty: 1 };
 
     function titleOf(view) {
         var r = ROUTES[view];
@@ -213,8 +212,7 @@
         return [
             { label: 'Overview', run: function () { host.go('overview'); } },
             { label: 'Live Sessions', run: function () { host.go('live'); } },
-            { label: 'Sections', run: function () { host.go('sections'); } },
-            { label: 'All students', run: function () { host.go('students'); } },
+            { label: 'Students', run: function () { host.go('students'); } },
             { label: 'Faculty', run: function () { host.go('faculty'); } },
             { label: 'Stage Controls', run: function () { host.go('controls'); } },
             { label: 'Math Task', run: function () { host.go('mathtask'); } }
