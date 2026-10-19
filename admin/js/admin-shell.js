@@ -211,7 +211,6 @@
     function paletteModules() {
         return [
             { label: 'Students', run: function () { host.go('students'); } },
-            { label: 'Stage Controls', run: function () { host.go('controls'); } },
             { label: 'Math Task', run: function () { host.go('mathtask'); } }
         ];
     }

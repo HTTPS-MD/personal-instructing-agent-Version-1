@@ -312,6 +312,7 @@
     var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
+        if (view === 'controls') { view = 'students'; }     /* Stage Controls is the switch beside each stage tab now */
         if (view === 'live') { view = 'students'; }     /* Live Sessions is on the Students table now: the dot on the avatar, and the minutes per stage */
         if (view === 'overview') { view = 'students'; }     /* Overview was an empty page: the console opens on Students */
         if (view === 'sections' || view === 'faculty') { view = 'students'; }     /* the old Class Sections and Faculty addresses: both are on the Students page now */
@@ -3398,10 +3399,83 @@
             paintGateStatus(gate);
             paintGateFoot(gate);
         });
+        renderStageSwitches();
+    }
+
+    /* ---- Stage switches on the Students tab -------------------------------
+       One switch beside each stage tab opens or closes that stage for the section chosen in the
+       top bar. It does exactly what Stage Controls did, through the same functions:
+       opening is grantSections() (admin_grant_stage), closing is revokeSections()
+       (admin_revoke_stage, or admin_set_stage_open for a stage an old version left open for
+       everyone). Opening asks first: it lets a whole class in at once. */
+    function renderStageSwitches() {
+        var bar = $('#stage-tabs');
+        if (!bar) { return; }
+        var section = window.PIASectionNow || '';
+        GATES.forEach(function (gate) {
+            var tab = bar.querySelector('[data-stage-filter="' + gate.label + '"]');
+            if (!tab) { return; }
+            var btn = bar.querySelector('[data-gate-switch="' + gate.key + '"]');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'stage-switch';
+                btn.setAttribute('role', 'switch');
+                btn.setAttribute('data-gate-switch', gate.key);
+                tab.insertAdjacentElement('afterend', btn);
+            }
+            var ready = !!section && state.overrides !== undefined && state.cohortLoaded;
+            var on = ready && sectionOpen(gate, section);
+            btn.hidden = !section;
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+            btn.classList.toggle('is-on', on);
+            btn.disabled = !ready || btn.classList.contains('is-working');
+            btn.setAttribute('aria-label', gate.title + ' for ' + section + (on ? ': open' : ': closed'));
+            btn.title = !section ? '' : (gate.open
+                ? gate.title + ' is open for every section. Switching it off closes it for all of them.'
+                : (on ? 'Open for ' + section + '. Switch off to close it.' : 'Closed for ' + section + '. Switch on to let the section in.'));
+        });
+    }
+
+    async function toggleStage(gate, btn) {
+        var section = window.PIASectionNow || '';
+        if (!section || btn.classList.contains('is-working')) { return; }
+        btn.classList.add('is-working');
+        btn.disabled = true;
+        try {
+            state.gateSelected[gate.key] = [section];
+            if (sectionOpen(gate, section)) {
+                await revokeSections(gate.key, null);          /* asks first, in its own way */
+            } else {
+                var members = state.cohort.filter(function (s) { return s.section === section; }).length;
+                var ok = await confirmAction({
+                    title: 'Open stage',
+                    heading: 'Open ' + gate.title + ' for ' + section + '?',
+                    message: members + (members === 1 ? ' student' : ' students') + ' of ' + section +
+                        ' can enter it right away. A student who has not finished the stage before it stays out.',
+                    confirmLabel: 'Open stage'
+                });
+                if (ok) { await grantSections(gate.key, null); }
+            }
+        } finally {
+            state.gateSelected[gate.key] = [];
+            btn.classList.remove('is-working');
+            renderStageSwitches();
+        }
     }
 
     function initGates() {
         var grid = $('#gates-grid');
+
+        var tabsBar = $('#stage-tabs');
+        if (tabsBar) {
+            tabsBar.addEventListener('click', function (event) {
+                var sw = event.target.closest('[data-gate-switch]');
+                if (!sw) { return; }
+                event.stopPropagation();
+                toggleStage(gateByKey(sw.getAttribute('data-gate-switch')), sw);
+            });
+        }
 
         /* The section picked in the top bar changed: Stage Controls shows that section only, so
            nothing ticked for another one may stay ticked, and Live Sessions re-reads its rows. */
