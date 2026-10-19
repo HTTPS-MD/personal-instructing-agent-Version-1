@@ -124,3 +124,9 @@
 .stage-switch.is-on { background: var(--accent); }
 .stage-switch.is-on::after { left: 16px; }
 .stage-switch:disabled { opacity: .5; cursor: progress; }
+
+/* Confirmation dialogs: text on the left, and no icon. The heading and the red or blue button
+   already say what kind of question it is. */
+#modal-confirm .modal-hero { align-items: flex-start; text-align: left; }
+#modal-confirm .modal-hero-glyph { display: none; }
+#modal-confirm .modal-hero-text { max-width: none; }

@@ -3453,7 +3453,8 @@
                     heading: 'Open ' + gate.title + ' for ' + section + '?',
                     message: members + (members === 1 ? ' student' : ' students') + ' of ' + section +
                         ' can enter it right away. A student who has not finished the stage before it stays out.',
-                    confirmLabel: 'Open stage'
+                    confirmLabel: 'Open stage',
+                    tone: 'accent'
                 });
                 if (ok) { await grantSections(gate.key, null); }
             }
