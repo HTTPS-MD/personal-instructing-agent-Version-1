@@ -312,6 +312,7 @@
     var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
+        if (view === 'live') { view = 'students'; }     /* Live Sessions is on the Students table now: the dot on the avatar, and the minutes per stage */
         if (view === 'overview') { view = 'students'; }     /* Overview was an empty page: the console opens on Students */
         if (view === 'sections' || view === 'faculty') { view = 'students'; }     /* the old Class Sections and Faculty addresses: both are on the Students page now */
         if (VIEWS.indexOf(view) === -1) { view = 'overview'; }
@@ -1590,6 +1591,7 @@
         loadStageTimes().then(function () {
             renderLiveSessions();
             renderSections();
+            paintStageTimes();
         }).catch(function () { /* the next tick tries again */ });
     }
 
@@ -1799,6 +1801,45 @@
         return !!(state.filters.section || state.filters.stage || state.filters.group !== 'all' || state.filters.search.trim());
     }
 
+    /* Minutes the server counted for a student in each stage (student_stage_time, migration 0035),
+       as three columns of the Students table. A dash means nothing is recorded, or the stage does
+       not apply to that student's group: Character selection is only for the Free choice group, and
+       the control group takes the OCEAN test only. */
+    function stageMinutes(s, field, applies) {
+        var row = state.stageTimes ? state.stageTimes[String(s.email || '').toLowerCase()] : null;
+        var seconds = row ? Number(row[field]) : NaN;
+        if (!applies || !isFinite(seconds) || seconds <= 0) { return '—'; }
+        return seconds < 60 ? '<1 min' : Math.round(seconds / 60) + ' min';
+    }
+
+    function stageTimeCells(s) {
+        var group = s.group_type;
+        var cell = function (key, field, applies) {
+            return '<td class="mono" data-stage-time="' + key + '">' + esc(stageMinutes(s, field, applies)) + '</td>';
+        };
+        return cell('ocean', 'ocean_time', true) +
+            cell('character', 'character_select_time', group === 'non-assigned') +
+            cell('tutoring', 'tutoring_time', group !== 'control');
+    }
+
+    /* Refresh the three columns in place (no full redraw) when new stage times arrive. */
+    function paintStageTimes() {
+        var byEmail = {};
+        state.rosterPage.forEach(function (s) { byEmail[String(s.email || '').toLowerCase()] = s; });
+        $$('#student-tbody tr[data-student]').forEach(function (tr) {
+            var s = byEmail[String(tr.getAttribute('data-student') || '').toLowerCase()];
+            if (!s) { return; }
+            var group = s.group_type;
+            var set = function (key, field, applies) {
+                var td = tr.querySelector('[data-stage-time="' + key + '"]');
+                if (td) { td.textContent = stageMinutes(s, field, applies); }
+            };
+            set('ocean', 'ocean_time', true);
+            set('character', 'character_select_time', group === 'non-assigned');
+            set('tutoring', 'tutoring_time', group !== 'control');
+        });
+    }
+
     function renderRoster() {
         var tbody = $('#student-tbody');
         var empty = $('#student-empty');
@@ -1812,7 +1853,8 @@
             return rosterRow(s,
                 '<td>' + esc(s.section || '—') + '</td>' +
                 conditionCell(s) +
-                '<td>' + stageBadge(stageOf(s)) + '</td>');
+                '<td>' + stageBadge(stageOf(s)) + '</td>' +
+                stageTimeCells(s));
         }).join('');
 
         var pages = Math.max(1, Math.ceil(state.totalStudents / PAGE_SIZE));

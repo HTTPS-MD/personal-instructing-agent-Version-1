@@ -130,7 +130,7 @@
             <nav class="sidebar-nav" aria-label="Main">
                 <ul class="nav-list">
                     <li hidden><button type="button" class="nav-item" data-view="overview" tabindex="-1">Overview</button></li>
-                    <li><button type="button" class="nav-item" data-view="live">Live Sessions</button></li>
+                    <li hidden><button type="button" class="nav-item" data-view="live" tabindex="-1">Live Sessions</button></li>
                     <li class="nav-parent" id="nav-people">
                         <button type="button" class="nav-item nav-toggle" id="nav-people-toggle"
                             aria-expanded="false" aria-controls="nav-people-list">
@@ -320,7 +320,7 @@
                             <table class="table">
                                 <caption class="sr-only">Students</caption>
                                 <thead id="roster-thead">
-                                    <tr><th scope="col">Student</th><th scope="col">Section</th><th scope="col">Condition</th><th scope="col">Stage</th></tr>
+                                    <tr><th scope="col">Student</th><th scope="col">Section</th><th scope="col">Condition</th><th scope="col">Stage</th><th scope="col">OCEAN</th><th scope="col">Character</th><th scope="col">Tutoring</th></tr>
                                 </thead>
                                 <tbody id="student-tbody"></tbody>
                             </table>
@@ -1699,13 +1699,13 @@
     <!-- Shared client + helpers (defines `sb`, escapeHTML, getOrCreateDeviceId,
          registerChannel, executeForceLogout, normalizeOceanScore …) -->
     <script src="../../assets/js/function.js"></script>
-    <script src="../js/admin-shell.js?v=20261024a"></script>
+    <script src="../js/admin-shell.js?v=20261025a"></script>
     <!-- The 50 statements and the 1-5 scale, for the drawer's answer list. -->
     <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/math-task-generator.js"></script>
     <script src="../js/students-tools.js?v=20261023b"></script>
     <script src="../js/add-students.js?v=20261019c"></script>
-    <script src="../js/admin-dashboard.js?v=20261024a"></script>
+    <script src="../js/admin-dashboard.js?v=20261025a"></script>
 </body>
 
 </html>
