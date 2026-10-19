@@ -62,6 +62,8 @@
         var select = $('#section-filter');
         return select ? select.value : '';
     }
+    /* Other pages read the chosen section from here (Live Sessions, Stage Controls). */
+    Object.defineProperty(window, 'PIASectionNow', { get: function () { return chosen(); }, configurable: true });
 
     function minutesLeft(iso) { return Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 60000)); }
     function clock(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
@@ -148,7 +150,26 @@
     /* ---- the section chips ---------------------------------------------------- */
     function isOpen(name) { return overview.open.some(function (c) { return c.section === name; }); }
 
-    function titleHost() { return $('#view-students .page-head .page-title'); }
+    /* The section picker lives in the top bar, so it follows the admin to every page that is about
+       one class (Students, Live Sessions, Stage Controls). */
+    function titleHost() {
+        var host = $('#section-host');
+        if (host) { return host; }
+        var left = $('.topbar-left');
+        if (!left) { return null; }
+        host = document.createElement('div');
+        host.id = 'section-host';
+        host.hidden = true;
+        left.appendChild(host);
+        return host;
+    }
+
+    function updateHostVisibility() {
+        var host = $('#section-host');
+        if (!host) { return; }
+        var view = (window.location.hash || '').replace('#', '');
+        host.hidden = !(view === 'students' || view === 'live' || view === 'controls');
+    }
 
     function profsOf(section) {
         var email = holder[section];
@@ -186,9 +207,9 @@
             overview.sections.map(function (x) { return row(x.section, x.section, x.students, isOpen(x.section)); }).join('') +
             '<button type="button" data-section-new style="' + item + ';border-top:1px solid var(--line)">+ New section</button>' + remove + '</div>';
         var wasOpen = h1.querySelector('[data-section-menu]') && !h1.querySelector('[data-section-menu]').hidden;
-        h1.style.position = 'relative';
-        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px">' +
-            esc(label) + ' <span aria-hidden="true" style="font-size:.6em;opacity:.7">▾</span></button>' + menu;
+        h1.innerHTML = '<button type="button" data-section-toggle aria-haspopup="menu" aria-expanded="' + !!wasOpen + '">' +
+            esc(label) + ' <span aria-hidden="true" style="font-size:.7em;opacity:.8">▾</span></button>' + menu;
+        updateHostVisibility();
         if (wasOpen) { h1.querySelector('[data-section-menu]').hidden = false; }
         renderProfLine();
     }
@@ -444,6 +465,8 @@
            over the same cell, so nothing moves when the box is ticked. */
         var sel = function (suffix) { return masked.split(', ').map(function (x) { return x + suffix; }).join(', '); };
         st.textContent = '#roster-thead th{background:var(--line-soft)}'
+            + '#section-host{position:relative;display:flex;align-items:center;min-width:0}#section-host[hidden]{display:none}'
+            + '#section-host [data-section-toggle]{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-text);border-radius:6px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}'
             + '#view-students .filter-row .input{height:40px;min-height:40px;box-sizing:border-box}'
             + '#view-students .page-actions .btn{min-height:40px;box-sizing:border-box}'
             + '[data-section-menu] button:hover{background:var(--line-soft)!important}'
@@ -497,6 +520,13 @@
         var scores = $('#section-scores-open');
         var actions = $('#view-students .page-actions');
         if (scores && actions && scores.parentNode !== actions) { actions.insertBefore(scores, actions.firstChild); }
+        var filter = $('#section-filter');
+        if (filter) {
+            filter.addEventListener('change', function () {
+                document.dispatchEvent(new CustomEvent('pia:section-changed', { detail: { section: chosen() } }));
+            });
+        }
+        window.addEventListener('hashchange', updateHostVisibility);
         var att = $('#attendance-bar');
         if (att) { att.style.display = 'none'; }
         if (!h1) { return; }

@@ -12,6 +12,7 @@
 <body>
     <!-- SIMULATION ONLY: the parts of the Students page that students-tools.js touches, in the console's own
          styles. The console draws the table and then calls the hook; a few lines here do the same. -->
+    <header class="topbar"><div class="topbar-left"></div><div class="topbar-right"></div></header>
     <main class="main" style="padding:24px 16px;max-width:1100px;margin:0 auto">
         <section class="page" id="view-students" data-view-panel="students">
             <div class="page-head"><h1 class="page-title">Students</h1>
@@ -64,6 +65,7 @@
             document.getElementById('open-add').addEventListener('click', function () { overlay.classList.add('is-mounted', 'is-open'); });
             overlay.addEventListener('click', function (e) { if (e.target.closest('[data-modal-close]')) { overlay.classList.remove('is-open', 'is-mounted'); } });
         })();
+        if (!location.hash) { location.hash = '#students'; }
         window.addEventListener('load', renderRoster);
     </script>
 </body>

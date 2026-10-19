@@ -1415,6 +1415,7 @@
         var rows = [];
         live.expiry = Infinity;
         state.cohort.forEach(function (s) {
+            if (window.PIASectionNow && s.section !== window.PIASectionNow) { return; }     /* the section picked in the top bar */
             var time = times[String(s.email || '').toLowerCase()];
             var conn = presenceOf(s, time, now);
             if (!conn) { return; }
@@ -3276,13 +3277,15 @@
         }
 
         var selected = state.gateSelected[gate.key];
-        var allTicked = !gate.open && selected.length === state.sections.length;
-        var html = head(gate.open ? '' :
+        var scoped = window.PIASectionNow
+            ? state.sections.filter(function (x) { return x.name === window.PIASectionNow; }) : state.sections;
+        var allTicked = !gate.open && selected.length === scoped.length;
+        var html = head(gate.open || window.PIASectionNow ? '' :
             '<button type="button" class="btn btn-ghost btn-sm" data-gate-all="' + gate.key + '">' +
             (allTicked ? 'Clear' : 'Select all') + '</button>');
 
         html += '<div class="gate-sections" role="group" aria-label="Sections for ' + esc(gate.title) + '">' +
-            state.sections.map(function (section) {
+            scoped.map(function (section) {
                 var members = state.cohort.filter(function (s) { return s.section === section.name; });
                 var open = sectionOpen(gate, section.name);
                 var inside = members.filter(function (s) { return s.current_stage === gate.label; }).length;
@@ -3356,6 +3359,14 @@
 
     function initGates() {
         var grid = $('#gates-grid');
+
+        /* The section picked in the top bar changed: Stage Controls shows that section only, so
+           nothing ticked for another one may stay ticked, and Live Sessions re-reads its rows. */
+        document.addEventListener('pia:section-changed', function () {
+            GATES.forEach(function (gate) { state.gateSelected[gate.key] = []; });
+            renderGateAccess();
+            renderLiveSessions();
+        });
 
         grid.addEventListener('change', function (event) {
             var box = event.target.closest('[data-gate-section]');
