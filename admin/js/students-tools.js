@@ -167,8 +167,13 @@
     function updateHostVisibility() {
         var host = $('#section-host');
         if (!host) { return; }
-        var view = (window.location.hash || '').replace('#', '');
-        host.hidden = !(view === 'students' || view === 'live' || view === 'controls');
+        /* Read the page that is actually showing: the console changes the address with
+           history.replaceState, which fires no hashchange, so the address cannot be trusted. */
+        var shown = ['students', 'live', 'controls'].some(function (name) {
+            var panel = $('#view-' + name);
+            return !!panel && !panel.classList.contains('is-hidden');
+        });
+        host.hidden = !shown;
     }
 
     function profsOf(section) {
@@ -527,6 +532,11 @@
             });
         }
         window.addEventListener('hashchange', updateHostVisibility);
+        ['students', 'live', 'controls', 'overview', 'mathtask', 'profile', 'settings'].forEach(function (name) {
+            var panel = $('#view-' + name);
+            if (panel) { new MutationObserver(updateHostVisibility).observe(panel, { attributes: true, attributeFilter: ['class'] }); }
+        });
+        updateHostVisibility();
         var att = $('#attendance-bar');
         if (att) { att.style.display = 'none'; }
         if (!h1) { return; }
