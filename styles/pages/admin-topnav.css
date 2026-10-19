@@ -25,23 +25,30 @@
     .nav-toggle-mobile { display: none; }
     .main { grid-area: main; }
 
-    /* Brand on the left of the top bar, account on the right. */
+    /* Brand on the left of the top bar, account on the right. They are as tall as the bar and
+       sticky, so they stay put with it when the page scrolls. */
     .sidebar-brand {
         grid-area: top;
-        align-self: center;
+        align-self: start;
         justify-self: start;
-        height: auto;
+        height: var(--topbar-h);
         padding: 0 24px;
         border: 0;
-        position: relative;
+        position: sticky;
+        top: 0;
         z-index: calc(var(--z-sticky) + 2);
     }
     .sidebar-foot {
         grid-area: top;
-        align-self: center;
+        align-self: start;
         justify-self: end;
+        height: var(--topbar-h);
+        display: flex;
+        align-items: center;
         margin: 0 16px 0 0;
         border: 0;
+        position: sticky;
+        top: 0;
         z-index: calc(var(--z-sticky) + 2);
     }
     .sidebar-user { width: auto; padding: 0; border-radius: 50%; }
@@ -68,6 +75,7 @@
     .nav-list { display: flex; align-items: stretch; gap: 4px; }
     .nav-list > li + li { margin-top: 0; }
     .nav-list > li { display: flex; }
+    .nav-list > li[hidden] { display: none; }
     .nav-toggle { display: none; }                 /* "People" had one child: show it directly */
     #nav-people-list { display: flex !important; margin: 0; padding: 0; border: 0; }
     #nav-people-list > li + li { margin-top: 0; }
