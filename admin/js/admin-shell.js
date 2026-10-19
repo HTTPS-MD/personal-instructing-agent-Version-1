@@ -210,7 +210,6 @@
        view or dialog. Nothing for export, security log or devices. */
     function paletteModules() {
         return [
-            { label: 'Overview', run: function () { host.go('overview'); } },
             { label: 'Live Sessions', run: function () { host.go('live'); } },
             { label: 'Students', run: function () { host.go('students'); } },
             { label: 'Stage Controls', run: function () { host.go('controls'); } },

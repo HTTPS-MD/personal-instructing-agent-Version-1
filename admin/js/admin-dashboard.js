@@ -312,6 +312,7 @@
     var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
 
     function switchView(view) {
+        if (view === 'overview') { view = 'students'; }     /* Overview was an empty page: the console opens on Students */
         if (view === 'sections' || view === 'faculty') { view = 'students'; }     /* the old Class Sections and Faculty addresses: both are on the Students page now */
         if (VIEWS.indexOf(view) === -1) { view = 'overview'; }
 
@@ -339,7 +340,7 @@
         var fromHash = (window.location.hash || '').replace('#', '');
         var stored = '';
         try { stored = sessionStorage.getItem('pia.admin.view') || ''; } catch (err) { /* ignore */ }
-        switchView(fromHash || stored || 'overview');
+        switchView(fromHash || stored || 'students');
 
         /* Back / forward and edited addresses follow the hash. */
         window.addEventListener('hashchange', function () {
