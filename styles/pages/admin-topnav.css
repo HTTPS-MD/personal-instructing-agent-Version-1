@@ -91,3 +91,6 @@
     .nav-item.is-active { background: transparent; color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
     .nav-count { display: none; }
 }
+
+/* The search bar in the top bar is not shown: the Students page has its own search. */
+.quickfind[hidden] { display: none; }
