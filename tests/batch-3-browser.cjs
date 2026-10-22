@@ -400,6 +400,7 @@ function fixture() {
     assert.equal(await overflow(p), true);
     await p.locator('#modal-qb-edit .modal-close').click();
     await p.locator('[data-qb-view="rules"]').click();
+    await shot(p, 'mathtask-rules-dark-1280');
     await p.locator('#qb-min-questions').fill('4');
     await p.locator('#qb-config-save').click();
     await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
