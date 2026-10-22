@@ -299,8 +299,7 @@
                      scroll away (nav.js). data-resume-label: auth.js swaps this
                      label for a returning session, and "Continue to dashboard"
                      does not fit a phone bar. -->
-                <button type="button" class="tap btn-pop nav-signin nav-auth" data-auth-open="signin"
-                    data-resume-label="Dashboard">Enter student number</button>
+                <button type="button" class="tap btn-pop nav-signin nav-auth" data-auth-open="staff">Sign in as teacher/admin</button>
                 <!-- Last before the hamburger: while the two buttons above are
                      standing down (they keep their space), the toggle holds the
                      far edge instead of floating beside an empty gap. -->
@@ -381,32 +380,27 @@
                          sit on top of them. -->
                     <div class="shell act-drop-inner">
                         <div class="hero-copy">
-                            <!-- The kicker. data-nav-edge: the navbar turns solid the
-                                 moment this line would slide under it (nav.js). -->
-                            <p class="hero-kicker" data-reveal data-nav-edge>Grade 7 maths &middot; Percentages</p>
-
-                            <!-- The name is the headline. Three words, three lines,
-                                 the last one printed in the volt box.
-
-                                 data-lit-words, NOT data-scrub-words: it is already on
-                                 screen at load, so it gets a one-time staggered
-                                 entrance rather than a scroll scrub. -->
                             <h1 class="drop-title" id="drop-title" data-lit-words>
                                 <span class="drop-l1">Personal</span>
                                 <span class="drop-l2">Instructing</span>
                                 <span class="drop-l3">Agent</span>
                             </h1>
 
-                            <p class="drop-sub" data-reveal>
-                                Practise Grade 7 percentages step by step. Explore teaching styles,
-                                then type your student number to start.
-                            </p>
+                            <p class="drop-sub" data-reveal>Ace percentages with friendly characters!</p>
 
-                            <!-- The page's two account actions. While these are on
-                                 screen the navbar hides its own copies; nav.js brings
-                                 those back once #hero-cta scrolls away. -->
-                            <div class="hero-cta" id="hero-cta" data-reveal>
-                                <button type="button" class="tap cta cta-primary" data-auth-open="signin">
+                            <!-- Signed out: the student number is typed right here and
+                                 auth.js hands it to the sign-in dialog (wireHeroJoin).
+                                 Signed in (html[data-session]): the form is hidden and
+                                 the one button below takes over as "Continue". -->
+                            <div class="hero-cta hero-join" id="hero-cta" data-reveal>
+                                <form class="join" id="hero-join" novalidate>
+                                    <label class="sr-only" for="join-num">Student number</label>
+                                    <input class="join-in" id="join-num" type="text" inputmode="numeric"
+                                        autocomplete="off" spellcheck="false" maxlength="14"
+                                        placeholder="Enter your student number">
+                                    <button type="submit" class="join-btn">Join</button>
+                                </form>
+                                <button type="button" class="tap cta cta-primary hero-resume" data-auth-open="signin">
                                     <span class="cta-label">Enter student number</span>
                                     <span class="cta-orb" aria-hidden="true">
                                         <svg class="icon">
@@ -419,93 +413,6 @@
                                 admin marks you present first.</p>
                         </div>
 
-                        <!-- THE CAST. Six persona cutouts, dealt onto the cover.
-                             Each is a link down to the character select, and
-                             agent-select.js highlights that tutor when you land
-                             there (data-pick = the tutor's data-agent id).
-
-                             ART. Each full-body persona image fits its reserved box.
-                             The previous cast illustration is the image fallback. -->
-                        <ul class="cast" aria-label="The six tutors">
-                            <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-open">
-                                    <span class="cast-art" aria-hidden="true">
-                                        <picture>
-                                            <img src="assets/images/personas/Openness/default.webp"
-                                                data-fallback="assets/images/cast/pia-open.webp" alt="" width="1428"
-                                                height="2000" decoding="async">
-                                        </picture>
-                                    </span>
-                                    <span class="cast-name">Ava</span>
-                                    <span class="cast-tag">Finds the why</span>
-                                </a>
-                            </li>
-                            <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-conscientious">
-                                    <span class="cast-art" aria-hidden="true">
-                                        <picture>
-                                            <img src="assets/images/personas/Conscientiousness/happy.webp"
-                                                data-fallback="assets/images/cast/pia-conscientious.webp" alt=""
-                                                width="1428" height="2000" decoding="async">
-                                        </picture>
-                                    </span>
-                                    <span class="cast-name">Cara</span>
-                                    <span class="cast-tag">Every detail</span>
-                                </a>
-                            </li>
-                            <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-extravert">
-                                    <span class="cast-art" aria-hidden="true">
-                                        <picture>
-                                            <img src="assets/images/personas/Extraverted/default.webp"
-                                                data-fallback="assets/images/cast/pia-extravert.webp" alt=""
-                                                width="1428" height="2000" decoding="async">
-                                        </picture>
-                                    </span>
-                                    <span class="cast-name">Theo</span>
-                                    <span class="cast-tag">High energy</span>
-                                </a>
-                            </li>
-                            <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-agreeable">
-                                    <span class="cast-art" aria-hidden="true">
-                                        <picture>
-                                            <img src="assets/images/personas/Agreeableness/default.webp"
-                                                data-fallback="assets/images/cast/pia-agreeable.webp" alt=""
-                                                width="1428" height="2000" decoding="async">
-                                        </picture>
-                                    </span>
-                                    <span class="cast-name">Amy</span>
-                                    <span class="cast-tag">Endless patience</span>
-                                </a>
-                            </li>
-                            <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-calm">
-                                    <span class="cast-art" aria-hidden="true">
-                                        <picture>
-                                            <img src="assets/images/personas/Neuroticism/happy.webp"
-                                                data-fallback="assets/images/cast/pia-calm.webp" alt="" width="1428"
-                                                height="2000" decoding="async">
-                                        </picture>
-                                    </span>
-                                    <span class="cast-name">Kai</span>
-                                    <span class="cast-tag">Checks every step</span>
-                                </a>
-                            </li>
-                            <li class="cast-slot" data-reveal>
-                                <a class="cast-card" href="#agent-select" data-pick="pia-neutral">
-                                    <span class="cast-art" aria-hidden="true">
-                                        <picture>
-                                            <img src="assets/images/personas/Neutral/default.webp"
-                                                data-fallback="assets/images/cast/pia-neutral.webp" alt="" width="1428"
-                                                height="2000" decoding="async">
-                                        </picture>
-                                    </span>
-                                    <span class="cast-name">Noel</span>
-                                    <span class="cast-tag">Straightforward guidance</span>
-                                </a>
-                            </li>
-                        </ul>
                     </div>
 
                     <!-- WCAG 2.2.2: motion that starts on its own and runs longer
@@ -1324,7 +1231,7 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script defer src="assets/js/function.js"></script>
-    <script defer src="assets/js/auth.js?v=20261021a"></script>
+    <script defer src="assets/js/auth.js?v=20261022a"></script>
     <script defer src="assets/js/landing.js"></script>
 
     <!-- The navbar: transparent-to-solid state, the mobile sheet and the

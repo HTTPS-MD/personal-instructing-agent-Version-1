@@ -1349,8 +1349,30 @@
         try { localStorage.setItem(GREETING_NAME_KEY, JSON.stringify({ email: email, name: name })); } catch (err) { /* ignore */ }
     }
 
+    /* The hero's "Enter your student number + Join" bar. It only forwards:
+       open the same sign-in dialog, put the digits in its field and submit
+       that form, so every check still lives in handleStudentJoin. */
+    function wireHeroJoin() {
+        var form = $('#hero-join');
+        if (!form) { return; }
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var opener = $('.hero-resume');
+            var digits = $('#join-num').value.replace(/\D/g, '');
+            if (!opener) { return; }
+            opener.click();
+            var field = $('#join-number');
+            var dialogForm = $('#signin-form');
+            if (!digits || !field || !dialogForm) { return; }
+            field.value = digits;
+            if (dialogForm.requestSubmit) { dialogForm.requestSubmit(); }
+            else { dialogForm.dispatchEvent(new Event('submit', { cancelable: true })); }
+        });
+    }
+
     function boot() {
         initModals();
+        wireHeroJoin();
 
         /* Presentation-only field behaviour: works with or without a backend. */
         initPasswordToggles();

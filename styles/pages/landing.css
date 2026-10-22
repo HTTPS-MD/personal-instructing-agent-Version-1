@@ -2788,3 +2788,56 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 @media (prefers-reduced-motion: reduce) {
     .overlay, .overlay *, .nav-auth { transition: none !important; }
 }
+
+
+/* ═══════════════════════════ 7.9 CENTRED HERO · STUDENT-NUMBER JOIN BAR ═══
+   One centred column: headline, tagline, the number bar. No cast cards; the
+   tutors are met in the next act. Signed in, the bar gives way to the one
+   "Continue" button (html[data-session]). */
+.act.act-drop { justify-content: center; padding-block: calc(var(--topbar-h) + 2rem) 4rem; }
+.act-drop-inner { grid-template-columns: minmax(0, 1fr) !important; justify-items: center; }
+.hero-copy { align-items: center; text-align: center; width: 100%; }
+.drop-title { font-size: clamp(2.4rem, 7cqi, 5.5rem); line-height: 1; letter-spacing: -0.05em; }
+.drop-title > .drop-l1, .drop-title > .drop-l2 { display: inline; margin: 0; }
+.drop-title > .drop-l1 { margin-inline-end: 0.25em; }
+.drop-title > .drop-l3 { margin: 0.18em auto 0; transform-origin: 50% 50%; }
+.drop-sub { margin: 1.75rem auto 0; max-width: none; padding: 0; border: 0; font-size: clamp(1.15rem, 2vw, 1.5rem); }
+
+.hero-join { flex-direction: column; align-items: center; }
+.join {
+    display: flex;
+    width: min(38rem, 100%);
+    border: var(--edge-w) solid var(--rule);
+    background: var(--bg);
+    box-shadow: var(--hard) var(--hard) 0 var(--pop);
+}
+.join:focus-within { outline: 2px solid var(--focus); outline-offset: 4px; }
+.join-in {
+    flex: 1;
+    min-width: 0;
+    padding: 1.1rem 1.25rem;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 1.2rem;
+}
+.join-in::placeholder { color: color-mix(in srgb, var(--text) 55%, transparent); }
+.join-btn {
+    padding: 0 2.2rem;
+    border: 0;
+    border-inline-start: var(--edge-w) solid var(--rule);
+    background: var(--accent);
+    color: var(--on-accent);
+    font: inherit;
+    font-size: 1.3rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.join-btn:hover { background: var(--volt); color: var(--on-volt); }
+
+/* The Continue button only exists once a session does. */
+.hero-resume { display: none; }
+:root[data-session] .hero-resume { display: inline-flex; }
+:root[data-session] .join { display: none; }
