@@ -204,38 +204,9 @@
         queueFit();
         window.scrollTo({ top: 0, behavior: 'auto' });
 
-        /* The classroom video behind the tutor: only while the game is showing,
-           and never for people who ask for reduced motion (the poster stays). */
         if (name === 'session') {
-            startMentorVideo();
             requestAnimationFrame(function () { requestAnimationFrame(function () { fitSpeech(); centerFigure(); }); });
         }
-    }
-
-    /* The classroom behind the tutor: the landing page's own hero film, added only
-       when the game starts and never for people who ask for reduced motion (they
-       keep the still, which is the CSS background). */
-    function startMentorVideo() {
-        var side = $('.video-mentor-sidebar');
-        if (!side || $('#mentor-video')) { return; }
-        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (calm) { return; }
-
-        var video = document.createElement('video');
-        video.id = 'mentor-video';
-        video.className = 'mentor-bg-video';
-        video.muted = true; video.loop = true; video.playsInline = true;
-        video.setAttribute('aria-hidden', 'true');
-        video.tabIndex = -1;
-        video.preload = 'metadata';
-        video.poster = '../../assets/images/hero-classroom-poster.jpg';
-        var src = document.createElement('source');
-        src.src = '../../assets/videos/hero-classroom-720.mp4';
-        src.type = 'video/mp4';
-        video.appendChild(src);
-        side.insertBefore(video, side.firstChild);
-        var p = video.play();
-        if (p && p.catch) { p.catch(function () {}); }
     }
 
     function setBootText(message) {
@@ -800,7 +771,10 @@
         if (closed) {
             if (!state.startLede) { state.startLede = lede.textContent; }
             btn.disabled = true;
-            lede.textContent = 'Tutoring is closed right now. Please wait for your teacher to open it again.';
+            /* Before the teacher's start time it is "not open yet"; after the end it is closed. */
+            lede.textContent = state.notOpenYet
+                ? 'Tutoring has not opened yet. Please wait for your teacher to open it.'
+                : 'Tutoring is closed right now. Please wait for your teacher to open it again.';
         } else if (state.startLede) {
             lede.textContent = state.startLede;
             state.startLede = '';
@@ -826,12 +800,20 @@
         if (!res || res.error || !res.data) { return; }   /* no answer: nothing changes */
 
         clearTimeout(state.closeTimer);
-        var left = Number(res.data.seconds_to_close);
-        if (res.data.seconds_to_close != null && isFinite(left) && left >= 0) {
+        /* The page re-asks at the exact moment the window opens or closes (never drawn). */
+        var left = Number(res.data.seconds_to_close != null ? res.data.seconds_to_close : res.data.seconds_to_open);
+        var nextAt = res.data.seconds_to_close != null ? res.data.seconds_to_close : res.data.seconds_to_open;
+        if (nextAt != null && isFinite(left) && left >= 0) {
             state.closeTimer = setTimeout(checkTutoring, Math.min(left, 3600) * 1000 + 300);
         }
 
         var closed = res.data.closed === true;
+        var notYet = res.data.not_open_yet === true;
+        if (notYet !== state.notOpenYet && closed === state.closed && !state.inSession) {
+            state.notOpenYet = notYet;
+            paintStartClosed(closed);
+        }
+        state.notOpenYet = notYet;
         if (closed === state.closed && (closed === state.expired || !state.inSession)) {
             if (!state.inSession) { paintStartClosed(closed); }
             return;

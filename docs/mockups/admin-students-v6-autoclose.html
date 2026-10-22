@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-surface="admin"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup v6: one Tutoring switch with auto-close</title>
+<link rel="stylesheet" href="../../styles/global.css"><link rel="stylesheet" href="../../styles/pages/admin.css"><link rel="stylesheet" href="../../styles/pages/admin-console.css">
+<style>
+body{margin:0;background:var(--bg-body);color:var(--text);font-family:var(--font-body);font-size:var(--fs-body)}
+.w{mawidth:1000px;margin:0 auto;padding:28px 32px 40px}
+h1{margin:0 0 4px;font-size:var(--fs-h1)} .msub{color:var(--text-muted);margin:0 0 24px}
+.state{margin-bottom:28px}
+.mlab{display:flex;align-items:center;gap:10px;margin:0 0 10px;font:500 var(--fs-xs) var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint)}
+.mlab b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font:600 11px var(--font-body);letter-spacing:0}
+.mbar{background:var(--bg-surface);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:14px 16px;display:flex;align-items:center;gap:14px;flewrap:wrap;position:relative}
+.stage{display:flex;align-items:center;gap:10px;padding:8px 14px;border:1px solid var(--line-soft);border-radius:var(--r-md);background:var(--bg-surface-hi)}
+.stage .n{color:var(--text-muted)}
+.sw{width:34px;height:18px;border-radius:9px;background:var(--track);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+.sw.on{background:var(--accent)} .sw.on::after{left:18px}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:3px 10px;border-radius:999px;font-size:var(--fs-sm);font-weight:600}
+.pill i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.open{color:#7fd6a0;background:color-mix(in srgb,#3fb97a 14%,transparent)}
+.pill.closed{color:#f08a8a;background:color-mix(in srgb,#e5484d 14%,transparent)}
+.pill.plain{color:var(--text-muted);background:var(--bg-chip)}
+.mb{height:30px;padding:0 12px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:var(--r-md);font:inherit;font-size:var(--fs-sm)}
+.mb.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600} .mb.dng{color:#f08a8a;border-color:#6b3a3f}
+.sp{flex:1}
+.mhint{color:var(--text-muted);font-size:var(--fs-sm)}
+.mpop{margin-top:10px;width:380px;background:var(--bg-surface-hi);border:1px solid var(--line);border-radius:var(--r-card);padding:18px;boshadow:var(--shadow-lg)}
+.mpop h3{margin:0 0 4px;font-size:var(--fs-h3)} .mpop p{margin:0 0 14px;color:var(--text-muted);font-size:var(--fs-sm)}
+.chk{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.box{width:16px;height:16px;border-radius:3px;background:var(--accent);display:grid;place-items:center;color:#fff;font-size:11px}
+.num{display:inline-flex;align-items:center;height:30px;min-width:56px;padding:0 10px;border:1px solid var(--line-input);border-radius:var(--r-md);background:var(--bg-field);justify-content:center;font-family:var(--font-mono)}
+.mpop .mrow{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.tab{padding:8px 12px;color:var(--text-muted)} .tabs{display:flex;gap:4px;align-items:center}
+.warn{margin:10px 0 0;padding:10px 12px;border:1px solid color-mix(in srgb,#e5a43a 45%,transparent);background:color-mix(in srgb,#e5a43a 10%,transparent);border-radius:var(--r-md);color:#e8c27a;font-size:var(--fs-sm)}
+.bad{font-size:var(--fs-sm);color:var(--text-faint);margin-top:6px}
+.rad{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-input);flex:none;box-sizing:border-box}.rad.on{border:5px solid var(--accent)}.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}.seg i{font-style:normal;padding:4px 9px;font-size:12px;color:var(--text-muted);border-left:1px solid var(--line)}.seg i:first-child{border-left:0}.seg i.on{background:var(--accent-soft);color:var(--accent-text)}.mpop{width:440px!important}.mbar:has(.mpop){padding-bottom:14px}.sched{margin:2px 0 14px 26px;display:flex;flex-direction:column;gap:8px}.fld{display:flex;align-items:center;gap:8px}.fl{width:40px;color:var(--text-muted);font-size:var(--fs-sm)}.fv{flex:1;height:30px;display:flex;align-items:center;padding:0 10px;border:1px solid var(--line-input);border-radius:6px;background:var(--bg-field)}.fv.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}.tm{height:30px;min-width:84px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line-input);border-radius:6px;background:var(--bg-field);font-family:var(--font-mono);font-size:12px}
+.mpop{width:420px!important}
+.cal{position:absolute;left:436px;top:0;width:290px;background:var(--bg-surface-hi);border:1px solid var(--line);border-radius:var(--r-card);padding:14px;box-shadow:var(--shadow-lg)}.ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.ch span{color:var(--text-muted);padding:0 8px}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}.cg u{text-decoration:none;color:var(--text-faint);font-size:11px;padding:4px 0}.cg i{font-style:normal;height:30px;display:grid;place-items:center;border-radius:6px;font-size:13px}.cg i.past{color:var(--text-faint);opacity:.45}.cg i.today{box-shadow:inset 0 0 0 1px var(--line-input)}.cg i.sel{background:var(--accent);color:#fff;font-weight:600}
+.ct{display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}.ct .mhint{margin-right:auto}.seg2{display:inline-flex;margin-left:6px;border:1px solid var(--line);border-radius:6px;overflow:hidden}.seg2 i{font-style:normal;padding:4px 9px;font-size:12px;color:var(--text-muted)}.seg2 i.on{background:var(--accent-soft);color:var(--accent-text)}
+.ct .num{min-width:38px!important;padding:0 6px}.dt{display:inline-flex;align-items:center;height:30px;padding:0 6px;border:1px solid var(--line-input);border-radius:6px;background:var(--bg-field);gap:0}.dt.bad{border-color:#e5484d}.dt em{font-style:normal;color:var(--text-faint);padding:0 1px}.sg{text-align:center;font-family:var(--font-mono);font-size:13px;border-radius:4px;padding:2px 0}.dt:first-of-type .sg:first-child{background:var(--accent-soft);color:var(--accent-text)}.tt{margin-left:8px}.cic{margin-left:8px;color:var(--text-muted);width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px}.note{margin:10px 0 0;color:var(--text-muted);font-size:var(--fs-sm)}.mpop{width:520px!important}.fl{width:40px}.tt .seg2{margin-left:6px}
+.tt{padding-right:2px!important}.tt .seg2{margin-right:-4px}</style></head><body><div class="w">
+<h1>Students · Earth</h1><p class="msub">Each stage has one switch. For Tutoring, you can also let it close by itself.</p>
+
+<div class="state"><div class="mlab"><b>1</b> Closed (switch off)</div>
+<div class="mbar"><div class="stage"><span class="n">Tutoring dashboard</span><span class="sw"></span><span class="pill closed"><i></i>Closed</span></div><span class="mhint">Students of Earth can’t enter Tutoring.</span></div></div>
+
+<div class="state"><div class="mlab"><b>2</b> You turn it on → pick Schedule (typeable date, default today) or Open now</div>
+<div class="mbar" style="padding-bottom:14px"><div class="stage"><span class="n">Tutoring dashboard</span><span class="sw on"></span></div>
+<div class="mpop" style="margin-top:12px">
+<h3>Open Tutoring for Earth</h3><p>22 students will be able to enter.</p>
+<div class="chk"><span class="rad on"></span> <b>Schedule</b> <span class="mhint">opens and closes by itself</span></div>
+<div class="sched"><div class="fld"><span class="fl">Start</span><span class="dt"><span class="sg" style="width:30px">10</span><em>/</em><span class="sg" style="width:30px">22</span><em>/</em><span class="sg" style="width:30px">26</span></span><span class="dt tt"><span class="sg" style="width:30px">9</span><em>:</em><span class="sg" style="width:30px">00</span><span class="seg2"><i class="on">AM</i><i class="">PM</i></span></span><span class="cic">▦</span></div><div class="fld"><span class="fl">End</span><span class="dt"><span class="sg" style="width:30px">10</span><em>/</em><span class="sg" style="width:30px">22</span><em>/</em><span class="sg" style="width:30px">26</span></span><span class="dt tt"><span class="sg" style="width:30px">10</span><em>:</em><span class="sg" style="width:30px">00</span><span class="seg2"><i class="on">AM</i><i class="">PM</i></span></span><span class="cic">▦</span></div>
+<div class="mhint" style="margin-left:48px">Runs 1 hr · Thu, Oct 22 · students see “Not open yet” until the start.</div></div>
+<div class="chk"><span class="rad"></span> <b>Open now</b> <span class="mhint">stays open until you close it</span></div>
+<div class="mrow"><button class="mb">Cancel</button><button class="mb pri">Schedule</button></div>
+</div></div>
+<div class="note">Date starts as today. Click a part (MM, DD, YY) and type, or use ↑ ↓. The ▦ icon opens a calendar only if you want one.</div>
+<div class="mbar" style="margin-top:10px;display:block;border-color:#6b3a3f"><div class="mlab" style="margin:0 0 8px">Wrong entry looks like this</div><div class="fld" style="margin-left:0"><span class="fl">End</span><span class="dt bad"><span class="sg" style="width:30px">10</span><em>/</em><span class="sg" style="width:30px">22</span><em>/</em><span class="sg" style="width:30px">26</span></span><span class="dt tt bad"><span class="sg" style="width:30px">8</span><em>:</em><span class="sg" style="width:30px">00</span><span class="seg2"><i class="on">AM</i><i>PM</i></span></span><span class="mhint" style="color:#f08a8a">End must be after the start (9:00 AM).</span></div></div>
+</div>
+
+<div class="state"><div class="mlab"><b>3</b> Open with a timer (what you see while it runs)</div>
+<div class="mbar"><div class="stage"><span class="n">Tutoring dashboard</span><span class="sw on"></span><span class="pill open"><i></i>Open · closes in 42 min</span></div><button class="mb">+ 30 min</button><button class="mb dng">Close now</button><span class="sp"></span><span class="mhint">Closes 10:00 AM</span></div></div>
+
+<div class="state"><div class="mlab"><b>4</b> Open with no timer</div>
+<div class="mbar"><div class="stage"><span class="n">Tutoring dashboard</span><span class="sw on"></span><span class="pill open"><i></i>Open</span></div><button class="mb">Set auto-close…</button><span class="sp"></span><span class="mhint">Stays open until you switch it off.</span></div></div>
+
+<div class="state"><div class="mlab"><b>5</b> The timer ran out → it shows Closed by itself and the switch flips off</div>
+<div class="mbar"><div class="stage"><span class="n">Tutoring dashboard</span><span class="sw"></span><span class="pill closed"><i></i>Closed · auto-closed 10:00 AM</span></div><button class="mb pri">Reopen</button><span class="sp"></span><span class="mhint">No more “switch says open but students are locked out”.</span></div></div>
+<div class="state"><div class="mlab"><b>6</b> Scheduled (switch is armed, not open yet)</div>
+<div class="mbar"><div class="stage"><span class="n">Tutoring dashboard</span><span class="sw on"></span><span class="pill plain"><i></i>Scheduled · Oct 28, 9:00–10:00 AM</span></div><button class="mb">Edit</button><button class="mb dng">Cancel schedule</button><span class="sp"></span><span class="mhint">Opens by itself at 9:00. Students see “Not open yet” until then.</span></div></div>
+</div></body></html>

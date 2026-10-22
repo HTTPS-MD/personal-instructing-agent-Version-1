@@ -186,7 +186,7 @@
                     </nav>
                 </div>
                 <div class="topbar-right">
-                    <button type="button" class="quickfind" id="palette-open" aria-haspopup="dialog"
+                    <button type="button" class="quickfind" id="palette-open" hidden aria-haspopup="dialog"
                         aria-controls="palette" aria-expanded="false"
                         aria-label="Search students, sections, or commands" aria-keyshortcuts="Control+K Meta+K">
                         <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
@@ -268,8 +268,6 @@
                         <p class="scope-line" id="scope-line" aria-live="polite">Loading…</p>
                         <button type="button" class="btn btn-secondary is-hidden" id="section-scores-open">Input Scores</button>
                     </div>
-
-
 
                     <!-- Section chips and attendance for the chosen section; admin/js/students-tools.js
                          draws them, and the Student number column of the table. -->
@@ -487,7 +485,12 @@
                             </button>
                         </div>
 
-                        <div class="grid grid-main">
+                        <div class="qb-subtabs" role="tablist" aria-label="Math task sections">
+                            <button class="qb-subtab is-active" type="button" role="tab" id="qb-tab-questions" aria-selected="true" data-qb-view="questions">Questions</button>
+                            <button class="qb-subtab" type="button" role="tab" id="qb-tab-rules" aria-selected="false" data-qb-view="rules">Rules</button>
+                        </div>
+
+                        <div class="grid grid-main qb-view-questions" id="qb-views">
                             <!-- Question bank -->
                             <div class="card" data-region="mathtask">
                                 <div class="card-head">
@@ -575,13 +578,6 @@
                                         </div>
                                     </div>
 
-                                    <div class="field qb-global">
-                                        <label class="label" for="qb-closes-at">Tutoring closes at <span class="qb-scope">All topics</span></label>
-                                        <input class="input" type="datetime-local" id="qb-closes-at" step="60" disabled>
-                                        <p class="field-msg" data-msg-for="qb-closes-at"></p>
-                                        <p class="qb-help" id="qb-closes-note">Available after the game database update.</p>
-                                        <button class="btn btn-secondary btn-sm" type="button" id="qb-closes-clear" disabled>Clear closing time</button>
-                                    </div>
                                     <fieldset class="qb-scoring" id="qb-scoring">
                                         <legend class="label">Scoring rules <span class="qb-scope">All topics</span></legend>
                                         <p class="qb-help">A question's score = its maximum points, minus a penalty for each wrong answer and each hint, plus a bonus for a fast answer with no wrong answer. Percentages are of that question's own maximum, so they work for any point value. The server works the score out when the question is finished; students never see it.</p>
@@ -774,6 +770,103 @@
                     <button class="btn btn-primary" type="submit" form="register-student-form" id="rs-submit">
                         <svg class="icon"><use href="#i-check"></use></svg>
                         Register student
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================ MODAL · ENROLL STUDENTS (batch) -->
+    <!-- Two steps. 1 Add: a section and school emails. 2 Review: one row per student (name read
+         from the email, condition, status), then one consent box and Enroll. Each student goes
+         through the same steps as Register student (enrollOneStudent): roster check, auth account
+         with a random password nobody sees, profile row with both consents. Nothing is created
+         until every row is Ready and the consent box is ticked. -->
+    <div class="overlay" id="modal-enroll-students" role="dialog" aria-modal="true"
+        aria-labelledby="enroll-students-title">
+        <div class="modal modal-xl modal-enroll">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="enroll-students-title">Enroll students</h2>
+                    <p class="muted" id="bn-step-label" aria-live="polite">Step 1 of 2 · Add</p>
+                </div>
+            </header>
+
+            <div class="modal-body">
+                <form id="enroll-students-form" novalidate>
+                    <div id="bn-step-add">
+                        <div class="bn-intro">
+                            <div class="field bn-section-field">
+                                <label class="label" for="bn-section" id="bn-section-label">Section <span class="req">*</span></label>
+                                <select class="select" id="bn-section" data-section-select></select>
+                                <p class="field-msg" data-msg-for="bn-section"></p>
+                            </div>
+                            <div class="field bn-emails-field">
+                                <label class="label" for="bn-emails">School emails, one per line</label>
+                                <textarea class="input" id="bn-emails" rows="8" autocomplete="off" spellcheck="false"
+                                    placeholder="lastname.firstname@ue.edu.ph" aria-describedby="bn-emails-hint"></textarea>
+                                <p class="field-hint muted" id="bn-emails-hint">Names are read from lastname.firstname@ue.edu.ph and shown for you to check on the next step.</p>
+                                <p class="field-msg" id="bn-add-msg" aria-live="polite"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="bn-step-review" class="is-hidden">
+                        <div class="bn-review-head">
+                            <button type="button" class="btn btn-ghost btn-sm" id="bn-back">&larr; Back</button>
+                            <p class="bn-review-title" id="bn-review-title"></p>
+                            <p class="bn-issues" id="bn-issues" aria-live="polite"></p>
+                        </div>
+
+                        <div class="bn-tools">
+                            <div class="filter-field">
+                                <label class="filter-label" for="bn-apply-group" id="bn-apply-group-label">Condition for everyone</label>
+                                <select class="input input-sm" id="bn-apply-group">
+                                    <option value="">Choose…</option>
+                                    <option value="assigned">EXP · Assigned persona</option><option value="non-assigned">EXP · Free choice</option><option value="neutral">EXP · Neutral persona</option><option value="control">CTRL · Traditional</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" id="bn-apply-all">Apply</button>
+                        </div>
+
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Students to enroll">
+                            <table class="table bn-table" id="bn-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">School email</th>
+                                        <th scope="col">Condition</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col"><span class="sr-only">Remove</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bn-tbody"></tbody>
+                            </table>
+                        </div>
+                        <p class="scope-line" id="bn-summary" aria-live="polite"></p>
+                    </div>
+
+                    <div class="bn-report is-hidden" id="bn-report" aria-live="polite"></div>
+                </form>
+            </div>
+
+            <footer class="modal-foot modal-foot-split">
+                <div class="bn-foot-consent is-hidden" id="bn-consent-wrap">
+                    <label class="check">
+                        <input type="checkbox" id="bn-consent">
+                        <span class="check-box"><svg class="icon"><use href="#i-check"></use></svg></span>
+                        <span class="check-text">
+                            Parental consent and student assent received for every student listed <span class="req">*</span>
+                        </span>
+                    </label>
+                    <p class="field-msg" data-msg-for="bn-consent"></p>
+                </div>
+                <div class="modal-foot-actions">
+                    <button class="btn btn-secondary" type="button" data-modal-close id="bn-cancel">Cancel</button>
+                    <button class="btn btn-primary" type="button" id="bn-continue">Continue</button>
+                    <button class="btn btn-primary is-hidden" type="submit" form="enroll-students-form" id="bn-submit" disabled>
+                        <svg class="icon"><use href="#i-check"></use></svg>
+                        <span id="bn-submit-label">Enroll students</span>
                     </button>
                 </div>
             </footer>
@@ -1303,6 +1396,45 @@
             <footer class="modal-foot">
                 <button class="btn btn-secondary" data-modal-close>Cancel</button>
                 <button class="btn btn-danger" id="confirm-accept">Proceed</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================ MODAL · OPEN / SCHEDULE THE TUTORING -->
+    <div class="overlay" id="modal-tutoring" role="dialog" aria-modal="true" aria-labelledby="tut-title">
+        <div class="modal modal-sm tut-modal">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="tut-title">Open Tutoring</h2>
+                    <p class="modal-sub" id="tut-sub"></p>
+                </div>
+            </header>
+            <div class="modal-body">
+                <label class="tut-opt"><input type="radio" name="tut-mode" value="schedule" checked>
+                    <b>Schedule</b> <span class="muted">opens and closes by itself</span></label>
+                <div class="tut-sched" id="tut-sched">
+                    <div class="tut-row" data-tut-row="start">
+                        <span class="tut-lab">Start</span>
+                        <span class="tut-box"><input inputmode="numeric" maxlength="2" data-p="mo" aria-label="Start month" placeholder="MM"><i>/</i><input inputmode="numeric" maxlength="2" data-p="d" aria-label="Start day" placeholder="DD"><i>/</i><input inputmode="numeric" maxlength="2" data-p="y" aria-label="Start year" placeholder="YY"></span>
+                        <span class="tut-box"><input inputmode="numeric" maxlength="2" data-p="h" aria-label="Start hour" placeholder="h"><i>:</i><input inputmode="numeric" maxlength="2" data-p="mi" aria-label="Start minute" placeholder="mm"><span class="tut-ampm"><button type="button" data-ap="AM">AM</button><button type="button" data-ap="PM">PM</button></span></span>
+                        <button type="button" class="tut-cal-btn" data-tut-cal="start" aria-label="Pick the start date"><svg class="icon"><use href="#i-grid"></use></svg></button>
+                    </div>
+                    <div class="tut-row" data-tut-row="end">
+                        <span class="tut-lab">End</span>
+                        <span class="tut-box"><input inputmode="numeric" maxlength="2" data-p="mo" aria-label="End month" placeholder="MM"><i>/</i><input inputmode="numeric" maxlength="2" data-p="d" aria-label="End day" placeholder="DD"><i>/</i><input inputmode="numeric" maxlength="2" data-p="y" aria-label="End year" placeholder="YY"></span>
+                        <span class="tut-box"><input inputmode="numeric" maxlength="2" data-p="h" aria-label="End hour" placeholder="h"><i>:</i><input inputmode="numeric" maxlength="2" data-p="mi" aria-label="End minute" placeholder="mm"><span class="tut-ampm"><button type="button" data-ap="AM">AM</button><button type="button" data-ap="PM">PM</button></span></span>
+                        <button type="button" class="tut-cal-btn" data-tut-cal="end" aria-label="Pick the end date"><svg class="icon"><use href="#i-grid"></use></svg></button>
+                    </div>
+                    <div class="tut-cal" id="tut-cal" hidden></div>
+                    <p class="muted tut-summary" id="tut-summary"></p>
+                    <p class="tut-error" id="tut-error" role="alert" hidden></p>
+                </div>
+                <label class="tut-opt"><input type="radio" name="tut-mode" value="now">
+                    <b>Open now</b> <span class="muted">stays open until you close it</span></label>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" data-modal-close>Cancel</button>
+                <button class="btn btn-primary" id="tut-accept">Schedule</button>
             </footer>
         </div>
     </div>

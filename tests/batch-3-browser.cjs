@@ -67,7 +67,7 @@ function makeData(overrides = {}) {
   return Object.assign({
     profiles: students.concat(admins), sections: sections.map(name => ({ name })), professors,
     settings: [{ key: 'stage_ocean', value: false }, { key: 'stage_char', value: false }, { key: 'stage_dash', value: false }],
-    stage_overrides: [], ocean_submissions: [], question_bank: [], app_config: [],
+    stage_overrides: [], tutoring_schedule: [], ocean_submissions: [], question_bank: [], app_config: [],
     student_stage_time: stageTimes
   }, overrides);
 }
@@ -162,6 +162,23 @@ function fixture() {
             score_sum: 0, errors: 0, hints: 0 }, history_total: 0, history: []
         }, error: null };
       }
+      if (name === 'admin_create_auth_user') {
+        if ((f.authFail || []).indexOf(args.target_email) !== -1) return { data: null, error: { message: 'fixture auth failure' } };
+        return { data: { ok: true }, error: null };
+      }
+      if (name === 'admin_grant_stage') {
+        (f.data.stage_overrides = f.data.stage_overrides || []).push({ stage: args.p_stage, section: args.p_section, granted_count: 1 });
+        return { data: { granted: ['student01@example.test'], skipped: [] }, error: null };
+      }
+      if (name === 'admin_revoke_stage') {
+        f.data.stage_overrides = (f.data.stage_overrides || []).filter(o => !(o.stage === args.p_stage && args.p_sections.indexOf(o.section) !== -1));
+        return { data: { moved: 0 }, error: null };
+      }
+      if (name === 'admin_set_tutoring_schedule') {
+        f.data.tutoring_schedule = (f.data.tutoring_schedule || []).filter(r => r.section !== args.p_section);
+        if (args.p_opens || args.p_closes) f.data.tutoring_schedule.push({ section: args.p_section, opens_at: args.p_opens, closes_at: args.p_closes });
+        return { data: { section: args.p_section }, error: null };
+      }
       if (name === 'claim_device') {
         const mine = args.p_device_id;
         const row = f.data.profiles.find(p => p.email === me);
@@ -191,13 +208,13 @@ function fixture() {
     await context.addInitScript(t => { try { if (!localStorage.getItem('pia_theme')) localStorage.setItem('pia_theme', t); localStorage.setItem('pia_user_email', 'admin@example.test'); } catch (e) {} }, theme);
     await context.route('**/*', r => {
       const u = r.request().url();
-      if (u.startsWith(origin + '/')) return r.continue();
       if (u.includes('/assets/js/vendor/supabase.js')) return r.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
+      if (u.startsWith(origin + '/')) return r.continue();
       leaked.push(u); return r.abort('blockedbyclient');
     });
     const page = await context.newPage();
     page.setDefaultTimeout(8000);
-    page.on('pageerror', e => results.push({ error: e.message }));
+    page.on('pageerror', e => results.push({ error: e.message, stack: String(e.stack).split('\n').slice(0, 3).join(' | ') }));
     if (clock) await page.clock.install({ time: new Date() });
     await page.goto(origin + ADMIN + '#' + route);
     await page.waitForFunction(() => !document.body.hasAttribute('data-boot'));
@@ -230,8 +247,8 @@ function fixture() {
     await context.route('**/*', r => {
       const u = r.request().url();
       if (u.endsWith('/admin/js/admin-dashboard.js')) return r.abort('failed');
-      if (u.startsWith(origin + '/')) return r.continue();
       if (u.includes('/assets/js/vendor/supabase.js')) return r.fulfill({ contentType: 'text/javascript', body: `(${fixture.toString()})();` });
+      if (u.startsWith(origin + '/')) return r.continue();
       return r.abort('blockedbyclient');
     });
     const page = await context.newPage();
@@ -347,10 +364,8 @@ function fixture() {
     const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, time_limit: 10, max_points: 10, game_closes_at: null }] }) });
     await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
     assert.equal((await p.locator('#view-mathtask .page-title').innerText()).trim(), 'Math task bank');
-    assert.equal(await p.locator('#qb-closes-at').isEnabled(), true);
+    assert.equal(await p.locator('#qb-closes-at, #qb-closes-note, #qb-closes-clear').count(), 0, 'the closing time moved to the Tutoring switch on Students');
     assert.equal(await p.locator('#qb-max-points, #qb-time-limit').count(), 0, 'Max points and the minutes limit are gone');
-    assert.match(await p.locator('#qb-closes-note').innerText(), /Philippine time/);
-    assert.match(await p.locator('#qb-closes-note').innerText(), /never shown/);
     await shot(p, 'mathtask-dark-1280');
     await p.locator('#qb-add-btn').click();
     assert.equal(await p.locator('#qb-steps .qb-step').count(), 2);
@@ -384,52 +399,38 @@ function fixture() {
     assert.equal(await p.locator('#qb-steps .qb-step').count(), 3);
     assert.equal(await overflow(p), true);
     await p.locator('#modal-qb-edit .modal-close').click();
-    await p.locator('#qb-closes-at').fill('2031-10-06T08:00');
+    await p.locator('[data-qb-view="rules"]').click();
+    await p.locator('#qb-min-questions').fill('4');
     await p.locator('#qb-config-save').click();
     await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
     const configWrite = (await calls(p)).find(c => c.table === 'app_config' && c.write === 'upsert');
-    assert.equal(configWrite.values.game_closes_at, '2031-10-06T08:00:00+08:00', 'saved as Philippine time (UTC+8)');
-    assert.equal(Date.parse(configWrite.values.game_closes_at), Date.parse('2031-10-06T00:00:00Z'), '08:00 PHT is 00:00 UTC');
+    assert.equal('game_closes_at' in configWrite.values, false, 'the global closing time is no longer written');
     assert.equal('max_points' in configWrite.values, false, 'max points is no longer sent');
     assert.equal('time_limit' in configWrite.values, false, 'the minutes limit is no longer sent');
-    await p.waitForFunction(() => !document.querySelector('#qb-closes-clear').disabled);
-    await p.locator('#qb-closes-clear').click();
-    assert.equal(await p.locator('#qb-closes-at').inputValue(), '');
-    await p.locator('#qb-config-save').click();
-    await p.waitForFunction(() => window.fixture.calls.filter(c => c.table === 'app_config' && c.write === 'upsert').length === 2);
-    const cleared = (await calls(p)).filter(c => c.table === 'app_config' && c.write === 'upsert')[1];
-    assert.equal(cleared.values.game_closes_at, null, 'cleared closing time is saved as null');
     await p.context().close();
-    const beforeGameMigration = await open('mathtask');
-    await beforeGameMigration.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
-    assert.equal(await beforeGameMigration.locator('#qb-closes-at').isEnabled(), false);
-    await beforeGameMigration.context().close();
   });
 
-  await check('math task: another admin\'s save (closing time, rules) reaches this screen at once; unsaved edits are kept and the admin is told', async () => {
+  await check('math task: another admin\'s save (rules) reaches this screen at once; unsaved edits are kept and the admin is told', async () => {
     const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, time_limit: 10, max_points: 10, game_closes_at: null }] }) });
     await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
     const emit = (table) => p.evaluate((tb) => (window.__rt || []).filter(r => r.filter && r.filter.table === tb).forEach(r => r.cb({ eventType: 'UPDATE' })), table);
-    assert.equal(await p.locator('#qb-closes-at').inputValue(), '', 'no closing time yet');
-    // another admin sets 1:00 AM Philippine time (17:00 UTC the day before)
-    await p.evaluate(() => { window.fixture.data.app_config[0].game_closes_at = '2031-10-05T17:00:00+00:00'; });
-    await emit('app_config');
-    await p.waitForFunction(() => document.querySelector('#qb-closes-at').value === '2031-10-06T01:00', null, { timeout: 4000 });
-    assert.match(await p.locator('body').innerText(), /Updated by another admin/);
-    // a mastery change by someone else arrives too
+    await p.locator('[data-qb-view="rules"]').click();
+    assert.equal(await p.locator('#qb-closes-at').count(), 0);
+    // another admin's mastery change arrives
     await p.evaluate(() => { window.fixture.data.app_config[0].easy_mastery = 65; });
     await emit('app_config');
     await p.waitForFunction(() => document.querySelector('#qb-mastery').value === '65', null, { timeout: 4000 });
+    assert.match(await p.locator('body').innerText(), /Updated by another admin/);
     // now THIS admin has an unsaved edit; the other admin saves again: the edit stays, with a warning
-    await p.locator('#qb-closes-at').fill('2031-12-25T20:00');
-    await p.evaluate(() => { window.fixture.data.app_config[0].game_closes_at = '2031-10-07T00:00:00+00:00'; });
+    await p.locator('#qb-min-questions').fill('5');
+    await p.evaluate(() => { window.fixture.data.app_config[0].easy_mastery = 70; });
     await emit('app_config');
     await p.waitForFunction(() => /Changed by another admin/.test(document.body.innerText), null, { timeout: 4000 });
-    assert.equal(await p.locator('#qb-closes-at').inputValue(), '2031-12-25T20:00', 'unsaved edit kept');
+    assert.equal(await p.locator('#qb-min-questions').inputValue(), '5', 'unsaved edit kept');
     // our own save does not announce itself as someone else\'s
     await p.locator('#qb-config-save').click();
     await p.waitForFunction(() => window.fixture.calls.some(c => c.table === 'app_config' && c.write === 'upsert'));
-    await p.evaluate(() => { window.fixture.data.app_config[0].game_closes_at = '2031-12-25T12:00:00+00:00'; });
+    await p.evaluate(() => { const c = window.fixture.data.app_config[0]; c.easy_mastery = 65; c.easy_min_questions = 5; });
     const before = (await p.locator('body').innerText()).split('Updated by another admin').length;
     await emit('app_config');
     await p.waitForTimeout(600);
@@ -440,6 +441,7 @@ function fixture() {
   await check('math task: scoring rules are configurable, validated, saved to the database config and shown with a live example; points are labelled as the maximum', async () => {
     const p = await open('mathtask', { data: makeData({ app_config: [{ id: 1, game_closes_at: null, score_wrong_pct: 20, score_hint_pct: 10, score_fast_bonus_pct: 20, score_fast_seconds: 30, score_speed_bonus: true, score_min: 0, score_repeat_enabled: false, score_repeat_pct: 50 }] }) });
     await p.waitForFunction(() => !document.querySelector('#qb-add-btn').disabled);
+    await p.locator('[data-qb-view="rules"]').click();
     const val = id => p.locator('#' + id).inputValue();
     assert.deepEqual([await val('qb-sc-wrong'), await val('qb-sc-hint'), await val('qb-sc-fast'), await val('qb-sc-secs'), await val('qb-sc-min'), await val('qb-sc-repeat-pct')], ['20', '10', '20', '30', '0', '50'], 'the saved values are shown');
     assert.equal(await p.locator('#qb-sc-speed').isChecked(), true);
@@ -1276,6 +1278,73 @@ function fixture() {
     await p.context().close();
   });
 
+  /* ================= TUTORING SWITCH + SCHEDULE (0060) ================= */
+  const pickSection = async (p, name) => {
+    await p.evaluate(n => { const sel = document.querySelector('#section-filter'); sel.value = n; sel.dispatchEvent(new Event('change', { bubbles: true })); }, name);
+    await p.waitForFunction(() => { const b = document.querySelector('[data-gate-switch="dash"]'); return b && !b.hidden && !b.disabled; });
+  };
+  const fillRow = async (p, which, [mo, d, y, h, mi, ap]) => {
+    const row = p.locator(`[data-tut-row="${which}"]`);
+    for (const [k, v] of [['mo', mo], ['d', d], ['y', y], ['h', h], ['mi', mi]]) await row.locator(`[data-p="${k}"]`).fill(String(v));
+    await row.locator(`[data-ap="${ap}"]`).click();
+  };
+  await check('tutoring switch: Schedule takes a start and an end, lets the section in, then saves the window (Philippine time)', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await pickSection(p, 'Earth');
+    await p.locator('[data-gate-switch="dash"]').click();
+    await p.waitForSelector('#modal-tutoring.is-open');
+    assert.match(await p.locator('#tut-title').innerText(), /Open Tutoring for Earth/);
+    assert.equal(await p.locator('#tut-accept').innerText(), 'Schedule');
+    await fillRow(p, 'start', ['12', '31', '31', '9', '00', 'AM']);
+    await fillRow(p, 'end', ['12', '31', '31', '10', '30', 'AM']);
+    assert.match(await p.locator('#tut-summary').innerText(), /Runs 1 h 30 min/);
+    await shot(p, 'tutoring-schedule-dialog-1280');
+    await p.locator('[data-tut-cal="start"]').click();
+    await shot(p, 'tutoring-schedule-calendar-1280');
+    await p.locator('[data-tut-cal="start"]').click();
+    await p.locator('#tut-accept').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.name === 'admin_set_tutoring_schedule'));
+    const made = (await calls(p)).filter(c => c.name === 'admin_grant_stage' || c.name === 'admin_set_tutoring_schedule');
+    assert.deepEqual(made.map(c => c.name), ['admin_grant_stage', 'admin_set_tutoring_schedule'], 'lets the section in first, then saves the window');
+    assert.deepEqual(made[1].args, { p_section: 'Earth', p_opens: '2031-12-31T01:00:00.000Z', p_closes: '2031-12-31T02:30:00.000Z' }, '9:00 AM and 10:30 AM Philippine time');
+    await p.waitForFunction(() => /Scheduled/.test(document.querySelector('.stage-state') ? document.querySelector('.stage-state').innerText : ''));
+    assert.equal(await p.locator('[data-gate-switch="dash"]').getAttribute('aria-checked'), 'true');
+    await p.context().close();
+  });
+  await check('tutoring switch: a wrong entry is explained and cannot be saved; Open now clears the window', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await pickSection(p, 'Earth');
+    await p.locator('[data-gate-switch="dash"]').click();
+    await p.waitForSelector('#modal-tutoring.is-open');
+    await fillRow(p, 'start', ['12', '31', '31', '9', '00', 'AM']);
+    await fillRow(p, 'end', ['12', '31', '31', '8', '00', 'AM']);
+    assert.match(await p.locator('#tut-error').innerText(), /end must be after the start/i);
+    assert.equal(await p.locator('#tut-accept').isDisabled(), true);
+    await fillRow(p, 'end', ['02', '31', '31', '8', '00', 'AM']);
+    assert.match(await p.locator('#tut-error').innerText(), /real date and time/i, 'Feb 31 is not a date');
+    await p.locator('input[name="tut-mode"][value="now"]').check();
+    assert.equal(await p.locator('#tut-accept').innerText(), 'Open now');
+    assert.equal(await p.locator('#tut-accept').isDisabled(), false);
+    await p.locator('#tut-accept').click();
+    await p.waitForFunction(() => window.fixture.calls.some(c => c.name === 'admin_set_tutoring_schedule'));
+    const set = (await calls(p)).find(c => c.name === 'admin_set_tutoring_schedule');
+    assert.deepEqual(set.args, { p_section: 'Earth', p_opens: null, p_closes: null });
+    await p.waitForFunction(() => /Open/.test(document.querySelector('.stage-state') ? document.querySelector('.stage-state').innerText : ''));
+    await p.context().close();
+  });
+  await check('tutoring switch: after the end time it shows Closed (auto-closed) and switching on asks again instead of revoking', async () => {
+    const d = makeData({ stage_overrides: [{ stage: 'dash', section: 'Earth', granted_count: 3 }],
+      tutoring_schedule: [{ section: 'Earth', opens_at: null, closes_at: '2026-10-14T00:55:00+08:00' }] });
+    const p = await open('students', { data: d }); await waitStudents(p);
+    await pickSection(p, 'Earth');
+    assert.equal(await p.locator('[data-gate-switch="dash"]').getAttribute('aria-checked'), 'false', 'the switch no longer says open');
+    assert.match(await p.locator('.stage-state').innerText(), /Closed · auto-closed Oct 14, 12:55 AM/);
+    await p.locator('[data-gate-switch="dash"]').click();
+    await p.waitForSelector('#modal-tutoring.is-open');
+    assert.equal((await calls(p)).filter(c => c.name === 'admin_revoke_stage').length, 0, 'nobody is sent back to the Waiting Room');
+    await p.context().close();
+  });
+
   /* ================= STAGE CONTROLS ================= */
   await check('stage controls: three stages with real ids and no policy reference table', async () => {
     const p = await open('controls');
@@ -1825,6 +1894,232 @@ function fixture() {
     });
   }
   await check('zoom 200%: report written', async () => { fs.writeFileSync(path.join(out, 'zoom-b3.json'), JSON.stringify(zoomReport, null, 2)); assert.ok(Object.keys(zoomReport).length >= 16); });
+
+  /* ================= ENROLL STUDENTS (batch) ================= */
+  const openEnroll = async p => { await p.locator('[data-modal-open="modal-enroll-students"]').click(); await p.waitForSelector('#modal-enroll-students.is-open'); };
+  /* Step 1 -> Step 2: type the emails, press Continue, wait for the review. */
+  const addEmails = async (p, list) => {
+    await p.locator('#bn-emails').fill(list.join('\n'));
+    await p.locator('#bn-continue').click();
+    await p.waitForSelector('#bn-step-review:not(.is-hidden)');
+  };
+  const enrollRows = p => p.locator('#bn-tbody tr').evaluateAll(trs => trs.map(tr => ({
+    name: tr.querySelector('[data-bn-field=name]').value, email: tr.querySelector('.bn-email-text').innerText.trim(),
+    group: tr.querySelector('[data-bn-field=group]').value,
+    status: (tr.querySelector('[data-bn-status]').innerText + ' ' + tr.querySelector('[data-bn-note]').innerText).replace(/\s+/g, ' ').trim() })));
+  const tickEnrollConsents = async p => { await p.locator('label:has(#bn-consent)').click(); };
+  /* The dropdowns in this dialog are the themed ones: open the list, click the option. */
+  const chooseCustom = async (p, id, value) => {
+    const index = await p.locator('#' + id + ' option').evaluateAll((els, v) => els.findIndex(e => e.value === v), value);
+    assert.ok(index >= 0, id + ': missing value ' + value);
+    await p.locator('#' + id + ' ~ .custom-select .custom-select-trigger').click();
+    await p.locator('#' + id + '-list .custom-select-option[data-index="' + index + '"]').click();
+  };
+  const chooseRowGroup = async (p, row, value) => {
+    const tr = p.locator('#bn-tbody tr').nth(row);
+    const index = await tr.locator('select option').evaluateAll((els, v) => els.findIndex(e => e.value === v), value);
+    const sid = await tr.locator('select').getAttribute('id');
+    await tr.locator('.custom-select-trigger').click();
+    /* The open list lives on <body> (a dialog would clip it), so it is found by the select's id, not inside the row. */
+    await p.locator('#' + sid + '-list .custom-select-option[data-index="' + index + '"]').click();
+  };
+  const applyToAll = async (p, value) => { await chooseCustom(p, 'bn-apply-group', value); await p.locator('#bn-apply-all').click(); };
+  const enrollCalls = async p => (await calls(p)).filter(c => (c.method === 'rpc' && c.name === 'admin_create_auth_user') || (c.table === 'profiles' && c.write === 'insert'));
+
+  await check('enroll: opens on step 1 with a section and a box of emails; Continue needs at least one email', async () => {
+    const p = await open('students'); await waitStudents(p);
+    assert.equal(await p.locator('[data-modal-open="modal-enroll-students"]').innerText(), 'Enroll students');
+    await openEnroll(p);
+    assert.match(await p.locator('#bn-step-label').innerText(), /Step 1 of 2/);
+    assert.equal(await p.locator('#bn-step-review').isVisible(), false, 'no table, no consent yet');
+    assert.equal(await p.locator('#bn-consent-wrap').isVisible(), false);
+    assert.equal(await p.locator('#bn-submit').isVisible(), false);
+    await p.locator('#bn-continue').click();
+    assert.match(await p.locator('#bn-add-msg').innerText(), /Add at least one school email/);
+    assert.equal(await p.locator('#bn-step-review').isVisible(), false, 'stays on step 1');
+    await p.locator('#bn-emails').fill('not an email here');
+    await p.locator('#bn-continue').click();
+    assert.match(await p.locator('#bn-add-msg').innerText(), /Add at least one school email/);
+    await p.context().close();
+  });
+
+  await check('enroll: emails become rows with the name read from them; doubtful names are marked Check; problems come first', async () => {
+    const existing = Object.assign({}, makeData().profiles[0], { email: 'existing.student@ue.edu.ph', full_name: 'Existing Student', role: 'student' });
+    const base = makeData();
+    const p = await open('students', { data: makeData({ profiles: base.profiles.concat([existing]) }) }); await waitStudents(p);
+    await openEnroll(p);
+    await addEmails(p, ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph', 'sanchez.jose@ue.edu.ph', 'delgado.ana@ue.edu.ph',
+      'delacruz.juan@ue.edu.ph', 'santos.mariacristina@ue.edu.ph', 'cruz.ana2@ue.edu.ph', 'someone@gmail.com',
+      'existing.student@ue.edu.ph', 'reyes.pedro@ue.edu.ph']);
+    assert.match(await p.locator('#bn-step-label').innerText(), /Step 2 of 2/);
+    const rows = await enrollRows(p);
+    assert.equal(rows.length, 9, 'a repeated email is added once');
+    const by = e => rows.find(r => r.email === e);
+    assert.equal(by('reyes.pedro@ue.edu.ph').name, 'Pedro Reyes', 'lastname.firstname becomes "Firstname Lastname"');
+    assert.match(by('delacruz.juan@ue.edu.ph').status, /Check.*two words/i, 'Delacruz may be Dela Cruz');
+    assert.match(by('santos.mariacristina@ue.edu.ph').status, /Check.*long name/i);
+    assert.match(by('cruz.ana2@ue.edu.ph').status, /Check.*number/i);
+    for (const e of ['santos.maria@ue.edu.ph', 'sanchez.jose@ue.edu.ph', 'delgado.ana@ue.edu.ph']) assert.ok(!/Check/.test(by(e).status), e + ' is an ordinary name');
+    assert.equal(by('someone@gmail.com').name, '', 'a non-school address is never guessed');
+    assert.match(by('someone@gmail.com').status, /Fix.*first and a last name/);
+    assert.match(by('existing.student@ue.edu.ph').status, /Fix.*Already on the roster/);
+    const order = rows.map(r => r.email);
+    const firstOrdinary = order.indexOf('reyes.pedro@ue.edu.ph');
+    for (const e of ['delacruz.juan@ue.edu.ph', 'santos.mariacristina@ue.edu.ph', 'cruz.ana2@ue.edu.ph', 'someone@gmail.com', 'existing.student@ue.edu.ph']) {
+      assert.ok(order.indexOf(e) < firstOrdinary, e + ' is listed before the ordinary rows');
+    }
+    assert.match(await p.locator('#bn-review-title').innerText(), /^Earth · 9 students$/);
+    assert.match(await p.locator('#bn-issues').innerText(), /1 to check|to check/);
+    assert.equal(await p.locator('#bn-submit').isDisabled(), true);
+    await p.context().close();
+  });
+
+  await check('enroll: Looks right and editing a name clear a Check; Remove drops a row; Back keeps the list and adds more', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEnroll(p);
+    await addEmails(p, ['delacruz.juan@ue.edu.ph', 'garcia.luis@ue.edu.ph']);
+    await applyToAll(p, 'control');
+    const check = async () => (await enrollRows(p)).find(r => r.email === 'delacruz.juan@ue.edu.ph').status;
+    assert.match(await check(), /Check/);
+    await p.locator('[data-bn-confirm]').click();
+    assert.equal(await check(), 'Ready');
+    await p.locator('#bn-tbody tr').first().locator('[data-bn-field="name"]').fill('Juan Dela Cruz');
+    assert.equal(await check(), 'Ready', 'an edited name stays Ready');
+    await p.locator('#bn-back').click();
+    assert.match(await p.locator('#bn-step-label').innerText(), /Step 1 of 2/);
+    assert.match(await p.locator('#bn-add-msg').innerText(), /2 students are already in the list/);
+    await p.locator('#bn-emails').fill('lim.ana@ue.edu.ph'); await p.locator('#bn-continue').click();
+    assert.equal(await p.locator('#bn-tbody tr').count(), 3, 'the new email joins the list');
+    assert.equal((await enrollRows(p)).find(r => r.email === 'delacruz.juan@ue.edu.ph').name, 'Juan Dela Cruz', 'an edit survives going back');
+    await p.locator('#bn-tbody tr').last().locator('[data-bn-remove]').click();
+    assert.equal(await p.locator('#bn-tbody tr').count(), 2, 'Remove drops a row');
+    await p.context().close();
+  });
+
+  await check('enroll: Condition for everyone sets every row; a row can still be changed; the summary counts them', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEnroll(p);
+    await addEmails(p, ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph', 'garcia.luis@ue.edu.ph']);
+    await applyToAll(p, 'neutral');
+    assert.ok((await enrollRows(p)).every(r => r.group === 'neutral'));
+    await chooseRowGroup(p, 1, 'control');
+    assert.deepEqual((await enrollRows(p)).map(r => r.group), ['neutral', 'control', 'neutral']);
+    assert.match(await p.locator('#bn-summary').innerText(), /Neutral 2 · Control 1/);
+    assert.equal(await p.locator('#bn-split, #bn-seed').count(), 0, 'no split and no seed in the dialog');
+    await p.context().close();
+  });
+
+  await check('enroll: Section, Condition for everyone and each row use the themed dropdown; one box records consent and assent', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEnroll(p);
+    assert.equal(await p.locator('#bn-section').isHidden(), true, 'the native menu is hidden');
+    assert.equal(await p.locator('#bn-section ~ .custom-select').count(), 1, 'the themed one stands in');
+    await chooseCustom(p, 'bn-section', 'Mars');
+    assert.equal(await p.locator('#bn-section').inputValue(), 'Mars');
+    assert.equal(await p.locator('#bn-section ~ .custom-select .custom-select-value').innerText(), 'Mars');
+    await addEmails(p, ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph']);
+    assert.match(await p.locator('#bn-review-title').innerText(), /^Mars · 2 students$/);
+    assert.equal(await p.locator('#bn-apply-group ~ .custom-select').count(), 1);
+    assert.equal(await p.locator('#bn-tbody .custom-select').count(), 2, 'every row has the themed dropdown');
+    await chooseRowGroup(p, 0, 'neutral');
+    assert.deepEqual((await enrollRows(p)).map(r => r.group), ['neutral', '']);
+    await p.locator('#bn-tbody tr').nth(1).locator('.custom-select-trigger').focus();
+    await p.keyboard.press('ArrowDown'); await p.keyboard.press('ArrowDown'); await p.keyboard.press('Enter');
+    assert.equal((await enrollRows(p))[1].group, 'non-assigned', 'two Down presses then Enter pick the second option');
+    assert.equal(await p.locator('#bn-consent-wrap .check').count(), 1, 'a single consent box');
+    assert.match(await p.locator('#bn-consent-wrap').innerText(), /Parental consent and student assent/);
+    await p.context().close();
+  });
+
+  await check('enroll: nothing is created without the consent box; every row must be Ready first; Enter never enrolls', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEnroll(p);
+    await addEmails(p, ['reyes.pedro@ue.edu.ph']);
+    assert.equal(await p.locator('#bn-submit').isDisabled(), true, 'a row with no condition blocks Enroll');
+    await applyToAll(p, 'assigned');
+    assert.equal(await p.locator('#bn-submit').isDisabled(), false);
+    assert.match(await p.locator('#bn-submit-label').innerText(), /Enroll 1 student$/);
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#bn-tbody [data-bn-field="name"]').focus(); await p.keyboard.press('Enter');
+    await p.locator('#bn-submit').click();
+    assert.match(await p.locator('[data-msg-for="bn-consent"]').innerText(), /Parental consent and student assent/);
+    assert.equal(await p.locator('#bn-assent').count(), 0, 'one box records both');
+    assert.deepEqual(await enrollCalls(p), [], 'no account and no profile without consent');
+    await p.context().close();
+  });
+
+  await check('enroll: students are created one by one like Register student, with both consents, one device and a random password nobody sees', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await openEnroll(p);
+    await chooseCustom(p, 'bn-section', 'Jupiter');
+    await addEmails(p, ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph', 'garcia.luis@ue.edu.ph']);
+    await applyToAll(p, 'assigned');
+    await p.locator('#bn-tbody tr').nth(0).locator('[data-bn-field="name"]').fill('Pedro Garcia Reyes');
+    await tickEnrollConsents(p);
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#bn-submit').click();
+    await p.waitForFunction(() => document.querySelector('#bn-report') && !document.querySelector('#bn-report').classList.contains('is-hidden'));
+    const made = await enrollCalls(p);
+    const auth = made.filter(c => c.method === 'rpc'), ins = made.filter(c => c.table === 'profiles');
+    assert.equal(auth.length, 3); assert.equal(ins.length, 3);
+    assert.deepEqual(auth.map(c => c.args.target_email), ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph', 'garcia.luis@ue.edu.ph']);
+    assert.ok(auth.every(c => /^.{16,}$/.test(c.args.default_password)), 'a long generated password');
+    assert.equal(new Set(auth.map(c => c.args.default_password)).size, 3, 'a different password for each');
+    const row = ins[0].values[0];
+    assert.equal(row.full_name, 'Pedro Garcia Reyes'); assert.equal(row.section, 'Jupiter'); assert.equal(row.role, 'student');
+    assert.equal(row.parental_consent, true); assert.equal(row.student_assent, true); assert.equal(row.max_devices, 1); assert.equal(row.status, 'inactive');
+    assert.equal(row.group_type, 'assigned');
+    assert.equal(ins[1].values[0].full_name, 'Maria Santos', 'the guessed name is saved as shown');
+    assert.match(await p.locator('#bn-report').innerText(), /3 of 3 enrolled in Jupiter/);
+    assert.equal(await p.locator('#bn-tbody tr').count(), 0, 'enrolled rows leave the list');
+    assert.equal(await p.locator('#bn-cancel').innerText(), 'Close');
+    const page = await p.locator('body').innerText();
+    assert.ok(auth.every(c => !page.includes(c.args.default_password)), 'no password is shown');
+    await p.context().close();
+  });
+
+  await check('enroll: one failure is reported and the others still enroll; the failed row stays to fix', async () => {
+    const p = await open('students'); await waitStudents(p);
+    await p.evaluate(() => { window.fixture.authFail = ['santos.maria@ue.edu.ph']; });
+    await openEnroll(p);
+    await addEmails(p, ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph', 'garcia.luis@ue.edu.ph']);
+    await applyToAll(p, 'control');
+    await tickEnrollConsents(p);
+    await p.evaluate(() => { window.fixture.calls.length = 0; });
+    await p.locator('#bn-submit').click();
+    await p.waitForFunction(() => !document.querySelector('#bn-report').classList.contains('is-hidden'));
+    const made = await enrollCalls(p);
+    assert.equal(made.filter(c => c.table === 'profiles').length, 2, 'the account that failed has no profile');
+    assert.equal(made.filter(c => c.method === 'rpc').length, 3, 'the run did not stop');
+    const report = await p.locator('#bn-report').innerText();
+    assert.match(report, /2 of 3 enrolled/); assert.match(report, /santos\.maria@ue\.edu\.ph: Account not created/);
+    assert.deepEqual((await enrollRows(p)).map(r => r.email), ['santos.maria@ue.edu.ph'], 'only the failed row stays');
+    await p.context().close();
+  });
+
+  await check('enroll: Escape closes the dialog and returns focus; the Register student button is unchanged', async () => {
+    const p = await open('students'); await waitStudents(p);
+    const btn = p.locator('[data-modal-open="modal-enroll-students"]');
+    await btn.focus(); await p.keyboard.press('Enter');
+    await p.waitForSelector('#modal-enroll-students.is-open');
+    await p.keyboard.press('Escape');
+    await p.waitForSelector('#modal-enroll-students:not(.is-open)');
+    await focusIs(p, el => el && el.getAttribute('data-modal-open') === 'modal-enroll-students');
+    assert.deepEqual((await p.locator('#view-students .page-actions .btn').allInnerTexts()).map(s => s.trim()), ['Manage sections', 'Enroll students', 'Register student']);
+    await p.context().close();
+  });
+
+  await check('enroll: at 375px the review scrolls inside its frame, keeps the phone menu in the rows, and the page does not overflow', async () => {
+    const p = await open('students', { width: 375, height: 800 }); await waitStudents(p);
+    await openEnroll(p);
+    await addEmails(p, ['reyes.pedro@ue.edu.ph', 'santos.maria@ue.edu.ph']);
+    assert.equal(await overflow(p), true, 'no page overflow');
+    const frame = await p.locator('#modal-enroll-students .table-wrap').evaluate(e => ({ client: e.clientWidth, scroll: e.scrollWidth }));
+    assert.ok(frame.scroll > frame.client, 'the table scrolls sideways inside its own frame');
+    assert.equal(await p.locator('#bn-tbody select').first().isVisible(), true, 'a narrow screen keeps the native menu in the rows');
+    assert.equal(await p.locator('#bn-tbody .custom-select').first().isVisible(), false);
+    await p.context().close();
+  });
 
   await check('visual: shell and key views captured in both themes (light variants)', async () => {
     for (const [route, name] of [['live', 'live'], ['faculty', 'faculty'], ['students', 'students'], ['controls', 'controls'], ['settings', 'settings'], ['profile', 'profile']]) {

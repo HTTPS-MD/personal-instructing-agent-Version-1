@@ -106,17 +106,12 @@
             </section>
 
             <!-- ========================================== SESSION SCREEN -->
-            <!-- The original PIA game arrangement: tutor on the left, the problem
-                 workspace in the centre, solved questions and the error log on the
-                 right. The page chrome above it is the student header; the original
-                 game's own top strip, colour picker and character choice are gone. -->
+            <!-- One responsive classroom stage: tutor, board, workbook and logs
+                 share the same wallpaper coordinates. -->
             <section class="screen game-screen" id="screen-session" aria-label="Your tutoring session">
                 <div class="app-container game-frame">
 
                     <div class="left-sidebar video-mentor-sidebar">
-                        <!-- The classroom film is added by student-dashboard.js when the game starts (never for reduced motion); the still is the CSS background. -->
-                        <div class="mentor-video-overlay" aria-hidden="true"></div>
-
                         <div class="avatar-container video-copy-layer">
                             <div class="prompt-box" id="status-msg">
                                 <p class="tutor-speech" id="agent-speech" role="status" aria-live="polite">Let's get started. Read the problem carefully.</p>

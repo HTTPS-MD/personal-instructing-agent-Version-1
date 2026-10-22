@@ -264,6 +264,7 @@
         deviceDiag: [],      // the last device-registration problems (see deviceProblem)
         overrides: undefined, // stage_overrides rows; undefined = loading, null = unavailable
         overridesMissing: false,
+        schedules: undefined, // tutoring_schedule rows (0060); undefined = loading, null = not available yet
         gateSelected: { ocean: [], char: [], dash: [] }, // ticked section names per stage card; kept here so a repaint keeps them
         cohortLoaded: false,
         sectionsLoaded: false,
@@ -518,9 +519,6 @@
     function toastOk(title, description) { toast(title, description, 'accent'); }
     function toastErr(title, description) { toast(title, description, 'danger'); }
 
-    /* Lent to the Add students dialog (admin/js/add-students.js). */
-    window.PIAAdmin = { refreshAll: function () { return refreshAll(); }, toastOk: toastOk, toastErr: toastErr };
-
     /* ---- 3.6 Confirm and notice dialogs ---- */
 
     /* Returns a promise so callers can `await confirmAction(...)` instead of
@@ -685,7 +683,7 @@
        The label swaps but the button keeps its measured width, so toolbars and
        modal footers never resize mid-request. */
     function setBusy(button, busyLabel) {
-        if (!button) { return function () {}; }
+        if (!button) { return function () { }; }
         var originalHTML = button.innerHTML;
         var originalWidth = button.getBoundingClientRect().width;
 
@@ -728,9 +726,9 @@
             for (var c = 0; c < columns; c++) {
                 out += '<td>' + (c === 0
                     ? '<div class="cell-user"><span class="skeleton skeleton-avatar"></span>' +
-                      '<span class="cell-user-text" style="width:160px">' +
-                      '<span class="skeleton skeleton-line" style="width:70%"></span>' +
-                      '<span class="skeleton skeleton-line" style="width:90%"></span></span></div>'
+                    '<span class="cell-user-text" style="width:160px">' +
+                    '<span class="skeleton skeleton-line" style="width:70%"></span>' +
+                    '<span class="skeleton skeleton-line" style="width:90%"></span></span></div>'
                     : '<span class="skeleton skeleton-pill"></span>') + '</td>';
             }
             out += '</tr>';
@@ -1215,6 +1213,7 @@
         }
     }
 
+
     async function loadFaculty() {
         var res = await sb.from('professors').select('*').order('name', { ascending: true });
         if (res.error) { throw res.error; }
@@ -1250,6 +1249,7 @@
             console.error('[PIA] stage overrides could not be read:', overrides.error);
         }
         state.overrides = overrides.error ? null : (overrides.data || []);
+        await loadTutoringSchedules();
 
         renderGates();
     }
@@ -1264,6 +1264,7 @@
             select.innerHTML = markup || '<option value="">No sections yet</option>';
             if (current) { select.value = current; }
         });
+        refreshCustomSelect('bn-section');
 
         /* The Students filter: "All sections" first, then one option per section. */
         var filter = $('#section-filter');
@@ -1521,7 +1522,7 @@
                 (r.seconds === null
                     ? '<td class="duration-cell col-w-time" data-live-conn="' + r.conn + '" title="No stage time recorded">—</td>'
                     : '<td class="duration-cell col-w-time" data-live-clock="' + r.seconds + '" data-live-conn="' + r.conn +
-                      '" title="Counted while in ' + esc(stageLabel(r.counted)) + '">' + esc(formatClock(r.seconds)) + '</td>') +
+                    '" title="Counted while in ' + esc(stageLabel(r.counted)) + '">' + esc(formatClock(r.seconds)) + '</td>') +
                 '</tr>';
         }).join('');
 
@@ -1910,8 +1911,8 @@
         list.setAttribute('aria-labelledby', id + '-label');
         list.hidden = true;
         box.appendChild(trigger);
-        box.appendChild(list);
         field.appendChild(box);
+        /* The list lives on <body> while open: inside a dialog it would be clipped by the modal's overflow. */
         select.hidden = true;
         select.tabIndex = -1;
         select.setAttribute('aria-hidden', 'true');
@@ -1956,15 +1957,46 @@
             if (!open) { return; }
             open = false;
             list.hidden = true;
+            list.remove();
+            window.removeEventListener('resize', onViewportChange);
+            document.removeEventListener('scroll', onViewportChange, true);
             trigger.setAttribute('aria-expanded', 'false');
             paint();
             if (restoreFocus) { trigger.focus({ preventScroll: true }); }
+        }
+        function place() {
+            var r = trigger.getBoundingClientRect();
+            var room = 12;
+            var below = window.innerHeight - r.bottom - room;
+            var above = r.top - room;
+            var want = Math.min(list.scrollHeight + 2, 288);
+            var flip = below < want && above > below;
+            var max = Math.max(96, Math.min(288, flip ? above : below));
+            list.style.minWidth = r.width + 'px';
+            list.style.left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8)) + 'px';
+            list.style.maxHeight = max + 'px';
+            if (flip) {
+                list.style.top = 'auto';
+                list.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+            } else {
+                list.style.bottom = 'auto';
+                list.style.top = (r.bottom + 4) + 'px';
+            }
+        }
+        function onViewportChange(event) {
+            /* Scrolling the list itself must not close it. */
+            if (event && event.type === 'scroll' && list.contains(event.target)) { return; }
+            close(false);
         }
         function show() {
             Object.keys(customSelects).forEach(function (key) { if (key !== id) { customSelects[key].close(); } });
             refresh();
             open = true;
+            document.body.appendChild(list);
             list.hidden = false;
+            place();
+            window.addEventListener('resize', onViewportChange);
+            document.addEventListener('scroll', onViewportChange, true);
             trigger.setAttribute('aria-expanded', 'true');
             paint();
         }
@@ -1996,11 +2028,17 @@
             var item = event.target.closest('[data-index]');
             if (item) { choose(Number(item.dataset.index)); }
         });
-        document.addEventListener('pointerdown', function (event) {
-            if (open && !box.contains(event.target)) { close(false); }
-        });
+        function onPointerDown(event) {
+            if (open && !box.contains(event.target) && !list.contains(event.target)) { close(false); }
+        }
+        document.addEventListener('pointerdown', onPointerDown);
         select.addEventListener('change', refresh);
-        customSelects[id] = { refresh: refresh, close: close };
+        customSelects[id] = {
+            refresh: refresh,
+            close: close,
+            /* For selects that are rebuilt (the Enroll students rows): stop listening and forget it. */
+            destroy: function () { close(false); list.remove(); document.removeEventListener('pointerdown', onPointerDown); delete customSelects[id]; }
+        };
         refresh();
     }
     function initCustomSelects() {
@@ -2125,7 +2163,7 @@
         controlNote.classList.toggle('is-hidden', !beyondOcean);
         controlNote.textContent = beyondOcean
             ? 'Control students take the OCEAN test only, but this record shows ' +
-              (s.is_in_game === true ? 'a tutoring session in progress' : 'the ' + stageLabel(s.current_stage).toLowerCase() + ' stage') + '.'
+            (s.is_in_game === true ? 'a tutoring session in progress' : 'the ' + stageLabel(s.current_stage).toLowerCase() + ' stage') + '.'
             : '';
         /* Clearing a tutor to re-pick only makes sense where the student picks one. */
         var reselect = $('[data-student-action="retake-character"]');
@@ -2306,8 +2344,8 @@
             ' · scored with the BFPT sheet';
         var matchingNote = s.group_type === 'assigned' && r.ocean_n != null
             ? '<p class="bfpt-meta">For character matching, Neuroticism is ' +
-                esc(40 - Number(r.ocean_n)) + '/40 (higher means more stress). ' +
-                'The BFPT N score above runs in the opposite direction.</p>'
+            esc(40 - Number(r.ocean_n)) + '/40 (higher means more stress). ' +
+            'The BFPT N score above runs in the opposite direction.</p>'
             : '';
 
         var answers;
@@ -2679,59 +2717,30 @@
         var release = setBusy($('#rs-submit'), 'Registering…');
 
         try {
-            /* Pre-check BEFORE creating the auth user. admin_create_auth_user
-               runs first; if the profiles insert then fails (duplicate email,
-               for instance) an auth user is left behind with no profile, and
-               every later attempt fails with "user already exists" — that
-               student can never be registered again. Checking first avoids the
-               whole situation.
+            var result = await enrollOneStudent({
+                email: email, fullName: fullName, section: section, groupType: groupType
+            });
 
-               It also names the consent columns, so a database without
-               migration 0033 is caught here too, before anything is created. */
-            var existing = await sb.from('profiles')
-                .select('email' + CONSENT_COLUMNS).eq('email', email).maybeSingle();
-
-            if (existing.error) {
-                toastErr('Registration stopped', isMissingColumn(existing.error)
+            if (result.status === 'precheck_error') {
+                toastErr('Registration stopped', isMissingColumn(result.error)
                     ? MIGRATION_MISSING
-                    : friendlyDbError(existing.error, 'Could not check the roster for this email.'));
+                    : friendlyDbError(result.error, 'Could not check the roster for this email.'));
                 return;
             }
-
-            if (existing.data) {
+            if (result.status === 'duplicate') {
                 setFieldError('rs-email', 'This email is already on the roster.');
                 toastErr('Duplicate email', email + ' already has an account.');
                 return;
             }
-
-            var authRes = await sb.rpc('admin_create_auth_user', {
-                target_email: email,
-                default_password: generateSecurePassword()
-            });
-
-            if (authRes.error) {
-                toastErr('Auth user not created', friendlyDbError(authRes.error, 'Could not create the auth user.'));
+            if (result.status === 'auth_error') {
+                toastErr('Auth user not created', friendlyDbError(result.error, 'Could not create the auth user.'));
                 return;
             }
-
-            var newRow = {
-                full_name: fullName,
-                email: email,
-                section: section,
-                group_type: groupType,
-                parental_consent: true,
-                student_assent: true,
-                max_devices: 1,   /* one device per student; enforced by the database (0027, 0037) */
-                status: 'inactive',
-                role: 'student'
-            };
-            var insertRes = await sb.from('profiles').insert([newRow]);
-
-            if (insertRes.error) {
+            if (result.status === 'profile_error') {
                 /* The auth user succeeded but the profile row failed. Say so
                    plainly — an orphan needs cleaning up before retrying. */
                 showNotice('Registration incomplete',
-                    friendlyDbError(insertRes.error, 'Could not save the profile.') +
+                    friendlyDbError(result.error, 'Could not save the profile.') +
                     '\n\nAn auth user was already created for ' + email +
                     '. It must be deleted before registering this student again.',
                     'danger');
@@ -2749,6 +2758,431 @@
         } finally {
             release();
         }
+    }
+
+    /* One student, start to finish. Register student and Enroll students both
+       call this, so the two cannot drift apart.
+
+       The roster check runs BEFORE the auth account is created. admin_create_auth_user
+       runs first; if the profiles insert then fails (duplicate email, for instance) an
+       auth user is left behind with no profile, and every later attempt fails with
+       "user already exists" — that student can never be registered again. Checking
+       first avoids the whole situation. It also names the consent columns, so a
+       database without migration 0033 is caught here too, before anything is created.
+
+       Returns { status, error }. status is one of: created, duplicate, precheck_error,
+       auth_error, profile_error. It never shows anything; the caller decides what to say. */
+    async function enrollOneStudent(student) {
+        var existing = await sb.from('profiles')
+            .select('email' + CONSENT_COLUMNS).eq('email', student.email).maybeSingle();
+
+        if (existing.error) { return { status: 'precheck_error', error: existing.error }; }
+        if (existing.data) { return { status: 'duplicate' }; }
+
+        var authRes = await sb.rpc('admin_create_auth_user', {
+            target_email: student.email,
+            default_password: generateSecurePassword()
+        });
+        if (authRes.error) { return { status: 'auth_error', error: authRes.error }; }
+
+        var newRow = {
+            full_name: student.fullName,
+            email: student.email,
+            section: student.section,
+            group_type: student.groupType,
+            parental_consent: true,
+            student_assent: true,
+            max_devices: 1,   /* one device per student; enforced by the database (0027, 0037) */
+            status: 'inactive',
+            role: 'student'
+        };
+        var insertRes = await sb.from('profiles').insert([newRow]);
+        if (insertRes.error) { return { status: 'profile_error', error: insertRes.error }; }
+
+        return { status: 'created' };
+    }
+
+    /* ---- Enroll students (batch) ---- */
+    /* Many students into one section, in two steps. Step 1: a section and school emails. Step 2:
+       one row per student with the name read from the email (lastname.firstname@ue.edu.ph), a
+       condition and a status. Rows whose guess is uncertain are marked Check until the admin
+       confirms them. Nothing is created until every row is Ready and the consent box is ticked.
+       Students are created one at a time; a failure is reported and the rest carry on. */
+
+    var BN_GROUPS = [
+        { value: 'assigned', label: 'EXP · Assigned persona', short: 'Assigned' },
+        { value: 'non-assigned', label: 'EXP · Free choice', short: 'Free choice' },
+        { value: 'neutral', label: 'EXP · Neutral persona', short: 'Neutral' },
+        { value: 'control', label: 'CTRL · Traditional', short: 'Control' }
+    ];
+    var BN_DOMAIN = 'ue.edu.ph';
+    var bn = { rows: [], nextId: 1, running: false, defaultGroup: '', step: 1, selectIds: [], section: '' };
+
+    function bnTitleCase(word) {
+        return word.toLowerCase().replace(/(^|[\s'’-])([a-zñ])/g, function (m, lead, letter) {
+            return lead + letter.toUpperCase();
+        });
+    }
+
+    /* lastname.firstname@ue.edu.ph -> { name, check }. `check` is a plain-words reason the guess may be
+       wrong; empty when nothing looks odd. A name is never invented: when the shape is not recognised
+       the name stays empty and the admin types it. */
+    function guessNames(email) {
+        var at = email.lastIndexOf('@');
+        var local = at > 0 ? email.slice(0, at) : email;
+        var domain = at > 0 ? email.slice(at + 1) : '';
+        var out = { name: '', check: '' };
+
+        if (domain !== BN_DOMAIN) {
+            out.check = 'Not a ' + BN_DOMAIN + ' address. Type the name.';
+            return out;
+        }
+        var parts = local.split('.');
+        if (parts.length < 2 || !parts[0] || !parts[1]) {
+            out.check = 'The email is not lastname.firstname. Type the name.';
+            return out;
+        }
+        if (parts.length > 2) {
+            out.name = bnTitleCase(parts.slice(1).join(' ') + ' ' + parts[0]);
+            out.check = 'The email has more than one dot. Check the name.';
+            return out;
+        }
+
+        out.name = bnTitleCase(parts[1]) + ' ' + bnTitleCase(parts[0]);
+
+        if (/\d/.test(local)) {
+            out.check = 'The email has a number in it. Check the name.';
+        } else if (/^(jr|sr|ii|iii|iv)$/.test(parts[1]) || /(jr|sr|iii)$/.test(parts[1]) && parts[1].length > 4) {
+            out.check = 'May include a suffix such as Jr. Check the name.';
+        } else if (/^(dela|delos|delas|santa|van|von)[a-z]{3,}$/.test(parts[0])) {
+            out.check = 'The surname may be two words (for example Dela Cruz). Check it.';
+        } else if (parts[1].length >= 10 || parts[0].length >= 12) {
+            out.check = 'A long name that may be two words. Check it.';
+        }
+        return out;
+    }
+
+    function bnAddRow(fields) {
+        var row = {
+            id: bn.nextId++, name: '', email: '',
+            group: bn.defaultGroup, check: '', confirmed: false, touched: false
+        };
+        Object.keys(fields || {}).forEach(function (key) { row[key] = fields[key]; });
+        bn.rows.push(row);
+        return row;
+    }
+
+    function bnRowById(id) {
+        return bn.rows.filter(function (row) { return row.id === id; })[0];
+    }
+
+    function bnCleanName(row) {
+        return row.name.trim().replace(/\s+/g, ' ');
+    }
+
+    /* The state of every row, worked out together so duplicates inside the list are seen.
+       ignoreGroup is for ordering the rows when they are first shown, before any condition is chosen. */
+    function bnStates(ignoreGroup) {
+        var counts = {};
+        bn.rows.forEach(function (row) { counts[row.email] = (counts[row.email] || 0) + 1; });
+        var onRoster = {};
+        (state.cohort || []).forEach(function (s) { onRoster[normalizeEmail(s.email)] = true; });
+
+        return bn.rows.map(function (row) {
+            if (bnCleanName(row).split(' ').filter(Boolean).length < 2) { return { kind: 'error', text: 'Enter a first and a last name.' }; }
+            if (!isEmail(row.email)) { return { kind: 'error', text: 'Enter a valid school email address.' }; }
+            if (counts[row.email] > 1) { return { kind: 'error', text: 'This email is in the list more than once.' }; }
+            if (onRoster[row.email]) { return { kind: 'error', text: 'Already on the roster.' }; }
+            if (row.check && !row.confirmed) { return { kind: 'check', text: row.check }; }
+            if (!ignoreGroup && !row.group) { return { kind: 'error', text: 'Choose a condition.' }; }
+            return { kind: 'ready', text: '' };
+        });
+    }
+
+    function bnStatusHtml(row, st) {
+        if (st.kind === 'ready') { return '<span class="badge badge-accent">Ready</span>'; }
+        if (st.kind === 'check') {
+            return '<span class="badge badge-warn">Check</span> ' +
+                '<button type="button" class="btn btn-ghost btn-sm" data-bn-confirm="' + row.id + '">Looks right</button>';
+        }
+        return '<span class="badge badge-danger">Fix</span>';
+    }
+
+    /* Updates the status cells, the headline and the Enroll button without touching the inputs, so
+       typing never loses focus. */
+    function bnPaint() {
+        var states = bnStates();
+        var ready = 0, check = 0, fix = 0;
+        bn.rows.forEach(function (row, index) {
+            var st = states[index];
+            if (st.kind === 'ready') { ready++; } else if (st.kind === 'check') { check++; } else { fix++; }
+            var cell = $('[data-bn-row="' + row.id + '"] [data-bn-status]');
+            if (cell) { cell.innerHTML = bnStatusHtml(row, st); }
+            var note = $('[data-bn-row="' + row.id + '"] [data-bn-note]');
+            if (note) { note.textContent = st.kind === 'ready' ? '' : st.text; note.className = 'bn-note' + (st.kind === 'error' ? ' bn-note-fix' : ''); }
+        });
+
+        var n = bn.rows.length;
+        $('#bn-review-title').textContent = (bn.section ? bn.section + ' · ' : '') + n + (n === 1 ? ' student' : ' students');
+        var issues = [];
+        if (check) { issues.push(check + ' to check'); }
+        if (fix) { issues.push(fix + ' to fix'); }
+        $('#bn-issues').textContent = n === 0 ? '' : (issues.length ? issues.join(' · ') : 'All ready');
+        $('#bn-issues').classList.toggle('is-ok', n > 0 && !issues.length);
+
+        var tally = BN_GROUPS.map(function (g) {
+            var count = bn.rows.filter(function (row) { return row.group === g.value; }).length;
+            return count ? g.short + ' ' + count : '';
+        }).filter(Boolean);
+        $('#bn-summary').textContent = tally.join(' · ');
+
+        var allReady = n > 0 && ready === n;
+        $('#bn-submit').disabled = bn.running || !allReady;
+        $('#bn-submit-label').textContent = n > 0 ? 'Enroll ' + n + (n === 1 ? ' student' : ' students') : 'Enroll students';
+    }
+
+    function bnRender() {
+        var groupOptions = '<option value="">Choose…</option>' + BN_GROUPS.map(function (g) {
+            return '<option value="' + g.value + '">' + esc(g.short) + '</option>';
+        }).join('');
+
+        (bn.selectIds || []).forEach(function (id) { if (customSelects[id]) { customSelects[id].destroy(); } });
+        bn.selectIds = bn.rows.map(function (row) { return 'bn-group-' + row.id; });
+
+        $('#bn-tbody').innerHTML = bn.rows.map(function (row, index) {
+            var n = index + 1;
+            return '<tr data-bn-row="' + row.id + '">' +
+                '<td><input class="input input-sm" data-bn-field="name" value="' + esc(row.name) + '" autocomplete="off" aria-label="Full name, row ' + n + '"></td>' +
+                '<td><span class="bn-email-text">' + esc(row.email) + '</span><div class="bn-note" data-bn-note></div></td>' +
+                '<td><span class="sr-only" id="bn-group-' + row.id + '-label">Condition, row ' + n + '</span>' +
+                '<select class="input input-sm" id="bn-group-' + row.id + '" data-bn-field="group">' +
+                groupOptions.replace('value="' + row.group + '"', 'value="' + row.group + '" selected') + '</select></td>' +
+                '<td data-bn-status></td>' +
+                '<td><button type="button" class="btn btn-ghost btn-sm bn-remove" data-bn-remove="' + row.id + '" aria-label="Remove ' + esc(row.email) + '" title="Remove this student">&times;</button></td>' +
+                '</tr>';
+        }).join('');
+        bn.selectIds.forEach(initCustomSelect);
+        $('#bn-table').closest('.table-wrap').classList.toggle('is-hidden', bn.rows.length === 0);
+        bnPaint();
+    }
+
+    function bnShowStep(step) {
+        bn.step = step;
+        $('#bn-step-add').classList.toggle('is-hidden', step !== 1);
+        $('#bn-step-review').classList.toggle('is-hidden', step !== 2);
+        $('#bn-continue').classList.toggle('is-hidden', step !== 1);
+        $('#bn-submit').classList.toggle('is-hidden', step !== 2);
+        $('#bn-consent-wrap').classList.toggle('is-hidden', step !== 2);
+        $('#bn-step-label').textContent = step === 1 ? 'Step 1 of 2 · Add' : 'Step 2 of 2 · Review';
+    }
+
+    function bnReset() {
+        if (bn.running) { return; }
+        bn.rows = [];
+        bn.nextId = 1;
+        bn.defaultGroup = '';
+        bn.section = '';
+        $('#bn-emails').value = '';
+        $('#bn-apply-group').value = '';
+        refreshCustomSelect('bn-apply-group');
+        $('#bn-consent').checked = false;
+        $('#bn-add-msg').textContent = '';
+        $('#bn-cancel').textContent = 'Cancel';
+        var report = $('#bn-report');
+        report.classList.add('is-hidden');
+        report.innerHTML = '';
+        clearFormErrors('enroll-students-form');
+        bnShowStep(1);
+        bnRender();
+    }
+
+    function bnContinue() {
+        $('#bn-add-msg').textContent = '';
+        var section = $('#bn-section').value;
+        if (!setFieldError('bn-section', section ? '' : 'Create a section first.')) { return; }
+        bn.section = section;
+
+        var found = ($('#bn-emails').value.match(/[^\s,;<>"']+@[^\s,;<>"']+/g) || []).map(normalizeEmail);
+        var have = {};
+        bn.rows.forEach(function (row) { have[row.email] = true; });
+        found.forEach(function (email) {
+            if (have[email]) { return; }
+            have[email] = true;
+            var guess = guessNames(email);
+            bnAddRow({ email: email, name: guess.name, check: guess.check });
+        });
+
+        if (!bn.rows.length) {
+            $('#bn-add-msg').textContent = found.length ? 'Those emails are already in the list.' : 'Add at least one school email address.';
+            return;
+        }
+
+        /* Students whose name needs a look come first; everyone else keeps their order. */
+        var states = bnStates(true);
+        var order = bn.rows.map(function (row, i) { return { row: row, weight: states[i].kind === 'ready' ? 1 : 0, i: i }; });
+        order.sort(function (a, b) { return a.weight - b.weight || a.i - b.i; });
+        bn.rows = order.map(function (item) { return item.row; });
+
+        $('#bn-emails').value = '';
+        bnRender();
+        bnShowStep(2);
+        var first = $('#bn-tbody [data-bn-field="name"]');
+        if (first) { first.focus({ preventScroll: true }); }
+    }
+
+    function bnBack() {
+        bnShowStep(1);
+        var n = bn.rows.length;
+        $('#bn-add-msg').textContent = n + (n === 1 ? ' student is' : ' students are') + ' already in the list. Add more emails, or Continue.';
+        $('#bn-emails').focus();
+    }
+
+    function bnApplyAll() {
+        var group = $('#bn-apply-group').value;
+        if (!group) { return; }
+        bn.defaultGroup = group;
+        bn.rows.forEach(function (row) { row.group = group; });
+        bnRender();
+    }
+
+    function bnOnInput(event) {
+        var input = event.target.closest('[data-bn-field]');
+        if (!input) { return; }
+        var row = bnRowById(Number(input.closest('[data-bn-row]').getAttribute('data-bn-row')));
+        if (!row) { return; }
+
+        if (input.getAttribute('data-bn-field') === 'group') {
+            row.group = input.value;
+        } else {
+            row.name = input.value;
+            row.touched = true;
+            row.confirmed = true;   /* the admin has looked at the name */
+        }
+        bnPaint();
+    }
+
+    function bnOnClick(event) {
+        var remove = event.target.closest('[data-bn-remove]');
+        if (remove) {
+            var id = Number(remove.getAttribute('data-bn-remove'));
+            bn.rows = bn.rows.filter(function (row) { return row.id !== id; });
+            bnRender();
+            if (!bn.rows.length) { bnBack(); }
+            return;
+        }
+        var confirmBtn = event.target.closest('[data-bn-confirm]');
+        if (confirmBtn) {
+            var row = bnRowById(Number(confirmBtn.getAttribute('data-bn-confirm')));
+            if (row) { row.confirmed = true; bnPaint(); }
+        }
+    }
+
+    function bnFailureText(result) {
+        if (result.status === 'duplicate') { return 'Already on the roster.'; }
+        if (result.status === 'precheck_error') {
+            return isMissingColumn(result.error) ? MIGRATION_MISSING : friendlyDbError(result.error, 'Could not check the roster for this email.');
+        }
+        if (result.status === 'auth_error') { return 'Account not created: ' + friendlyDbError(result.error, 'Could not create the auth user.'); }
+        if (result.status === 'profile_error') {
+            return friendlyDbError(result.error, 'Could not save the profile.') +
+                ' An account was already created for this email and must be deleted before it is enrolled again.';
+        }
+        return result.message || 'Could not enroll this student.';
+    }
+
+    async function handleEnrollStudents(event) {
+        event.preventDefault();
+        if (bn.running || bn.step !== 2) { return; }
+        clearFormErrors('enroll-students-form');
+
+        /* One box records both: the database wants parental consent AND student assent on every new
+           student (0037), and enrollOneStudent saves both. */
+        var consentOk = setFieldError('bn-consent', $('#bn-consent').checked ? '' : 'Parental consent and student assent must be recorded first.');
+        var states = bnStates();
+        if (!bn.rows.length || states.some(function (st) { return st.kind !== 'ready'; })) { return; }
+        if (!consentOk) { return; }
+
+        var section = bn.section;
+        bn.running = true;
+        $('#bn-cancel').disabled = true;
+        $$('#enroll-students-form input, #enroll-students-form select, #enroll-students-form textarea, #enroll-students-form button, #bn-consent').forEach(function (el) { el.disabled = true; });
+        var release = setBusy($('#bn-submit'), 'Enrolling…');
+
+        var queue = bn.rows.slice();
+        var total = queue.length;
+        var created = [];
+        var failed = [];
+
+        try {
+            for (var i = 0; i < queue.length; i++) {
+                var row = queue[i];
+                $('#bn-issues').textContent = 'Enrolling ' + (i + 1) + ' of ' + total + '…';
+                var result;
+                try {
+                    result = await enrollOneStudent({
+                        email: row.email,
+                        fullName: bnCleanName(row),
+                        section: section,
+                        groupType: row.group
+                    });
+                } catch (err) {
+                    result = { status: 'error', message: (err && err.message) || 'Network error.' };
+                }
+                if (result.status === 'created') { created.push(row); }
+                else { failed.push({ row: row, text: bnFailureText(result) }); }
+            }
+        } finally {
+            bn.running = false;
+            release();
+            $('#bn-cancel').disabled = false;
+            $$('#enroll-students-form input, #enroll-students-form select, #enroll-students-form textarea, #enroll-students-form button, #bn-consent').forEach(function (el) { el.disabled = false; });
+        }
+
+        /* Rows that were created leave the list; the rest stay so they can be fixed and tried again. */
+        var createdIds = {};
+        created.forEach(function (row) { createdIds[row.id] = true; });
+        bn.rows = bn.rows.filter(function (row) { return !createdIds[row.id]; });
+
+        var report = $('#bn-report');
+        report.classList.remove('is-hidden');
+        report.innerHTML =
+            '<p><strong>' + created.length + ' of ' + total + ' enrolled' + (section ? ' in ' + esc(section) : '') + '.</strong></p>' +
+            (failed.length
+                ? '<p>' + failed.length + ' not enrolled:</p><ul>' + failed.map(function (f) {
+                    return '<li>' + esc(f.row.email) + ': ' + esc(f.text) + '</li>';
+                }).join('') + '</ul><p>Those students are still in the list. Fix them and enroll again; students already enrolled are skipped.</p>'
+                : '<p>Everyone is on the roster, inactive until they use the activation link.</p>');
+
+        if (created.length) {
+            toastOk(created.length + (created.length === 1 ? ' student enrolled' : ' students enrolled'),
+                failed.length ? failed.length + ' were not enrolled. See the list.' : 'Inactive until they use the activation link.');
+            refreshAll();
+        } else if (failed.length) {
+            toastErr('No students enrolled', 'See the list in the dialog.');
+        }
+        if (!bn.rows.length) { $('#bn-cancel').textContent = 'Close'; }
+        bnRender();
+    }
+
+    function initEnrollStudents() {
+        $('#enroll-students-form').addEventListener('submit', handleEnrollStudents);
+        $('#bn-continue').addEventListener('click', bnContinue);
+        $('#bn-back').addEventListener('click', bnBack);
+        $('#bn-apply-all').addEventListener('click', bnApplyAll);
+        $('#bn-tbody').addEventListener('input', bnOnInput);
+        $('#bn-tbody').addEventListener('change', bnOnInput);
+        $('#bn-tbody').addEventListener('click', bnOnClick);
+        /* Enter in a name box must not enroll anyone; it just stays where it is. */
+        $('#enroll-students-form').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && event.target.tagName === 'INPUT') { event.preventDefault(); }
+        });
+        $('#bn-consent').addEventListener('change', function () { setFieldError('bn-consent', ''); });
+        initCustomSelect('bn-section');
+        initCustomSelect('bn-apply-group');
+        $$('[data-modal-open="modal-enroll-students"]').forEach(function (button) {
+            button.addEventListener('click', bnReset);
+        });
+        bnReset();
     }
 
     /* ---- Edit student ---- */
@@ -2977,7 +3411,7 @@
                 '<td class="muted">' + esc(f.department || '—') + '</td>' +
                 '<td>' + (f.assigned_section
                     ? '<button type="button" class="cell-link" data-section-open="' + esc(f.assigned_section) + '"' +
-                      ' aria-label="Show students in section ' + esc(f.assigned_section) + '">' + esc(f.assigned_section) + '</button>'
+                    ' aria-label="Show students in section ' + esc(f.assigned_section) + '">' + esc(f.assigned_section) + '</button>'
                     : '<span class="badge">Unassigned</span>') + '</td>' +
                 facultyProgress(f) +
                 '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
@@ -3335,7 +3769,7 @@
                 var inside = members.filter(function (s) { return s.current_stage === gate.label; }).length;
                 var detail = state.cohortLoaded
                     ? members.length + (members.length === 1 ? ' student' : ' students') +
-                      (open && !gate.open ? ' · ' + inside + ' in stage' : '')
+                    (open && !gate.open ? ' · ' + inside + ' in stage' : '')
                     : '';
                 return '' +
                     '<label class="check gate-section">' +
@@ -3426,9 +3860,14 @@
             }
             var ready = !!section && state.overrides !== undefined && state.cohortLoaded;
             var on = ready && sectionOpen(gate, section);
+            if (gate.key === 'dash' && ready && Array.isArray(state.schedules)) {
+                var phase = tutPhase(gate, section).phase;
+                on = phase === 'open' || phase === 'scheduled';
+            }
             btn.hidden = !section;
             btn.setAttribute('aria-checked', on ? 'true' : 'false');
             btn.classList.toggle('is-on', on);
+            if (gate.key === 'dash') { paintTutoringState(btn, gate, section, ready); }
             btn.disabled = !ready || btn.classList.contains('is-working');
             btn.setAttribute('aria-label', gate.title + ' for ' + section + (on ? ': open' : ': closed'));
             btn.title = !section ? '' : (gate.open
@@ -3444,7 +3883,9 @@
         btn.disabled = true;
         try {
             state.gateSelected[gate.key] = [section];
-            if (sectionOpen(gate, section)) {
+            if (gate.key === 'dash' && Array.isArray(state.schedules)) {
+                await toggleTutoring(gate, section);
+            } else if (sectionOpen(gate, section)) {
                 await revokeSections(gate.key, null);          /* asks first, in its own way */
             } else {
                 var members = state.cohort.filter(function (s) { return s.section === section; }).length;
@@ -3465,7 +3906,307 @@
         }
     }
 
+    /* ---- Tutoring: one switch, with an optional schedule (migration 0060) ----------------------
+       The switch still lets the section in (admin_grant_stage / admin_revoke_stage). The schedule is
+       the time window around it, per section, kept in tutoring_schedule and judged by the server on
+       every answer and hint. Nothing has to run at the start or the end. Times are typed and shown
+       in Philippine time (UTC+8), as the old closing time was. */
+    var TUT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var tut = { gate: null, section: '', editing: false, calFor: null, calMonth: null, wired: false };
+
+    async function loadTutoringSchedules() {
+        var res = await sb.from('tutoring_schedule').select('section, opens_at, closes_at');
+        state.schedules = res.error ? null : (res.data || []);
+    }
+
+    function tutSchedule(section) {
+        return (Array.isArray(state.schedules) && state.schedules.filter(function (r) { return r.section === section; })[0]) || null;
+    }
+
+    /* closed | open | scheduled | autoclosed, from the switch (granted) and the schedule. */
+    function tutPhase(gate, section) {
+        if (!sectionOpen(gate, section)) { return { phase: 'closed' }; }
+        var row = tutSchedule(section);
+        var opens = row && row.opens_at ? Date.parse(row.opens_at) : null;
+        var closes = row && row.closes_at ? Date.parse(row.closes_at) : null;
+        var now = Date.now();
+        if (opens && opens > now) { return { phase: 'scheduled', opens: opens, closes: closes }; }
+        if (closes && closes <= now) { return { phase: 'autoclosed', closes: closes }; }
+        return { phase: 'open', closes: closes };
+    }
+
+    function phParts(ms) {
+        var d = new Date(ms + 8 * 3600 * 1000);
+        return { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes() };
+    }
+    function phClock(p) {
+        var h12 = p.h % 12 === 0 ? 12 : p.h % 12;
+        return h12 + ':' + (p.mi < 10 ? '0' : '') + p.mi + ' ' + (p.h < 12 ? 'AM' : 'PM');
+    }
+    function phStamp(ms, withDate) {
+        var p = phParts(ms);
+        return (withDate ? TUT_MONTHS[p.mo - 1] + ' ' + p.d + ', ' : '') + phClock(p);
+    }
+    function sameDay(a, b) {
+        var x = phParts(a), y = phParts(b);
+        return x.y === y.y && x.mo === y.mo && x.d === y.d;
+    }
+    function tutLeft(ms) {
+        var mins = Math.max(1, Math.round((ms - Date.now()) / 60000));
+        return mins < 60 ? mins + ' min' : Math.floor(mins / 60) + ' h ' + (mins % 60 ? (mins % 60) + ' min' : '');
+    }
+
+    function tutStatusText(ph) {
+        if (ph.phase === 'autoclosed') { return { cls: 'is-closed', text: 'Closed · auto-closed ' + phStamp(ph.closes, !sameDay(ph.closes, Date.now())) }; }
+        if (ph.phase === 'scheduled') {
+            var when = ph.closes
+                ? (sameDay(ph.opens, ph.closes)
+                    ? phStamp(ph.opens, true) + ' – ' + phStamp(ph.closes, false)
+                    : phStamp(ph.opens, true) + ' → ' + phStamp(ph.closes, true))
+                : 'opens ' + phStamp(ph.opens, true);
+            return { cls: 'is-plain', text: 'Scheduled · ' + when };
+        }
+        if (ph.phase === 'open') {
+            if (!ph.closes) { return { cls: 'is-open', text: 'Open' }; }
+            return { cls: 'is-open', text: ph.closes - Date.now() < 6 * 3600 * 1000
+                ? 'Open · closes in ' + tutLeft(ph.closes)
+                : 'Open · closes ' + phStamp(ph.closes, true) };
+        }
+        return null;
+    }
+
+    function paintTutoringState(btn, gate, section, ready) {
+        var host = btn.parentNode.querySelector('.stage-state');
+        var info = (ready && Array.isArray(state.schedules)) ? tutStatusText(tutPhase(gate, section)) : null;
+        if (!info) { if (host) { host.remove(); } return; }
+        if (!host) {
+            host = document.createElement('span');
+            host.className = 'stage-state';
+            btn.insertAdjacentElement('afterend', host);
+        }
+        var phase = tutPhase(gate, section).phase;
+        host.innerHTML = '<span class="pill ' + info.cls + '">' + esc(info.text) + '</span>' +
+            ((phase === 'open' || phase === 'scheduled') ? '<button type="button" class="stage-change" data-tut-change>Change</button>' : '');
+    }
+
+    async function toggleTutoring(gate, section) {
+        var ph = tutPhase(gate, section);
+        if (ph.phase === 'open' || ph.phase === 'scheduled') {
+            state.gateSelected[gate.key] = [section];
+            await revokeSections(gate.key, null);                 /* asks first, in its own way */
+            if (!sectionOpen(gate, section)) { await saveTutoringSchedule(section, null, null, true); }
+            return;
+        }
+        openTutoringDialog(gate, section, false);
+    }
+
+    async function saveTutoringSchedule(section, opensIso, closesIso, quiet) {
+        var res = await sb.rpc('admin_set_tutoring_schedule', { p_section: section, p_opens: opensIso, p_closes: closesIso });
+        if (res.error) {
+            if (!quiet) { toastErr('Schedule not saved', friendlyDbError(res.error, 'The request did not complete.')); }
+            return false;
+        }
+        state.schedules = (state.schedules || []).filter(function (r) { return r.section !== section; });
+        if (opensIso || closesIso) { state.schedules.push({ section: section, opens_at: opensIso, closes_at: closesIso }); }
+        return true;
+    }
+
+    /* ---- the dialog ---- */
+    function tutRow(which) { return $('[data-tut-row="' + which + '"]'); }
+    function tutNum(row, key) { return row.querySelector('[data-p="' + key + '"]'); }
+
+    function tutFill(which, ms) {
+        var row = tutRow(which), p = phParts(ms), h12 = p.h % 12 === 0 ? 12 : p.h % 12;
+        tutNum(row, 'mo').value = p.mo < 10 ? '0' + p.mo : p.mo;
+        tutNum(row, 'd').value = p.d < 10 ? '0' + p.d : p.d;
+        tutNum(row, 'y').value = String(p.y).slice(2);
+        tutNum(row, 'h').value = h12;
+        tutNum(row, 'mi').value = p.mi < 10 ? '0' + p.mi : p.mi;
+        tutAmpm(row, p.h < 12 ? 'AM' : 'PM');
+    }
+    function tutAmpm(row, ap) {
+        $$('[data-ap]', row).forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-ap') === ap); });
+    }
+
+    /* The row as a Philippine-time stamp in ms, or null when it is not a real date and time. */
+    function tutRead(which) {
+        var row = tutRow(which);
+        var v = function (k) { var t = tutNum(row, k).value.trim(); return /^\d{1,2}$/.test(t) ? parseInt(t, 10) : null; };
+        var mo = v('mo'), d = v('d'), y = v('y'), h = v('h'), mi = v('mi');
+        var ap = (row.querySelector('[data-ap].is-on') || {}).textContent;
+        if (mo === null || d === null || y === null || h === null || mi === null || !ap) { return null; }
+        if (mo < 1 || mo > 12 || d < 1 || d > 31 || h < 1 || h > 12 || mi > 59) { return null; }
+        var h24 = (h % 12) + (ap === 'PM' ? 12 : 0);
+        var stamp = Date.UTC(2000 + y, mo - 1, d, h24, mi) - 8 * 3600 * 1000;
+        var back = phParts(stamp);
+        return (back.mo === mo && back.d === d) ? stamp : null;    /* Feb 31 and the like */
+    }
+
+    function tutCheck() {
+        var mode = ($('input[name="tut-mode"]:checked') || {}).value;
+        var err = $('#tut-error'), sum = $('#tut-summary'), msg = '';
+        ['start', 'end'].forEach(function (w) { tutRow(w).querySelectorAll('.tut-box').forEach(function (b) { b.classList.remove('is-bad'); }); });
+        $('#tut-sched').classList.toggle('is-off', mode === 'now');
+        sum.textContent = '';
+        if (mode === 'schedule') {
+            var a = tutRead('start'), b = tutRead('end');
+            if (a === null || b === null) { msg = 'Fill in a real date and time for both the start and the end.'; }
+            else if (b <= a) { msg = 'The end must be after the start (' + phStamp(a, true) + ').'; }
+            else if (b <= Date.now()) { msg = 'The end is already past. Pick a later time.'; }
+            else {
+                var mins = Math.round((b - a) / 60000);
+                sum.textContent = 'Runs ' + (mins >= 60 ? Math.floor(mins / 60) + ' h ' : '') + (mins % 60 ? (mins % 60) + ' min' : '') +
+                    ' · students see “Not open yet” until the start.';
+            }
+            if (msg && (a !== null && b !== null)) { tutRow('end').querySelector('.tut-box').classList.add('is-bad'); }
+        }
+        err.hidden = !msg;
+        err.textContent = msg;
+        $('#tut-accept').textContent = mode === 'now' ? 'Open now' : 'Schedule';
+        $('#tut-accept').disabled = !!msg;
+        return !msg;
+    }
+
+    function openTutoringDialog(gate, section, editing) {
+        tut.gate = gate; tut.section = section; tut.editing = editing; tut.calFor = null;
+        var members = state.cohort.filter(function (s) { return s.section === section; }).length;
+        $('#tut-title').textContent = (editing ? 'Change Tutoring schedule for ' : 'Open Tutoring for ') + section;
+        $('#tut-sub').textContent = members + (members === 1 ? ' student' : ' students') + ' of ' + section + ' can enter. A student who has not finished the stage before it stays out.';
+        var row = tutSchedule(section);
+        var now = Date.now(), start = Math.ceil(now / 300000) * 300000;
+        var opens = editing && row && row.opens_at ? Date.parse(row.opens_at) : start;
+        var closes = editing && row && row.closes_at ? Date.parse(row.closes_at) : opens + 3600000;
+        tutFill('start', opens);
+        tutFill('end', closes);
+        $('input[name="tut-mode"][value="schedule"]').checked = true;
+        $('#tut-cal').hidden = true;
+        tutCheck();
+        openModal('modal-tutoring');
+    }
+
+    function tutCalRender() {
+        var cal = $('#tut-cal'), m = tut.calMonth, first = new Date(Date.UTC(m.y, m.mo - 1, 1));
+        var days = new Date(Date.UTC(m.y, m.mo, 0)).getUTCDate(), lead = first.getUTCDay();
+        var today = phParts(Date.now()), cur = tutRead(tut.calFor), sel = cur === null ? null : phParts(cur);
+        var html = '<div class="tut-cal-head"><button type="button" data-cal-nav="-1" aria-label="Previous month">‹</button><b>' +
+            ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m.mo - 1] +
+            ' ' + m.y + '</b><button type="button" data-cal-nav="1" aria-label="Next month">›</button></div><div class="tut-cal-grid">' +
+            ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(function (d) { return '<u>' + d + '</u>'; }).join('');
+        for (var i = 0; i < lead; i++) { html += '<span></span>'; }
+        for (var d = 1; d <= days; d++) {
+            var past = m.y < today.y || (m.y === today.y && (m.mo < today.mo || (m.mo === today.mo && d < today.d)));
+            var cls = (m.y === today.y && m.mo === today.mo && d === today.d ? ' is-today' : '') +
+                (sel && sel.y === m.y && sel.mo === m.mo && sel.d === d ? ' is-sel' : '');
+            html += '<button type="button" data-cal-day="' + d + '" class="' + cls.trim() + '"' + (past ? ' disabled' : '') + '>' + d + '</button>';
+        }
+        cal.innerHTML = html + '</div>';
+    }
+
+    function wireTutoringDialog() {
+        if (tut.wired || !$('#modal-tutoring')) { return; }
+        tut.wired = true;
+        var modal = $('#modal-tutoring');
+
+        modal.addEventListener('input', function (event) {
+            var el = event.target;
+            if (el.matches('[data-p]')) {
+                el.value = el.value.replace(/\D/g, '').slice(0, 2);
+                if (el.value.length === 2) {
+                    var all = $$('input[data-p]', el.closest('.tut-row')), at = all.indexOf(el);
+                    if (all[at + 1]) { all[at + 1].focus(); all[at + 1].select(); }
+                }
+            }
+            tutCheck();
+        });
+        modal.addEventListener('keydown', function (event) {
+            var el = event.target;
+            if (!el.matches || !el.matches('[data-p]') || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) { return; }
+            event.preventDefault();
+            var k = el.getAttribute('data-p'), n = parseInt(el.value, 10) || 0, step = event.key === 'ArrowUp' ? 1 : -1;
+            var lim = { mo: [1, 12], d: [1, 31], y: [0, 99], h: [1, 12], mi: [0, 59] }[k];
+            n += step; if (n > lim[1]) { n = lim[0]; } if (n < lim[0]) { n = lim[1]; }
+            el.value = (k === 'h' ? String(n) : (n < 10 ? '0' + n : String(n)));
+            tutCheck();
+        });
+        modal.addEventListener('change', function (event) { if (event.target.name === 'tut-mode') { tutCheck(); } });
+        modal.addEventListener('click', function (event) {
+            var ap = event.target.closest('[data-ap]');
+            if (ap) { tutAmpm(ap.closest('.tut-row'), ap.getAttribute('data-ap')); tutCheck(); return; }
+
+            var calBtn = event.target.closest('[data-tut-cal]');
+            if (calBtn) {
+                var which = calBtn.getAttribute('data-tut-cal'), cal = $('#tut-cal');
+                if (!cal.hidden && tut.calFor === which) { cal.hidden = true; return; }
+                var ms = tutRead(which), p = phParts(ms === null ? Date.now() : ms);
+                tut.calFor = which; tut.calMonth = { y: p.y, mo: p.mo };
+                tutCalRender(); cal.hidden = false;
+                return;
+            }
+            var nav = event.target.closest('[data-cal-nav]');
+            if (nav) {
+                var m = tut.calMonth, mo = m.mo + parseInt(nav.getAttribute('data-cal-nav'), 10);
+                tut.calMonth = { y: m.y + (mo > 12 ? 1 : mo < 1 ? -1 : 0), mo: mo > 12 ? 1 : mo < 1 ? 12 : mo };
+                tutCalRender();
+                return;
+            }
+            var day = event.target.closest('[data-cal-day]');
+            if (day) {
+                var row = tutRow(tut.calFor), d = parseInt(day.getAttribute('data-cal-day'), 10), c = tut.calMonth;
+                tutNum(row, 'mo').value = c.mo < 10 ? '0' + c.mo : c.mo;
+                tutNum(row, 'd').value = d < 10 ? '0' + d : d;
+                tutNum(row, 'y').value = String(c.y).slice(2);
+                $('#tut-cal').hidden = true;
+                tutCheck();
+            }
+        });
+
+        $('#tut-accept').addEventListener('click', async function () {
+            if (!tutCheck()) { return; }
+            var mode = $('input[name="tut-mode"]:checked').value;
+            var gate = tut.gate, section = tut.section, opens = null, closes = null;
+            if (mode === 'schedule') {
+                opens = new Date(tutRead('start')).toISOString();
+                closes = new Date(tutRead('end')).toISOString();
+            }
+            closeModal(modal);
+            var btn = $('[data-gate-switch="' + gate.key + '"]');
+            if (btn) { btn.classList.add('is-working'); btn.disabled = true; }
+            try {
+                if (!sectionOpen(gate, section)) {
+                    state.gateSelected[gate.key] = [section];
+                    await grantSections(gate.key, null);
+                    if (!sectionOpen(gate, section)) { return; }   /* nobody could be let in: nothing to schedule */
+                }
+                var ok = await saveTutoringSchedule(section, opens, closes, false);
+                if (ok) {
+                    toastOk(mode === 'now' ? 'Tutoring is open' : 'Tutoring scheduled',
+                        mode === 'now' ? section + ' stays open until you close it.'
+                            : section + ': ' + phStamp(Date.parse(opens), true) + ' to ' + phStamp(Date.parse(closes), true) + '.');
+                }
+            } finally {
+                state.gateSelected[gate.key] = [];
+                if (btn) { btn.classList.remove('is-working'); }
+                renderStageSwitches();
+            }
+        });
+
+        /* "Change" beside the status opens the same dialog, filled with the current schedule. */
+        var bar = $('#stage-tabs');
+        if (bar) {
+            bar.addEventListener('click', function (event) {
+                if (!event.target.closest('[data-tut-change]')) { return; }
+                event.stopPropagation();
+                var gate = gateByKey('dash'), section = window.PIASectionNow || '';
+                if (section) { openTutoringDialog(gate, section, true); }
+            }, true);
+        }
+
+        /* Keep the countdown honest, and catch the moment a schedule starts or ends. */
+        setInterval(function () { if (!document.hidden) { renderStageSwitches(); } }, 30000);
+    }
+
     function initGates() {
+        wireTutoringDialog();
         var grid = $('#gates-grid');
 
         var tabsBar = $('#stage-tabs');
@@ -3603,7 +4344,7 @@
                 : 'Revoke ' + gate.title + ' for ' + names.join(', ') + '?',
             message: (inside
                 ? inside + ' student' + (inside === 1 ? ' is' : 's are') + ' inside now and will return to the ' +
-                  'Waiting Room. Anyone part-way through can still finish and submit what they started. '
+                'Waiting Room. Anyone part-way through can still finish and submit what they started. '
                 : 'Nobody is inside right now. ') +
                 'Nothing already submitted is changed or removed.' +
                 (everyone ? '' : ' Other sections keep their access.'),
@@ -3905,10 +4646,10 @@
 
         var banner = problem
             ? '<div class="notice notice-danger" role="alert">' + icon('alert') +
-              '<div><p class="notice-title">' + esc(problem.title) + '</p>' +
-              '<p class="notice-text">' + esc(problem.message) + '</p></div></div>' +
-              '<div class="device-problem-actions"><button class="btn btn-secondary btn-sm" type="button" ' +
-              'data-retry="admindevices">Try registering again</button></div>'
+            '<div><p class="notice-title">' + esc(problem.title) + '</p>' +
+            '<p class="notice-text">' + esc(problem.message) + '</p></div></div>' +
+            '<div class="device-problem-actions"><button class="btn btn-secondary btn-sm" type="button" ' +
+            'data-retry="admindevices">Try registering again</button></div>'
             : '';
 
         if (!devices || !devices.length) {
@@ -3927,7 +4668,7 @@
                 (isCurrent
                     ? '<span class="badge badge-accent">This device</span>'
                     : '<button class="btn btn-danger-soft btn-sm" data-revoke-admin="' + esc(deviceId) +
-                      '" aria-label="Revoke ' + esc(info.label) + '">Revoke</button>') +
+                    '" aria-label="Revoke ' + esc(info.label) + '">Revoke</button>') +
                 '</div>';
         }).join('');
 
@@ -4173,7 +4914,7 @@
             var status = pending
                 ? '<span class="badge">Awaiting activation</span>'
                 : '<span class="presence"><span class="dot ' + (signedIn ? 'dot-on' : 'dot-off') +
-                  '" aria-hidden="true"></span>' + (signedIn ? 'Signed in' : 'Signed out') + '</span>';
+                '" aria-hidden="true"></span>' + (signedIn ? 'Signed in' : 'Signed out') + '</span>';
             return '<tr>' +
                 '<td><div class="cell-user"><span class="avatar" aria-hidden="true">' + esc(initialsOf(a.full_name, a.email)) + '</span>' +
                 '<span class="cell-user-text"><span class="cell-name">' + esc(a.full_name || '(no name)') +
@@ -4587,6 +5328,13 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'app_config' }, qbLiveRefresh)
                 .subscribe();
         });
+        registerChannel('admin-realtime-tutoring-schedule', function (channel) {
+            return channel
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'tutoring_schedule' }, function () {
+                    loadTutoringSchedules().then(renderStageSwitches).catch(function (err) { console.error('Schedule reload failed:', err); });
+                })
+                .subscribe();
+        });
         registerChannel('admin-realtime-question-bank', function (channel) {
             return channel
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'question_bank' }, qbLiveRefresh)
@@ -4675,9 +5423,11 @@
     };
     var QB_ORDER = ['EASY', 'MEDIUM', 'HARD'];
     var QB_POINTS_MAX = 500;
-    var QB_STEP_LABELS = { EASY: ['Conversion', 'Multiplication'],
+    var QB_STEP_LABELS = {
+        EASY: ['Conversion', 'Multiplication'],
         MEDIUM: ['Subtraction', 'Division', 'Conversion'],
-        HARD: ['Subtraction', 'Division', 'Conversion'] };
+        HARD: ['Subtraction', 'Division', 'Conversion']
+    };
     var QB_COLUMNS = 'id, difficulty, question, final_answer, hint, points';
 
     function qbDefaultRules() { return { mastery: 80, minQuestions: 3, maxErrors: 3 }; }
@@ -4788,7 +5538,7 @@
         if (!ok) { n.textContent = ''; return; }
         var v = { wrong: +sc.wrong, hint: +sc.hint, fast: +sc.fast, secs: +sc.secs, speed: sc.speed, min: +sc.min };
         var bits = ['clean ' + qbExampleScore(20, 0, 0, false, v), '1 wrong ' + qbExampleScore(20, 1, 0, false, v),
-            '1 hint ' + qbExampleScore(20, 0, 1, false, v), '1 wrong + 1 hint ' + qbExampleScore(20, 1, 1, false, v)];
+        '1 hint ' + qbExampleScore(20, 0, 1, false, v), '1 wrong + 1 hint ' + qbExampleScore(20, 1, 1, false, v)];
         if (v.speed) { bits.push('fast and clean (under ' + v.secs + ' s) ' + qbExampleScore(20, 0, 0, true, v)); }
         n.textContent = 'Example for a 20-point question: ' + bits.join(' · ') + '.';
     }
@@ -4901,20 +5651,18 @@
                     maxErrors: toInt(c[key + '_max_errors'], 3)
                 };
             });
-            var serverHasClosing = Object.prototype.hasOwnProperty.call(c, 'game_closes_at');
-            var serverCloses = serverHasClosing && c.game_closes_at ? qbPhLocal(c.game_closes_at) : '';
+            var serverCloses = '';   /* the closing time now lives on each section's Tutoring switch (0060) */
             var serverHasScoring = Object.prototype.hasOwnProperty.call(c, 'score_wrong_pct');
             var serverScoring = serverHasScoring ? qbScoringFromRow(c) : null;
             var sig = qbConfigSig(serverCloses, serverRules, serverScoring);
             var byOther = qb.configSeen !== null && qb.configSeen !== sig;
             qb.configSeen = sig;
-            qb.hasClosing = serverHasClosing;
+            qb.hasClosing = false;
             qb.hasScoring = serverHasScoring;
             if (!qb.dirty) {
                 qb.rules = serverRules;
-                qb.closesAt = serverCloses;
                 if (serverScoring) { qb.scoring = serverScoring; }
-                if (byOther) { toastOk('Updated by another admin', 'The rules, the scoring and the closing time on this screen now match what was just saved.'); }
+                if (byOther) { toastOk('Updated by another admin', 'The rules and the scoring on this screen now match what was just saved.'); }
             } else if (byOther) {
                 toastErr('Changed by another admin', 'Your unsaved edits were kept. Saving will replace what the other admin just saved.');
             }
@@ -5069,7 +5817,7 @@
         wrap.className = 'row-actions';
 
         [['edit', 'pencil', 'Edit question ' + n, 'Edit question, steps and hints'],
-         ['delete', 'trash', 'Delete question ' + n, 'Delete question']].forEach(function (spec) {
+        ['delete', 'trash', 'Delete question ' + n, 'Delete question']].forEach(function (spec) {
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn-icon';
@@ -5091,14 +5839,14 @@
         tr.setAttribute('aria-hidden', 'true');
         tr.innerHTML =
             '<td class="qb-cell-q">' +
-                '<div class="qb-q qb-skel-q"><span class="skeleton skeleton-line" style="width:92%"></span>' +
-                '<span class="skeleton skeleton-line" style="width:64%"></span></div>' +
-                '<div class="qb-meta"><span class="skeleton qb-skel-meta"></span></div>' +
+            '<div class="qb-q qb-skel-q"><span class="skeleton skeleton-line" style="width:92%"></span>' +
+            '<span class="skeleton skeleton-line" style="width:64%"></span></div>' +
+            '<div class="qb-meta"><span class="skeleton qb-skel-meta"></span></div>' +
             '</td>' +
             '<td class="qb-cell-answer"><span class="qb-cell-label">&nbsp;</span><span class="skeleton qb-skel-field"></span></td>' +
             '<td class="qb-cell-points"><span class="qb-cell-label">&nbsp;</span><span class="skeleton qb-skel-field"></span></td>' +
             '<td class="qb-cell-actions"><div class="row-actions"><span class="skeleton qb-skel-btn"></span>' +
-                '<span class="skeleton qb-skel-btn"></span></div></td>';
+            '<span class="skeleton qb-skel-btn"></span></div></td>';
         return tr;
     }
 
@@ -5111,25 +5859,14 @@
         qbPaintRange();
         $('#qb-min-questions').value = rules.minQuestions == null ? '' : String(rules.minQuestions);
         $('#qb-max-errors').value = rules.maxErrors == null ? '' : String(rules.maxErrors);
-        if (document.activeElement !== $('#qb-closes-at')) {
-            $('#qb-closes-at').value = qb.closesAt;
-        }
-        var passed = qb.closesAt && qbPhToIso(qb.closesAt) && Date.parse(qbPhToIso(qb.closesAt)) <= Date.now();
-        $('#qb-closes-note').textContent = !qb.hasClosing
-            ? 'Available after the game database update.'
-            : (passed
-                ? 'This time has already passed: the tutoring will be locked for every student as soon as you save.'
-                : 'Philippine time. From this moment the tutoring is locked for every student, even if they quit and come back, until you set a later time. Leave it empty for no closing time. Students are never shown this time.');
 
         ['#qb-mastery', '#qb-min-questions', '#qb-max-errors'].forEach(function (sel) {
             $(sel).disabled = !ready;
         });
-        $('#qb-closes-at').disabled = !ready || !qb.hasClosing;
-        $('#qb-closes-clear').disabled = !ready || !qb.hasClosing || !qb.closesAt;
 
         var sc = qb.scoring, sActive = document.activeElement && document.activeElement.id;
         [['#qb-sc-wrong', 'wrong'], ['#qb-sc-hint', 'hint'], ['#qb-sc-fast', 'fast'], ['#qb-sc-secs', 'secs'],
-         ['#qb-sc-min', 'min'], ['#qb-sc-repeat-pct', 'repeatPct']].forEach(function (pair) {
+        ['#qb-sc-min', 'min'], ['#qb-sc-repeat-pct', 'repeatPct']].forEach(function (pair) {
             if (sActive !== pair[0].slice(1)) { $(pair[0]).value = String(sc[pair[1]]); }
             $(pair[0]).disabled = !ready || !qb.hasScoring;
         });
@@ -5639,7 +6376,7 @@
         /* Every topic is checked, not only the one on screen: an invalid
            value typed into another topic takes the admin back there. */
         var fields = [['minQuestions', 'qb-min-questions', 'Solved to level up'],
-                      ['maxErrors', 'qb-max-errors', 'Wrong to level down']];
+        ['maxErrors', 'qb-max-errors', 'Wrong to level down']];
         var order = [qb.topic].concat(QB_ORDER.filter(function (t) { return t !== qb.topic; }));
 
         for (var i = 0; i < order.length; i++) {
@@ -5654,18 +6391,7 @@
             }
         }
 
-        var closesIso = null;
-        if (qb.hasClosing && qb.closesAt) {
-            closesIso = qbPhToIso(qb.closesAt);
-            if (closesIso === null) {
-                setFieldError('qb-closes-at', 'Pick a valid date and time.');
-                $('#qb-closes-at').focus();
-                return;
-            }
-        }
-
         var row = { id: 1 };
-        if (qb.hasClosing) { row.game_closes_at = closesIso; }
         if (qb.hasScoring) {
             var scv = qb.scoring, specs = [
                 ['qb-sc-wrong', scv.wrong, 0, 100, 'a whole number from 0 to 100'],
@@ -5714,8 +6440,10 @@
 
         qb.dirty = false;
         if (qb.hasScoring) {
-            qb.scoring = { wrong: row.score_wrong_pct, hint: row.score_hint_pct, fast: row.score_fast_bonus_pct, secs: row.score_fast_seconds,
-                speed: row.score_speed_bonus, min: row.score_min, repeatOn: row.score_repeat_enabled, repeatPct: row.score_repeat_pct };
+            qb.scoring = {
+                wrong: row.score_wrong_pct, hint: row.score_hint_pct, fast: row.score_fast_bonus_pct, secs: row.score_fast_seconds,
+                speed: row.score_speed_bonus, min: row.score_min, repeatOn: row.score_repeat_enabled, repeatPct: row.score_repeat_pct
+            };
         }
         qb.configSeen = qbConfigSig(qb.closesAt, qb.rules, qb.hasScoring ? qb.scoring : null);
         renderQbRules();
@@ -5766,14 +6494,8 @@
                 qbMarkDirty();
             });
         });
-        $('#qb-closes-at').addEventListener('input', function () {
-            qb.closesAt = this.value;
-            setFieldError(this.id, '');
-            qbMarkDirty();
-            renderQbRules();
-        });
         [['#qb-sc-wrong', 'wrong'], ['#qb-sc-hint', 'hint'], ['#qb-sc-fast', 'fast'], ['#qb-sc-secs', 'secs'],
-         ['#qb-sc-min', 'min'], ['#qb-sc-repeat-pct', 'repeatPct']].forEach(function (pair) {
+        ['#qb-sc-min', 'min'], ['#qb-sc-repeat-pct', 'repeatPct']].forEach(function (pair) {
             $(pair[0]).addEventListener('input', function () {
                 qb.scoring[pair[1]] = this.value;
                 setFieldError(this.id, '');
@@ -5788,12 +6510,17 @@
                 renderQbRules();
             });
         });
-        $('#qb-closes-clear').addEventListener('click', function () {
-            qb.closesAt = '';
-            $('#qb-closes-at').value = '';
-            setFieldError('qb-closes-at', '');
-            qbMarkDirty();
-            renderQbRules();
+        /* Questions and Rules are two views of the same topic; the topic tabs above stay put. */
+        $$('[data-qb-view]').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                var view = tab.getAttribute('data-qb-view');
+                $('#qb-views').className = 'grid grid-main qb-view-' + view;
+                $$('[data-qb-view]').forEach(function (other) {
+                    var on = other === tab;
+                    other.classList.toggle('is-active', on);
+                    other.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+            });
         });
         $('#qb-config-form').addEventListener('submit', qbSaveRules);
 
@@ -5918,6 +6645,7 @@
 
         initTutorFields();
         $('#register-student-form').addEventListener('submit', handleRegisterStudent);
+        initEnrollStudents();
         $('#edit-student-form').addEventListener('submit', handleUpdateStudent);
         $$('#edit-student-form [data-score-test]').forEach(function (input) {
             input.addEventListener('input', function () { paintScorePreview(input.getAttribute('data-score-test')); });

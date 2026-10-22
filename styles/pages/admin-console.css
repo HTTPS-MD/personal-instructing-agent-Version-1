@@ -12,9 +12,9 @@
         which no longer uses the hover rail in shell.css.
      3. Flattens the shared components admin.css built as tinted cards.
 
-   Colour follows the homepage (ink, paper, violet); green is kept only for
+   Colour follows the homepage (navy ink, cream paper, blue); green is kept only for
    "connected" status, with the usual amber / red for warnings. Primary actions
-   are flat violet fills with an ink label.
+   are flat blue fills with an ink label.
    ==========================================================================*/
 
 /* ------------------------------------------------------------- 1. TOKENS --- */
@@ -78,20 +78,20 @@
     --stripe: transparent;
 
     --accent: var(--palette-violet);
-    --accent-text: #5b21b6;                  /* violet as text on paper */
-    --accent-strong: #7c3aed;
-    --accent-hover: #8e4cf5;
+    --accent-text: #1745b0;                  /* blue as text on paper */
+    --accent-strong: #2563d9;
+    --accent-hover: #5aa2ff;
     --accent-soft: color-mix(in srgb, var(--palette-violet) 14%, var(--palette-paper));
     --accent-line: color-mix(in srgb, var(--palette-violet) 45%, var(--palette-paper));
     --on-accent: var(--palette-ink);
     --on-primary: var(--palette-ink);
     --color-primary: var(--accent);
-    --focus: #5b21b6;
-    --ok: #146c36;                           /* connected / online */
+    --focus: #1745b0;
+    --ok: #0e7a3c;                           /* connected / online */
 
     --primary: var(--palette-violet);        /* violet fill, ink label (5:1) */
     --on-primary-btn: var(--palette-ink);
-    --primary-hover: #b27bff;
+    --primary-hover: #6aa8ff;
 
     --warning: #92400e; --warning-soft: #fdf2d8; --warning-line: #e8c36a; --warning-ink: #92400e;
     --danger: #b91c1c; --danger-strong: #991b1b; --danger-ink: #b91c1c; --color-danger: #b91c1c;
@@ -122,19 +122,19 @@
     --line-input: color-mix(in srgb, var(--palette-paper) 52%, var(--palette-ink));
 
     --accent: var(--palette-violet);
-    --accent-text: #c4a1ff;
-    --accent-strong: #c4a1ff;
-    --accent-hover: #c4a1ff;
+    --accent-text: #a5ccff;
+    --accent-strong: #a5ccff;
+    --accent-hover: #a5ccff;
     --accent-soft: color-mix(in srgb, var(--palette-violet) 18%, var(--palette-ink));
     --accent-line: color-mix(in srgb, var(--palette-violet) 50%, var(--palette-ink));
     --on-accent: var(--palette-ink);
     --on-primary: var(--palette-ink);
     --focus: var(--palette-volt);
-    --ok: #4ade80;
+    --ok: #2ed573;
 
     --primary: var(--palette-violet);
     --on-primary-btn: var(--palette-ink);
-    --primary-hover: #b27bff;
+    --primary-hover: #6aa8ff;
 
     --warning: #fbbf24; --warning-soft: #2b2108; --warning-line: #5c4713; --warning-ink: #fbbf24;
     --danger: #f87171; --danger-strong: #fca5a5; --danger-ink: #f87171; --color-danger: #f87171;
@@ -860,8 +860,8 @@ html[data-surface="admin"] .palette-input:focus-visible { box-shadow: none; back
 .custom-select-chevron { width: 8px; height: 8px; flex: 0 0 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
 .custom-select-trigger[aria-expanded="true"] .custom-select-chevron { transform: translateY(2px) rotate(225deg); }
 .custom-select-list {
-    position: absolute; z-index: 20; top: calc(100% + 4px); left: 0;
-    min-width: 100%; max-width: min(20rem, calc(100vw - 32px)); max-height: min(18rem, 50vh); overflow: auto;
+    position: fixed; z-index: 250; top: 0; left: 0;   /* placed by JS; lives on <body> so dialogs cannot clip it */
+    min-width: 10rem; max-width: min(20rem, calc(100vw - 32px)); max-height: 18rem; overflow: auto; overscroll-behavior: contain;
     padding: 4px; border: 1px solid var(--line-input); border-radius: 6px;
     background: var(--bg-surface); box-shadow: var(--shadow-lg);
 }
@@ -889,3 +889,74 @@ html[data-surface="admin"] .palette-input:focus-visible { box-shadow: none; back
     margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--warning-line); border-radius: 4px;
     background: var(--warning-soft); color: var(--warning-ink); font-size: var(--fs-sm);
 }
+
+/* ---- Enroll students (batch) ---------------------------------------------
+   Two steps. Step 1 is a section and a box of emails. Step 2 is one row per student:
+   name, email, condition, status. The consent box sits in the footer next to Enroll. */
+.modal-enroll { max-width: min(960px, 100%); }
+
+.bn-intro { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 16px 24px; align-items: start; }
+.bn-intro .field { margin: 0; }
+#bn-emails { min-height: 180px; resize: vertical; font-family: var(--font-mono, monospace); }
+.bn-section-field { display: flex; flex-direction: column; }
+.bn-section-field .custom-select { order: 1; width: 100%; }
+.bn-section-field .field-msg { order: 2; }
+.bn-section-field .field-msg:empty { display: none; }
+#bn-add-msg:empty { display: none; }
+@media (max-width: 720px) { .bn-intro { grid-template-columns: minmax(0, 1fr); } }
+
+.bn-review-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 14px; }
+.bn-review-title { margin: 0; font-weight: 600; }
+.bn-issues { margin: 0 0 0 auto; color: var(--warning, inherit); font-size: var(--fs-sm); }
+.bn-issues.is-ok { color: var(--accent, inherit); }
+
+.bn-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.bn-tools .filter-field { min-width: 0; }
+.bn-tools .custom-select { width: 240px; }
+
+.bn-table { table-layout: fixed; min-width: 640px; }
+.bn-table thead th {
+    padding: 10px 8px; text-align: left; font-weight: 600;
+    border-bottom: 1px solid var(--border, rgba(127, 127, 127, .3));
+}
+.bn-table td { padding: 10px 8px; vertical-align: top; border-bottom: 1px solid var(--border-soft, rgba(127, 127, 127, .18)); }
+.bn-table .input-sm { width: 100%; min-width: 0; }
+.bn-table th:nth-child(1), .bn-table td:nth-child(1) { width: 30%; }
+.bn-table th:nth-child(2), .bn-table td:nth-child(2) { width: 31%; }
+.bn-table th:nth-child(3), .bn-table td:nth-child(3) { width: 19%; }
+.bn-table th:nth-child(4), .bn-table td:nth-child(4) { width: 15%; padding-top: 14px; }
+.bn-table th:nth-child(5), .bn-table td:nth-child(5) { width: 5%; text-align: center; }
+.bn-table td:nth-child(2) { padding-top: 14px; }
+.bn-email-text { display: block; overflow-wrap: anywhere; font-size: var(--fs-sm); }
+.bn-table td:nth-child(4) .btn { display: block; margin-top: 4px; padding: 0; height: auto; }
+.bn-table .bn-remove { font-size: 20px; line-height: 1; padding: 0 8px; opacity: .6; }
+.bn-table tr:hover .bn-remove, .bn-table .bn-remove:focus-visible { opacity: 1; }
+.bn-note { color: var(--text-muted, inherit); font-size: var(--fs-xs); margin-top: 4px; }
+.bn-note:empty { display: none; }
+.bn-note-fix { color: var(--danger, inherit); }
+.bn-table .custom-select { width: 100%; }
+.bn-table .custom-select-trigger { min-height: 34px; }
+/* A wide dialog lets the condition lists open over the page; a narrow one scrolls the grid sideways and
+   would cut an open list off, so it keeps the phone's own menu there. */
+@media (min-width: 1000px) { #modal-enroll-students .table-wrap { overflow: visible; } }
+@media (max-width: 999px) {
+    .bn-table .custom-select { display: none; }
+    .bn-table select[hidden] { display: block !important; }
+}
+
+#bn-summary { margin: 12px 0 0; }
+#bn-summary:empty { display: none; }
+.bn-foot-consent { min-width: 0; flex: 1 1 320px; }
+.bn-foot-consent .check { margin: 0; }
+.bn-foot-consent .field-msg { margin: 4px 0 0; }
+.bn-report { margin-top: 12px; padding: 12px 16px; border: 1px solid var(--border, currentColor); border-radius: var(--r-md, 6px); }
+.bn-report ul { margin: 6px 0 6px 18px; }
+
+/* Math Task: Questions and Rules are separate views, so the table has the full width. */
+.qb-subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line-soft); }
+.qb-subtab { padding: 10px 16px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--text-muted); font: inherit; cursor: pointer; }
+.qb-subtab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+#qb-views { grid-template-columns: minmax(0, 1fr); }
+#qb-views.qb-view-questions .qb-config { display: none; }
+#qb-views.qb-view-rules > [data-region="mathtask"]:not(.qb-config) { display: none; }
+#qb-views.qb-view-rules .qb-config { max-width: 760px; }
