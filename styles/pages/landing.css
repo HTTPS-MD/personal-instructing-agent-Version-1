@@ -2841,3 +2841,43 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .hero-resume { display: none; }
 :root[data-session] .hero-resume { display: inline-flex; }
 :root[data-session] .join { display: none; }
+
+
+/* ═════════════════════════════ 7.10 HERO BACKGROUND · THE SIX IN THEIR CLASSROOM
+   A still picture per theme replaces the looping video (and its pause button
+   and the vertical running head). Anchored to the bottom so the tutors, which
+   sit in the lower half, are never cropped; the copy sits in the wall and
+   chalkboard above them. */
+.hero-media {
+    background: var(--bg-body) url("../../assets/images/classroom-six-characters-light.webp") center bottom / cover no-repeat;
+}
+:root[data-theme="dark"] .hero-media {
+    background-image: url("../../assets/images/classroom-six-characters-dark.webp");
+}
+.hero-tone { display: none; }
+/* Only a soft wash behind the navbar and the headline, so the picture stays bright. */
+.hero-scrim {
+    background:
+        linear-gradient(to bottom,
+            color-mix(in srgb, var(--bg-body) 70%, transparent) 0,
+            transparent calc(var(--topbar-h) * 1.8)),
+        radial-gradient(ellipse 60% 38% at 50% 24%,
+            color-mix(in srgb, var(--bg-body) 62%, transparent) 0%,
+            transparent 100%);
+}
+.act.act-drop { justify-content: flex-start; padding-block: calc(var(--topbar-h) + 1.25rem) 4rem; }
+.drop-title { font-size: clamp(2.2rem, 4.4cqi, 3.75rem); }
+.drop-title > .drop-l3 { display: inline-block; margin: 0 0 0 0.3em; }
+.drop-sub { margin-block-start: 0.6rem; font-size: clamp(1.05rem, 1.6vw, 1.3rem); }
+.hero-join { margin-block-start: 0.9rem; }
+.join { width: min(32rem, 100%); }
+.join-in { padding-block: 0.7rem; font-size: 1.1rem; }
+.join-btn { font-size: 1.15rem; }
+/* The number hint would sit on the tutors' heads; it stays for screen readers. */
+.hero-copy .signed-out-copy {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}

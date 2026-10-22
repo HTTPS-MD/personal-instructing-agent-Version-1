@@ -345,37 +345,14 @@
                      first act of .reel-flow, so the scrub range is unchanged. -->
                 <section class="act act-drop" id="hero" aria-labelledby="drop-title">
 
-                    <!-- Decorative, so hidden from assistive tech entirely.
-
-                         No autoplay attribute and preload="none": nothing is
-                         downloaded until landing.js decides to play, which it
-                         skips for reduced motion and Save-Data. Without JS
-                         the poster is the hero, which is the right failure.
-
-                         The loop is a ping-pong re-encode of the original
-                         AdobeStock pan with eased turnarounds, so it never
-                         jump-cuts: 4.5 MB at 1080p and 2.2 MB at 720p, against
-                         19.5 MB for the 4K source, which is still listed last
-                         as a fallback. It is an MP4 container despite the
-                         .mov name, hence type="video/mp4" — declaring
-                         video/quicktime would make Chrome and Firefox skip it. -->
+                    <!-- Decorative background: the classroom with the six tutors. The picture
+                         is set per theme in landing.css (section 7.10). -->
                     <div class="hero-media" aria-hidden="true">
-                        <video class="hero-video" id="hero-video" poster="assets/images/hero-classroom-poster.jpg" muted
-                            loop playsinline preload="none" disablepictureinpicture disableremoteplayback tabindex="-1">
-                            <source src="assets/videos/hero-classroom-720.mp4" type="video/mp4"
-                                media="(max-width: 48rem)">
-                            <source src="assets/videos/hero-classroom-1080.mp4" type="video/mp4">
-                            <source src="assets/videos/AdobeStock_1646385409.mov" type="video/mp4">
-                        </video>
                         <span class="hero-tone"></span>
                         <span class="hero-scrim"></span>
                     </div>
 
-                    <!-- The running head down the right edge, like a manga
-                         volume's spine. Decorative. -->
-                    <p class="hero-spine" aria-hidden="true">Grade 7 &middot; 数学 &middot; Maths</p>
-
-                    <!-- The copy on the left, the cast on the right from 60rem up;
+                                        <!-- The copy on the left, the cast on the right from 60rem up;
                          below that the cast follows the buttons, so it can never
                          sit on top of them. -->
                     <div class="shell act-drop-inner">
@@ -415,19 +392,6 @@
 
                     </div>
 
-                    <!-- WCAG 2.2.2: motion that starts on its own and runs longer
-                         than five seconds needs a way to stop it. [hidden] until
-                         landing.js takes charge of the video, so a JS-less
-                         visitor never sees a dead control. -->
-                    <button type="button" class="tap hero-video-toggle" id="hero-video-toggle" hidden>
-                        <svg class="icon icon-pause" aria-hidden="true">
-                            <use href="#i-pause"></use>
-                        </svg>
-                        <svg class="icon icon-play" aria-hidden="true">
-                            <use href="#i-play"></use>
-                        </svg>
-                        <span class="sr-only" data-video-label>Play background video</span>
-                    </button>
                 </section>
 
                 <!-- ------------------------------- 2.1 MEET THE TUTORS -------
