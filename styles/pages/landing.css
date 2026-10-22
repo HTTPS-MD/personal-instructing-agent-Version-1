@@ -2867,7 +2867,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 }
 .act.act-drop { justify-content: flex-start; padding-block: calc(var(--topbar-h) + 1.25rem) 4rem; }
 .drop-title { font-size: clamp(2.2rem, 4.4cqi, 3.75rem); }
-.drop-title > .drop-l3 { display: inline-block; margin: 0 0 0 0.3em; }
+/* One row, every piece centred on the same line (text and the volt box). */
+.drop-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0.25em; }
+.drop-title > .drop-l1, .drop-title > .drop-l2, .drop-title > .drop-l3 { display: block; margin: 0; }
 .drop-sub { margin-block-start: 0.6rem; font-size: clamp(1.05rem, 1.6vw, 1.3rem); }
 .hero-join { margin-block-start: 0.9rem; }
 .join { width: min(32rem, 100%); }
