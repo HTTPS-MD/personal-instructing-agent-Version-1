@@ -2881,3 +2881,15 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     clip-path: inset(50%);
     white-space: nowrap;
 }
+
+/* "Show password": a checkbox under the field instead of an eye button. */
+.show-pw {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-block-start: 0.25rem;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    user-select: none;
+}
+.show-pw input { width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--accent); cursor: pointer; }

@@ -282,26 +282,39 @@
        reader announce "Hide password, pressed", which contradicts itself.
        data-pw-shown marks a revealed field so closeModal() can still find it
        and wipe it once its type is "text". */
-    function setPasswordShown(input, button, shown) {
+    var PW_CONTROLS = '[data-pw-toggle], [data-pw-check]';
+
+    function pwInput(control) {
+        return document.getElementById(control.getAttribute('data-pw-toggle') || control.getAttribute('data-pw-check'));
+    }
+
+    function setPasswordShown(input, control, shown) {
         input.type = shown ? 'text' : 'password';
         if (shown) { input.setAttribute('data-pw-shown', ''); } else { input.removeAttribute('data-pw-shown'); }
-        button.setAttribute('aria-pressed', String(shown));
+        if (control.type === 'checkbox') { control.checked = shown; }
+        else { control.setAttribute('aria-pressed', String(shown)); }
     }
 
     function maskPasswords(root) {
-        $$('[data-pw-toggle]', root).forEach(function (button) {
-            var input = document.getElementById(button.getAttribute('data-pw-toggle'));
-            if (input) { setPasswordShown(input, button, false); }
+        $$(PW_CONTROLS, root).forEach(function (control) {
+            var input = pwInput(control);
+            if (input) { setPasswordShown(input, control, false); }
         });
     }
 
+    /* A "Show password" checkbox (data-pw-check) or the older eye button
+       (data-pw-toggle); both drive the same field. */
     function initPasswordToggles() {
-        $$('[data-pw-toggle]').forEach(function (button) {
-            var input = document.getElementById(button.getAttribute('data-pw-toggle'));
+        $$(PW_CONTROLS).forEach(function (control) {
+            var input = pwInput(control);
             if (!input) { return; }
-            button.addEventListener('click', function () {
-                setPasswordShown(input, button, input.type === 'password');
-            });
+            if (control.type === 'checkbox') {
+                control.addEventListener('change', function () { setPasswordShown(input, control, control.checked); });
+            } else {
+                control.addEventListener('click', function () {
+                    setPasswordShown(input, control, input.type === 'password');
+                });
+            }
         });
     }
 
@@ -318,8 +331,8 @@
     }
 
     function initCapsLock() {
-        $$('[data-pw-toggle]').forEach(function (button) {
-            var input = document.getElementById(button.getAttribute('data-pw-toggle'));
+        $$(PW_CONTROLS).forEach(function (control) {
+            var input = pwInput(control);
             if (!input) { return; }
             var check = function (event) {
                 if (event.getModifierState) { setCapsHint(input, event.getModifierState('CapsLock')); }
@@ -623,11 +636,15 @@
         $('#join-number').focus();
     }
 
-    async function enterWithToken(tokenHash) {
+    /* `ui` lets a caller that has no sign-in dialog open (the hero's Join bar)
+       say where failures and progress go: { current(), fail(message), report(text, tone) }.
+       Without it, the sign-in dialog is used, as before. */
+    async function enterWithToken(tokenHash, ui) {
+        ui = ui || {};
         var overlay = $('#modal-signin');
         var version = overlay.dataset.authVersion || '0';
-        var current = function () { return overlay.classList.contains('is-open') && (overlay.dataset.authVersion || '0') === version; };
-        var fail = function (message) { backToNumber(message); };
+        var current = ui.current || function () { return overlay.classList.contains('is-open') && (overlay.dataset.authVersion || '0') === version; };
+        var fail = ui.fail || function (message) { backToNumber(message); };
 
         /* This tab is a student's: the session lives in the tab, not in the
            browser, so closing the tab ends it on this PC (function.js). Set
@@ -673,7 +690,7 @@
             return;
         }
 
-        await routeAfterSignIn(profile, role, function (text, tone) { setStatus('signin-status', text, tone); });
+        await routeAfterSignIn(profile, role, ui.report || function (text, tone) { setStatus('signin-status', text, tone); });
     }
 
     async function handleStudentJoin(event) {
@@ -1349,24 +1366,66 @@
         try { localStorage.setItem(GREETING_NAME_KEY, JSON.stringify({ email: email, name: name })); } catch (err) { /* ignore */ }
     }
 
-    /* The hero's "Enter your student number + Join" bar. It only forwards:
-       open the same sign-in dialog, put the digits in its field and submit
-       that form, so every check still lives in handleStudentJoin. */
+    /* The hero's "Enter your student number + Join" bar. No dialog opens on
+       the way in: the number is looked up, and if the admin has the class open
+       the student walks straight in (the same pipeline as the sign-in dialog,
+       enterWithToken). Only a refusal opens a dialog, with the reason. */
+    function showJoinError(message) {
+        $('#join-error-text').textContent = message;
+        openModal('modal-join-error');
+    }
+
+    var heroJoinPending = false;
+
+    async function heroJoin(number) {
+        if (heroJoinPending) { return; }
+        if (typeof sb === 'undefined' || !sb) {
+            showJoinError('The sign-in service is unavailable. Check your connection and reload.');
+            return;
+        }
+        if (number.length !== 11) {
+            showJoinError('Type your 11-digit student number.');
+            return;
+        }
+
+        heroJoinPending = true;
+        var button = $('#hero-join .join-btn');
+        var release = setBusy(button, 'Checking…');
+        var walkedIn = false;
+        try {
+            var found = await joinCall({ action: 'lookup', number: number });
+            if (!found.ok) {
+                showJoinError((found.data && found.data.error) || 'Could not check the number. Try again.');
+                return;
+            }
+            var entered = await joinCall({ action: 'enter', number: number });
+            if (!entered.ok) {
+                showJoinError((entered.data && entered.data.error) || 'Could not let you in. Try again.');
+                return;
+            }
+            walkedIn = true;
+            await enterWithToken(entered.data.token_hash, {
+                current: function () { return true; },
+                fail: function (message) { walkedIn = false; showJoinError(message); },
+                report: function () { button.textContent = 'Entering…'; }
+            });
+        } catch (err) {
+            walkedIn = false;
+            showJoinError('Can’t reach the server. Check your Wi-Fi, then try again.');
+        } finally {
+            heroJoinPending = false;
+            /* Signed in: the page is already on its way to the dashboard, so
+               the button stays busy until it leaves. */
+            if (!walkedIn) { release(); }
+        }
+    }
+
     function wireHeroJoin() {
         var form = $('#hero-join');
         if (!form) { return; }
         form.addEventListener('submit', function (event) {
             event.preventDefault();
-            var opener = $('.hero-resume');
-            var digits = $('#join-num').value.replace(/\D/g, '');
-            if (!opener) { return; }
-            opener.click();
-            var field = $('#join-number');
-            var dialogForm = $('#signin-form');
-            if (!digits || !field || !dialogForm) { return; }
-            field.value = digits;
-            if (dialogForm.requestSubmit) { dialogForm.requestSubmit(); }
-            else { dialogForm.dispatchEvent(new Event('submit', { cancelable: true })); }
+            heroJoin($('#join-num').value.replace(/\D/g, ''));
         });
     }
 

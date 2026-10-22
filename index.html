@@ -990,20 +990,9 @@
                                 <button type="button" class="link-btn" data-auth-open="forgot">Forgot
                                     password?</button>
                             </div>
-                            <div class="pw-wrap">
-                                <input class="input" type="password" id="st-password" name="password"
-                                    autocomplete="current-password" enterkeyhint="go" placeholder="••••••••"
-                                    aria-describedby="st-password-msg">
-                                <button type="button" class="pw-toggle" data-pw-toggle="st-password"
-                                    aria-label="Show password" aria-pressed="false">
-                                    <svg class="icon icon-eye" aria-hidden="true">
-                                        <use href="#i-eye"></use>
-                                    </svg>
-                                    <svg class="icon icon-eye-off" aria-hidden="true">
-                                        <use href="#i-eye-off"></use>
-                                    </svg>
-                                </button>
-                            </div>
+                            <input class="input" type="password" id="st-password" name="password"
+                                autocomplete="current-password" enterkeyhint="go" placeholder="••••••••"
+                                aria-describedby="st-password-msg">
                             <p class="field-msg" id="st-password-msg" data-msg-for="st-password"></p>
                         </div>
                     </div>
@@ -1024,19 +1013,14 @@
                         Sign out of other devices
                     </button>
 
-                    <!-- "student", not "signin": auth.js relabels every
-                         data-auth-open="signin" trigger for a returning session,
-                         and this is navigation between dialogs, not an entry point. -->
-                    <div class="portal-links">
-                        <p class="portal-note">
-                            Not staff?
-                            <button type="button" class="link-btn" data-auth-open="student">Student sign in</button>
-                        </p>
-                    </div>
                 </form>
             </div>
         </div>
     </div>
+                            <label class="show-pw">
+                                <input type="checkbox" id="st-show-pw" data-pw-check="st-password">
+                                <span>Show password</span>
+                            </label>
 
     <div class="overlay" id="modal-activate" role="dialog" aria-modal="true" aria-labelledby="activate-title"
         aria-describedby="activate-description">
@@ -1070,6 +1054,27 @@
                         <button type="button" class="link-btn" id="ac-resend">Resend email</button>
                         <button type="button" class="link-btn" id="ac-change-email">Use a different email</button>
                     </div>
+    <!-- The hero's Join bar opens this only when the number is refused. -->
+    <div class="overlay" id="modal-join-error" role="alertdialog" aria-modal="true" aria-labelledby="join-error-title"
+        aria-describedby="join-error-text">
+        <div class="modal modal-sm">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="join-error-title">Can’t let you in yet</h2>
+                </div>
+                <button class="modal-close" data-modal-close aria-label="Close dialog">
+                    <svg class="icon">
+                        <use href="#i-x"></use>
+                    </svg>
+                </button>
+            </header>
+            <div class="modal-body">
+                <p class="portal-note" id="join-error-text" role="status"></p>
+                <button type="button" class="btn btn-primary portal-submit" data-modal-close data-autofocus>Try again</button>
+            </div>
+        </div>
+    </div>
+
                 </section>
                 <p class="email-cooldown" id="ac-cooldown"></p>
                 <p class="auth-status" id="activate-status" role="status"><svg class="icon" aria-hidden="true">
@@ -1195,7 +1200,7 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script defer src="assets/js/function.js"></script>
-    <script defer src="assets/js/auth.js?v=20261022a"></script>
+    <script defer src="assets/js/auth.js?v=20261022b"></script>
     <script defer src="assets/js/landing.js"></script>
 
     <!-- The navbar: transparent-to-solid state, the mobile sheet and the
