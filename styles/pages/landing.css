@@ -2843,39 +2843,38 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 :root[data-session] .join { display: none; }
 
 
-/* ═════════════════════════════ 7.10 HERO BACKGROUND · THE SIX IN THEIR CLASSROOM
+/* ═════════════════════════════ 7.10 HERO BACKGROUND · THE SIX AT THEIR DESK
    A still picture per theme replaces the looping video (and its pause button
-   and the vertical running head). Anchored to the bottom so the tutors, which
-   sit in the lower half, are never cropped; the copy sits in the wall and
-   chalkboard above them. */
+   and the vertical running head). The six tutors sit along the bottom and the
+   wall above them is left empty, so the copy is centred in that wall: the bottom
+   of the picture (about 48% of it) is kept clear of copy. The picture is 16:9 and
+   anchored to the bottom, so its height is the larger of the hero and width / 1.78. */
 .hero-media {
-    background: var(--bg-body) url("../../assets/images/classroom-six-characters-light.webp") center bottom / cover no-repeat;
+    background: #a9c9ee url("../../assets/images/school-characters-bg-light-v4.webp") center bottom / cover no-repeat;
 }
 :root[data-theme="dark"] .hero-media {
-    background-image: url("../../assets/images/classroom-six-characters-dark.webp");
+    background: #0e1a44 url("../../assets/images/school-characters-bg-dark-v4.webp") center bottom / cover no-repeat;
 }
 .hero-tone { display: none; }
-/* Only a soft wash behind the navbar and the copy block, so the picture stays bright. */
+/* Only a thin wash under the navbar; the picture is left as drawn. */
 .hero-scrim {
-    background:
-        linear-gradient(to bottom,
-            color-mix(in srgb, var(--bg-body) 70%, transparent) 0,
-            transparent calc(var(--topbar-h) * 1.8)),
-        radial-gradient(ellipse 42% 30% at 50% calc(50% + var(--topbar-h) / 2),
-            color-mix(in srgb, var(--bg-body) 85%, transparent) 0%,
-            color-mix(in srgb, var(--bg-body) 60%, transparent) 55%,
-            transparent 100%);
+    background: linear-gradient(to bottom,
+        color-mix(in srgb, var(--bg-body) 55%, transparent) 0,
+        transparent calc(var(--topbar-h) * 1.6));
 }
-/* Exactly in the middle of the screen below the navbar. The tutors' faces behind it
-   are allowed to be covered; the wash below keeps the words readable. */
 .act.act-drop {
     justify-content: center;
-    padding-block: var(--topbar-h) 0;
+    padding-block: calc(var(--topbar-h) + 2.5rem) calc(max(100svh, 56.25vw) * 0.48);
 }
-/* The headline keeps its stacked shape ("Personal Instructing" over the volt "Agent").
-   The letters, not the line box, are what the eye centres: the volt box carried its
+.drop-title { font-size: clamp(2.2rem, 6.2cqi, 4.75rem); }
+/* The letters, not the line box, are what the eye centres: the volt box carried its
    spare room below the baseline (for the "g"), so "Agent" sat high in it. */
 .drop-title > .drop-l3 { padding: 0.11em 0.14em 0; }
+/* "Ask, solve, [shine]" on one centred line, the box level with the words. */
+.drop-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0.22em; }
+.drop-title > .drop-l1, .drop-title > .drop-l2, .drop-title > .drop-l3 { display: block; margin: 0; }
+.drop-sub { margin-block-start: 0.9rem; font-size: clamp(1rem, 1.5vw, 1.25rem); }
+.hero-join { margin-block-start: 1.1rem; }
 
 /* "Show password": a checkbox under the field instead of an eye button. */
 .show-pw {
@@ -2888,3 +2887,59 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     user-select: none;
 }
 .show-pw input { width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+/* ═════════════════════════════ 11. HOW PIA HELPS · three tilted cards ═════
+   Kept deliberately small: a tilt, the page's hard shadow, a coloured number. */
+.help-head { text-align: center; margin-block-end: clamp(var(--sp-8), 7vh, var(--sp-9)); }
+.help-head .band-lede { margin-inline: auto; }
+.help-head .mono-tag { justify-content: center; }
+.help-mark {
+    display: inline-block;
+    padding: 0 0.16em;
+    background: var(--volt);
+    color: var(--on-volt);
+    font-style: normal;
+    box-shadow: 0.07em 0.07em 0 var(--pop);
+    transform: rotate(-2deg);
+}
+.help-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-7);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.help-card {
+    position: relative;
+    padding: var(--sp-8) var(--sp-6) var(--sp-6);
+    border: var(--edge-w) solid var(--rule);
+    background: var(--bg-surface);
+    box-shadow: var(--hard) var(--hard) 0 var(--pop);
+}
+.help-card:nth-child(1) { transform: rotate(-2deg); }
+.help-card:nth-child(2) { transform: rotate(1.5deg); }
+.help-card:nth-child(3) { transform: rotate(-1deg); }
+.help-card p { margin: 0; line-height: 1.5; }
+.help-name { margin: 0 0 var(--sp-3); font-size: 1.75rem; letter-spacing: -0.03em; }
+.help-num {
+    position: absolute;
+    inset-block-start: -1.5rem;
+    inset-inline-start: -1.1rem;
+    width: 3.5rem;
+    height: 3.5rem;
+    display: grid;
+    place-items: center;
+    border: var(--edge-w) solid var(--on-volt);
+    border-radius: 50%;
+    background: var(--volt);
+    color: var(--on-volt);
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    font-weight: 700;
+}
+.help-card:nth-child(2) .help-num { background: #ff8fb8; }
+.help-card:nth-child(3) .help-num { background: #7fe0b0; }
+@media (max-width: 48rem) {
+    .help-list { grid-template-columns: 1fr; gap: var(--sp-8); }
+}
