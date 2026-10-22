@@ -2855,44 +2855,27 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     background-image: url("../../assets/images/classroom-six-characters-dark.webp");
 }
 .hero-tone { display: none; }
-/* Only a soft wash behind the navbar and the headline, so the picture stays bright. */
+/* Only a soft wash behind the navbar and the copy block, so the picture stays bright. */
 .hero-scrim {
     background:
         linear-gradient(to bottom,
             color-mix(in srgb, var(--bg-body) 70%, transparent) 0,
             transparent calc(var(--topbar-h) * 1.8)),
-        radial-gradient(ellipse 60% 38% at 50% 24%,
-            color-mix(in srgb, var(--bg-body) 62%, transparent) 0%,
+        radial-gradient(ellipse 42% 30% at 50% calc(50% + var(--topbar-h) / 2),
+            color-mix(in srgb, var(--bg-body) 85%, transparent) 0%,
+            color-mix(in srgb, var(--bg-body) 60%, transparent) 55%,
             transparent 100%);
 }
-/* Centred in the free band between the navbar and the tutors' heads. The picture
-   is 3:2 and anchored to the bottom, so its height is the larger of the hero and
-   the width / 1.5; the heads start about 37% down it, so the bottom 62% is kept
-   clear of copy. */
+/* Exactly in the middle of the screen below the navbar. The tutors' faces behind it
+   are allowed to be covered; the wash below keeps the words readable. */
 .act.act-drop {
     justify-content: center;
-    padding-block: var(--topbar-h) calc(max(100svh, 66.667vw) * 0.625);
+    padding-block: var(--topbar-h) 0;
 }
-.drop-title { font-size: clamp(2.2rem, 4.4cqi, 3.75rem); }
-/* One row, every piece centred on the same line (text and the volt box). */
-.drop-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0.25em; }
-.drop-title > .drop-l1, .drop-title > .drop-l2, .drop-title > .drop-l3 { display: block; margin: 0; }
-/* The letters, not the line box, are what the eye centres: the volt box carried
-   its spare room below the baseline (for the "g"), so "Agent" sat high in it. */
+/* The headline keeps its stacked shape ("Personal Instructing" over the volt "Agent").
+   The letters, not the line box, are what the eye centres: the volt box carried its
+   spare room below the baseline (for the "g"), so "Agent" sat high in it. */
 .drop-title > .drop-l3 { padding: 0.11em 0.14em 0; }
-.drop-sub { margin-block-start: 0.6rem; font-size: clamp(1.05rem, 1.6vw, 1.3rem); }
-.hero-join { margin-block-start: 0.9rem; }
-.join { width: min(32rem, 100%); }
-.join-in { padding-block: 0.7rem; font-size: 1.1rem; }
-.join-btn { font-size: 1.15rem; }
-/* The number hint would sit on the tutors' heads; it stays for screen readers. */
-.hero-copy .signed-out-copy {
-    position: absolute;
-    width: 1px; height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
 
 /* "Show password": a checkbox under the field instead of an eye button. */
 .show-pw {
