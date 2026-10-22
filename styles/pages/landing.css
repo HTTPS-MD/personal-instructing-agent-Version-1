@@ -2943,3 +2943,110 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 @media (max-width: 48rem) {
     .help-list { grid-template-columns: 1fr; gap: var(--sp-8); }
 }
+
+
+/* ═════════════════════════════ 12. SOFT CONTROLS · rounded, light, one icon each ═══
+   Navbar: plain words (no ruled strip), an outlined pill for staff sign-in and a round
+   theme button. Hero: a cream card with a person icon and a yellow "Join →" button. */
+@media (min-width: 64rem) {
+    .nav-links { border: 0; background: none; gap: 0.25rem; }
+    .nav-links > li + li { border: 0; }
+    .nav .nav-link {
+        border: 0;
+        border-radius: 999px;
+        background: none;
+        padding: 0.5rem 1rem;
+        font-family: var(--font-body);
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0;
+    }
+    .nav .nav-link:hover { background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); }
+}
+.nav .nav-signin {
+    border: 2px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    box-shadow: none;
+    transform: none;
+}
+.nav .nav-signin:hover { background: var(--text); color: var(--bg-body); }
+.nav .theme-toggle { border: 2px solid currentColor; border-radius: 50%; background: transparent; box-shadow: none; }
+
+.drop-title > .drop-l3 { border: 0; border-radius: 0.2em; box-shadow: none; }
+
+.join {
+    align-items: center;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 1.1rem;
+    background: #fff8e7;
+    color: #0d1230;
+    box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.28);
+}
+.join-ic { flex: none; width: 1.5rem; height: 1.5rem; margin-inline: 0.9rem 0.25rem; }
+.join-in { color: #0d1230; }
+.join-in::placeholder { color: rgba(13, 18, 48, 0.6); }
+.join-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 1.6rem;
+    border: 0;
+    border-radius: 0.8rem;
+    background: var(--volt);
+    color: var(--on-volt);
+}
+.join-btn .icon { width: 1.25rem; height: 1.25rem; }
+.join-btn:hover { background: #ffe66d; color: var(--on-volt); }
+
+
+/* ═════════════════════════════ 13. FOOTER · a card with the logo and the join field ═════
+   Navy in both themes, like the hero's overlay. The field and button are the hero's. */
+.foot { padding-block: var(--sp-9) var(--sp-7); }
+.foot-card {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    align-items: center;
+    gap: var(--sp-8);
+    padding: clamp(var(--sp-6), 5vw, var(--sp-9));
+    color: #fff8e7;
+}
+/* The leaning card: only the box is skewed, the words stay upright. */
+.foot-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border: 3px solid var(--volt);
+    border-radius: 1.75rem;
+    background: #0a0f2e;
+    transform: skewX(-2.5deg);
+}
+.foot-logo { width: min(100%, 26rem); height: auto; justify-self: center; }
+.foot-join { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-4); }
+.foot-title { margin: 0; font-size: clamp(1.75rem, 3.2vw, 2.75rem); line-height: 1; letter-spacing: -0.04em; color: var(--volt); }
+.foot-join .join { width: 100%; }
+.foot-hint { margin: 0; font-size: 0.9375rem; color: rgba(255, 248, 231, 0.75); }
+.foot-lines {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-3) var(--sp-6);
+    padding-block-start: var(--sp-5);
+    border-block-start: 1px solid rgba(255, 248, 231, 0.2);
+}
+.foot-card .foot-line { color: rgba(255, 248, 231, 0.78); }
+.foot-card .foot-staff-label,
+.foot-card .foot-line-mono { color: rgba(255, 248, 231, 0.72); }
+.foot-card .link-btn { color: var(--volt); }
+.foot-note { flex-basis: 100%; max-width: 70ch; }
+@media (max-width: 48rem) {
+    .foot-card { grid-template-columns: 1fr; text-align: center; }
+    .foot-join { align-items: center; }
+}

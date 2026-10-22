@@ -1377,7 +1377,8 @@
 
     var heroJoinPending = false;
 
-    async function heroJoin(number) {
+    async function heroJoin(form) {
+        var number = $('.join-in', form).value.replace(/\D/g, '');
         if (heroJoinPending) { return; }
         if (typeof sb === 'undefined' || !sb) {
             showJoinError('The sign-in service is unavailable. Check your connection and reload.');
@@ -1389,7 +1390,7 @@
         }
 
         heroJoinPending = true;
-        var button = $('#hero-join .join-btn');
+        var button = $('.join-btn', form);
         var release = setBusy(button, 'Checking…');
         var walkedIn = false;
         try {
@@ -1421,11 +1422,11 @@
     }
 
     function wireHeroJoin() {
-        var form = $('#hero-join');
-        if (!form) { return; }
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            heroJoin($('#join-num').value.replace(/\D/g, ''));
+        $$('form.join').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                heroJoin(form);
+            });
         });
     }
 

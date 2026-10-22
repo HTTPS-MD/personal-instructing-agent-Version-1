@@ -371,10 +371,11 @@
                             <div class="hero-cta hero-join" id="hero-cta" data-reveal>
                                 <form class="join" id="hero-join" novalidate>
                                     <label class="sr-only" for="join-num">Student number</label>
+                                    <svg class="join-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
                                     <input class="join-in" id="join-num" type="text" inputmode="numeric"
                                         autocomplete="off" spellcheck="false" maxlength="14"
                                         placeholder="Enter your student number">
-                                    <button type="submit" class="join-btn">Join</button>
+                                    <button type="submit" class="join-btn">Join <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
                                 </form>
                                 <button type="button" class="tap cta cta-primary hero-resume" data-auth-open="signin">
                                     <span class="cta-label">Enter student number</span>
@@ -799,55 +800,40 @@
                 </ol>
             </div>
         </section>
-
-        <!-- ============================================== 6. FINAL CTA ---- -->
-        <section class="band band-finale" id="get-started" aria-labelledby="cta-title">
-            <div class="shell finale-inner">
-                <p class="mono-tag" data-reveal>
-                    Ready?
-                </p>
-
-                <h2 class="finale-title" id="cta-title" data-scrub-words>
-                    Ready? Let&rsquo;s go!
-                </h2>
-
-                <p class="finale-sub" data-reveal>
-                    Type your student number and jump in. PIA saves your progress under your name.
-                </p>
-
-                <p class="account-guidance signed-out-copy">Number not working? Tell your teacher.</p>
-
-                <!-- The same pair as the hero, in the same style: one design for
-                     one pair of actions, wherever it appears. -->
-                <div class="finale-actions" data-reveal>
-                    <button type="button" class="tap cta cta-primary" data-auth-open="signin">
-                        <span class="cta-label">Enter student number</span>
-                        <span class="cta-orb" aria-hidden="true">
-                            <svg class="icon">
-                                <use href="#i-login"></use>
-                            </svg>
-                        </span>
-                    </button>
-                </div>
-
-                <p class="finale-staff" data-reveal>
-                    Teacher or admin?
-                    <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
-                </p>
-            </div>
-        </section>
     </main>
 
-    <footer class="foot">
-        <div class="shell foot-inner">
-            <p class="foot-line">PIA System &middot; Personal Instructing Agent</p>
-            <p class="foot-line foot-staff">
-                <span class="foot-staff-label">Staff</span>
-                <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
-            </p>
-            <p class="foot-line">For teachers and parents: PIA is part of a research study. Its design draws on self-determination theory (autonomy, competence and relatedness). Authorized teachers and administrators can view learning records according to their roles.</p>
-            <p class="foot-line foot-line-mono">University of the East &middot; Grade 7 mathematics &middot; Percentages
-                &middot; 2026</p>
+    <footer class="foot" id="get-started" aria-labelledby="cta-title">
+        <div class="shell">
+            <!-- The last stop: the logo on the left, the same student-number field on the right.
+                 Signed in, the form gives way to the Continue button (html[data-session]). -->
+            <div class="foot-card">
+                <img class="foot-logo" src="assets/images/logo.svg" alt="PIA">
+                <div class="foot-join">
+                    <h2 class="foot-title" id="cta-title">Ready? Let&rsquo;s go!</h2>
+                    <form class="join" id="foot-join" novalidate>
+                        <label class="sr-only" for="foot-num">Student number</label>
+                        <svg class="join-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+                        <input class="join-in" id="foot-num" type="text" inputmode="numeric"
+                            autocomplete="off" spellcheck="false" maxlength="14"
+                            placeholder="Enter your student number">
+                        <button type="submit" class="join-btn">Join <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+                    </form>
+                    <button type="button" class="tap cta cta-primary hero-resume" data-auth-open="signin">
+                        <span class="cta-label">Enter student number</span>
+                    </button>
+                    <p class="foot-hint signed-out-copy">Number not working? Tell your teacher.</p>
+                </div>
+
+                <div class="foot-lines">
+                <p class="foot-line">PIA System &middot; Personal Instructing Agent</p>
+                <p class="foot-line foot-staff">
+                    <span class="foot-staff-label">Staff</span>
+                    <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
+                </p>
+                <p class="foot-line foot-note">For teachers and parents: PIA is part of a research study. Its design draws on self-determination theory (autonomy, competence and relatedness). Authorized teachers and administrators can view learning records according to their roles.</p>
+                <p class="foot-line foot-line-mono">University of the East &middot; Grade 7 mathematics &middot; Percentages &middot; 2026</p>
+            </div>
+            </div>
         </div>
     </footer>
 
@@ -1178,7 +1164,7 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script defer src="assets/js/function.js"></script>
-    <script defer src="assets/js/auth.js?v=20261022b"></script>
+    <script defer src="assets/js/auth.js?v=20261022c"></script>
     <script defer src="assets/js/landing.js"></script>
 
     <!-- The navbar: transparent-to-solid state, the mobile sheet and the
