@@ -2870,6 +2870,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 /* One row, every piece centred on the same line (text and the volt box). */
 .drop-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0.25em; }
 .drop-title > .drop-l1, .drop-title > .drop-l2, .drop-title > .drop-l3 { display: block; margin: 0; }
+/* The letters, not the line box, are what the eye centres: the volt box carried
+   its spare room below the baseline (for the "g"), so "Agent" sat high in it. */
+.drop-title > .drop-l3 { padding: 0.11em 0.14em 0; }
 .drop-sub { margin-block-start: 0.6rem; font-size: clamp(1.05rem, 1.6vw, 1.3rem); }
 .hero-join { margin-block-start: 0.9rem; }
 .join { width: min(32rem, 100%); }
