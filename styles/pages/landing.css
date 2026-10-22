@@ -2865,7 +2865,14 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
             color-mix(in srgb, var(--bg-body) 62%, transparent) 0%,
             transparent 100%);
 }
-.act.act-drop { justify-content: flex-start; padding-block: calc(var(--topbar-h) + 1.25rem) 4rem; }
+/* Centred in the free band between the navbar and the tutors' heads. The picture
+   is 3:2 and anchored to the bottom, so its height is the larger of the hero and
+   the width / 1.5; the heads start about 37% down it, so the bottom 62% is kept
+   clear of copy. */
+.act.act-drop {
+    justify-content: center;
+    padding-block: var(--topbar-h) calc(max(100svh, 66.667vw) * 0.625);
+}
 .drop-title { font-size: clamp(2.2rem, 4.4cqi, 3.75rem); }
 /* One row, every piece centred on the same line (text and the volt box). */
 .drop-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0.25em; }
