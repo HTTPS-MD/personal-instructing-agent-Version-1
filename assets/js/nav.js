@@ -89,38 +89,27 @@
     /* ==================================================================== *
      * 1. SURFACE                                                           *
      * ==================================================================== *
-     * Transparent exactly as long as nothing but video is under the bar.
-     *
-     * The trigger is the hero's FIRST line of copy ([data-nav-edge]), not
-     * the hero's bottom edge. Keying off the bottom kept the bar transparent
-     * for the whole hero, so on the way down the headline slid underneath
-     * the links and the two sets of type collided. Now the bar frosts the
-     * moment copy would pass under it, and clears again on the way back up.
-     *
-     * The root is the viewport with the bar's height shaved off the top and
-     * the threshold is 1, so "fully intersecting" means "entirely below the
-     * bar". Anything less, with the edge's top above the bar's bottom, is
-     * copy going under. The bar's height is fixed (--topbar-h; it no longer
-     * wraps), so it is read once rather than re-observed on resize.          */
+     * No background at the very top of the page, where the hero picture is
+     * under the bar; solid as soon as the page has scrolled, so the links never
+     * sit on top of the copy sliding by. A plain scroll check rather than an
+     * observer, so it behaves the same in every browser and when the file is
+     * opened straight from disk.                                             */
 
     function initSurface(nav) {
-        var edge = $('#hero [data-nav-edge]') || $('#hero');
+        var queued = false;
 
-        if (!edge || !('IntersectionObserver' in window)) {
-            nav.classList.add('is-solid');
-            return;
+        function update() {
+            queued = false;
+            nav.classList.toggle('is-solid', (window.scrollY || window.pageYOffset || 0) > 24);
         }
 
-        var barHeight = Math.round(nav.getBoundingClientRect().height) || 68;
+        window.addEventListener('scroll', function () {
+            if (queued) { return; }
+            queued = true;
+            requestAnimationFrame(update);
+        }, { passive: true });
 
-        new IntersectionObserver(function (entries) {
-            var entry = entries[0];
-            var under = entry.intersectionRatio < 1 && entry.boundingClientRect.top < barHeight + 1;
-            nav.classList.toggle('is-solid', under);
-        }, {
-            rootMargin: '-' + barHeight + 'px 0px 0px 0px',
-            threshold: [0, 1]
-        }).observe(edge);
+        update();
     }
 
 
