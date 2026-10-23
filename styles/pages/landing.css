@@ -3004,7 +3004,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 /* ═════════════════════════════ 13. FOOTER · a card with the logo and the join field ═════
    Navy in both themes, like the hero's overlay. The field and button are the hero's. */
-.foot { padding-block: var(--sp-9) var(--sp-7); }
+.foot { padding-block: var(--sp-9) 0; overflow: hidden; }
 .foot-card {
     position: relative;
     isolation: isolate;
@@ -3012,7 +3012,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     align-items: center;
     gap: var(--sp-8);
-    padding: clamp(var(--sp-6), 5vw, var(--sp-9));
+    padding: clamp(var(--sp-6), 5vw, var(--sp-9)) clamp(var(--sp-6), 5vw, var(--sp-9)) var(--sp-8);
     color: #fff8e7;
 }
 /* The leaning card: only the box is skewed, the words stay upright. */
@@ -3021,8 +3021,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     position: absolute;
     inset: 0;
     z-index: -1;
+    inset-block-end: -3rem;
     border: 3px solid var(--volt);
-    border-radius: 1.75rem;
+    border-block-end: 0;
+    border-radius: 1.75rem 1.75rem 0 0;
     background: #0a0f2e;
     transform: skewX(-2.5deg);
 }
