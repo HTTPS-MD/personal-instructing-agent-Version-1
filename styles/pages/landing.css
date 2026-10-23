@@ -3271,20 +3271,19 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 }
 @keyframes helpPop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
 
-.band-help { position: relative; overflow: hidden; --hm-w: clamp(7.5rem, 20vw, 13rem); }
-/* On every screen the two tutors stand in the bottom corners, under the cards, and the band keeps
-   room for them. On very wide screens (below) they move out into the side margins instead. */
-.band-help { padding-block-end: calc(var(--band-pad) + var(--hm-w) * 1.1); }
-.help-mate { display: block; position: absolute; inset-block-end: 0; width: var(--hm-w); pointer-events: none; z-index: 2; }
+.band-help { position: relative; overflow: hidden; --hm-w: clamp(8.5rem, 11vw, 14rem); padding-block-end: calc(var(--band-pad) + 1rem); }
+.band-help .shell { position: relative; z-index: 1; }
+/* The two tutors stand at the left and right edges of the screen, level with the cards and partly
+   tucked behind them, so they are beside the content and not under it. Phones keep the cards
+   full width and no tutors. */
+.help-mate { display: none; position: absolute; inset-block-end: calc(var(--band-pad) + 1.25rem); width: var(--hm-w); pointer-events: none; z-index: 0; }
 .help-mate img { display: block; width: 100%; height: auto; filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.28)); }
-.help-mate-l { inset-inline-start: clamp(0.25rem, 3vw, 3rem); }
+.help-mate-l { inset-inline-start: calc(var(--hm-w) * -0.12); }
 .help-mate-l img { transform: scaleX(-1); }
-.help-mate-r { inset-inline-end: clamp(0.25rem, 3vw, 3rem); }
-@media (min-width: 96rem) {
-    .band-help { --hm-w: clamp(11rem, 12vw, 15rem); padding-block-end: calc(var(--band-pad) + 1rem); }
-    .help-mate-l { inset-inline-start: 0.5rem; }
-    .help-mate-r { inset-inline-end: 0.5rem; }
-}
+.help-mate-r { inset-inline-end: calc(var(--hm-w) * -0.12); }
+@media (min-width: 72rem) { .help-mate { display: block; } }
+/* "backup!" is highlighted like the lesson title: a soft rounded yellow, no blue edge. */
+.band-help .help-mark { border-radius: 1rem; transform: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
 .js .help-mate-l[data-reveal] { --reveal-y: 0rem; transform: translate3d(-3rem, 0, 0); --d: 200ms; }
 .js .help-mate-r[data-reveal] { --reveal-y: 0rem; transform: translate3d(3rem, 0, 0); --d: 320ms; }
 .js .help-mate[data-reveal].is-in { transform: none; }
