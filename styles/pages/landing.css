@@ -3154,7 +3154,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
         --mate-w: clamp(20rem, 27vw, 30rem);
         --hang: clamp(0px, calc((100vw - 78rem) / 2 + 1rem), 7rem);
     }
-    .band-strip .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline-end: calc(var(--mate-w) * 0.68 - var(--hang) + 1rem); }
+    .band-strip .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline-end: calc(var(--mate-w) * 0.55 - var(--hang) + 1rem); }
     .lesson-mate { inset-inline-end: calc(var(--hang) * -1); }
 }
 
@@ -3271,7 +3271,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 }
 @keyframes helpPop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
 
-.band-help { position: relative; overflow: hidden; --hm-w: clamp(8.5rem, 11vw, 14rem); padding-block-end: calc(var(--band-pad) + 1rem); }
+.band-help { position: relative; overflow: hidden; --hm-w: clamp(9rem, calc((100vw - 51rem) / 2 + 3rem), 30rem); padding-block-end: calc(var(--band-pad) + 1rem); }
 .band-help .shell { position: relative; z-index: 1; }
 /* The two tutors stand at the left and right edges of the screen, level with the cards and partly
    tucked behind them, so they are beside the content and not under it. Phones keep the cards
@@ -3286,9 +3286,15 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 /* Narrower cards, centred, so the tutors have room on both sides. Below 72rem there are no tutors,
    so the cards go back to the full width of the column. */
 @media (min-width: 72rem) {
-    .band-help .help-list { grid-template-columns: repeat(3, minmax(0, 19rem)); justify-content: center; gap: var(--sp-6); }
+    .band-help .help-list { grid-template-columns: repeat(3, minmax(0, 20rem)); justify-content: center; gap: var(--sp-6); }
 }
 .band-help .help-mark { border-radius: 1rem; transform: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
 .js .help-mate-l[data-reveal] { --reveal-y: 0rem; transform: translate3d(-3rem, 0, 0); --d: 200ms; }
 .js .help-mate-r[data-reveal] { --reveal-y: 0rem; transform: translate3d(3rem, 0, 0); --d: 320ms; }
 .js .help-mate[data-reveal].is-in { transform: none; }
+
+
+/* Tutors may tuck behind the cards (never in front), so the cards stay fully readable and can be
+   wider. */
+.band-strip .strip { position: relative; z-index: 1; }
+.band-strip .lesson-mate { z-index: 0; }
