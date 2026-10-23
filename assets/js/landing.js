@@ -522,6 +522,46 @@
 
 
     /* ==================================================================== *
+     * 8B. FOOTER RISE                                                      *
+     * ==================================================================== *
+     * The footer card rises as you scroll down and sinks again as you scroll
+     * back up: its position is tied to where it sits in the window, not to a
+     * one-time "has appeared" flag. It reads from the shared frame loop above
+     * and writes one custom property (--rise, 0 to 1), set through the style
+     * object, so there is no inline style attribute for the CSP to object to.
+     * Without this script, or under reduced motion, --rise falls back to 1 in
+     * the CSS and the card simply sits there.                                */
+
+    function initFooterRise() {
+        var card = $('.foot-card');
+        var foot = card && card.closest('.foot');
+        if (!card || !foot || reduceMotion) { return; }
+
+        var last = -1;
+
+        addReader(function () {
+            /* Where the card WOULD be with no rise applied: the footer's top plus the card's
+               own offset (offsetTop ignores transforms). Measuring the card itself would
+               feed its own movement back in and make the two directions disagree. */
+            var top = foot.getBoundingClientRect().top + card.offsetTop;
+            var height = card.offsetHeight;
+            var vh = window.innerHeight || document.documentElement.clientHeight;
+            /* 0 when the card's top edge is at the bottom of the window, 1 once
+               about two thirds of the card is on screen. */
+            var span = Math.min(height * 0.68, vh * 0.6);
+            var t = Math.max(0, Math.min(1, (vh - top) / span));
+            /* Ease out, and round so a pixel of scroll does not write a style. */
+            var eased = Math.round((1 - Math.pow(1 - t, 3)) * 200) / 200;
+            if (eased !== last) {
+                last = eased;
+                card.style.setProperty('--rise', String(eased));
+            }
+            return false;
+        });
+    }
+
+
+    /* ==================================================================== *
      * 9. BOOT                                                              *
      * ==================================================================== */
 
@@ -544,6 +584,7 @@
         initWordScrub();
         initHeroVideo();
         initHoverIntent();
+        initFooterRise();
         wake();
 
         /* For whoever opens the console. Every project should have one.
