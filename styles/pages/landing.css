@@ -3124,7 +3124,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 /* The tutor beside the panels. Phone and tablet: standing on the bottom edge, centred under
    the panels. Wide screens: on the right, big, with room kept for it beside the panels. */
-.band-strip { --mate-w: clamp(12rem, 52vw, 17rem); }
+.band-strip { --mate-w: clamp(13rem, 62vw, 19rem); --hang: 0px; }
 .lesson-mate {
     display: block;
     width: var(--mate-w);
@@ -3136,12 +3136,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 @media (min-width: 36rem) and (max-width: 55.99rem) {
     .band-strip .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .band-strip { --mate-w: clamp(15rem, 36vw, 20rem); }
+    .band-strip { --mate-w: clamp(16rem, 40vw, 22rem); }
 }
 
 /* Small laptops and tablets landscape: two rows of two panels, the tutor on the right. */
 @media (min-width: 56rem) {
-    .band-strip { --mate-w: clamp(15rem, 24vw, 18rem); }
+    .band-strip { --mate-w: clamp(16rem, 28vw, 22rem); }
     .band-strip .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); padding-inline-end: calc(var(--mate-w) * 0.85); }
     .band-strip .panel-a, .band-strip .panel-b, .band-strip .panel-c, .band-strip .panel-d { grid-column: auto; margin-block-start: 0; }
     .lesson-mate { position: absolute; inset-inline-end: 0; inset-block-end: calc(var(--band-pad) * -1); margin: 0; }
@@ -3149,8 +3149,13 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 /* Wide screens: four panels in a row, a bigger tutor. */
 @media (min-width: 72rem) {
-    .band-strip { --mate-w: clamp(18rem, 20vw, 24rem); }
-    .band-strip .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline-end: calc(var(--mate-w) * 0.8); }
+    /* A bigger tutor that leans into the page margin on the right, so the four panels keep their width. */
+    .band-strip {
+        --mate-w: clamp(20rem, 27vw, 30rem);
+        --hang: clamp(0px, calc((100vw - 78rem) / 2 + 1rem), 7rem);
+    }
+    .band-strip .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline-end: calc(var(--mate-w) * 0.68 - var(--hang) + 1rem); }
+    .lesson-mate { inset-inline-end: calc(var(--hang) * -1); }
 }
 
 
