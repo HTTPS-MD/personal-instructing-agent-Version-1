@@ -3283,6 +3283,11 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .help-mate-r { inset-inline-end: calc(var(--hm-w) * -0.12); }
 @media (min-width: 72rem) { .help-mate { display: block; } }
 /* "backup!" is highlighted like the lesson title: a soft rounded yellow, no blue edge. */
+/* Narrower cards, centred, so the tutors have room on both sides. Below 72rem there are no tutors,
+   so the cards go back to the full width of the column. */
+@media (min-width: 72rem) {
+    .band-help .help-list { grid-template-columns: repeat(3, minmax(0, 19rem)); justify-content: center; gap: var(--sp-6); }
+}
 .band-help .help-mark { border-radius: 1rem; transform: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
 .js .help-mate-l[data-reveal] { --reveal-y: 0rem; transform: translate3d(-3rem, 0, 0); --d: 200ms; }
 .js .help-mate-r[data-reveal] { --reveal-y: 0rem; transform: translate3d(3rem, 0, 0); --d: 320ms; }
