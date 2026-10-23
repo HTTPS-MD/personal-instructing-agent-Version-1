@@ -3219,3 +3219,22 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     .band-strip .band-title,
     .band-strip .band-lede { transition: opacity 700ms ease, transform 700ms ease; }
 }
+
+
+/* ═════════════════════════════ 17. MORE SCROLL REVEALS · the later sections arrive as you scroll ═════
+   The same reveal as the top of the page (landing.js adds .is-in), now also on the help cards, the
+   tutor beside the lesson and the footer card. They rise a little further and arrive one after the
+   other. The help cards keep their tilt: the finished state is written out per card because the
+   generic ".is-in { transform: none }" would otherwise straighten them. */
+.js .help-card[data-reveal],
+.js .foot-card[data-reveal],
+.js .lesson-mate[data-reveal] { --reveal-y: 2.75rem; }
+
+.js .help-card[data-reveal]:nth-child(1) { transform: translate3d(0, var(--reveal-y), 0) rotate(-2deg); --d: 0ms; }
+.js .help-card[data-reveal]:nth-child(2) { transform: translate3d(0, var(--reveal-y), 0) rotate(1.5deg); --d: 140ms; }
+.js .help-card[data-reveal]:nth-child(3) { transform: translate3d(0, var(--reveal-y), 0) rotate(-1deg); --d: 280ms; }
+.js .help-card[data-reveal].is-in:nth-child(1) { transform: rotate(-2deg); }
+.js .help-card[data-reveal].is-in:nth-child(2) { transform: rotate(1.5deg); }
+.js .help-card[data-reveal].is-in:nth-child(3) { transform: rotate(-1deg); }
+.js .lesson-mate[data-reveal] { --d: 260ms; }
+.js .foot-card[data-reveal] { --d: 0ms; }
