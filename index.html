@@ -394,6 +394,70 @@
 
                 </section>
 
+                <!-- ---------------------- LESSON, right under the hero ---------------------- -->
+        <!-- ========================================= 3. HOW A LESSON WORKS -->
+        <!-- Chunking, shown rather than described: one percentage-increase
+             problem, one move per panel -- the same three steps the tutoring
+             session's hints walk through. An ordered list, so a screen reader
+             hears four numbered steps; each bubble says who is talking. The
+             arrow is hidden from screen readers and spoken as "to". -->
+        <section class="band band-strip" id="lesson" aria-labelledby="strip-title">
+            <div class="shell">
+                <header class="band-head">
+                    
+                    <h2 class="band-title" id="strip-title" data-reveal>
+                        Big problem? <em class="help-mark">Cut it into panels!</em>
+                    </h2>
+                    <p class="band-lede" data-reveal>
+                        A &#8369;100 bag now costs &#8369;120. By what percent did the price jump?
+                    </p>
+                </header>
+
+                <ol class="strip">
+                    <li class="panel panel-a" data-reveal>
+                        <p class="caption panel-cap">The problem</p>
+                        <p class="panel-eq">&#8369;100 <span aria-hidden="true">&rarr;</span><span
+                                class="sr-only">to</span> &#8369;120</p>
+                        <p class="bubble"><span class="sr-only">PIA: </span>The price went up. By what percent?
+                            Let&rsquo;s find out.</p>
+                    </li>
+                    <li class="panel panel-b" data-reveal>
+                        <p class="caption panel-cap">Find the change</p>
+                        <p class="panel-eq">
+                            <span class="panel-work">&#8369;120 &minus; &#8369;100</span>
+                            &#8369;20 more
+                        </p>
+                        <p class="bubble"><span class="sr-only">PIA: </span>First, how much did it go up? New
+                            price minus old price.</p>
+                    </li>
+                    <li class="panel panel-c" data-reveal>
+                        <p class="caption panel-cap">Compare to the start</p>
+                        <p class="panel-eq">
+                            <!-- The common slip, struck out: dividing by the NEW price. Hidden
+                                 from screen readers, which hear "20 divided by 100". -->
+                            <span class="panel-work">20 &divide; <del aria-hidden="true">120</del> 100</span>
+                            = 0.20
+                        </p>
+                        <p class="bubble"><span class="sr-only">PIA: </span>Divide by the ORIGINAL price, where
+                            it started. That&rsquo;s the whole trick.</p>
+                    </li>
+                    <li class="panel panel-d panel-splash" data-reveal>
+                        <p class="caption panel-cap">Done &check;</p>
+                        <p class="panel-eq panel-eq-big">20%</p>
+                        <p class="panel-check">Check: 20% of &#8369;100 = &#8369;20 &check;</p>
+                        
+                    </li>
+                                </ol>
+
+                <!-- A tutor beside the panels. Animated, so people who ask for less motion
+                     get the still picture instead. Decorative. -->
+                <picture class="lesson-mate" aria-hidden="true">
+                    <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Agreeableness/happy.webp">
+                    <img src="assets/images/personas/Agreeableness/happy-math-easy.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
+                </picture>
+            </div>
+        </section>
+
                 <!-- ------------------------------- 2.1 MEET THE TUTORS -------
                      A showcase, not a menu. Students never pick their tutor
                      here — a few questions after sign-in do the matching — so
@@ -713,73 +777,12 @@
             </div><!-- /.reel-flow -->
         </div><!-- /.reel -->
 
-        <!-- ========================================= 3. HOW A LESSON WORKS -->
-        <!-- Chunking, shown rather than described: one percentage-increase
-             problem, one move per panel -- the same three steps the tutoring
-             session's hints walk through. An ordered list, so a screen reader
-             hears four numbered steps; each bubble says who is talking. The
-             arrow is hidden from screen readers and spoken as "to". -->
-        <section class="band band-strip" id="lesson" aria-labelledby="strip-title">
-            <div class="shell">
-                <header class="band-head">
-                    
-                    <h2 class="band-title" id="strip-title" data-reveal>
-                        Big problem? <em class="help-mark">Cut it into panels!</em>
-                    </h2>
-                    <p class="band-lede" data-reveal>
-                        A &#8369;100 bag now costs &#8369;120. By what percent did the price jump?
-                    </p>
-                </header>
-
-                <ol class="strip">
-                    <li class="panel panel-a" data-reveal>
-                        <p class="caption panel-cap">The problem</p>
-                        <p class="panel-eq">&#8369;100 <span aria-hidden="true">&rarr;</span><span
-                                class="sr-only">to</span> &#8369;120</p>
-                        <p class="bubble"><span class="sr-only">PIA: </span>The price went up. By what percent?
-                            Let&rsquo;s find out.</p>
-                    </li>
-                    <li class="panel panel-b" data-reveal>
-                        <p class="caption panel-cap">Find the change</p>
-                        <p class="panel-eq">
-                            <span class="panel-work">&#8369;120 &minus; &#8369;100</span>
-                            &#8369;20 more
-                        </p>
-                        <p class="bubble"><span class="sr-only">PIA: </span>First, how much did it go up? New
-                            price minus old price.</p>
-                    </li>
-                    <li class="panel panel-c" data-reveal>
-                        <p class="caption panel-cap">Compare to the start</p>
-                        <p class="panel-eq">
-                            <!-- The common slip, struck out: dividing by the NEW price. Hidden
-                                 from screen readers, which hear "20 divided by 100". -->
-                            <span class="panel-work">20 &divide; <del aria-hidden="true">120</del> 100</span>
-                            = 0.20
-                        </p>
-                        <p class="bubble"><span class="sr-only">PIA: </span>Divide by the ORIGINAL price, where
-                            it started. That&rsquo;s the whole trick.</p>
-                    </li>
-                    <li class="panel panel-d panel-splash" data-reveal>
-                        <p class="caption panel-cap">Done &check;</p>
-                        <p class="panel-eq panel-eq-big">20%</p>
-                        <p class="panel-check">Check: 20% of &#8369;100 = &#8369;20 &check;</p>
-                        
-                    </li>
-                                </ol>
-
-                <!-- A tutor beside the panels. Animated, so people who ask for less motion
-                     get the still picture instead. Decorative. -->
-                <picture class="lesson-mate" aria-hidden="true">
-                    <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Agreeableness/happy.webp">
-                    <img src="assets/images/personas/Agreeableness/happy-math-easy.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
-                </picture>
-            </div>
-        </section>
 
         <!-- ================================ 4. HOW PIA HELPS ================ -->
         <!-- One short band: three tilted cards with a coloured number. It replaces the
              old theory band and the six-card capabilities band. -->
         <section class="band band-help" id="why-pia" aria-labelledby="help-title">
+            <div class="breath" aria-hidden="true"></div>
             <div class="shell">
                 <header class="help-head">
                     <p class="mono-tag" data-reveal>How PIA helps</p>
@@ -809,6 +812,7 @@
     </main>
 
     <footer class="foot" id="get-started" aria-labelledby="cta-title">
+            <div class="breath" aria-hidden="true"></div>
         <div class="shell">
             <!-- The last stop: the logo on the left, the same student-number field on the right.
                  Signed in, the form gives way to the Continue button (html[data-session]). -->
