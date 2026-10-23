@@ -3243,3 +3243,42 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .js .help-card[data-reveal].is-in:nth-child(3) { transform: rotate(-1deg); }
 .js .lesson-mate[data-reveal] { --d: 260ms; }
 .js .foot-card[data-reveal] { --d: 0ms; }
+
+
+/* ═════════════════════════════ 18. HELP BAND · modern cards, two cheering tutors ═════
+   Same family as the lesson: rounded cream cards, soft shadow, no hard offsets. Staggered on
+   purpose (the middle one sits lower), a yellow number that pops when the card arrives, and the
+   two tutors slide in from the edges once. Motion is opacity/transform only and is switched off
+   by reduced motion (the existing rule plus the media query below). */
+.band-help .help-head { margin-block-end: clamp(var(--sp-6), 6vh, var(--sp-8)); }
+.band-help .help-card {
+    border: 0;
+    border-radius: 1.5rem;
+    background: #fff8e7;
+    color: #0a0f2e;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
+    padding: calc(var(--sp-8) - 0.25rem) var(--sp-6) var(--sp-6);
+}
+.band-help .help-card p { color: rgba(10, 15, 46, 0.82); font-size: 1.125rem; line-height: 1.5; }
+.band-help .help-card:nth-child(2) { margin-block-start: 1.75rem; }
+.band-help .help-num { border: 0; background: #ffd83d; color: #0a0f2e; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22); }
+.band-help .help-card:nth-child(2) .help-num,
+.band-help .help-card:nth-child(3) .help-num { background: #ffd83d; }
+@media (prefers-reduced-motion: no-preference) {
+    .band-help .help-card.is-in .help-num { animation: helpPop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; animation-delay: calc(var(--d, 0ms) + 260ms); }
+    .band-help .help-card { transition: transform 300ms ease, box-shadow 300ms ease; }
+    .band-help .help-card.is-done:hover { transform: translateY(-6px) rotate(0deg); box-shadow: 0 22px 40px rgba(0, 0, 0, 0.3); }
+}
+@keyframes helpPop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+.band-help { position: relative; overflow: hidden; }
+.help-mate { display: none; position: absolute; inset-block-end: 0; width: clamp(11rem, 12vw, 15rem); pointer-events: none; z-index: 2; }
+.help-mate img { display: block; width: 100%; height: auto; filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.28)); }
+.help-mate-l { inset-inline-start: 0.5rem; }
+.help-mate-l img { transform: scaleX(-1); }
+.help-mate-r { inset-inline-end: 0.5rem; }
+/* Only where the margins beside the 78rem column are wide enough to hold a tutor. */
+@media (min-width: 96rem) { .help-mate { display: block; } }
+.js .help-mate-l[data-reveal] { --reveal-y: 0rem; transform: translate3d(-3rem, 0, 0); --d: 200ms; }
+.js .help-mate-r[data-reveal] { --reveal-y: 0rem; transform: translate3d(3rem, 0, 0); --d: 320ms; }
+.js .help-mate[data-reveal].is-in { transform: none; }
