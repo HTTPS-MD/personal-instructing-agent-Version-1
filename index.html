@@ -722,13 +722,12 @@
         <section class="band band-strip" id="lesson" aria-labelledby="strip-title">
             <div class="shell">
                 <header class="band-head">
-                    <p class="mono-tag" data-reveal>How a lesson works</p>
+                    
                     <h2 class="band-title" id="strip-title" data-reveal>
-                        Big problem?<br>
-                        <span class="band-title-quiet">Cut it into panels.</span>
+                        Big problem? <em class="help-mark">Cut it into panels!</em>
                     </h2>
                     <p class="band-lede" data-reveal>
-                        A &#8369;100 bag now costs &#8369;120. By what percent did the price jump? Let&rsquo;s crack it, one panel at a time!
+                        A &#8369;100 bag now costs &#8369;120. By what percent did the price jump?
                     </p>
                 </header>
 
@@ -761,12 +760,19 @@
                             it started. That&rsquo;s the whole trick.</p>
                     </li>
                     <li class="panel panel-d panel-splash" data-reveal>
-                        <p class="caption panel-cap">Done</p>
+                        <p class="caption panel-cap">Done &check;</p>
                         <p class="panel-eq panel-eq-big">20%</p>
                         <p class="panel-check">Check: 20% of &#8369;100 = &#8369;20 &check;</p>
-                        <span class="sfx" aria-hidden="true">Click!</span>
+                        
                     </li>
-                </ol>
+                                </ol>
+
+                <!-- A tutor beside the panels. Animated, so people who ask for less motion
+                     get the still picture instead. Decorative. -->
+                <picture class="lesson-mate" aria-hidden="true">
+                    <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Agreeableness/happy.webp">
+                    <img src="assets/images/personas/Agreeableness/happy-math-easy.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
+                </picture>
             </div>
         </section>
 

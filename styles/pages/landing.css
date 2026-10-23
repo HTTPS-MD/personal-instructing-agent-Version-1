@@ -3052,3 +3052,103 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     .foot-card { grid-template-columns: 1fr; text-align: center; }
     .foot-join { align-items: center; }
 }
+
+
+/* ═════════════════════════════ 14. LESSON · modern panels on a bottom-up gradient ═══
+   Same family as the hero: rounded, a soft shadow, no hard offsets, no tilt. The ground
+   is a gradient that is strongest at the bottom and fades up into the hero. */
+.band.band-strip {
+    padding-block: calc(var(--band-pad) + 1rem) var(--band-pad);
+    border-block-start: 0;
+    background: linear-gradient(0deg, #22418f 0%, #182f78 40%, #101a4a 75%, #0b1034 100%);
+    color: #f1ead8;
+    overflow: hidden;
+}
+:root[data-theme="light"] .band.band-strip {
+    background: linear-gradient(0deg, #bcd2f2 0%, #d3e2f6 45%, #e8eef7 100%);
+    color: #0a0f2e;
+}
+.band-strip .shell { position: relative; }
+.band-strip .band-head { max-width: none; margin-block-end: clamp(var(--sp-6), 5vh, var(--sp-8)); }
+.band-strip .band-title { font-size: clamp(2.25rem, 5vw, 4rem); line-height: 1.05; }
+.band-strip .band-lede { color: inherit; opacity: 0.92; }
+.band-strip .help-mark { border-radius: 1rem; transform: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
+
+.band-strip .panel {
+    border: 0;
+    border-radius: 1.5rem;
+    background: #fff8e7;
+    color: #0a0f2e;
+    box-shadow: 0 16px 36px rgba(6, 10, 40, 0.3);
+    padding: var(--sp-6) var(--sp-5);
+}
+.band-strip .panel-cap {
+    position: static;
+    align-self: flex-start;
+    padding: 0.3rem 0.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: #ffe27a;
+    color: #0a0f2e;
+    box-shadow: none;
+    transform: none;
+    font-family: var(--font-body);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.band-strip .panel-eq { font-family: var(--font-display); font-size: clamp(1.5rem, 2.1vw, 1.85rem); letter-spacing: -0.04em; }
+.band-strip .panel-work { font-size: 0.72em; font-weight: 600; color: inherit; margin: 0 0 0.2rem; white-space: nowrap; }
+.band-strip .panel .bubble,
+.band-strip .panel-check {
+    max-width: none;
+    margin: 0;
+    padding: 0.65rem 0.9rem;
+    border: 0;
+    border-radius: 1rem;
+    background: #f1ecdd;
+    color: #0a0f2e;
+    box-shadow: none;
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+.band-strip .panel .bubble::before,
+.band-strip .panel .bubble::after { display: none; }
+.band-strip .panel-splash { background: linear-gradient(160deg, #4f93ff, #2f6bea); color: #fff; overflow: hidden; }
+.band-strip .panel-splash::before { display: none; }
+.band-strip .panel-splash .panel-eq-big { font-size: clamp(3.25rem, 6vw, 4.75rem); line-height: 1; letter-spacing: -0.05em; color: #ffe27a; text-shadow: 0 4px 0 rgba(10, 15, 46, 0.25); }
+.band-strip .panel-splash .panel-check { background: #fff8e7; }
+
+/* The tutor beside the panels. Phone and tablet: standing on the bottom edge, centred under
+   the panels. Wide screens: on the right, big, with room kept for it beside the panels. */
+.band-strip { --mate-w: clamp(12rem, 52vw, 17rem); }
+.lesson-mate {
+    display: block;
+    width: var(--mate-w);
+    margin: var(--sp-7) auto calc(var(--band-pad) * -1);
+    pointer-events: none;
+}
+.lesson-mate img { display: block; width: 100%; height: auto; filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.28)); }
+.band-strip .panel-cap { white-space: normal; }
+
+@media (min-width: 36rem) and (max-width: 55.99rem) {
+    .band-strip .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .band-strip { --mate-w: clamp(15rem, 36vw, 20rem); }
+}
+
+/* Small laptops and tablets landscape: two rows of two panels, the tutor on the right. */
+@media (min-width: 56rem) {
+    .band-strip { --mate-w: clamp(15rem, 24vw, 18rem); }
+    .band-strip .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); padding-inline-end: calc(var(--mate-w) * 0.85); }
+    .band-strip .panel-a, .band-strip .panel-b, .band-strip .panel-c, .band-strip .panel-d { grid-column: auto; margin-block-start: 0; }
+    .lesson-mate { position: absolute; inset-inline-end: 0; inset-block-end: calc(var(--band-pad) * -1); margin: 0; }
+}
+
+/* Wide screens: four panels in a row, a bigger tutor. */
+@media (min-width: 72rem) {
+    .band-strip { --mate-w: clamp(18rem, 20vw, 24rem); }
+    .band-strip .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-inline-end: calc(var(--mate-w) * 0.8); }
+}
