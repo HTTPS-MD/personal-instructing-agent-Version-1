@@ -60,7 +60,9 @@ html[data-surface="admin"] .app { background: transparent; }
 
 /* ------------------------------------------------- 3. TOP BAR: LOGO + ADMIN */
 html[data-surface="admin"] .topbar {
-    background: transparent;
+    background: color-mix(in srgb, var(--bg-body) 82%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     border-bottom: 0;
 }
 html[data-surface="admin"] .sidebar-brand { gap: 12px; background: transparent; border: 0; }
@@ -92,12 +94,29 @@ html[data-surface="admin"] .sidebar-user .avatar { box-shadow: 0 0 0 2px var(--a
 
 /* ------------------------------------------------------------------ 4. TABS */
 @media (min-width: 56.3125rem) {
+    /* One bar: logo and "Admin", then the tabs, then the theme button and the account. */
+    html[data-surface="admin"] .app {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+        grid-template-areas: "brand tabs foot" "main main main";
+    }
+    html[data-surface="admin"] .topbar { grid-area: 1 / 1 / 2 / 4; }
+    html[data-surface="admin"] .sidebar-brand { grid-area: brand; }
+    html[data-surface="admin"] .sidebar-foot { grid-area: foot; }
+    html[data-surface="admin"] .main { grid-area: main; }
     html[data-surface="admin"] .sidebar-nav {
+        grid-area: tabs;
+        position: sticky;
+        top: 0;
+        z-index: calc(var(--z-sticky) + 2);
+        height: var(--topbar-h);
+        display: flex;
+        align-items: center;
         background: transparent;
         border-bottom: 0;
-        padding: 0 24px 8px;
+        padding: 0 8px;
     }
-    html[data-surface="admin"] .nav-list { gap: 8px; }
+    html[data-surface="admin"] .nav-list { gap: 6px; }
     html[data-surface="admin"] .nav-item {
         min-height: 40px;
         padding: 0 18px;
