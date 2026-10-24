@@ -40,7 +40,7 @@
         overview: { trail: ['Overview'] },
         live: { trail: ['Live Sessions'] },
         students: { trail: ['People', 'Students'] },
-        faculty: { trail: ['People', 'Faculty'] },
+        faculty: { trail: ['People', 'Professors'] },
         controls: { trail: ['Stage Controls'] },
         mathtask: { trail: ['Math Task'] },
         profile: { trail: ['Profile'] },

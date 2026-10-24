@@ -181,48 +181,6 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
     html[data-surface="admin"] .brand-link:hover { transform: none; }
 }
 
-/* ------------------------------------------------ 9. THE PROFESSOR'S CARD --- */
-.prof-card-host:empty { display: none; }
-.prof-card-host { margin: 0 0 16px; }
-.prof-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-    padding: 16px 18px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-card);
-    background: var(--bg-surface);
-    box-shadow: 0 14px 34px rgb(0 0 0 / 0.14);
-}
-@media (min-width: 48rem) {
-    .prof-card:not(.is-empty) { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); align-items: center; gap: 28px; }
-}
-.prof-card.is-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.prof-card-none { margin: 0; color: var(--text-muted); }
-.prof-card-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.prof-card-avatar {
-    flex: none; width: 48px; height: 48px; border-radius: 50%;
-    display: grid; place-items: center;
-    background: var(--admin-pill); color: var(--admin-pill-ink);
-    font: 700 1rem var(--font-display);
-}
-.prof-card-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.prof-card-role { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
-.prof-card-name { font: 700 1.125rem var(--font-display); text-align: left; padding: 0; width: fit-content; max-width: 100%; }
-.prof-card-mail { font-size: var(--fs-sm); color: var(--text-muted); overflow-wrap: anywhere; }
-.prof-card-status { margin: 0 0 8px; font-weight: 600; font-size: var(--fs-sm); color: var(--text-muted); }
-.prof-card-status.is-done { color: var(--ok); }
-.prof-card-note { margin: 8px 0 0; font-size: var(--fs-xs); color: var(--text-muted); }
-.prof-ocean { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
-.prof-ocean li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr) 2rem; align-items: center; gap: 8px; }
-.prof-ocean-k { font: 700 var(--fs-sm) var(--font-display); }
-.prof-ocean-bar { height: 8px; border-radius: 999px; background: var(--bg-chip); overflow: hidden; }
-.prof-ocean-bar i { display: block; height: 100%; border-radius: inherit; background: var(--admin-pill); }
-.prof-ocean-v { text-align: right; font-size: var(--fs-sm); }
-
-/* "Show details" off: the professor's name and email are blurred, like the students'. */
-.pia-hide-details .prof-card [data-mask] { filter: blur(7px); user-select: none; pointer-events: none; }
-
 /* ------------------------------------------------ 10. "ALL SECTIONS" BOX --- */
 /* The search sits in the page header, beside the buttons; "All sections" is a pill inside it. */
 .head-search { order: -1; position: relative; display: flex; align-items: center; flex: 1 1 18rem; max-width: 26rem; min-width: 0; }

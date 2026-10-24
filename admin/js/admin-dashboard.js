@@ -1223,11 +1223,30 @@
     }
 
 
+    async function loadFacultyOcean() {
+        var emails = (state.faculty || []).map(function (f) { return String(f.email || '').toLowerCase(); }).filter(Boolean);
+        state.facultyOcean = {};
+        if (!emails.length) { return; }
+        try {
+            var both = await Promise.all([
+                sb.from('profiles').select('email, is_ocean_done').in('email', emails),
+                sb.from('ocean_submissions').select('email, ocean_e, ocean_a, ocean_c, ocean_n, ocean_o, submitted_at')
+                    .in('email', emails).order('submitted_at', { ascending: false })
+            ]);
+            var map = {};
+            emails.forEach(function (e) { map[e] = { done: false, row: null }; });
+            (both[0].data || []).forEach(function (r) { var m = map[String(r.email).toLowerCase()]; if (m) { m.done = !!r.is_ocean_done; } });
+            (both[1].data || []).forEach(function (r) { var m = map[String(r.email).toLowerCase()]; if (m && !m.row) { m.row = r; } });
+            state.facultyOcean = (both[0].error || both[1].error) ? {} : map;
+        } catch (e) { state.facultyOcean = {}; }
+    }
+
     async function loadFaculty() {
         var res = await sb.from('professors').select('*').order('name', { ascending: true });
         if (res.error) { throw res.error; }
 
         state.faculty = res.data || [];
+        await loadFacultyOcean();
         $('#nav-count-faculty').textContent = state.faculty.length;
         renderFaculty($('#faculty-search') ? $('#faculty-search').value : '');
         renderSections();     /* the professor column reads this */
@@ -3404,13 +3423,25 @@
        that does not exist, or a cohort that has not loaded shows a dash,
        never a zero. */
     function facultyProgress(f) {
-        var dash = '<td class="col-right muted">—</td><td class="col-right muted">—</td>';
+        var dash = '<td class="col-right muted">—</td>';
         if (!f.assigned_section || !state.cohortLoaded) { return dash; }
         if (!state.sections.some(function (sec) { return sec.name === f.assigned_section; })) { return dash; }
         var members = state.cohort.filter(function (s) { return s.section === f.assigned_section; });
-        var done = members.filter(hasCurrentResult).length;
-        return '<td class="col-right mono">' + members.length + '</td>' +
-            '<td class="col-right mono">' + esc(oceanFraction(done, members.length)) + '</td>';
+        return '<td class="col-right mono">' + members.length + '</td>';
+    }
+
+    /* The professor's OWN OCEAN result, read from ocean_submissions (only an admin can). Raw
+       scores 0-40 as stored; the BFPT sheet scores N the other way round to its name, so a LOW
+       N means MORE stress. */
+    function facultyOcean(f) {
+        var info = (state.facultyOcean || {})[String(f.email || '').toLowerCase()];
+        if (!info) { return '<td class="muted">—</td>'; }
+        if (info.done && info.row) {
+            var r = info.row;
+            return '<td class="mono" title="Raw scores, 0 to 40. A low N means more stress.">' +
+                'E ' + r.ocean_e + ' · A ' + r.ocean_a + ' · C ' + r.ocean_c + ' · N ' + r.ocean_n + ' · O ' + r.ocean_o + '</td>';
+        }
+        return '<td><span class="badge">' + (info.row ? 'Retake pending' : 'Not yet') + '</span></td>';
     }
 
     function renderFaculty(term) {
@@ -3433,12 +3464,12 @@
                 '<tr class="is-clickable" tabindex="0" data-faculty="' + esc(f.email) + '"' +
                 ' aria-label="Open profile: ' + esc(f.name || f.email) + '">' +
                 '<td>' + userCell({ full_name: f.name, email: f.email }) + '</td>' +
-                '<td class="muted">' + esc(f.department || '—') + '</td>' +
                 '<td>' + (f.assigned_section
                     ? '<button type="button" class="cell-link" data-section-open="' + esc(f.assigned_section) + '"' +
                     ' aria-label="Show students in section ' + esc(f.assigned_section) + '">' + esc(f.assigned_section) + '</button>'
                     : '<span class="badge">Unassigned</span>') + '</td>' +
                 facultyProgress(f) +
+                facultyOcean(f) +
                 '<td><span class="badge ' + (active ? 'badge-accent' : '') + '">' +
                 (active ? 'Active' : 'Inactive') + '</span></td>' +
                 '</tr>';

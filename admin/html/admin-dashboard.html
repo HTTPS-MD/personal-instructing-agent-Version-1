@@ -35,7 +35,7 @@
     <link rel="stylesheet" href="../../styles/pages/admin.css">
     <link rel="stylesheet" href="../../styles/pages/admin-console.css">
     <link rel="stylesheet" href="../../styles/pages/admin-topnav.css?v=20261027b">
-    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028e">
+    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028f">
 </head>
 
 <body data-boot="pending">
@@ -141,8 +141,8 @@
                         <ul class="nav-sub" id="nav-people-list" hidden>
                             <li><button type="button" class="nav-item" data-view="students">
                                 <span>Students</span><span class="nav-count mono" id="nav-count-students">—</span></button></li>
-                            <li hidden><button type="button" class="nav-item" data-view="faculty" tabindex="-1">
-                                <span>Faculty</span><span class="nav-count mono" id="nav-count-faculty">—</span></button></li>
+                            <li><button type="button" class="nav-item" data-view="faculty">
+                                <span>Professors</span><span class="nav-count mono" id="nav-count-faculty">—</span></button></li>
                         </ul>
                     </li>
                     <li hidden><button type="button" class="nav-item" data-view="controls" tabindex="-1">Stage Controls</button></li>
@@ -342,14 +342,14 @@
                 <!-- ============================== VIEW 5 · FACULTY ======= -->
                 <section class="page is-hidden" id="view-faculty" data-view-panel="faculty">
                     <div class="page-head">
-                        <h1 class="page-title">Faculty</h1>
+                        <h1 class="page-title">Professors</h1>
                         <div class="page-actions">
                             <button type="button" class="btn btn-primary" data-modal-open="modal-add-professor">Add professor</button>
                         </div>
                     </div>
 
                     <div class="scope-row">
-                        <p class="scope-line">Each professor sees only their assigned section. Student counts and OCEAN completion are for that section.</p>
+                        <p class="scope-line">Each professor sees only their section, and answers the OCEAN questionnaire once at their first sign-in. Only you can see the results (raw scores, 0 to 40).</p>
                     </div>
 
                     <div class="panel" data-region="faculty">
@@ -357,26 +357,25 @@
                             <div class="filter-field filter-search">
                                 <label class="filter-label" for="faculty-search">Search</label>
                                 <input type="search" class="input input-sm" id="faculty-search"
-                                    placeholder="Name, email or department">
+                                    placeholder="Name or email">
                             </div>
                         </div>
-                        <div class="table-wrap" tabindex="0" role="region" aria-label="Faculty table">
+                        <div class="table-wrap" tabindex="0" role="region" aria-label="Professors table">
                             <table class="table">
-                                <caption class="sr-only">Faculty</caption>
+                                <caption class="sr-only">Professors</caption>
                                 <thead>
                                     <tr>
                                         <th scope="col">Professor</th>
-                                        <th scope="col">Department</th>
                                         <th scope="col">Section</th>
                                         <th scope="col" class="col-right">Students</th>
-                                        <th scope="col" class="col-right">OCEAN completed</th>
+                                        <th scope="col">OCEAN (E · A · C · N · O)</th>
                                         <th scope="col">Account status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="faculty-tbody"></tbody>
                             </table>
                             <div id="faculty-empty" class="state-block is-hidden">
-                                <p class="state-title">No faculty yet</p>
+                                <p class="state-title">No professors yet</p>
                             </div>
                         </div>
                     </div>
@@ -1836,9 +1835,9 @@
     <!-- The 50 statements and the 1-5 scale, for the drawer's answer list. -->
     <script src="../../assets/js/bfpt-items.js"></script>
     <script src="../js/math-task-generator.js"></script>
-    <script src="../js/students-tools.js?v=20261028a"></script>
+    <script src="../js/students-tools.js?v=20261028b"></script>
     <script src="../js/add-students.js?v=20261019c"></script>
-    <script src="../js/admin-dashboard.js?v=20261028b"></script>
+    <script src="../js/admin-dashboard.js?v=20261028c"></script>
 </body>
 
 </html>
