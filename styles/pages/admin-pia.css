@@ -15,6 +15,10 @@
 
 /* ---------------------------------------------------------------- 1. TOKENS */
 :root[data-surface="admin"] {
+    /* The landing page's column: 78rem wide, a clamp(1.25rem, 5vw, 3rem) gutter. The top bar and the
+       page content both start and end on it, so the logo, the content and the account button line up. */
+    --bar-gutter: clamp(1.25rem, 5vw, 3rem);
+    --bar-edge: max(var(--bar-gutter), calc((100vw - 78rem) / 2 + var(--bar-gutter)));
     --r-card: 20px; --r-pill: 999px; --r-xs: 8px; --r-sm: 12px; --r-md: 14px;
     --r-lg: 20px; --r-xl: 24px; --r-2xl: 28px;
     --control-h: 38px; --field-h: 40px; --row-h: 52px;
@@ -104,8 +108,6 @@ html[data-surface="admin"] .sidebar-user .avatar { box-shadow: 0 0 0 2px var(--a
 @media (min-width: 56.3125rem) {
     /* One bar: logo and "Admin", then the tabs, then the theme button and the account. */
     html[data-surface="admin"] .app {
-        --bar-gutter: clamp(1.25rem, 5vw, 3rem);
-        --bar-edge: max(var(--bar-gutter), calc((100vw - 78rem) / 2 + var(--bar-gutter)));
         grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
         grid-template-rows: var(--topbar-h) minmax(0, 1fr);
         grid-template-areas: "brand tabs foot" "main main main";
@@ -338,3 +340,12 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 @media (min-width: 56.25rem) { .settings-cols { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } }
 .settings-col { min-width: 0; }
 .settings-col > .stack { display: grid; gap: 12px; }
+
+/* The page content sits on the same column as the top bar. */
+@media (min-width: 56.3125rem) {
+    html[data-surface="admin"] .main { padding-inline: var(--bar-edge); }
+    html[data-surface="admin"] .page:not(.page-narrow) { max-width: none; }
+}
+
+/* Active sessions: an ordinary panel again, always open. */
+.sessions-panel .panel-title { margin-bottom: 8px; }
