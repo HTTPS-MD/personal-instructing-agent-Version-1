@@ -185,6 +185,13 @@
         host.hidden = !shown;
     }
 
+    /* A professor is shown by NAME. Some accounts have their email as the name; then the part before the @ is shown. */
+    function displayName(f) {
+        var n = String((f && f.name) || '').trim();
+        if (!n || n.indexOf('@') !== -1) { n = String(n || (f && f.email) || '').split('@')[0]; }
+        return n || 'Professor';
+    }
+
     function profsOf(section) {
         var email = holder[section];
         return profs.filter(function (f) { return String(f.email).toLowerCase() === email; });
@@ -242,7 +249,7 @@
             var email = String(f.email).toLowerCase();
             var theirs = sectionsOf(email);
             return '<button type="button" data-assign="' + esc(email) + '" style="' + item + (email === current ? ';font-weight:600;background:var(--line-soft)' : '') + '">' +
-                esc(f.name || f.email) + (theirs.length ? ' <span style="opacity:.65;font-weight:400">· ' + esc(theirs.join(', ')) + '</span>' : ' <span style="opacity:.65;font-weight:400">· no section</span>') +
+                esc(displayName(f)) + (theirs.length ? ' <span style="opacity:.65;font-weight:400">· ' + esc(theirs.join(', ')) + '</span>' : ' <span style="opacity:.65;font-weight:400">· no section</span>') +
                 (email === current ? ' ✓' : '') + '</button>';
         }).join('');
         var menu = document.createElement('div');
@@ -375,12 +382,12 @@
             return;
         }
         var f = list[0];
-        var name = f.name || f.email;
+        var name = displayName(f);
         el.innerHTML = '<div class="prof-card"><div class="prof-card-head">' +
             '<span class="prof-card-avatar" aria-hidden="true">' + esc(initials(name)) + '</span>' +
             '<div class="prof-card-who"><span class="prof-card-role">Professor · ' + esc(section) + '</span>' +
             '<button type="button" class="cell-link prof-card-name" data-prof="' + esc(f.email) + '"><span data-mask>' + esc(name) + '</span></button>' +
-            '<span class="prof-card-mail" data-mask>' + esc(f.email) + '</span></div>' +
+            '</div>' +
             '<button type="button" class="btn btn-secondary btn-sm" data-prof-change>Change</button></div>' +
             '<div class="prof-card-ocean">' + oceanHtml(slot) + '</div></div>';
         paintBars(el);

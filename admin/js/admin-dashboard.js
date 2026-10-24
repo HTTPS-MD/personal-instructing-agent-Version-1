@@ -1358,7 +1358,9 @@
             avatarMarkup(profile) +
             '<span class="cell-user-text">' +
             '<span class="cell-name">' + esc(profile.full_name || '(no name)') + '</span>' +
-            '<span class="cell-mail">' + esc(profile.email) + '</span>' +
+            /* The made-up address a number-door student gets (number@students.pia.invalid) tells the admin
+               nothing, so it is not shown; a real address still is. */
+            (/@students\.pia\.invalid$/i.test(String(profile.email || '')) ? '' : '<span class="cell-mail">' + esc(profile.email) + '</span>') +
             '</span>' +
             '</div>';
     }
