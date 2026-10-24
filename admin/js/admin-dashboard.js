@@ -311,11 +311,12 @@
 
     /* ---- 3.3 View router ---- */
 
-    var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'profile', 'settings'];
+    var VIEWS = ['overview', 'live', 'students', 'faculty', 'controls', 'mathtask', 'settings'];
 
     function switchView(view) {
         if (view === 'controls') { view = 'students'; }     /* Stage Controls is the switch beside each stage tab now */
         if (view === 'live') { view = 'students'; }     /* Live Sessions is on the Students table now: the dot on the avatar, and the minutes per stage */
+        if (view === 'profile') { view = 'settings'; }     /* Profile is part of Settings now */
         if (view === 'overview') { view = 'students'; }     /* Overview was an empty page: the console opens on Students */
         if (view === 'sections' || view === 'faculty') { view = 'students'; }     /* the old Class Sections and Faculty addresses: both are on the Students page now */
         if (VIEWS.indexOf(view) === -1) { view = 'overview'; }

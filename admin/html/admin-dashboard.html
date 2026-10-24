@@ -35,7 +35,7 @@
     <link rel="stylesheet" href="../../styles/pages/admin.css">
     <link rel="stylesheet" href="../../styles/pages/admin-console.css">
     <link rel="stylesheet" href="../../styles/pages/admin-topnav.css?v=20261027b">
-    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028l">
+    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028o">
 </head>
 
 <body data-boot="pending">
@@ -163,8 +163,6 @@
                     <svg class="icon icon-sm user-chevron" aria-hidden="true"><use href="#i-chev-up"></use></svg>
                 </button>
                 <div class="user-menu" id="user-menu" role="menu" aria-label="Account" hidden>
-                    <button type="button" class="user-menu-item" role="menuitem" data-user-action="profile">
-                        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-user"></use></svg>Profile</button>
                     <button type="button" class="user-menu-item" role="menuitem" data-user-action="settings">
                         <svg class="icon icon-sm" aria-hidden="true"><use href="#i-gear"></use></svg>Settings</button>
                     <button type="button" class="user-menu-item is-signout" role="menuitem" id="user-signout" data-user-action="signout">
@@ -293,17 +291,14 @@
                                 <button type="button" class="tab" data-stage-filter="Tutoring Dashboard" aria-pressed="false">Tutoring dashboard <span class="mono" data-stage-count="Tutoring Dashboard">—</span></button>
                                 <button type="button" class="tab" data-stage-filter="Active Game" aria-pressed="false" title="Marked as in a tutoring session by the student’s own page. It can be out of date if the page closed unexpectedly.">Active session <span class="mono" data-stage-count="Active Game">—</span></button>
                             </div>
-                        </div>
-
-                        <div class="filter-row">
                             <div class="filter-field" style="display:none">
                                 <label class="filter-label" id="section-filter-label">Section</label>
                                 <select class="input input-sm" id="section-filter">
                                     <option value="">All sections</option>
                                 </select>
                             </div>
-                            <div class="filter-field">
-                                <label class="filter-label" id="group-filter-label">Research group</label>
+                            <div class="filter-field bar-group">
+                                <label class="filter-label sr-only" id="group-filter-label">Research group</label>
                                 <select class="input input-sm" id="group-filter">
                                     <option value="all">All groups</option>
                                     <option value="experimental">Experimental</option>
@@ -393,10 +388,16 @@
                     </div>
                 </section>
 
-                <!-- ============================== VIEW 7 · PROFILE ======= -->
-                <section class="page page-narrow is-hidden" id="view-profile" data-view-panel="profile">
-                    <div class="page-head"><h1 class="page-title">Profile</h1></div>
+                <!-- ============================== VIEW 8 · SETTINGS ====== -->
+                <section class="page is-hidden" id="view-settings" data-view-panel="settings">
+                    <div class="page-head">
+                        <h1 class="page-title">Settings</h1>
+                        <div class="page-actions">
+                            <button type="button" class="btn btn-outline" data-modal-open="modal-add-admin">+ Add administrator</button>
+                        </div>
+                    </div>
 
+                    <!-- Your own account (it used to be the Profile page): name, password, signed-in browsers. -->
                     <div class="stack">
                         <section class="panel panel-pad" aria-labelledby="profile-details-title">
                             <h2 class="panel-title" id="profile-details-title">Personal details</h2>
@@ -424,18 +425,8 @@
                             <div id="admin-device-list"></div>
                         </section>
                     </div>
-                </section>
 
-                <!-- ============================== VIEW 8 · SETTINGS ====== -->
-                <section class="page is-hidden" id="view-settings" data-view-panel="settings">
-                    <div class="page-head">
-                        <h1 class="page-title">Settings</h1>
-                        <div class="page-actions">
-                            <button type="button" class="btn btn-outline" data-modal-open="modal-add-admin">+ Add administrator</button>
-                        </div>
-                    </div>
-
-                    <section class="panel" data-region="admins" aria-labelledby="admins-title">
+                    <section class="panel" data-region="admins" aria-labelledby="admins-title" style="margin-top:16px">
                         <div class="panel-bar"><h2 class="panel-title" id="admins-title">Administrators</h2></div>
                         <div class="table-wrap" tabindex="0" role="region" aria-label="Administrators table">
                             <table class="table">
@@ -1837,7 +1828,7 @@
     <script src="../js/math-task-generator.js"></script>
     <script src="../js/students-tools.js?v=20261028f"></script>
     <script src="../js/add-students.js?v=20261019c"></script>
-    <script src="../js/admin-dashboard.js?v=20261028d"></script>
+    <script src="../js/admin-dashboard.js?v=20261028e"></script>
 </body>
 
 </html>

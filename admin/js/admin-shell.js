@@ -63,6 +63,7 @@
     }
 
     function setRoute(view) {
+        if (view === 'profile') { view = 'settings'; }
         if (!ROUTES[view]) { view = 'overview'; }
 
         $$('.nav-item[data-view]').forEach(function (item) {
@@ -221,7 +222,6 @@
             { label: 'Manage sections', run: function () { host.openModal('modal-manage-sections'); } },
             { label: 'Go to Settings', run: function () { host.go('settings'); } },
             { label: 'New section', run: function () { host.openModal('modal-new-section'); } },
-            { label: 'Go to Profile', run: function () { host.go('profile'); } },
             { label: 'Add professor', run: function () { host.openModal('modal-add-professor'); } },
             { label: 'Add administrator', run: function () { host.openModal('modal-add-admin'); } }
         ];
