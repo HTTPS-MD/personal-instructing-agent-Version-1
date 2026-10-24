@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-surface="comic">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+
+    <!-- Before first paint: the stored theme (dark by default) goes on
+         <html> so there is never a flash of the wrong one. -->
+    <script src="../../assets/js/theme-boot.js"></script>
+    <title>PIA — Questionnaire</title>
+
+    <script src="/assets/js/vendor/supabase.js"></script>
+
+
+    <link rel="stylesheet" href="../../styles/global.css">
+    <link rel="stylesheet" href="../../styles/pages/student-journey.css">
+    <link rel="stylesheet" href="../../styles/pages/student-paper.css">
+</head>
+
+<!-- The teacher copy of the student questionnaire (data-staff). ocean-test.js removes `opacity-0` after verifying the
+     session and the prerequisite chain on the server. -->
+<body class="opacity-0 quiz paper" data-own-quit data-staff>
+
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+            <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+            <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+        </defs>
+    </svg>
+
+    <div class="journey">
+        <div class="journey-ambient journey-ambient--classroom" aria-hidden="true"></div>
+
+        <header class="journey-bar">
+            <div class="journey-shell journey-bar-inner">
+                <div class="journey-brand">
+                    <span class="brand-link"><img class="site-logo" src="../../assets/images/logo.svg" alt="PIA" width="48" height="48"></span>
+                </div>
+
+                <div class="journey-bar-right">
+                    <!-- Quit signs the student out (after a confirmation); the page shows no name. -->
+                    <button class="btn btn-signout" id="signout-btn" data-signout data-no-who>Quit</button>
+                    <button type="button" class="btn btn-signout btn-theme" id="theme-toggle" aria-label="Switch to light theme">
+                        <svg class="theme-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+                        <svg class="theme-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="journey-main">
+            <div class="journey-shell">
+
+                <!-- Consent / locked screen. ocean-test.js replaces the contents
+                     of this element, so it is left empty here. -->
+                <div id="gatekeeper-screen"></div>
+
+                <!-- The test itself. Hidden until consent is given or saved
+                     progress is restored. -->
+                <div id="test-container" class="hidden">
+                    <div class="test-wrap">
+                        <div class="question-card">
+                            <p class="question-counter" id="question-counter">1 of 50</p>
+                            <h1 class="question-text" id="question-text">—</h1>
+
+                            <!-- One delegated listener reads data-score. The labels are
+                                 the BFPT sheet's own 1-5 scale; ocean-test.js rewrites
+                                 each .answer-label from PIA_BFPT.scale, so this markup
+                                 and the admin results view cannot drift apart. -->
+                            <div class="answer-list" id="ocean-answer-list" role="group" aria-label="How much does this sound like you?">
+                                <button type="button" class="ocean-answer-btn" data-score="1"><span class="answer-label">Disagree</span></button>
+                                <button type="button" class="ocean-answer-btn" data-score="2"><span class="answer-label">Slightly disagree</span></button>
+                                <button type="button" class="ocean-answer-btn" data-score="3"><span class="answer-label">Neutral</span></button>
+                                <button type="button" class="ocean-answer-btn" data-score="4"><span class="answer-label">Slightly agree</span></button>
+                                <button type="button" class="ocean-answer-btn" data-score="5"><span class="answer-label">Agree</span></button>
+                            </div>
+
+                            <div class="test-nav">
+                                <button type="button" class="btn btn-secondary" id="btn-prev">
+                                    <svg class="icon"><use href="#i-chev-left"></use></svg>
+                                    Back
+                                </button>
+                                <button type="button" class="btn btn-primary" id="btn-submit-ocean" disabled hidden>
+                                    Submit
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="btn-next" disabled>
+                                    <span id="btn-next-label">Next</span>
+                                    <svg class="icon"><use href="#i-chev-right"></use></svg>
+                                </button>
+                            </div>
+
+                            <!-- Only used when something older is left to review; empty (and hidden) otherwise. -->
+                            <p class="submit-hint" id="submit-hint" aria-live="polite"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ================================================== MODAL · QUIT ---
+         Shown when a student tries to navigate away mid-test. The controller
+         toggles `modal-active` / `modal-content-active`; student-journey.css
+         maps those onto the standard dialog states. -->
+    <div class="overlay" id="quit-modal" role="dialog" aria-modal="true" aria-hidden="true"
+        aria-labelledby="quit-heading">
+        <div class="modal modal-sm" id="quit-modal-content">
+            <header class="modal-head">
+                <div class="modal-head-text">
+                    <h2 class="modal-title" id="quit-heading">Leave the questionnaire?</h2>
+                    <p class="modal-sub">Your answers so far are saved.</p>
+                </div>
+            </header>
+
+            <div class="modal-body">
+                <p class="modal-text">
+                    If you leave now you can come back and carry on from the same question.
+                    Nothing you've answered will be lost.
+                </p>
+
+                <div class="quit-progress">
+                    <div class="quit-progress-row">
+                        <span>Answered so far</span>
+                        <b id="quit-progress-count">0 of 50</b>
+                    </div>
+                    <div class="bar"><div class="bar-fill" id="quit-progress-fill" style="width:0%"></div></div>
+                </div>
+            </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-secondary" id="quit-modal-leave">Quit for now</button>
+                <button class="btn btn-primary" id="quit-modal-stay">Keep going</button>
+            </footer>
+        </div>
+    </div>
+
+    <script src="../../assets/js/function.js"></script>
+    <!-- The 50 statements and the 1-5 scale. Must load before ocean-test.js. -->
+    <script src="../../assets/js/bfpt-items.js"></script>
+    <script src="../../student/js/journey-header.js"></script>
+    <script src="../../student/js/ocean-test.js?v=20261028a"></script>
+</body>
+
+</html>

@@ -1,6 +1,12 @@
 const gatekeeperScreen = document.getElementById('gatekeeper-screen');
 const testContainer = document.getElementById('test-container');
 
+// The teacher copy of this page (teacher/html/teacher-ocean.html) sets data-staff on <body>.
+// Same 50 statements and screens; what differs is who may open it (a teacher, any time: no
+// admin switch), the function that saves it, and where it leads (the teacher dashboard).
+const STAFF = document.body.hasAttribute('data-staff');
+const TEACHER_DASHBOARD = 'teacher-dashboard.html';
+
 let isTestAllowed = false;
 let currentQuestionIndex = 0;
 let hasSubmitted = false;
@@ -111,16 +117,56 @@ function isTestInProgress() {
     return isTestAllowed && !hasSubmitted && answeredCount() > 0 && !isComplete();
 }
 
+// A teacher may take the questionnaire once. Anyone else is sent where they belong; a teacher who
+// has already finished goes on to the dashboard. The server enforces all of this again in
+// submit_ocean_results_teacher (migration 0061); this only decides which page to show.
+async function requireTeacherForOcean() {
+    const sb = window.supabaseClient;
+    if (!sb) { window.location.replace('../../index.html?signin=staff'); return null; }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session || !session.user) { window.location.replace('../../index.html?signin=staff'); return null; }
+
+    const { data: profile, error } = await sb.from('profiles')
+        .select('email, full_name, role, is_ocean_done')
+        .eq('email', session.user.email).maybeSingle();
+    if (error || !profile) { window.location.replace('../../index.html?signin=staff'); return null; }
+
+    const role = String(profile.role || 'student').trim().toLowerCase();
+    if (role === 'admin') { window.location.replace('../../admin/html/admin-dashboard.html'); return null; }
+    if (role !== 'teacher') { window.location.replace('../../student/html/waiting-room.html'); return null; }
+    if (profile.is_ocean_done === true) { window.location.replace(TEACHER_DASHBOARD); return null; }
+
+    document.body.classList.remove('opacity-0');
+    return profile;
+}
+
 async function checkAccessAndInit() {
     // Tinanggal ang dating 5s timeout + `isTestAllowed = true` na catch block:
     // fail-OPEN iyon -- kapag mabagal/nabigo ang network, bumubukas ang test
     // kahit walang session at kahit sarado ang stage. Fail-closed na ngayon:
     // kung hindi ma-verify ang session, nagre-redirect ang guard at hindi
     // kailanman nase-set sa true ang isTestAllowed.
-    verifiedProfile = await enforceStudentStage('ocean');
+    verifiedProfile = STAFF ? await requireTeacherForOcean() : await enforceStudentStage('ocean');
     if (!verifiedProfile) return;
 
     isTestAllowed = true;
+
+    if (STAFF) {
+        // No stage clock, no stage switch to listen to: a teacher's questionnaire is always open.
+        window.PIA_HAS_ACTIVE_WORK = isTestInProgress;
+        if (loadOceanProgress()) {
+            gatekeeperScreen.classList.add('hidden');
+            testContainer.classList.remove('hidden');
+            document.body.style.overflow = 'auto';
+            initTestUI();
+            loadQuestion();
+        } else {
+            renderGatekeeper();
+        }
+        setupExitGuard();
+        return;
+    }
 
     // Time in this stage is counted from now (active time only; function.js
     // 1C-5b), and a stage closed mid-test lets them finish (1C-5c).
@@ -206,7 +252,9 @@ function setupRealtimeListener() {
 
 // What the student is told about who can see their answers. It has to stay true of the study
 // (who really has access) and match the consent form; change it here, in one place.
-const PRIVACY_TEXT = 'Only the researchers see them. Never your classmates or teachers.';
+const PRIVACY_TEXT = STAFF
+    ? 'Only the researchers see them. Never your students or the school.'
+    : 'Only the researchers see them. Never your classmates or teachers.';
 
 function showPrivacyStep() {
     const container = document.getElementById('step-container');
@@ -226,7 +274,7 @@ function showPrivacyStep() {
         </section>
 
         <div class="gate-actions">
-            <a href="waiting-room.html" class="btn btn-secondary">Not right now</a>
+            ${STAFF ? '' : '<a href="waiting-room.html" class="btn btn-secondary">Not right now</a>'}
             <button type="button" data-action="start" class="btn btn-primary">I understand — start</button>
         </div>
     `;
@@ -239,7 +287,7 @@ async function startTestDirectly() {
     // .update({ current_stage }) ay hinaharangan na ng profile write guard --
     // iyon ang dating nagpapahintulot sa kahit sinong estudyante na ibigay sa
     // sarili nila ang kahit anong stage sa isang linya sa console.
-    if (supabaseClient) {
+    if (supabaseClient && !STAFF) {
         await supabaseClient.rpc('set_student_stage', { p_stage: 'OCEAN' });
     }
 
@@ -426,7 +474,7 @@ async function submitTestResults() {
     // estudyante, kahit sa network tab.
     if (!supabaseClient) return;
 
-    const { error } = await supabaseClient.rpc('submit_ocean_results', {
+    const { error } = await supabaseClient.rpc(STAFF ? 'submit_ocean_results_teacher' : 'submit_ocean_results', {
         p_responses: userResponses
     });
 
@@ -448,12 +496,12 @@ async function submitTestResults() {
     clearOceanProgress();
 
     // The final payload: locks the seconds spent on this stage.
-    await finalizeStageTime('OCEAN');
+    if (!STAFF) await finalizeStageTime('OCEAN');
 
     // Diretso sa simpleng thank-you screen. replace(), hindi href: ang Back
     // button ay hindi dapat magbalik sa isang questionnaire na naisumite na.
     // Ang thank-you page na ang bahala sa kung saan sila susunod.
-    window.location.replace('assessment-complete.html');
+    window.location.replace(STAFF ? TEACHER_DASHBOARD : 'assessment-complete.html');
 }
 
 // ==========================================

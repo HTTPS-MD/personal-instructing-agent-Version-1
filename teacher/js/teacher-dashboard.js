@@ -405,7 +405,7 @@
             }
 
             var email = session.data.session.user.email;
-            var res = await sb.from('profiles').select('role, section, full_name').eq('email', email).maybeSingle();
+            var res = await sb.from('profiles').select('role, section, full_name, is_ocean_done').eq('email', email).maybeSingle();
 
             if (res.error) {
                 if (isNetworkError(res.error)) { return 'offline'; }
@@ -423,6 +423,13 @@
             }
             if (res.data.role !== 'teacher') {
                 leave('This page is for teachers. Taking you back to sign in…');
+                return 'denied';
+            }
+
+            /* The questionnaire comes first: a teacher who has not taken it goes there, and it
+               brings them back here when it is saved. */
+            if (res.data.is_ocean_done !== true) {
+                window.location.replace('teacher-ocean.html');
                 return 'denied';
             }
 
