@@ -1119,6 +1119,8 @@
            closes this console at once instead of leaving it polling a class
            it can no longer read (function.js 1C-7). */
         if (typeof startStaffSessionWatch === 'function') { startStaffSessionWatch(); }
+        /* 15 quiet minutes: "Are you still there?", then a 60 second countdown and sign-out (function.js 1C-4). */
+        if (typeof startIdleWatchdog === 'function') { startIdleWatchdog({ limitMs: 15 * 60 * 1000 }); }
         bindControls();
         bindNetwork();
         paintIdentity();

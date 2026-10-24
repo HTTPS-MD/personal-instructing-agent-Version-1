@@ -6858,6 +6858,9 @@
         /* Ends this console the moment the server stops accepting its login
            (function.js 1C-7) -- a revoke from another device lands here. */
         startStaffSessionWatch();
+        /* Left open and unattended? After 30 quiet minutes it asks "Are you still there?" and signs out
+           after 60 seconds (function.js 1C-4). Uses this page's own signOut, which reports a failure. */
+        if (typeof startIdleWatchdog === 'function') { startIdleWatchdog({ limitMs: 30 * 60 * 1000, onTimeout: signOut }); }
         await loadAdminDevices();
     }
 
