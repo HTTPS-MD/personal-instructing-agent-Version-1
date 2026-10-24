@@ -4490,3 +4490,6 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
     .pv-lock-b { --oy: -8.5rem; }
     .pv-key-b { --oy: 8.5rem; }
 }
+
+/* 47. The Join button never wraps or spills: its busy label ("Wait…") stays inside it. */
+.join-btn { white-space: nowrap; }

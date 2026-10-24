@@ -1418,7 +1418,7 @@
 
         heroJoinPending = true;
         var button = $('.join-btn', form);
-        var release = setBusy(button, 'Checking…');
+        var release = setBusy(button, 'Wait…');   /* short: setBusy pins the button's width, and a longer label spilled out of it */
         var walkedIn = false;
         try {
             var found = await joinCall({ action: 'lookup', number: number });
@@ -1435,7 +1435,7 @@
             await enterWithToken(entered.data.token_hash, {
                 current: function () { return true; },
                 fail: function (message) { walkedIn = false; showJoinError(message); },
-                report: function () { button.textContent = 'Entering…'; }
+                report: function () { button.textContent = 'Wait…'; }
             });
         } catch (err) {
             walkedIn = false;
