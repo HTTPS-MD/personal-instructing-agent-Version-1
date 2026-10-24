@@ -580,10 +580,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
    Below 30rem the theme toggle moves into the sheet as a labelled switch;
    below 25rem "Activate account" shortens (the tail stays in the accessible
    name); below 21.5rem Sign in moves into the sheet as well. */
-@media (max-width: 29.99rem) {
-    .nav-actions .theme-toggle { display: none; }
-    .nav-menu-theme { display: flex; }
-}
+/* (The theme button now stays in the bar at every width; the menu no longer has a Dark mode row.) */
 
 @media (max-width: 24.99rem) {
     .nav-activate-tail {
@@ -2745,7 +2742,6 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 .nav-menu-student { display: flex; flex-wrap: wrap; }
 @media (max-width: 39.99rem) { .nav-actions .nav-activate { display: none; } }
 .js .nav:not(.has-auth) .nav-auth { transition: none; }
-.js .nav.is-open .nav-auth { opacity: 1; visibility: visible; }
 .account-guidance { margin-top: var(--sp-4); max-width: 48ch; color: var(--text-muted); line-height: 1.65; }
 :root[data-session] .signed-out-copy { display: none; }
 .email-accepted { line-height: 1.65; }
@@ -3160,50 +3156,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 }
 
 
-/* ═════════════════════════════ 15. BREATHING ROOM · space and a quiet divider ═════
-   More air above each section and one small divider (a rule that fades at both ends, with a
-   single yellow diamond) so a long scroll has resting points. Colours are the page's own. */
+/* ═════════════════════════════ 15. BREATHING ROOM · more space above each section ═════
+   More air above each section. (The small divider with the yellow diamond was removed.) */
 .band-strip { padding-block-start: var(--band-pad); }
 .band-help { padding-block: calc(var(--band-pad) + 3rem) calc(var(--band-pad) + 1rem); }
 .foot { position: relative; padding-block-start: calc(var(--sp-9) + 2rem); }
 
-.breath {
-    position: absolute;
-    inset-block-start: clamp(2rem, 6vh, 3.5rem);
-    inset-inline-start: 50%;
-    width: min(18rem, 46%);
-    height: 0.75rem;
-    transform: translateX(-50%);
-    pointer-events: none;
-    color: var(--text);
-}
-.breath::before {
-    content: "";
-    position: absolute;
-    inset-inline: 0;
-    inset-block-start: 0.34rem;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 30%, transparent) 25%, color-mix(in srgb, currentColor 30%, transparent) 75%, transparent);
-}
-.breath::after {
-    content: "";
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 50%;
-    width: 0.7rem;
-    height: 0.7rem;
-    margin-inline-start: -0.35rem;
-    border-radius: 2px;
-    background: var(--volt);
-    transform: rotate(45deg);
-    box-shadow: 0 0 0 0.4rem var(--breath-ground, transparent);
-}
-.band-strip { --breath-ground: #101a4a; color: #f1ead8; }
-:root[data-theme="light"] .band-strip { --breath-ground: #e1ebf7; }
-.band-help { --breath-ground: var(--bg-body); }
-.foot { --breath-ground: var(--bg-body); }
-.band-strip .breath { color: #f1ead8; }
-:root[data-theme="light"] .band-strip .breath { color: #0a0f2e; }
 
 
 /* ═════════════════════════════ 16. HERO → LESSON · the picture melts into the lesson ═════
@@ -3274,31 +3232,15 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 
 .band-help { position: relative; overflow: hidden; padding-block-end: calc(var(--band-pad) + 1rem); }
 .band-help .shell { position: relative; z-index: 1; }
-/* Two tutors, one at each edge, standing in FRONT of the outer cards. Each is sized from the room
-   left beside the card row (the row is 63rem wide), plus a little overlap, so it is always whole on
-   screen and never clipped. On screens too narrow to give them a useful size they are not shown. */
-.help-mate { display: none; position: absolute; inset-block-end: calc(var(--band-pad) + 1.25rem); pointer-events: none; z-index: 3;
-    width: clamp(10rem, calc((100vw - 63rem) / 2 + 2rem), 26rem); }
-.help-mate img { display: block; width: 100%; height: auto; filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.28)); }
-.help-mate-l { inset-inline-start: 0.5rem; }
-.help-mate-l img { transform: scaleX(-1); }
-.help-mate-r { inset-inline-end: 0.5rem; }
-@media (min-width: 82rem) {
-    .help-mate { display: block; }
-    /* keep the words of the two outer cards clear of the tutors */
-    .band-help .help-card:nth-child(1) { padding-inline-start: calc(var(--sp-6) + 1.25rem); }
-    .band-help .help-card:nth-child(3) { padding-inline-end: calc(var(--sp-6) + 1.25rem); }
-}
+.band-help .help-card:nth-child(2) { margin-block-start: 0; }
 /* "backup!" is highlighted like the lesson title: a soft rounded yellow, no blue edge. */
 /* Narrower cards, centred, so the tutors have room on both sides. Below 72rem there are no tutors,
    so the cards go back to the full width of the column. */
 @media (min-width: 72rem) {
     .band-help .help-list { grid-template-columns: repeat(3, minmax(0, 20rem)); justify-content: center; gap: var(--sp-6); }
 }
-.band-help .help-mark { border-radius: 1rem; transform: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
-.js .help-mate-l[data-reveal] { --reveal-y: 0rem; transform: translate3d(-3rem, 0, 0); --d: 200ms; }
-.js .help-mate-r[data-reveal] { --reveal-y: 0rem; transform: translate3d(3rem, 0, 0); --d: 320ms; }
-.js .help-mate[data-reveal].is-in { transform: none; }
+.band-help .help-mark,
+.band-video .help-mark { border-radius: 1rem; transform: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
 
 
 /* Tutors may tuck behind the cards (never in front), so the cards stay fully readable and can be
@@ -3572,36 +3514,979 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spac
 }
 
 
-/* ═════════════════════════════ 27. PICKER · a small scene behind each tutor ═════════════════
-   Plain CSS and inline SVG. The scene lives inside each .stage-figure, so it appears and
-   disappears with its tutor and agent-select.js needs no change. It is a small island, not a
-   background: a soft glow behind, a rounded patch of ground below, and a few props at the sides. */
+/* ═════════════════════════════ 27. PICKER · one classroom behind every tutor ═════════════════
+   A single picture (assets/images/classroom-backdrop-3d-pia-dark.webp and -light.webp: the board, the shelf and a round
+   wooden floor) sits behind whichever tutor is showing, so all six share the same room. It is a plain
+   decorative image in the board, and the tutor stands on its floor. (The earlier per-tutor scenes and
+   their pieces were removed.) */
+.act-select .select-board > .pk-backdrop {
+    position: absolute;
+    z-index: 0;
+    inset-inline: -4% auto;
+    inset-block-end: -22%;
+    width: 90%;
+    height: auto;
+    pointer-events: none;
+    filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.25));
+}
 @media (min-width: 56rem) {
+    /* the tutor stands in the middle of the floor; the bubble takes the right side */
+    .act-select .select-board > .pk-backdrop { inset-inline: 0 auto; inset-block-end: -20%; width: 74%; }
+    .act-select .stage { inset-inline: 16% auto; }
+    .act-select .detail { width: 46%; }
+}
+.act-select .stage { z-index: 1; }
+.act-select .detail { z-index: 2; }
+.act-select .stage-figure { position: relative; }
+.act-select .model-canvas-wrapper { position: relative; z-index: 1; overflow: visible; }
+.act-select .model-canvas-wrapper.has-art::before { display: none; }
+.act-select .stage-art img { filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.28)); }
+.act-select .stage-poke { z-index: 3; }
+
+
+/* ═════════════════════════════ 29. DIALOGS · modern, left-aligned, no decoration ═════════════════
+   One restyle of every dialog (sign-in, join message, reset, activate). Nothing is duplicated and
+   no markup changes; this only overrides section 16. Rounded card, soft shadow, sentence-case
+   labels, rounded fields, a flat blue button. Text is left-aligned throughout. Icons are only kept
+   where they carry meaning: the status and intro glyphs are hidden and the close button is the
+   word "Close". */
+.overlay { background: rgba(6, 10, 34, 0.62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+:root[data-theme="light"] .overlay { background: rgba(20, 30, 70, 0.38); }
+.overlay .modal {
+    border: 0;
+    border-radius: 1.75rem;
+    background: #101745;
+    color: #f1ead8;
+    text-align: start;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 248, 231, 0.12);
+}
+:root[data-theme="light"] .overlay .modal { background: #fff8e7; color: #0a0f2e; box-shadow: 0 30px 80px rgba(20, 30, 70, 0.3), 0 0 0 1px rgba(10, 15, 46, 0.08); }
+.overlay .modal * { text-align: start; }
+.overlay .modal-head { border: 0; padding: var(--sp-6) var(--sp-6) var(--sp-3); }
+.overlay .modal-body { padding: var(--sp-2) var(--sp-6) var(--sp-6); }
+.overlay .modal-title { font-size: 1.75rem; line-height: 1.1; letter-spacing: -0.04em; color: inherit; }
+.overlay .modal-sub, .overlay .portal-note { color: color-mix(in srgb, currentColor 72%, transparent); font-size: 1rem; line-height: 1.5; }
+
+.overlay .label { font-family: var(--font-body); font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: inherit; }
+.overlay .field:has(.input:focus) .label { color: inherit; }
+.overlay .input {
+    min-height: 3.25rem;
+    border: 0;
+    border-radius: 0.875rem;
+    padding-inline: 1rem;
+    background: #0b1138;
+    color: #f1ead8;
+    box-shadow: inset 0 0 0 1px rgba(255, 248, 231, 0.18);
+}
+:root[data-theme="light"] .overlay .input { background: #fff; color: #0a0f2e; box-shadow: inset 0 0 0 1px rgba(10, 15, 46, 0.2); }
+.overlay .input::placeholder { color: color-mix(in srgb, currentColor 50%, transparent); }
+.overlay .input:hover { box-shadow: inset 0 0 0 1px rgba(255, 248, 231, 0.34); }
+:root[data-theme="light"] .overlay .input:hover { box-shadow: inset 0 0 0 1px rgba(10, 15, 46, 0.36); }
+.overlay .input:focus, .overlay .input:focus-visible {
+    background: #0b1138;
+    box-shadow: inset 0 0 0 2px #5aa0ff, 0 0 0 4px rgba(90, 160, 255, 0.28);
+}
+:root[data-theme="light"] .overlay .input:focus, :root[data-theme="light"] .overlay .input:focus-visible { background: #fff; box-shadow: inset 0 0 0 2px #2f74ee, 0 0 0 4px rgba(47, 116, 238, 0.22); }
+.overlay .input.is-invalid { box-shadow: inset 0 0 0 2px var(--danger), 0 0 0 4px var(--danger-line); }
+
+.overlay .btn {
+    min-height: 3.25rem;
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: none;
+    font-family: var(--font-body);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+.overlay .btn:hover:not(:disabled), .overlay .btn:active:not(:disabled) { transform: none; box-shadow: none; }
+.overlay .btn-primary { background: #2f74ee; color: #fff; }
+.overlay .btn-primary:hover:not(:disabled) { background: #2a68d6; }
+.overlay .btn-secondary { background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent); }
+.overlay .btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); color: inherit; }
+.overlay .btn:disabled { border: 0; background: color-mix(in srgb, currentColor 12%, transparent); color: color-mix(in srgb, currentColor 50%, transparent); }
+
+.overlay .link-btn { color: #7fb4ff; text-decoration: underline; text-underline-offset: 0.2em; }
+:root[data-theme="light"] .overlay .link-btn { color: #2f74ee; }
+.overlay .link-btn:hover { background: none; color: inherit; }
+
+.overlay .modal-close {
+    width: auto;
+    flex: 0 0 auto;
+    padding-inline: 1rem;
+    min-height: 2.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    color: inherit;
+}
+.overlay .modal-close svg { display: none; }
+.overlay .modal-close::before { content: "Close"; font-family: var(--font-body); font-size: 0.875rem; font-weight: 600; }
+.overlay .modal-close:hover { background: color-mix(in srgb, currentColor 22%, transparent); color: inherit; }
+.overlay .modal-head { grid-template-columns: minmax(0, 1fr) auto; }
+
+.overlay .auth-status .icon, .overlay .auth-intro .icon { display: none; }
+.overlay .auth-status { padding: 0; }
+.overlay .auth-status.is-error { border: 0; color: #ff9a9a; }
+:root[data-theme="light"] .overlay .auth-status.is-error { color: #b3261e; }
+.overlay .auth-status.is-ok { border: 0; background: none; color: inherit; }
+.overlay .auth-intro { border: 0; border-radius: 1rem; background: color-mix(in srgb, currentColor 8%, transparent); }
+.overlay .modal-foot { border: 0; background: none; padding: var(--sp-2) var(--sp-6) var(--sp-6); }
+.show-pw { color: inherit; font-size: 0.9375rem; }
+
+
+/* ═════════════════════════════ 30. PHONE · the menu and the footer, modern ═════════════════
+   Below 64rem the menu is a floating rounded card under the bar (not a ruled sheet), the hamburger
+   is two soft lines that turn into a cross (drawn in CSS, no icon), the rows are big and rounded,
+   and the main button is the same yellow as the rest of the page. The footer card on a phone is
+   left-aligned and stacked: small logo, title, a full-width field and button, then the
+   "made at" logos, the developers' email and the staff link. */
+@media (max-width: 63.99rem) {
+    .nav .nav-burger {
+        position: relative;
+        border: 0;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--text) 12%, transparent);
+        color: var(--text);
+    }
+    .nav .nav-burger:hover { background: color-mix(in srgb, var(--text) 22%, transparent); color: var(--text); }
+    .nav .nav-burger .icon { display: none; }
+    .nav-burger::before,
+    .nav-burger::after {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        inset-block-start: 50%;
+        width: 1.25rem;
+        height: 2px;
+        margin: -1px auto 0;
+        border-radius: 2px;
+        background: currentColor;
+        transition: transform 220ms var(--ease-snap);
+        transform: translateY(-0.28rem);
+    }
+    .nav-burger::after { transform: translateY(0.28rem); }
+    .nav-burger[aria-expanded="true"]::before { transform: rotate(45deg); }
+    .nav-burger[aria-expanded="true"]::after { transform: rotate(-45deg); }
+
+    .nav-scrim { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+
+    .nav-menu {
+        inset-block-start: calc(100% + 0.5rem);
+        inset-inline: 0.75rem;
+        gap: var(--sp-4);
+        padding: 0.75rem 0.75rem 1rem;
+        border: 0;
+        border-radius: 1.75rem;
+        background: var(--bg);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent);
+        transform: translateY(-0.5rem) scale(0.98);
+        transform-origin: top right;
+    }
+    .nav.is-open .nav-menu { transform: none; }
+
+    .nav-links { gap: 0.25rem; }
+    .nav-links > li + li { border: 0; }
+    .nav .nav-link {
+        min-height: 3.5rem;
+        padding-inline: 1rem;
+        border-radius: 1rem;
+        justify-content: space-between;
+        font-size: 1.5rem;
+    }
+    .nav .nav-link::after { content: "\2192"; font-family: var(--font-body); font-size: 1.25rem; font-weight: 600; opacity: 0.45; }
+    .nav .nav-link:hover { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+    .nav .nav-link[aria-current] { background: #ffd83d; color: #0a0f2e; box-shadow: none; }
+    .nav .nav-link[aria-current]::after { opacity: 0.7; }
+
+    .nav-menu-extra { gap: var(--sp-4); padding: var(--sp-4) 0.25rem 0; border-block-start: 1px solid color-mix(in srgb, var(--text) 14%, transparent); }
+    .nav-menu-extra .btn-pop {
+        width: 100%;
+        min-height: 3.25rem;
+        border: 0;
+        border-radius: 1rem;
+        background: #ffd83d;
+        color: #0a0f2e;
+        font-weight: 700;
+        box-shadow: none;
+        transform: none;
+    }
+    .nav-menu-extra .btn-pop:hover { background: #ffe574; color: #0a0f2e; }
+    .nav-menu-note { padding-inline: 0.75rem; }
+    .nav-menu-note .link-btn { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 0.2em; }
+    .nav-theme-row {
+        min-height: 3.25rem;
+        padding-inline: 1rem;
+        border: 0;
+        border-radius: 1rem;
+        background: color-mix(in srgb, var(--text) 8%, transparent);
+    }
+    .nav-theme-switch { width: 3rem; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 24%, transparent); }
+    .nav-theme-switch > span { inset: 3px auto 3px 3px; width: auto; height: auto; aspect-ratio: 1; border-radius: 50%; background: #fff8e7; }
+    .nav-theme-row[aria-pressed="true"] .nav-theme-switch { background: #ffd83d; }
+    .nav-theme-row[aria-pressed="true"] .nav-theme-switch > span { background: #0a0f2e; transform: translateX(1.375rem); }
+}
+
+@media (max-width: 48rem) {
+    .foot { padding-block-start: var(--sp-8); }
+    .foot-card {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--sp-4);
+        padding: var(--sp-6) var(--sp-5) var(--sp-8);
+        text-align: left;
+    }
+    .foot-card > * { min-width: 0; }
+    .foot-card::before { transform: skewX(-1.2deg); border-width: 2px; border-radius: 1.5rem 1.5rem 0 0; }
+    .foot-logo { width: 6.5rem; max-width: none; justify-self: start; }
+    .foot-join { align-items: stretch; gap: var(--sp-3); }
+    .foot-title { font-size: 2rem; }
+    .foot-join .join {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.5rem;
+        padding: 0.5rem;
+    }
+    .foot-join .join .join-ic { margin-inline-start: 0.5rem; }
+    .foot-join .join .join-in { min-height: 3.25rem; padding-inline: 0.25rem; }
+    .foot-join .join .join-btn { grid-column: 1 / -1; justify-content: center; min-height: 3.25rem; width: 100%; }
+    .foot-hint { text-align: left; }
+
+    .foot-lines { grid-template-columns: minmax(0, 1fr); justify-items: stretch; gap: var(--sp-5); text-align: left; padding-block-start: var(--sp-5); }
+    .foot-logos { justify-content: flex-start; gap: var(--sp-4); }
+    .foot-logos li { width: 4.5rem; }
+    .foot-contact { text-align: left; }
+    .foot-contact-title { font-size: 1.125rem; }
+    .foot-mail { display: flex; width: 100%; margin-block-start: var(--sp-3); padding: 0.85rem 0.85rem; gap: 0.5rem; border-radius: 1rem; font-size: 0.8125rem; letter-spacing: -0.01em; }
+    .foot-mail .icon { width: 1.125rem; height: 1.125rem; }
+    .foot-staff { justify-content: flex-start; }
+}
+
+
+/* ═════════════════════════════ 31. PICKER · the phone layout ═════════════════
+   Below 56rem the picker was still the old one: a boxed classroom picture with a swipe row of
+   chips above it. Now it follows the desktop: the tutor stands in their small scene on the left,
+   the bubble sits beside them, and the six tutors are a 3 x 2 grid of big, tappable cards below.
+   Nothing is hidden off-screen, so no tutor is a swipe away. */
+@media (max-width: 55.99rem) {
+    .act-select .select-layout { display: flex; flex-direction: column; gap: var(--sp-5); }
+    .act-select .select-board {
+        order: 1;
+        aspect-ratio: auto;
+        height: 20.5rem;
+        max-width: none;
+        margin: 0 0 3.25rem;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        overflow: visible;
+    }
+    :root[data-theme="dark"] .act-select .select-board { background-image: none; }
+    .act-select .stage { inset-block: 0; inset-inline: 6% auto; width: 52%; }
+    .act-select .stage-figure,
+    .act-select .model-canvas-wrapper { height: 100%; }
     .act-select .stage-figure { position: relative; }
-    .act-select .pk-scene { position: absolute; z-index: 0; inset-inline: -9% ; inset-block-end: 1%; height: 78%; pointer-events: none; }
-    .act-select .model-canvas-wrapper { position: relative; z-index: 1; overflow: visible; }
+    .act-select .model-canvas-wrapper { position: relative; z-index: 1; max-width: none; overflow: visible; }
+    .act-select .model-canvas-wrapper.has-art::before { display: none; }
+    .act-select .stage-art, .act-select .stage-art img { height: 100%; width: auto; max-width: 100%; margin-inline: auto; object-fit: contain; object-position: center bottom; }
     .act-select .stage-art img { filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.28)); }
     .act-select .stage-poke { z-index: 3; }
-    .act-select .model-canvas-wrapper.has-art::before { display: none; }
+
+    /* the bubble: absolute sizes here, because the bubble is only about 12rem wide */
+    .act-select .detail { z-index: 2; inset-block-start: 0.75rem; inset-inline: auto 0; width: 56%; transform: none; }
+    .act-select .detail-panel { padding: 0.9rem 0.95rem 1rem; }
+    .act-select .detail-name { font-size: 1.625rem; }
+    .act-select .detail-strength { margin-block-start: 0.4rem; padding: 0.2rem 0.65rem; font-size: 0.75rem; }
+    .act-select .detail-line { margin-block-start: 0.55rem; font-size: 0.875rem; line-height: 1.4; }
+    .act-select .detail-desc { display: none; }
+
+    /* the six tutors: 3 x 2 */
+    .act-select .roster {
+        order: 2;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.625rem;
+        margin: 0;
+        padding: 0.25rem 0 0;
+        overflow: visible;
+        scroll-snap-type: none;
+    }
+    .act-select .roster-item {
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.3rem;
+        width: auto;
+        min-width: 0;
+        min-height: 6.5rem;
+        padding: 0.65rem 0.25rem;
+        text-align: center;
+    }
+    .act-select .roster-icon { width: 3.4rem; }
+    .act-select .roster-text { align-items: center; }
+    .act-select .roster-name { font-size: 1.0625rem; }
+    .act-select .roster-strength { font-size: 0.75rem; line-height: 1.2; }
+    .act-select .roster-item:hover { transform: none; }
+    .act-select .roster-item[aria-selected="true"] { transform: none; box-shadow: 0 0 0 3px #f1ead8, 0 10px 22px rgba(0, 0, 0, 0.25); }
+    :root[data-theme="light"] .act-select .roster-item[aria-selected="true"] { box-shadow: 0 0 0 3px #0a0f2e, 0 10px 22px rgba(0, 0, 0, 0.2); }
 }
-.pk-scene { display: none; }
-@media (min-width: 56rem) { .pk-scene { display: block; } }
-.pk-sky { position: absolute; inset: 0; border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; opacity: 0.55; }
-.pk-ground { position: absolute; inset-inline: 0; inset-block-end: 0; height: 36%; border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%; }
-.pk-art { position: absolute; z-index: 1; display: block; height: auto; }
-.pk-cloud { position: absolute; z-index: 1; background: #fff; border-radius: 99px; opacity: 0.92; box-shadow: inset 0 -5px 0 rgba(150, 170, 210, 0.35); }
-.pk-cloud::before, .pk-cloud::after { content: ""; position: absolute; background: #fff; border-radius: 50%; }
-.pk-cloud::before { left: 18%; top: -55%; width: 42%; height: 150%; }
-.pk-cloud::after { left: 48%; top: -75%; width: 36%; height: 170%; }
-.pk-beach .pk-sky   { background: radial-gradient(ellipse at 50% 30%, rgba(255, 226, 150, 0.55), transparent 70%); }
-.pk-beach .pk-ground   { background: linear-gradient(#f0d9a0, #d9b873); }
-.pk-library .pk-sky { background: radial-gradient(ellipse at 50% 30%, rgba(255, 200, 150, 0.45), transparent 70%); }
-.pk-library .pk-ground { background: linear-gradient(#b98a5a, #8e6238); }
-.pk-field .pk-sky   { background: radial-gradient(ellipse at 50% 30%, rgba(255, 170, 120, 0.5), transparent 70%); }
-.pk-field .pk-ground   { background: linear-gradient(#8fd06a, #5fae4a); }
-.pk-garden .pk-sky  { background: radial-gradient(ellipse at 50% 30%, rgba(190, 230, 255, 0.5), transparent 70%); }
-.pk-garden .pk-ground  { background: linear-gradient(#a6dc8a, #6dbb6a); }
-.pk-night .pk-sky   { background: radial-gradient(ellipse at 50% 30%, rgba(150, 160, 255, 0.5), transparent 70%); }
-.pk-night .pk-ground   { background: linear-gradient(#6f78c8, #4a52a0); }
-.pk-stone .pk-sky   { background: radial-gradient(ellipse at 50% 30%, rgba(220, 225, 235, 0.55), transparent 70%); }
-.pk-stone .pk-ground   { background: linear-gradient(#bfc4cf, #9aa1b0); }
+
+
+/* ═════════════════════════════ 32. NAVBAR · Join, and a quiet Teacher / Admin ═════════════════
+   Two buttons with two different weights: Join is the solid yellow one (it shows once the hero's
+   field has scrolled away); Teacher / Admin is a thin outline, because few people use it and they
+   know where to look. Below 40rem Join and Teacher / Admin share one slot in the bar (section 46). */
+.nav .nav-join {
+    border: 0;
+    border-radius: 999px;
+    background: #ffd83d;
+    color: #0a0f2e;
+    font-weight: 700;
+    box-shadow: none;
+    transform: none;
+}
+.nav .nav-join:hover { background: #ffe574; color: #0a0f2e; }
+.nav .nav-signin {
+    border-width: 1px;
+    border-color: color-mix(in srgb, var(--text) 45%, transparent);
+    font-weight: 600;
+    font-size: 0.9375rem;
+}
+.nav .nav-signin:hover { background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); }
+
+
+
+/* ═════════════════════════════ 33. FOOTER · three columns, then the last line ═════════════════
+   Made at, Contact and Your privacy (written out, no dialog) sit on one line under the join field, each
+   with a small label. One thin row below: who made it, the staff link and a way back to the top. On a
+   phone everything stacks and stays left-aligned. The card is no longer skewed, so the columns line up. */
+.foot-base {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-6);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid rgba(255, 248, 231, 0.2);
+    font-size: 0.875rem;
+}
+.foot-copy, .foot-base-links { margin: 0; color: rgba(255, 248, 231, 0.72); }
+.foot-base-links { display: flex; gap: var(--sp-5); }
+.foot-card .foot-base .link-btn { color: #ffd83d; font-weight: 600; text-decoration: underline; text-underline-offset: 0.2em; }
+@media (max-width: 48rem) {
+    .foot-base { flex-direction: column; align-items: flex-start; }
+}
+.foot-card::before { transform: skewX(-2.5deg); }
+.foot-cols {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--sp-7);
+    padding-block-start: var(--sp-6);
+    border-block-start: 1px solid rgba(255, 248, 231, 0.2);
+    text-align: left;
+}
+.foot-h { margin: 0 0 var(--sp-3); font-family: var(--font-body); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 248, 231, 0.72); }
+.foot-cols .foot-logos { justify-content: flex-start; }
+.foot-cols .foot-logos li { width: 4.5rem; }
+.foot-cols .foot-contact { text-align: left; }
+.foot-cols .foot-mail { margin-block-start: 0; padding: 0.7rem 0.95rem; border-radius: 0.9rem; font-size: 0.875rem; overflow-wrap: break-word; }
+.foot-sub { margin: var(--sp-3) 0 0; font-size: 0.875rem; color: rgba(255, 248, 231, 0.72); }
+@media (max-width: 64rem) {
+    .foot-cols { grid-template-columns: auto minmax(0, 1fr); }
+}
+@media (max-width: 48rem) {
+    .foot-cols { grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); }
+}
+
+
+/* ═════════════════════════════ 34. PICKER · round tutor buttons, more room ═════════════════
+   The six tutors are now round pictures with no words beside them (the name and the description
+   are in the bubble once a tutor is picked). Their names stay in the page for screen readers and as
+   a tooltip, so nothing is lost. The section also has more air: a bigger scene, a narrower bubble
+   and wider gaps. */
+.act-select { --bub: 3.25rem; }
+.act-select .roster-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.act-select .roster-item,
+.act-select .roster-item:hover {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    flex: none;
+    width: var(--bub);
+    height: var(--bub);
+    min-height: 0;
+    padding: 0.2rem;
+    border-radius: 50%;
+    transform: none;
+}
+.act-select .roster-icon { width: 100%; border-width: 3px; }
+.act-select .roster-item:hover { transform: scale(1.08); }
+.act-select .roster-item[aria-selected="true"],
+.act-select .roster-item[aria-selected="true"]:hover {
+    transform: scale(1.14);
+    box-shadow: 0 0 0 4px #f1ead8, 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+:root[data-theme="light"] .act-select .roster-item[aria-selected="true"] { box-shadow: 0 0 0 4px #0a0f2e, 0 12px 24px rgba(0, 0, 0, 0.22); }
+.act-select .roster-item:focus-visible { outline: 3px solid #ffd83d; outline-offset: 5px; }
+
+@media (max-width: 55.99rem) {
+    .act-select .roster { display: flex; flex-wrap: nowrap; justify-content: center; gap: 0.5rem; padding-block: 0.5rem 0; }
+    .act-select .select-layout { gap: var(--sp-6); }
+    .act-select .select-board { height: 22rem; margin-block-end: 3rem; }
+}
+
+@media (min-width: 56rem) {
+    .act-select { --bub: 4rem; }
+    .act-select .select-shell { gap: 3.5rem; }
+    .act-select .select-head { gap: 1rem; }
+    .act-select .select-lede { max-width: 34rem; line-height: 1.6; }
+    .act-select .select-layout { grid-template-columns: 6rem minmax(0, 1fr); gap: clamp(2rem, 5vw, 5rem); }
+    .act-select .roster { align-items: center; justify-content: center; gap: 1.25rem; }
+    .act-select .select-board { height: clamp(26rem, 38vw, 33rem); }
+    .act-select .detail { width: 42%; }
+}
+
+
+/* ═════════════════════════════ 35. PICKER · the round tutors in a straight line ═════════════════
+   From 56rem the six round buttons are a column on the LEFT of the scene; below that they are one
+   row ABOVE it. Straight lines both ways, and the row never wraps, so no tutor is hidden. */
+.act-select { --pk-h: clamp(26rem, 38vw, 33rem); }
+
+.act-select .select-layout { display: flex; flex-direction: column; align-items: center; gap: var(--sp-5); }
+.act-select .roster {
+    order: 1;
+    position: static;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-self: auto;
+    gap: clamp(0.4rem, 2.2vw, 1.5rem);
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0.5rem 0 0;
+}
+.act-select .roster-item,
+.act-select .roster-item:hover,
+.act-select .roster-item[aria-selected="true"] {
+    position: relative;
+    left: auto;
+    top: auto;
+    translate: none;
+}
+.act-select .select-board { order: 2; margin-block-start: 0; }
+
+@media (min-width: 56rem) {
+    .act-select .select-layout {
+        display: grid;
+        grid-template-columns: 6rem minmax(0, 1fr);
+        align-items: center;
+        gap: clamp(2rem, 5vw, 5rem);
+        width: min(70rem, 100%);
+    }
+    .act-select .roster { grid-column: 1; grid-row: 1; flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; width: auto; padding: 0; }
+    .act-select .select-board { grid-column: 2; grid-row: 1; width: 100%; height: var(--pk-h); }
+}
+
+/* Hover: a tutor grows a little under the pointer and settles back when it leaves. */
+.act-select .roster-item {
+    cursor: pointer;
+    transition: transform 220ms cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 220ms ease, background-color 200ms ease;
+}
+@media (hover: hover) {
+    .act-select .roster-item:hover { transform: scale(1.18); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32); z-index: 2; }
+    .act-select .roster-item[aria-selected="true"]:hover { transform: scale(1.26); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .act-select .roster-item { transition: none; }
+}
+
+
+/* ═════════════════════════════ 36. PRIVACY SECTION, BACK TO TOP ═════════════════
+   The privacy note is its own section above the footer (see section 39 for how it looks). It is flat
+   in the gradient's third colour, so the footer's gradient continues from it. */
+.band.band-privacy { background: var(--g3); border-block-start: 0; --breath-ground: transparent; }
+
+.foot-up { display: flex; justify-content: center; margin-block-end: var(--sp-6); }
+.to-top {
+    min-height: 2.75rem;
+    padding: 0.6rem 1.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: #ffd83d;
+    color: #0a0f2e;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+    transition: transform 200ms ease, background-color 200ms ease;
+}
+.to-top:hover { background: #ffe574; transform: translateY(-3px); }
+.to-top:focus-visible { outline: 3px solid #fff8e7; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .to-top { transition: none; } .to-top:hover { transform: none; } }
+
+
+/* Narrow phones: the six round buttons share the row width, so none is cut off at 360 or 320 px. */
+@media (max-width: 55.99rem) {
+    .act-select { --bub: min(3.25rem, calc((100vw - 3.5rem - 2rem) / 6)); }
+    .act-select .roster { gap: 0.4rem; }
+}
+
+
+/* ═════════════════════════════ 37. FOOTER · one compact row, much shorter ═════════════════
+   The logos, the developers' contact, and the staff link with the copyright line now share ONE
+   row under the join field (no separate bottom row), the logo is smaller, and the padding is
+   tighter. Same information, a lot less height. */
+.foot-card { gap: 1.25rem 2.5rem; padding: 2rem clamp(1.5rem, 4vw, 3.5rem) 1.5rem; }
+.foot-logo { width: min(100%, 15rem); }
+.foot-title { font-size: clamp(1.5rem, 2.6vw, 2.25rem); }
+.foot-join { gap: 0.75rem; }
+.foot-cols { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.5rem 2.5rem; padding-block-start: 1.25rem; }
+.foot-cols .foot-logos li { width: 3.5rem; }
+.foot-cols .foot-logos { gap: 0.75rem; }
+.foot-h { margin-block-end: 0.5rem; }
+.foot-sub { margin-block-start: 0.5rem; }
+.foot-meta { display: grid; gap: 0.4rem; justify-items: end; text-align: right; font-size: 0.875rem; }
+.foot-meta p { margin: 0; }
+.foot-card .foot-meta .link-btn { color: #ffd83d; font-weight: 600; text-decoration: underline; text-underline-offset: 0.2em; }
+@media (max-width: 64rem) {
+    .foot-cols { grid-template-columns: auto minmax(0, 1fr); }
+    .foot-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem 1.5rem; text-align: left; }
+}
+@media (max-width: 48rem) {
+    .foot-card { gap: 1rem; padding: 1.5rem 1.25rem 1.25rem; }
+    .foot-logo { width: 5rem; }
+    .foot-title { font-size: 1.75rem; }
+    .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 1rem; padding-block-start: 1rem; }
+    .foot-cols .foot-logos li { width: 3.25rem; }
+    .foot-meta { flex-direction: column; align-items: flex-start; }
+}
+
+
+/* The backdrop has a dark and a light picture; the theme shows one of them. */
+.act-select .pk-backdrop-light { display: none; }
+:root[data-theme="light"] .act-select .pk-backdrop-light { display: block; }
+:root[data-theme="light"] .act-select .pk-backdrop-dark { display: none; }
+
+
+/* ═════════════════════════════ 38. PICKER · the tutor in the middle of the floor ═════════════════
+   From 56rem the scene is its own box: the floor is centred in it and the tutor stands in the middle
+   of the floor. The speech bubble sits BESIDE the scene, in room reserved on its right, so it never
+   covers the floor (the tutor used to look as if standing at the edge). The bubble's type is sized in
+   rem here, because it is about 19rem wide. */
+@media (min-width: 56rem) {
+    .act-select .select-board { width: auto; margin-inline-end: clamp(15rem, 24vw, 20rem); }
+    .act-select .select-board > .pk-backdrop { inset-inline: 0; inset-block-end: 0; width: 100%; transform: translateY(23%); }
+    .act-select .stage { inset-inline: 20% auto; width: 60%; }
+    .act-select .detail {
+        inset-inline: auto;
+        inset-inline-start: calc(100% + 2rem);
+        inset-block-start: 50%;
+        width: clamp(14rem, 22vw, 19rem);
+        transform: translateY(-50%);
+    }
+    .act-select .detail-panel { padding: 1.25rem 1.4rem 1.4rem; }
+    .act-select .detail-name { font-size: 1.875rem; }
+    .act-select .detail-strength { margin-block-start: 0.5rem; padding: 0.2rem 0.7rem; font-size: 0.8125rem; }
+    .act-select .detail-line { margin-block-start: 0.75rem; font-size: 1rem; line-height: 1.4; }
+    .act-select .detail-desc { margin-block-start: 0.6rem; font-size: 0.875rem; line-height: 1.5; }
+}
+
+
+/* ═════════════════════════════ 39. PRIVACY · short, centred, with a padlock and keys drifting about ═════════════════
+   Three short lines in the middle. A padlock and a key (two of each, one big and one small) float
+   around them, each on its own slow loop. They are pictures only: behind the words, never in the way,
+   and still when the person asked for less motion. The section clips them at its edges. */
+.band.band-privacy { overflow: clip; }
+.privacy-simple { position: relative; z-index: 1; max-width: 40rem; margin-inline: auto; text-align: center; }
+.privacy-simple .band-title, .privacy-line, .privacy-sub { color: #f1ead8; }
+:root[data-theme="light"] .privacy-simple .band-title,
+:root[data-theme="light"] .privacy-line,
+:root[data-theme="light"] .privacy-sub { color: #0a0f2e; }
+.privacy-line { margin: var(--sp-5) 0 0; font-size: clamp(1.25rem, 2.4vw, 1.625rem); line-height: 1.4; font-weight: 600; }
+.privacy-line b { background: #ffd83d; color: #0a0f2e; padding: 0 0.3em; border-radius: 0.4em; font-weight: 700; }
+.privacy-sub { margin: var(--sp-4) 0 0; font-size: 1.0625rem; line-height: 1.55; opacity: 0.85; }
+
+/* The padlock and the keys start in the middle, behind the words, and burst outward to their places as the
+   section scrolls into view; scrolling back up draws them in again. landing.js writes --burst (0 to 1, smooth,
+   never past their places) from the section's position on screen; without script, or with reduced motion, --burst is 1
+   and they simply sit in their places. Offsets are from the middle: cqi is a share of the section's width. */
+.band.band-privacy { container-type: inline-size; }
+.pv-deco {
+    position: absolute;
+    z-index: 0;
+    inset-inline-start: 50%;
+    inset-block-start: 50%;
+    width: var(--w);
+    height: auto;
+    display: block;
+    pointer-events: none;
+    filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.28));
+    opacity: min(1, calc(var(--burst, 1) * 2.5));
+    /* The order of the properties matters: translate (outermost) places the picture, then rotate (the slow
+       sway) and scale turn and size it about its OWN centre, then transform spins it during the burst. Putting
+       the sway in the same transform as the offsets made it swing each picture around the middle of the
+       section like a pendulum, and pushed some of them out of the section. */
+    translate: calc(var(--ox) * var(--burst, 1) - 50%) calc(var(--oy) * var(--burst, 1) - 50% + var(--bob, 0px));
+    scale: calc(0.15 + 0.85 * var(--burst, 1));
+    transform: rotate(calc((1 - var(--burst, 1)) * var(--spin, 0deg)));
+}
+.pv-lock-a { --w: clamp(5.5rem, 15cqi, 13rem); --ox: -37cqi; --oy: -3.5rem; --spin: -200deg; --r0: -10deg; --r1: 4deg; }
+.pv-key-a { --w: clamp(5.5rem, 15cqi, 13rem); --ox: 37cqi; --oy: 4rem; --spin: 220deg; --r0: 14deg; --r1: -2deg; }
+.pv-lock-b { --w: clamp(3rem, 7cqi, 6rem); --ox: 29cqi; --oy: -7rem; --spin: 260deg; --r0: 8deg; --r1: -8deg; }
+.pv-key-b { --w: clamp(3rem, 7cqi, 6rem); --ox: -29cqi; --oy: 7rem; --spin: -240deg; --r0: -20deg; --r1: -4deg; }
+@media (max-width: 64rem) {
+    /* narrower than a laptop the words fill the middle, so the four sit above and below the text block */
+    .pv-lock-a { --w: 5.5rem; --ox: -31cqi; --oy: -10.5rem; }
+    .pv-key-a { --w: 5.5rem; --ox: 31cqi; --oy: 10.5rem; }
+    .pv-lock-b { --w: 3.25rem; --ox: 34cqi; --oy: -10.5rem; }
+    .pv-key-b { --w: 3.25rem; --ox: -34cqi; --oy: 10.5rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .pv-deco { animation: pvFloat var(--t, 7s) ease-in-out var(--d, 0s) infinite; }
+    .pv-lock-a { --t: 6s; --d: -1s; }
+    .pv-key-a { --t: 8s; --d: -3s; }
+    .pv-lock-b { --t: 5s; --d: -2s; }
+    .pv-key-b { --t: 7s; --d: -4s; }
+}
+@property --bob { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes pvFloat {
+    0%, 100% { --bob: 0px; rotate: var(--r0, -6deg); }
+    50% { --bob: -1rem; rotate: var(--r1, 6deg); }
+}
+
+
+/* ═════════════════════════════ 40. MOTION · one small idea per section ═════════════════
+   Each section gets its own gentle animation, so the page has a rhythm instead of one effect repeated:
+     hero      none: the first screen is still
+     lesson    the panels act it out: the wrong divisor is struck out, 20% pops, the check fades in
+     picker    a tutor pops onto the floor when picked, then breathes; the picked button pulses
+     privacy   the padlock and keys burst outward as it scrolls in (and back in as it scrolls out); the highlight sweeps across the key words
+     footer    the logo floats; the Join button glints every few seconds
+   Everything here moves only opacity, transform, translate, rotate or scale, is slow, and runs once or
+   on a long loop. All of it is off under "reduce motion", where the end state shows at once. */
+
+/* ---------- hero ---------- */
+/* The first screen has no entrance animation at all: everything is in place the moment the page opens, and the
+   words are never dimmed while they "light up". (The pull-back, drops, stamp and bounce were removed.) */
+#hero [data-reveal],
+#hero [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+    transition: none;
+}
+#hero .scrub-w,
+#hero .drop-l3 .scrub-w {
+    transition: none;
+}
+#hero .scrub-w { color: inherit; }
+#hero .drop-l3 .scrub-w { color: var(--on-volt); }
+
+/* ---------- lesson ---------- */
+.js .band-strip .panel-work del { text-decoration: none; position: relative; }
+.js .band-strip .panel-work del::after {
+    content: "";
+    position: absolute;
+    inset-inline: -0.06em;
+    inset-block-start: 56%;
+    height: 3px;
+    border-radius: 2px;
+    background: #ff6b6b;
+    transform: scaleX(0);
+    transform-origin: left;
+}
+.js .band-strip .panel.is-in .panel-work del::after { transform: none; transition: transform 600ms cubic-bezier(0.6, 0, 0.2, 1) 900ms; }
+@media (prefers-reduced-motion: reduce) {
+    .js .band-strip .panel-work del::after { transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .band-strip .panel-a .panel-eq > span[aria-hidden] { display: inline-block; animation: arrowNudge 2.6s ease-in-out 1.2s infinite; }
+    .js .band-strip .panel-d.is-in .panel-eq-big { animation: pctPop 800ms cubic-bezier(0.2, 0.9, 0.3, 1.5) 700ms both; }
+    .js .band-strip .panel-d.is-in .panel-check { animation: fadeUp 500ms ease 1400ms both; }
+}
+@keyframes arrowNudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(0.3em); } }
+@keyframes pctPop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes fadeUp { 0% { transform: translateY(0.6rem); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+/* ---------- picker ---------- */
+@media (prefers-reduced-motion: no-preference) {
+    .act-select .stage-figure:not([hidden]) .model-canvas-wrapper { animation: pkPop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+    .act-select .stage-art img { transform-origin: 50% 100%; animation: pkBreathe 4.5s ease-in-out infinite; }
+    .act-select .roster-item[aria-selected="true"]::after {
+        content: "";
+        position: absolute;
+        inset: -5px;
+        border: 2px solid #ffd83d;
+        border-radius: 50%;
+        pointer-events: none;
+        animation: ringPulse 2.4s ease-out infinite;
+    }
+}
+@keyframes pkPop { 0% { transform: translateY(1.2rem) scale(0.92); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes pkBreathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.02); } }
+@keyframes ringPulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.35); opacity: 0; } }
+
+/* ---------- privacy ---------- */
+.privacy-line b { background: linear-gradient(#ffd83d, #ffd83d) no-repeat left center / 100% 100%; }
+.js .privacy-simple:not(.is-in) .privacy-line b { background-size: 0% 100%; }
+.js .privacy-simple.is-in .privacy-line b { transition: background-size 700ms cubic-bezier(0.6, 0, 0.2, 1) 500ms; }
+
+/* ---------- footer ---------- */
+.foot-join .join-btn { position: relative; overflow: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+    .foot-logo { animation: logoFloat 6s ease-in-out infinite; }
+    .foot-join .join-btn::after {
+        content: "";
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        width: 40%;
+        background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+        transform: translateX(-180%) skewX(-18deg);
+        animation: shineSweep 6s ease-in-out 1.5s infinite;
+        pointer-events: none;
+    }
+}
+@keyframes logoFloat {
+    0%, 100% { translate: 0 0; rotate: -1.5deg; }
+    50% { translate: 0 -0.45rem; rotate: 1.5deg; }
+}
+
+
+/* ═════════════════════════════ 41. HOW IT WORKS · the video, right after the hero ═════════════════
+   A big 16:9 player on the lesson's first colour (so the gradient carries on into the example), a big
+   round Play button over the poster until it is pressed, and three one-line steps underneath. */
+.band.band-video { background: var(--g0); border-block-start: 0; --breath-ground: transparent; }
+.band-video .band-title, .band-video .band-lede, .how-steps { color: #f1ead8; }
+:root[data-theme="light"] .band-video .band-title,
+:root[data-theme="light"] .band-video .band-lede,
+:root[data-theme="light"] .how-steps { color: #0a0f2e; }
+.band-video .band-head { text-align: center; margin-inline: auto; }
+.band-video .band-lede { margin-inline: auto; text-align: center; max-width: 40rem; }
+.video-frame {
+    position: relative;
+    width: min(100%, 60rem);
+    margin: 2rem auto 0;
+    aspect-ratio: 16 / 9;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    background: #0a0f2e;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+.video-frame video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.video-play { display: none; }
+.video-frame.has-play .video-play {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    display: block;
+    width: 5.5rem;
+    height: 5.5rem;
+    border: 0;
+    border-radius: 50%;
+    background: #ffd83d;
+    cursor: pointer;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    transition: transform 200ms ease, opacity 200ms ease;
+}
+.video-frame.has-play .video-play::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 0;
+    height: 0;
+    transform: translateX(0.2rem);
+    border-block: 1.1rem solid transparent;
+    border-inline-start: 1.8rem solid #0a0f2e;
+}
+.video-frame.has-play .video-play:hover { transform: scale(1.08); }
+.video-frame.has-play .video-play:focus-visible { outline: 4px solid #fff8e7; outline-offset: 4px; }
+.video-frame.is-playing .video-play { opacity: 0; pointer-events: none; }
+.band-video .how-steps {
+    list-style: none;
+    margin: 1.75rem auto 0;
+    padding: 0;
+    width: min(100%, 60rem);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-4);
+}
+.how-steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1.1rem;
+    border-radius: 1rem;
+    background: rgba(255, 248, 231, 0.1);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+}
+:root[data-theme="light"] .how-steps li { background: rgba(10, 15, 46, 0.07); }
+.how-num {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: #ffd83d;
+    color: #0a0f2e;
+    font-family: var(--font-display);
+    font-weight: 700;
+}
+@media (max-width: 40rem) {
+    .band-video .how-steps { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+    .video-frame { border-radius: 1rem; }
+    .video-frame.has-play .video-play { width: 4.25rem; height: 4.25rem; }
+    .video-frame.has-play .video-play::before { border-block-width: 0.85rem; border-inline-start-width: 1.4rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .video-frame.has-play:not(.is-playing) .video-play::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 3px solid #ffd83d;
+        border-radius: 50%;
+        pointer-events: none;
+        animation: ringPulse 2.4s ease-out infinite;
+    }
+}
+
+
+/* ═════════════════════════════ 42. WELCOME · "Welcome to" is typed, then the logo fades in ═════════════════
+   The last scene before the footer: two centred lines on the gradient (which runs on unbroken from the
+   privacy section into the footer). The first line is typed by landing.js; the second is the PIA logo, hidden
+   until the typing is done and then fading and settling in. With no script or with reduced motion both just show. */
+.band.band-welcome { background: var(--g3); border-block-start: 0; --breath-ground: transparent; padding-block: clamp(2rem, 7vh, 4.5rem) clamp(1rem, 3vh, 2rem); }
+.welcome-line { margin: 0; display: grid; justify-items: center; gap: clamp(0.5rem, 2vh, 1.25rem); text-align: center; }
+.welcome-text {
+    display: block;
+    min-height: 1.2em;
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 6vw, 4.5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    color: #f1ead8;
+}
+:root[data-theme="light"] .welcome-text { color: #0a0f2e; }
+.welcome-logo { display: block; width: min(80%, 22rem); height: auto; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.3)); }
+.is-typing .welcome-text::after {
+    content: "";
+    display: inline-block;
+    width: 0.08em;
+    height: 0.9em;
+    margin-inline-start: 0.08em;
+    vertical-align: -0.1em;
+    background: #ffd83d;
+    animation: caretBlink 800ms steps(1) infinite;
+}
+.band-welcome.is-typing-ready .welcome-logo { opacity: 0; transform: translateY(0.75rem) scale(0.92); }
+.band-welcome.is-typed .welcome-logo { opacity: 1; transform: none; transition: opacity 900ms ease, transform 900ms cubic-bezier(0.2, 0.9, 0.3, 1.25); }
+@keyframes caretBlink { 50% { opacity: 0; } }
+
+
+/* ═════════════════════════════ 43. BACKUP BAND · the six tutors on the cards ═════════════════
+   All six, arm in arm, standing on the row of cards. One picture, so nothing sits at the screen edges and
+   nothing can be clipped: it is as wide as the card row (or the column on a phone) and scales with it. Their
+   feet rest on the top edge of the cards; the cards (and their number badges) stay in front. They spring up
+   from behind the cards once, then sway very slightly; still under "reduce motion". */
+.band-help .help-list { position: relative; z-index: 2; }
+.help-crew { display: block; position: relative; z-index: 1; width: min(100%, 63rem); margin: 0 auto -0.6rem; pointer-events: none; }
+.help-crew img { display: block; width: 100%; height: auto; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.28)); }
+.js .help-crew[data-reveal] { --reveal-y: 2rem; --d: 120ms; }
+@media (prefers-reduced-motion: no-preference) {
+    .js .help-crew[data-reveal] { --reveal-y: 0rem; }
+    .js .help-crew.is-in {
+        transform-origin: 50% 100%;
+        animation: crewRise 1000ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both, crewSway 7s ease-in-out 1.2s infinite;
+    }
+}
+@keyframes crewRise { 0% { transform: translateY(42%); } 100% { transform: none; } }
+@keyframes crewSway { 0%, 100% { rotate: -0.5deg; } 50% { rotate: 0.5deg; } }
+
+
+/* The example's heading and lede keep clear of the tutor on the right: they wrap before reaching him
+   instead of running underneath. Same room the panels already keep (section 14). */
+@media (min-width: 56rem) {
+    .band-strip .band-head { max-width: calc(100% - var(--mate-w) * 0.75 + var(--hang)); }
+}
+
+
+/* ═════════════════════════════ 44. PICKER · tablets: keep the phone scene, centred ═════════════════
+   Between a phone and 56rem the scene box was as wide as the screen, so its square classroom picture grew
+   taller than the box and rose over the six round buttons. The scene now keeps a phone-sized box
+   (at most 34rem wide), centred, and the buttons sit above it. */
+@media (max-width: 55.99rem) {
+    .act-select .select-board { width: 100%; max-width: 34rem; margin-inline: auto; }
+}
+
+
+/* ═════════════════════════════ 45. SPACING · the same breathing room around every section ═════════════════
+   Every section now has the same space above and below (one variable), the picker and the backup band
+   no longer sit tighter than the rest, and the gap between a section's heading and its content is steadier. */
+:root { --band-pad: clamp(5rem, 8vw + 1rem, 10rem); }
+.act.act-select { padding-block-end: var(--band-pad); }
+.band.band-help { padding-block: var(--band-pad); }
+.band.band-privacy { padding-block: var(--band-pad); }
+.band.band-welcome { padding-block: calc(var(--band-pad) * 0.6) clamp(1.5rem, 4vh, 3rem); }
+.band-video .band-head { margin-block-end: 0; }
+.band-strip .band-head { margin-block-end: clamp(var(--sp-6), 6vh, var(--sp-8)); }
+@media (max-width: 40rem) {
+    .band-video .band-head,
+    .band-strip .band-head { margin-block-end: var(--sp-6); }
+    .band-video .video-frame { margin-block-start: 1.5rem; }
+}
+/* the padlock and keys wait out of sight until the script has placed them */
+@media (prefers-reduced-motion: no-preference) {
+    .js .band-privacy { --burst: 0; }
+}
+
+
+/* ═════════════════════════════ 46. PHONE · navbar actions, menu, and compact student-number fields ═════════════════
+   Navbar at every width: [Join, or Teacher / Admin] [theme] [menu]. On a phone Join and Teacher / Admin share
+   one slot: Teacher / Admin while the hero's field is on screen, Join once it has scrolled away. The menu holds
+   only the section links. The student-number fields (hero and footer) are one slim row: field and Join side
+   by side, at a normal text size, instead of a tall field with a big button under it. */
+@media (max-width: 39.99rem) {
+    .nav .nav-signin { padding-inline: 0.85rem; min-height: 2.5rem; font-size: 0.8125rem; white-space: nowrap; }
+    .nav:not(.has-auth) .nav-join { display: none; }
+    .nav.has-auth .nav-signin { display: none; }
+    .nav-actions { gap: 0.4rem; }
+
+    .join { padding: 0.375rem; border-radius: 1rem; }
+    .join-ic { width: 1.25rem; height: 1.25rem; margin-inline: 0.6rem 0.1rem; }
+    .join-in { min-width: 0; min-height: 2.75rem; font-size: 1rem; }
+    .join-btn { min-height: 2.75rem; padding: 0.5rem 1.1rem; font-size: 1rem; }
+}
+@media (max-width: 48rem) {
+    .foot-join .join { display: flex; align-items: center; gap: 0.25rem; padding: 0.375rem; }
+    .foot-join .join .join-ic { margin-inline: 0.6rem 0.1rem; }
+    .foot-join .join .join-in { flex: 1 1 auto; min-width: 0; min-height: 2.75rem; padding-inline: 0.25rem; font-size: 1rem; }
+    .foot-join .join .join-btn { flex: none; grid-column: auto; width: auto; min-height: 2.75rem; padding: 0.5rem 1.1rem; font-size: 1rem; }
+}
+
+/* narrower than a laptop the padlock and keys sit above and below the words, so the section needs the room
+   (this comes after section 45 on purpose: same weight, later wins) */
+@media (max-width: 64rem) {
+    .band.band-privacy { padding-block: calc(var(--band-pad) + 1rem) calc(var(--band-pad) + 3.5rem); }
+}
+/* tablets: the section is shorter than on a phone (the words take fewer lines), so the four pictures sit a little
+   nearer the words, and stay inside the section */
+@media (min-width: 40rem) and (max-width: 64rem) {
+    .pv-lock-a { --oy: -8.5rem; }
+    .pv-key-a { --oy: 8.5rem; }
+    .pv-lock-b { --oy: -8.5rem; }
+    .pv-key-b { --oy: 8.5rem; }
+}

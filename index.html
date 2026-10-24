@@ -77,7 +77,7 @@
     <script src="assets/js/auth-callback.js"></script>
 
     <link rel="stylesheet" href="styles/global.css">
-    <link rel="stylesheet" href="styles/pages/landing.css">
+    <link rel="stylesheet" href="styles/pages/landing.css?v=20261025b">
 
     <!-- defer, on this and the three scripts at the end of <body>.
 
@@ -248,57 +248,34 @@
                  right side's controls have, so the centred links sit between
                  two things of similar mass instead of between a word and a
                  cluster. -->
-            <!-- THE LOGO. One file for every header: assets/images/logo.svg.
+            <!-- THE LOGO. The landing page uses small WebP copies of assets/images/logo.svg (logo-320, logo-640: 13 and 31 KB instead of 162 KB); other pages still use the SVG.
                  Replace it to rebrand; CSS caps it at --logo-h (global.css)
                  and keeps its aspect ratio, so any size or shape fits.
                  width/height only reserve its box before it loads. -->
             <a class="tap nav-mark brand-link" href="#top">
-                <img class="site-logo" src="assets/images/logo.svg" alt="PIA — Personal Instructing Agent, back to top"
-                    width="48" height="48">
+                <img class="site-logo" src="assets/images/logo-320.webp" alt="PIA — Personal Instructing Agent, back to top"
+                    width="96" height="48">
             </a>
 
             <nav class="nav-menu" id="nav-menu" aria-label="Page sections">
                 <ul class="nav-links">
-                    <li><a class="nav-link" href="#lesson">Lessons</a></li>
+                    <li><a class="nav-link" href="#how">How it works</a></li>
                     <li><a class="nav-link" href="#agent-select">Tutors</a></li>
                     <li><a class="nav-link" href="#why-pia">Why PIA</a></li>
-                    <li><a class="nav-link" href="#get-started">Get started</a></li>
+                    <li><a class="nav-link" href="#privacy">Privacy</a></li>
                 </ul>
-
-                <!-- Sheet-only. Never shown in the desktop bar, where the
-                     sign-in dialog already carries the staff entry points. -->
-                <div class="nav-menu-extra">
-                    <!-- Both account actions stay discoverable in the mobile menu. -->
-                    <div class="nav-menu-group nav-menu-student">
-                        <button type="button" class="tap btn-pop" data-auth-open="signin">Enter student number</button>
-                    </div>
-
-                    <!-- One staff door for teachers and admins alike, as the
-                         same quiet text link the sign-in dialog uses. -->
-                    <p class="nav-menu-note">
-                        Teacher or admin?
-                        <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
-                    </p>
-
-                    <!-- Only below 30rem, where the bar drops its own toggle.
-                         A real toggle button: the visible text IS the name,
-                         and aria-pressed carries the state. -->
-                    <div class="nav-menu-group nav-menu-theme">
-                        <button type="button" class="tap nav-theme-row" data-theme-toggle aria-pressed="false">
-                            <span class="nav-theme-text">Dark mode</span>
-                            <span class="nav-theme-switch" aria-hidden="true"><span></span></span>
-                        </button>
-                    </div>
-                </div>
             </nav>
 
             <div class="nav-actions">
-                <!-- .nav-auth: hidden while the hero's own Sign in / Activate
-                     buttons are on screen beside the headline, back once they
-                     scroll away (nav.js). data-resume-label: auth.js swaps this
+                <!-- Join (.nav-auth): hidden while the hero's own student-number
+                     field is on screen, back once it scrolls away (nav.js), so the
+                     student's way in is never more than one tap away. Teacher / Admin
+                     is the quiet outline beside it. On a phone the two share one slot:
+                     Teacher / Admin at the top, Join once the hero has scrolled away. data-resume-label: auth.js swaps this
                      label for a returning session, and "Continue to dashboard"
                      does not fit a phone bar. -->
-                <button type="button" class="tap btn-pop nav-signin nav-auth" data-auth-open="staff">Sign in as teacher/admin</button>
+                <button type="button" class="tap btn-pop nav-join nav-auth" data-auth-open="signin" data-resume-label="Continue">Join</button>
+                <button type="button" class="tap btn-pop nav-signin" data-auth-open="staff">Teacher / Admin</button>
                 <!-- Last before the hamburger: while the two buttons above are
                      standing down (they keep their space), the toggle holds the
                      far edge instead of floating beside an empty gap. -->
@@ -374,8 +351,8 @@
                                     <svg class="join-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
                                     <input class="join-in" id="join-num" type="text" inputmode="numeric"
                                         autocomplete="off" spellcheck="false" maxlength="14"
-                                        placeholder="Enter your student number">
-                                    <button type="submit" class="join-btn">Join <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+                                        placeholder="Student number">
+                                    <button type="submit" class="join-btn">Join</button>
                                 </form>
                                 <button type="button" class="tap cta cta-primary hero-resume" data-auth-open="signin">
                                     <span class="cta-label">Enter student number</span>
@@ -401,15 +378,41 @@
              session's hints walk through. An ordered list, so a screen reader
              hears four numbered steps; each bubble says who is talking. The
              arrow is hidden from screen readers and spoken as "to". -->
+
+        <!-- HOW IT WORKS. A 50-second tour (assets/video/pia-how-to-use.mp4, with its captions burned in).
+             Click to play, never autoplay. The video is a walkthrough made from redrawn screens; swap the
+             file for a real screen recording later without touching this markup. -->
+        <section class="band band-video" id="how" aria-labelledby="how-title">
+            <div class="shell">
+                <header class="band-head">
+                    <h2 class="band-title" id="how-title" data-reveal>See how <em class="help-mark">PIA works</em></h2>
+                    <p class="band-lede" data-reveal>A quick tour, from typing your number to your first answer.</p>
+                </header>
+                <div class="video-frame" data-reveal>
+                    <video id="how-video" controls preload="none" playsinline width="1280" height="720"
+                        poster="assets/video/pia-how-to-use-poster.webp">
+                        <source src="assets/video/pia-how-to-use.mp4" type="video/mp4">
+                        Your browser cannot play this video.
+                    </video>
+                    <button type="button" class="video-play" id="how-play" aria-label="Play the video"></button>
+                </div>
+                <ol class="how-steps">
+                    <li data-reveal><span class="how-num" aria-hidden="true">1</span>Type your number</li>
+                    <li data-reveal><span class="how-num" aria-hidden="true">2</span>Solve one step at a time</li>
+                    <li data-reveal><span class="how-num" aria-hidden="true">3</span>Ask for a hint if you&rsquo;re stuck</li>
+                </ol>
+            </div>
+        </section>
+
         <section class="band band-strip" id="lesson" aria-labelledby="strip-title">
             <div class="shell">
                 <header class="band-head">
                     
                     <h2 class="band-title" id="strip-title" data-reveal>
-                        Big problem? <em class="help-mark">Cut it into panels!</em>
+                        Got a big problem? <em class="help-mark">Cut it into panels!</em>
                     </h2>
                     <p class="band-lede" data-reveal>
-                        A &#8369;100 bag now costs &#8369;120. By what percent did the price jump?
+                        Here is one the tutors solve with you. A &#8369;100 bag now costs &#8369;120. By what percent did the price jump?
                     </p>
                 </header>
 
@@ -452,8 +455,8 @@
                 <!-- A tutor beside the panels. Animated, so people who ask for less motion
                      get the still picture instead. Decorative. -->
                 <picture class="lesson-mate" aria-hidden="true" data-reveal>
-                    <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Openness/happy.webp">
-                    <img src="assets/images/personas/Openness/happy-animated.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
+                    <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Extraverted/happy.webp">
+                    <img src="assets/images/personas/Extraverted/happy-animated.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
                 </picture>
             </div>
         </section>
@@ -484,12 +487,12 @@
                         <header class="select-head">
                             <p class="mono-tag" data-reveal>Pick your sidekick</p>
                             <h2 class="select-title" id="select-title" data-reveal>Who is your sidekick?</h2>
-                            <p class="select-lede" data-reveal>Tap a tutor to hear how they teach, then tap them in the scene to see them react! This does not pick anyone yet. Your teacher will tell you if you get to choose.</p>
+                            <p class="select-lede" data-reveal>Meet the tutors who help you. Tap one to hear how they teach, then tap them in the scene to see them react! This does not pick anyone yet. Your teacher will tell you if you get to choose.</p>
                         </header>
 
                         <div class="select-layout">
                             <div class="roster" role="tablist" aria-label="Tutors" data-reveal>
-                                <button type="button" class="roster-item" role="tab" id="tab-pia-open"
+                                <button type="button" class="roster-item" role="tab" id="tab-pia-open" title="Ava"
                                     aria-controls="panel-pia-open" aria-selected="true" tabindex="0"
                                     data-agent="pia-open">
                                     <span class="roster-icon" aria-hidden="true"><img
@@ -500,7 +503,7 @@
                                         <span class="roster-strength">Finds the why</span>
                                     </span>
                                 </button>
-                                <button type="button" class="roster-item" role="tab" id="tab-pia-conscientious"
+                                <button type="button" class="roster-item" role="tab" id="tab-pia-conscientious" title="Cara"
                                     aria-controls="panel-pia-conscientious" aria-selected="false" tabindex="-1"
                                     data-agent="pia-conscientious">
                                     <span class="roster-icon" aria-hidden="true"><img
@@ -511,7 +514,7 @@
                                         <span class="roster-strength">Every detail</span>
                                     </span>
                                 </button>
-                                <button type="button" class="roster-item" role="tab" id="tab-pia-extravert"
+                                <button type="button" class="roster-item" role="tab" id="tab-pia-extravert" title="Theo"
                                     aria-controls="panel-pia-extravert" aria-selected="false" tabindex="-1"
                                     data-agent="pia-extravert">
                                     <span class="roster-icon" aria-hidden="true"><img
@@ -522,7 +525,7 @@
                                         <span class="roster-strength">High energy</span>
                                     </span>
                                 </button>
-                                <button type="button" class="roster-item" role="tab" id="tab-pia-agreeable"
+                                <button type="button" class="roster-item" role="tab" id="tab-pia-agreeable" title="Amy"
                                     aria-controls="panel-pia-agreeable" aria-selected="false" tabindex="-1"
                                     data-agent="pia-agreeable">
                                     <span class="roster-icon" aria-hidden="true"><img
@@ -533,7 +536,7 @@
                                         <span class="roster-strength">Endless patience</span>
                                     </span>
                                 </button>
-                                <button type="button" class="roster-item" role="tab" id="tab-pia-calm"
+                                <button type="button" class="roster-item" role="tab" id="tab-pia-calm" title="Kai"
                                     aria-controls="panel-pia-calm" aria-selected="false" tabindex="-1"
                                     data-agent="pia-calm">
                                     <span class="roster-icon" aria-hidden="true"><img
@@ -544,7 +547,7 @@
                                         <span class="roster-strength">Checks every step</span>
                                     </span>
                                 </button>
-                                <button type="button" class="roster-item" role="tab" id="tab-pia-neutral"
+                                <button type="button" class="roster-item" role="tab" id="tab-pia-neutral" title="Noel"
                                     aria-controls="panel-pia-neutral" aria-selected="false" tabindex="-1"
                                     data-agent="pia-neutral">
                                     <span class="roster-icon" aria-hidden="true"><img
@@ -558,11 +561,14 @@
                             </div>
 
                             <div class="select-board" data-reveal>
+                                <!-- One shared classroom behind every tutor: the board, the shelf and a round floor, in a dark
+                                     and a light version (the theme shows one). Decorative; it does not change when the tutor does. -->
+                                <img class="pk-backdrop pk-backdrop-dark" src="assets/images/classroom-backdrop-3d-pia-dark.webp" alt="" width="1000" height="1000" loading="lazy" decoding="async" aria-hidden="true">
+                                <img class="pk-backdrop pk-backdrop-light" src="assets/images/classroom-backdrop-3d-pia-light.webp" alt="" width="1000" height="1000" loading="lazy" decoding="async" aria-hidden="true">
                                 <div class="stage">
                                     <div class="stage-figure" data-figure="pia-open"
                                         data-lines="Hi, I’m Ava! I like to ask “why” before we do the “how”.|Stuck on a rule? Let’s find out where it came from!|Great thinking! Shall we explore the next one together?"
                                         data-poses="assets/images/personas/Openness/default.webp assets/images/personas/Openness/happy.webp assets/images/personas/Openness/excited.webp">
-                                        <div class="pk-scene pk-beach" aria-hidden="true"><i class="pk-sky"></i><svg class="pk-art" style="left:2%;bottom:34%;width:38%" viewBox="0 0 120 200" aria-hidden="true"><path d="M62 196 C58 150 66 110 60 60" stroke="#8a5a2b" stroke-width="12" fill="none" stroke-linecap="round"/><g fill="#3fa066"><path d="M60 60 C20 40 6 60 4 78 C28 60 44 62 60 60Z"/><path d="M60 60 C100 38 116 58 118 76 C94 60 78 62 60 60Z"/><path d="M60 60 C46 22 70 6 84 14 C74 30 66 42 60 60Z"/><path d="M60 60 C70 28 40 14 30 24 C44 34 54 46 60 60Z"/></g></svg><i class="pk-cloud" style="right:4%;top:12%;width:22%;height:6%"></i><i class="pk-ground"></i></div>
                                         <div class="model-canvas-wrapper has-art" data-model="pia-open" role="img"
                                             aria-label="Ava, the Explorer, character art">
                                             <picture class="stage-art">
@@ -576,7 +582,6 @@
                                         data-lines="Hi, I’m Cara! I check every step, so nothing gets missed.|Same order, every time. Let’s go through it together!"
                                         data-poses="assets/images/personas/Conscientiousness/happy.webp assets/images/personas/Conscientiousness/excited.webp"
                                         hidden>
-                                        <div class="pk-scene pk-library" aria-hidden="true"><i class="pk-sky"></i><svg class="pk-art" style="left:0;bottom:33%;width:46%" viewBox="0 0 200 150" aria-hidden="true"><rect x="6" y="10" width="188" height="130" rx="8" fill="#7a4f2c"/><g><rect x="14" y="18" width="14" height="52" fill="#3d8bff"/><rect x="30" y="26" width="12" height="44" fill="#ffd83d"/><rect x="44" y="16" width="16" height="54" fill="#ff8fb8"/><rect x="62" y="24" width="12" height="46" fill="#7fe0b0"/><rect x="76" y="18" width="14" height="52" fill="#fff8e7"/><rect x="104" y="20" width="14" height="50" fill="#ffd83d"/><rect x="120" y="14" width="16" height="56" fill="#3d8bff"/><rect x="138" y="24" width="12" height="46" fill="#ff8fb8"/><rect x="152" y="18" width="14" height="52" fill="#7fe0b0"/></g><rect x="14" y="76" width="172" height="6" fill="#5a3a1c"/><g><rect x="16" y="88" width="16" height="46" fill="#7fe0b0"/><rect x="34" y="94" width="14" height="40" fill="#ffd83d"/><rect x="50" y="86" width="16" height="48" fill="#3d8bff"/><rect x="108" y="90" width="14" height="44" fill="#ff8fb8"/><rect x="124" y="86" width="16" height="48" fill="#fff8e7"/></g></svg><svg class="pk-art" style="right:4%;bottom:34%;width:16%" viewBox="0 0 70 110" aria-hidden="true"><path d="M35 8 C16 8 8 30 22 46 C26 54 26 60 26 66 L44 66 C44 60 44 54 48 46 C62 30 54 8 35 8Z" fill="#ffd83d"/><rect x="26" y="68" width="18" height="8" fill="#9aa1b0"/><rect x="28" y="78" width="14" height="6" fill="#9aa1b0"/><rect x="33" y="84" width="4" height="22" fill="#5a3a1c"/></svg><i class="pk-ground"></i></div>
                                         <div class="model-canvas-wrapper has-art" data-model="pia-conscientious"
                                             role="img" aria-label="Cara, the Detective, character art">
                                             <picture class="stage-art">
@@ -590,7 +595,6 @@
                                         data-lines="Hey, I’m Theo! Let’s make maths quick and fun!|Short questions, fast turns. You’ve got this!|Woohoo! Ready for the next one?"
                                         data-poses="assets/images/personas/Extraverted/default.webp assets/images/personas/Extraverted/happy.webp assets/images/personas/Extraverted/excited.webp"
                                         hidden>
-                                        <div class="pk-scene pk-field" aria-hidden="true"><i class="pk-sky"></i><svg class="pk-art" style="left:2%;bottom:34%;width:34%" viewBox="0 0 120 190" aria-hidden="true"><rect x="52" y="110" width="16" height="80" rx="6" fill="#8a5a2b"/><circle cx="60" cy="70" r="52" fill="#4caf50"/><circle cx="34" cy="90" r="30" fill="#5fc25f"/><circle cx="88" cy="86" r="30" fill="#5fc25f"/><circle cx="48" cy="56" r="8" fill="#ff6f6f"/><circle cx="76" cy="76" r="8" fill="#ff6f6f"/></svg><svg class="pk-art" style="right:4%;bottom:38%;width:24%" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="26" fill="#ffd83d"/><g stroke="#ffd83d" stroke-width="6" stroke-linecap="round"><path d="M60 8v16M60 96v16M8 60h16M96 60h16M24 24l11 11M85 85l11 11M96 24L85 35M35 85L24 96"/></g></svg><i class="pk-ground"></i></div>
                                         <div class="model-canvas-wrapper has-art" data-model="pia-extravert" role="img"
                                             aria-label="Theo, the Spark, character art">
                                             <picture class="stage-art">
@@ -604,7 +608,6 @@
                                         data-lines="Hi, I’m Amy! I’ll ask how it’s going, and I really mean it.|Take your time. I’m right here with you.|You did it! Let’s keep going together!"
                                         data-poses="assets/images/personas/Agreeableness/default.webp assets/images/personas/Agreeableness/happy.webp assets/images/personas/Agreeableness/excited.webp"
                                         hidden>
-                                        <div class="pk-scene pk-garden" aria-hidden="true"><i class="pk-sky"></i><svg class="pk-art" style="left:0;bottom:32%;width:54%" viewBox="0 0 220 100" aria-hidden="true"><ellipse cx="110" cy="62" rx="100" ry="30" fill="#5aaee8"/><ellipse cx="110" cy="56" rx="80" ry="20" fill="#8fd0ff"/><ellipse cx="80" cy="54" rx="14" ry="6" fill="#4caf50"/><circle cx="82" cy="50" r="6" fill="#ff8fb8"/><ellipse cx="140" cy="58" rx="12" ry="5" fill="#4caf50"/></svg><svg class="pk-art" style="right:3%;bottom:36%;width:28%" viewBox="0 0 120 130" aria-hidden="true"><g stroke="#3d8a4a" stroke-width="4" fill="none" stroke-linecap="round"><path d="M30 126 C30 90 30 70 30 50"/><path d="M60 126 C60 80 60 60 60 34"/><path d="M90 126 C90 96 90 76 90 56"/></g><circle cx="30" cy="44" r="14" fill="#ff8fb8"/><circle cx="60" cy="28" r="14" fill="#ffd83d"/><circle cx="90" cy="50" r="14" fill="#fff8e7"/></svg><i class="pk-ground"></i></div>
                                         <div class="model-canvas-wrapper has-art" data-model="pia-agreeable" role="img"
                                             aria-label="Amy, the Ally, character art">
                                             <picture class="stage-art">
@@ -618,7 +621,6 @@
                                         data-lines="Hi, I’m Kai! Let’s check each step together.|Slow and steady. Let’s make sure it’s right!"
                                         data-poses="assets/images/personas/Neuroticism/happy.webp assets/images/personas/Neuroticism/excited.webp"
                                         hidden>
-                                        <div class="pk-scene pk-night" aria-hidden="true"><i class="pk-sky"></i><svg class="pk-art" style="left:3%;top:6%;width:90%" viewBox="0 0 300 120" aria-hidden="true"><g fill="#fff8e7"><circle cx="30" cy="30" r="3"/><circle cx="90" cy="60" r="2"/><circle cx="150" cy="22" r="3"/><circle cx="210" cy="64" r="2"/><circle cx="262" cy="30" r="3"/><circle cx="60" cy="96" r="2"/><circle cx="240" cy="100" r="2"/></g><path d="M262 18 a22 22 0 1 0 18 34 a18 18 0 1 1 -18 -34Z" fill="#fff3c4"/></svg><svg class="pk-art" style="right:4%;bottom:34%;width:26%" viewBox="0 0 100 160" aria-hidden="true"><path d="M50 8 L90 110 H10Z" fill="#2f6f7a"/><path d="M50 40 L84 130 H16Z" fill="#3b8895"/><rect x="44" y="130" width="12" height="28" fill="#5a3a1c"/></svg><i class="pk-ground"></i></div>
                                         <div class="model-canvas-wrapper has-art" data-model="pia-calm" role="img"
                                             aria-label="Kai, the Cautious, character art">
                                             <picture class="stage-art">
@@ -632,7 +634,6 @@
                                         data-lines="Hello, I’m Noel. Clear, straightforward guidance.|Here’s the next step. Ready when you are."
                                         data-poses="assets/images/personas/Neutral/default.webp assets/images/personas/Neutral/approval.webp"
                                         hidden>
-                                        <div class="pk-scene pk-stone" aria-hidden="true"><i class="pk-sky"></i><i class="pk-cloud" style="left:3%;top:16%;width:30%;height:8%"></i><i class="pk-cloud" style="right:4%;top:8%;width:24%;height:7%"></i><svg class="pk-art" style="right:3%;bottom:34%;width:28%" viewBox="0 0 120 100" aria-hidden="true"><path d="M8 96 L36 30 L58 64 L78 20 L112 96Z" fill="#8f98ab"/><path d="M36 30 L46 48 L26 48Z M78 20 L90 44 L66 44Z" fill="#fff"/></svg><svg class="pk-art" style="left:6%;bottom:35%;width:18%" viewBox="0 0 80 60" aria-hidden="true"><ellipse cx="40" cy="38" rx="34" ry="18" fill="#a2a9b8"/><ellipse cx="30" cy="30" rx="18" ry="12" fill="#b6bccb"/></svg><i class="pk-ground"></i></div>
                                         <div class="model-canvas-wrapper has-art" data-model="pia-neutral" role="img"
                                             aria-label="Noel, the Neutral tutor, character art">
                                             <picture class="stage-art">
@@ -783,18 +784,24 @@
             </div><!-- /.reel-flow -->
         </div><!-- /.reel -->
 
-
         <!-- ================================ 4. HOW PIA HELPS ================ -->
         <!-- One short band: three tilted cards with a coloured number. It replaces the
              old theory band and the six-card capabilities band. -->
         <section class="band band-help" id="why-pia" aria-labelledby="help-title">
-            <div class="breath" aria-hidden="true"></div>
             <div class="shell">
                 <header class="help-head">
                     
                     <h2 class="band-title" id="help-title" data-reveal>You&rsquo;ve got <em class="help-mark">backup!</em></h2>
-                    <p class="band-lede" data-reveal>Three ways PIA has your back.</p>
+                    <p class="band-lede" data-reveal>And when you get stuck, here are three ways PIA has your back.</p>
                 </header>
+
+                <!-- All six tutors, standing on the cards. Decorative: the headline carries the message. -->
+                <picture class="help-crew" aria-hidden="true" data-reveal>
+                    <img src="assets/images/pia-six-characters-1400.webp"
+                         srcset="assets/images/pia-six-characters-800.webp 800w, assets/images/pia-six-characters-1400.webp 1400w"
+                         sizes="(min-width: 72rem) 63rem, 100vw"
+                         alt="" width="1400" height="694" loading="lazy" decoding="async">
+                </picture>
 
                 <ol class="help-list">
                     <li class="help-card" data-reveal>
@@ -811,26 +818,46 @@
                     </li>
                 </ol>
             </div>
-            <!-- Two tutors cheering from the edges (wide screens only). Animated WebP; the still
-                 picture for people who ask for less motion. Decorative. -->
-            <picture class="help-mate help-mate-l" aria-hidden="true" data-reveal>
-                <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Extraverted/happy.webp">
-                <img src="assets/images/personas/Extraverted/happy-animated.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
-            </picture>
-            <picture class="help-mate help-mate-r" aria-hidden="true" data-reveal>
-                <source media="(prefers-reduced-motion: reduce)" srcset="assets/images/personas/Neuroticism/happy.webp">
-                <img src="assets/images/personas/Neuroticism/happy-animated.webp" alt="" width="384" height="512" loading="lazy" decoding="async">
-            </picture>
+        </section>
+
+        <!-- PRIVACY. Kept short on purpose. The padlock and the key are decorative pictures scattered
+             around the text (assets/images/privacy-lock.webp and privacy-key.webp, square, transparent,
+             600 x 600 px). They burst outward from the middle as the section scrolls in, and back in as it scrolls out; replace those two files and nothing else needs to change.
+             DRAFT WORDING: check it against the consent form and what the system really stores
+             before the real run. -->
+        <section class="band band-privacy" id="privacy" aria-labelledby="privacy-title">
+            <img class="pv-deco pv-lock-a" src="assets/images/privacy-lock.webp" alt="" width="600" height="600" loading="lazy" decoding="async" aria-hidden="true">
+            <img class="pv-deco pv-key-a" src="assets/images/privacy-key.webp" alt="" width="600" height="600" loading="lazy" decoding="async" aria-hidden="true">
+            <img class="pv-deco pv-lock-b" src="assets/images/privacy-lock.webp" alt="" width="600" height="600" loading="lazy" decoding="async" aria-hidden="true">
+            <img class="pv-deco pv-key-b" src="assets/images/privacy-key.webp" alt="" width="600" height="600" loading="lazy" decoding="async" aria-hidden="true">
+            <div class="shell privacy-simple" data-reveal>
+                <h2 class="band-title" id="privacy-title">Your privacy</h2>
+                <p class="privacy-line">PIA keeps your <b>name, student number and answers</b>. Only your teacher and the research team can see them.</p>
+                <p class="privacy-sub">It is used to help your tutor teach you, and for a school research project. No ads, and nothing is sold.</p>
+            </div>
+        </section>
+
+        <!-- WELCOME. "Welcome to" is typed out when the section scrolls into view, then the PIA logo fades in
+             on the second line (landing.js initWelcomeType). Without script, or with reduced motion, both
+             simply show. The heading reads "Welcome to PIA" to screen readers; the typed text is hidden. -->
+        <section class="band band-welcome" id="welcome" aria-labelledby="welcome-title">
+            <div class="shell">
+                <h2 class="welcome-line" id="welcome-title">
+                    <span class="sr-only">Welcome to PIA</span>
+                    <span class="welcome-text" data-type="Welcome to" aria-hidden="true">Welcome to</span>
+                    <img class="welcome-logo" src="assets/images/logo-640.webp" alt="" width="640" height="320" loading="lazy" decoding="async" aria-hidden="true">
+                </h2>
+            </div>
         </section>
     </main>
 
     <footer class="foot" id="get-started" aria-labelledby="cta-title">
-            <div class="breath" aria-hidden="true"></div>
         <div class="shell">
+            <div class="foot-up"><button type="button" class="to-top" data-scroll-top>Back to top</button></div>
             <!-- The last stop: the logo on the left, the same student-number field on the right.
                  Signed in, the form gives way to the Continue button (html[data-session]). -->
             <div class="foot-card">
-                <img class="foot-logo" src="assets/images/logo.svg" alt="PIA">
+                <img class="foot-logo" src="assets/images/logo-640.webp" alt="PIA" width="640" height="320" loading="lazy" decoding="async">
                 <div class="foot-join">
                     <h2 class="foot-title" id="cta-title">Ready? Let&rsquo;s go!</h2>
                     <form class="join" id="foot-join" novalidate>
@@ -838,8 +865,8 @@
                         <svg class="join-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
                         <input class="join-in" id="foot-num" type="text" inputmode="numeric"
                             autocomplete="off" spellcheck="false" maxlength="14"
-                            placeholder="Enter your student number">
-                        <button type="submit" class="join-btn">Join <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+                            placeholder="Student number">
+                        <button type="submit" class="join-btn">Join</button>
                     </form>
                     <button type="button" class="tap cta cta-primary hero-resume" data-auth-open="signin">
                         <span class="cta-label">Enter student number</span>
@@ -847,22 +874,25 @@
                     <p class="foot-hint signed-out-copy">Number not working? Tell your teacher.</p>
                 </div>
 
-                <div class="foot-lines">
+                <!-- One compact row: the two school logos, the developers' contact, and the staff link
+                     with the copyright line. The privacy note has its own section above the footer. -->
+                <div class="foot-cols">
                     <ul class="foot-logos" aria-label="Made at">
                         <li><img src="assets/images/UE-logo.webp" alt="University of the East" width="709" height="709" loading="lazy" decoding="async"></li>
                         <li><img src="assets/images/ccss.png" alt="College of Computer Studies and Systems" width="1171" height="1171" loading="lazy" decoding="async"></li>
                     </ul>
-                    <div class="foot-contact">
-                        <h3 class="foot-contact-title">Get in touch with the Developers!</h3>
+                    <section class="foot-col foot-contact" aria-labelledby="foot-contact-h">
+                        <h3 class="foot-h" id="foot-contact-h">Contact the developers</h3>
                         <a class="foot-mail" href="mailto:personalinstructingagent@gmail.com">
                             <svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>
-                            personalinstructingagent@gmail.com
+                            <span>personalinstructingagent<wbr>@gmail.com</span>
                         </a>
+                        <p class="foot-sub">Questions about your data? Ask your teacher or write to us.</p>
+                    </section>
+                    <div class="foot-meta">
+                        <p class="foot-staff"><button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button></p>
+                        <p class="foot-copy">&copy; 2026 PIA &middot; University of the East, CCSS</p>
                     </div>
-                    <p class="foot-line foot-staff">
-                        <span class="foot-staff-label">Staff</span>
-                        <button type="button" class="link-btn" data-auth-open="staff">Teacher / Admin sign in</button>
-                    </p>
                 </div>
             </div>
         </div>
@@ -1033,7 +1063,6 @@
             </header>
             <div class="modal-body">
                 <p class="portal-note" id="join-error-text" role="status"></p>
-                <button type="button" class="btn btn-primary portal-submit" data-modal-close data-autofocus>Try again</button>
             </div>
         </div>
     </div>
@@ -1195,20 +1224,20 @@
     <div class="toast-stack" id="toast-stack" role="status" aria-live="polite"></div>
 
     <script defer src="assets/js/function.js"></script>
-    <script defer src="assets/js/auth.js?v=20261022c"></script>
-    <script defer src="assets/js/landing.js?v=20261023b"></script>
+    <script defer src="assets/js/auth.js?v=20261024b"></script>
+    <script defer src="assets/js/landing.js?v=20261024e"></script>
 
     <!-- The navbar: transparent-to-solid state, the mobile sheet and the
          scrollspy. Separate on the same rule as agent-select.js below — it
          owns the header and nothing else owns it. After auth.js on purpose:
          its sheet-closing click listener runs in the capture phase, so it
          wins regardless, but the order documents the dependency. -->
-    <script defer src="assets/js/nav.js?v=20261022a"></script>
+    <script defer src="assets/js/nav.js?v=20261024c"></script>
 
     <!-- Act 2's character-select rail. Separate from landing.js on the same
          rule everything else here follows: it owns the roster and nothing
          owns it. Removing it leaves a static, fully readable roster. -->
-    <script defer src="assets/js/agent-select.js"></script>
+    <script defer src="assets/js/agent-select.js?v=20261024a"></script>
 
     <!-- 3D agent models. Independent of everything above: it mounts a viewer
          into the .model-canvas-wrapper slots and touches nothing else. The
