@@ -258,6 +258,7 @@
         totalStudents: 0,
         page: 1,
         filters: { section: '', group: 'all', stage: null, search: '' },
+        allSections: false,  // the "All sections" box beside the search
         activeStudent: null,
         resetEmail: null,    // the student the Reset password dialog is acting on
         activeSection: null,
@@ -1019,7 +1020,7 @@
            gets rows back from it. Just the email column: the scores
            themselves are fetched by the participant profile. */
         function readProfiles(columns) {
-            return sb.from('profiles').select(columns).neq('role', 'admin').limit(2000);
+            return sb.from('profiles').select(columns).not('role', 'in', STAFF_ROLES).limit(2000);
         }
 
         var both = await Promise.all([
@@ -1103,10 +1104,18 @@
         renderSections();
     }
 
+    /* The Students table, its counts and the cohort figures are about STUDENTS: a professor has
+       a profile row too (with a section) but has their own card above the table. */
+    var STAFF_ROLES = '("admin","teacher")';
+
+    /* "All sections" box beside the search: the table, tab counts and search ignore the chosen
+       section. The section stays chosen in the top bar; ticking the box only widens the view. */
+    function allSectionsOn() { return !!state.allSections; }
+
     /* Group and stage filters shared by the roster query and the tab counts,
        so a count always describes the same rows the tab would show. */
     function applyGroupFilter(query) {
-        if (state.filters.section) { query = query.eq('section', state.filters.section); }
+        if (state.filters.section && !allSectionsOn()) { query = query.eq('section', state.filters.section); }
         var g = state.filters.group;
         if (g === 'experimental') { return query.in('group_type', ['assigned', 'non-assigned', 'neutral']); }
         if (g === 'assigned' || g === 'non-assigned' || g === 'neutral' || g === 'control') {
@@ -1135,7 +1144,7 @@
         state.loading.roster = true;
         $('#pager-info').textContent = 'Loading…';
 
-        var query = sb.from('profiles').select('*', { count: 'exact' }).neq('role', 'admin');
+        var query = sb.from('profiles').select('*', { count: 'exact' }).not('role', 'in', STAFF_ROLES);
 
         var term = sanitizeFilterTerm(state.filters.search).toLowerCase();
         if (term) {
@@ -1190,7 +1199,7 @@
     async function loadStageCounters() {
         var ticket = ++counterTicket;
         var base = function (stage) {
-            var q = sb.from('profiles').select('email', { count: 'exact', head: true }).neq('role', 'admin');
+            var q = sb.from('profiles').select('email', { count: 'exact', head: true }).not('role', 'in', STAFF_ROLES);
             return applyStageFilter(applyGroupFilter(q), stage === 'all' ? null : stage);
         };
 
@@ -1694,7 +1703,7 @@
     function renderScope() {
         var line = $('#scope-line');
         if (!line) { return; }
-        var section = state.filters.section;
+        var section = allSectionsOn() ? '' : state.filters.section;
         var scores = $('#section-scores-open');
         if (scores) { scores.classList.toggle('is-hidden', !section); }
         var search = $('#student-search');
@@ -2052,6 +2061,20 @@
             state.page = 1;
             loadRoster();
         }, 300));
+
+        var allBox = $('#all-sections');
+        if (allBox) {
+            allBox.addEventListener('change', function () {
+                state.allSections = allBox.checked;
+                window.PIAAllSections = allBox.checked;
+                document.documentElement.classList.toggle('pia-all-sections', allBox.checked);
+                state.page = 1;
+                renderScope();
+                loadRoster();
+                loadStageCounters();
+                if (window.PIACheckin && window.PIACheckin.refresh) { window.PIACheckin.refresh(); }
+            });
+        }
 
         $('#group-filter').addEventListener('change', function (event) {
             state.filters.group = event.target.value;
@@ -5366,7 +5389,7 @@
     async function searchStudentsRemote(term, signal) {
         var t = sanitizeFilterTerm(term).toLowerCase();
         if (!t) { return []; }
-        var query = sb.from('profiles').select('full_name, email, section').neq('role', 'admin')
+        var query = sb.from('profiles').select('full_name, email, section').not('role', 'in', STAFF_ROLES)
             .or('full_name.ilike.%' + t + '%,email.ilike.%' + t + '%')
             .order('full_name', { ascending: true }).limit(6);
         if (signal && typeof query.abortSignal === 'function') { query = query.abortSignal(signal); }

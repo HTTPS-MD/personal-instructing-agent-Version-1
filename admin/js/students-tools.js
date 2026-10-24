@@ -62,6 +62,10 @@
         var select = $('#section-filter');
         return select ? select.value : '';
     }
+    /* The section the Students page is scoped to right now: none while "All sections" is ticked
+       (then the table lists every section, and attendance, the professor card and the stage
+       switches, which are about ONE class, step aside). */
+    function scoped() { return window.PIAAllSections ? '' : chosen(); }
     /* Other pages read the chosen section from here (Live Sessions, Stage Controls). */
     Object.defineProperty(window, 'PIASectionNow', { get: function () { return chosen(); }, configurable: true });
 
@@ -247,14 +251,71 @@
         anchor.parentNode.appendChild(menu);
     }
 
+    /* ---- the professor's card ---------------------------------------------------
+       Under the title: who the professor of the chosen section is, and their OCEAN result (read
+       from ocean_submissions, which only an admin can read). The name and email are blurred
+       while "Show details" is off, like the students'. The scores are five raw numbers 0-40 as
+       stored; the BFPT sheet scores N the opposite way round to its name (a LOW stored N means
+       MORE stress), which the note under them says. One professor per section; a professor can
+       hold several sections. */
+    var oceanOf = {};             /* email -> { at, busy, done, row } */
+    var TRAITS = [['E', 'ocean_e', 'Extraversion'], ['A', 'ocean_a', 'Agreeableness'], ['C', 'ocean_c', 'Conscientiousness'],
+                  ['N', 'ocean_n', 'Neuroticism'], ['O', 'ocean_o', 'Openness']];
+
+    function loadOcean(email) {
+        var slot = oceanOf[email] || (oceanOf[email] = { at: 0, busy: false, done: null, row: null, known: false });
+        if (slot.busy || Date.now() - slot.at < 15000) { return; }
+        slot.busy = true;
+        Promise.all([
+            sb.from('profiles').select('is_ocean_done').eq('email', email).maybeSingle(),
+            sb.from('ocean_submissions').select('ocean_e, ocean_a, ocean_c, ocean_n, ocean_o, submitted_at')
+                .eq('email', email).order('submitted_at', { ascending: false }).limit(1)
+        ]).then(function (r) {
+            slot.done = !!(r[0].data && r[0].data.is_ocean_done);
+            slot.row = (r[1].data && r[1].data[0]) || null;
+            slot.known = !r[0].error && !r[1].error;
+        }).catch(function () { /* keep what we had */ }).then(function () {
+            slot.busy = false; slot.at = Date.now();
+            var el = $('#prof-line'); if (el) { el._sig = ''; }
+            renderProfLine();
+        });
+    }
+
+    function initials(name) {
+        var w = String(name || '').trim().split(/\s+/).filter(Boolean);
+        return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase();
+    }
+
+    function oceanHtml(slot) {
+        if (!slot || !slot.known) { return '<p class="prof-card-note">Checking OCEAN…</p>'; }
+        if (slot.done && slot.row) {
+            var when = new Date(slot.row.submitted_at).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+            return '<p class="prof-card-status is-done">OCEAN done · ' + esc(when) + '</p><ul class="prof-ocean" aria-label="OCEAN scores, 0 to 40">' +
+                TRAITS.map(function (t) {
+                    var v = Number(slot.row[t[1]]);
+                    return '<li title="' + t[2] + '"><span class="prof-ocean-k">' + t[0] + '</span>' +
+                        '<span class="prof-ocean-bar"><i data-w="' + Math.max(0, Math.min(40, v)) + '"></i></span>' +
+                        '<span class="prof-ocean-v mono">' + (isFinite(v) ? v : '—') + '</span></li>';
+                }).join('') + '</ul><p class="prof-card-note">Raw scores, 0 to 40. A low N means more stress, because the sheet scores N the other way round.</p>';
+        }
+        if (slot.row && !slot.done) { return '<p class="prof-card-status">Retake pending · will answer again at the next sign-in</p>'; }
+        return '<p class="prof-card-status">OCEAN not taken yet · opens by itself at their next sign-in</p>';
+    }
+
+    function paintBars(host) {
+        Array.prototype.slice.call(host.querySelectorAll('.prof-ocean-bar i[data-w]')).forEach(function (bar) {
+            bar.style.width = (Number(bar.getAttribute('data-w')) / 40 * 100) + '%';
+        });
+    }
+
     function renderProfLine() {
         var scope = $('#view-students .scope-row');
         if (!scope) { return; }
         var el = $('#prof-line');
         if (!el) {
-            el = document.createElement('p');
+            el = document.createElement('div');
             el.id = 'prof-line';
-            el.className = 'scope-line';
+            el.className = 'prof-card-host';
             scope.parentNode.insertBefore(el, scope.nextSibling);
             el.addEventListener('click', function (event) {
                 var open = event.target.closest('[data-prof]');
@@ -291,17 +352,33 @@
             });
             document.addEventListener('click', function (event) { if (!el.contains(event.target)) { closeProfMenu(); } });
         }
-        var section = chosen();
+        var section = scoped();
         if (!section) { el.innerHTML = ''; el._sig = ''; return; }
         var list = profsOf(section);
-        /* The page refreshes every few seconds: leave the line (and an open menu) alone unless it changed. */
-        var sig = section + '|' + (list.length ? list[0].email + '|' + list[0].name : '');
+        var who = list.length ? String(list[0].email).toLowerCase() : '';
+        if (who) { loadOcean(who); }
+        var slot = who ? oceanOf[who] : null;
+        /* The page refreshes every few seconds: leave the card (and an open menu) alone unless it changed. */
+        var sig = section + '|' + (list.length ? list[0].email + '|' + list[0].name : '') + '|' +
+            (slot ? [slot.known, slot.done, slot.row && slot.row.submitted_at].join(',') : '');
         if (el._sig === sig) { return; }
         el._sig = sig;
         closeProfMenu();
-        el.innerHTML = list.length
-            ? 'Professor: <button type="button" class="cell-link" data-prof="' + esc(list[0].email) + '">' + esc(list[0].name || list[0].email) + '</button> · <button type="button" class="cell-link" data-prof-change>Change</button>'
-            : 'No professor yet · <button type="button" class="cell-link" data-prof-change>Assign professor</button>';
+        if (!list.length) {
+            el.innerHTML = '<div class="prof-card is-empty"><p class="prof-card-none">No professor yet for ' + esc(section) + '.</p>' +
+                '<button type="button" class="btn btn-secondary btn-sm" data-prof-change>Assign professor</button></div>';
+            return;
+        }
+        var f = list[0];
+        var name = f.name || f.email;
+        el.innerHTML = '<div class="prof-card"><div class="prof-card-head">' +
+            '<span class="prof-card-avatar" aria-hidden="true">' + esc(initials(name)) + '</span>' +
+            '<div class="prof-card-who"><span class="prof-card-role">Professor · ' + esc(section) + '</span>' +
+            '<button type="button" class="cell-link prof-card-name" data-prof="' + esc(f.email) + '"><span data-mask>' + esc(name) + '</span></button>' +
+            '<span class="prof-card-mail" data-mask>' + esc(f.email) + '</span></div>' +
+            '<button type="button" class="btn btn-secondary btn-sm" data-prof-change>Change</button></div>' +
+            '<div class="prof-card-ocean">' + oceanHtml(slot) + '</div></div>';
+        paintBars(el);
     }
 
     var LAST_KEY = 'pia_students_section';
@@ -334,7 +411,7 @@
     function openFor(section) { return overview.open.filter(function (c) { return c.section === section; })[0]; }
 
     function renderAttendance() {
-        var section = chosen();
+        var section = scoped();
         var btn = $('#att-toggle');
         if (btn) {
             btn.hidden = !section;
@@ -363,7 +440,7 @@
     }
 
     function paintMarks() {
-        var section = chosen();
+        var section = scoped();
         var on = !!section;                                    /* the column is reserved once a section is chosen, so starting or stopping moves nothing */
         var live = on && !!openFor(section);
         document.documentElement.classList.toggle('pia-att-on', live);
@@ -598,7 +675,7 @@
     /* ---- called by the console after it has drawn the table -------------------- */
     async function decorateRoster() {
         build();
-        var picked = !!($('#section-filter') && $('#section-filter').value);
+        var picked = !!($('#section-filter') && $('#section-filter').value) && !window.PIAAllSections;
         document.documentElement.classList.toggle('pia-section-picked', picked);
         renderChips();
         renderAttendance();
@@ -645,6 +722,7 @@
 
     window.PIACheckin = {
         decorateRoster: decorateRoster,
-        saveNumberFor: function (email, number) { return saveNumber(email, number); }
+        saveNumberFor: function (email, number) { return saveNumber(email, number); },
+        refresh: function () { renderChips(); renderAttendance(); }
     };
 })();
