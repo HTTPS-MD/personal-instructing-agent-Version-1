@@ -310,3 +310,25 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 /* Settings: a small heading over "Your account"; the Administrators panel carries its own button. */
 .settings-group { margin: 0 0 10px; font: 700 var(--fs-xs) var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
 #view-settings .panel-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Active sessions folded to one line under Password. */
+.sessions-fold { padding-block: 0; }
+.sessions-fold > summary {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    min-height: 56px; cursor: pointer; list-style: none;
+}
+.sessions-fold > summary::-webkit-details-marker { display: none; }
+.sessions-fold > summary::after {
+    content: ""; flex: none; width: 8px; height: 8px; margin-left: auto;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg); transition: transform var(--t-base);
+}
+.sessions-fold[open] > summary::after { transform: rotate(225deg); }
+.sessions-fold > summary .panel-title { margin: 0; }
+.sessions-fold[open] { padding-bottom: 16px; }
+.sessions-fold[open] > summary { margin-bottom: 8px; }
+
+/* Administrators: a plain list. The column headings stay for screen readers only. */
+#view-settings [data-region="admins"] .table thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}

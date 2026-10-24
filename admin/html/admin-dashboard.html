@@ -35,7 +35,7 @@
     <link rel="stylesheet" href="../../styles/pages/admin.css">
     <link rel="stylesheet" href="../../styles/pages/admin-console.css">
     <link rel="stylesheet" href="../../styles/pages/admin-topnav.css?v=20261027b">
-    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028p">
+    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028q">
 </head>
 
 <body data-boot="pending">
@@ -415,13 +415,15 @@
                             </div>
                         </section>
 
-                        <!-- No device limit for administrators (migration 0032): the
-                             browsers signed in to this account, and a way to end any
-                             of them. -->
-                        <section class="panel panel-pad" aria-labelledby="profile-sessions-title" data-region="admindevices">
-                            <h2 class="panel-title" id="profile-sessions-title">Active sessions</h2>
+                        <!-- No device limit for administrators (migration 0032): the browsers signed in to
+                             this account, and a way to end any of them. Folded to one line; open it when needed. -->
+                        <details class="panel panel-pad sessions-fold" data-region="admindevices">
+                            <summary id="profile-sessions-title">
+                                <span class="panel-title">Active sessions</span>
+                                <span class="muted">Where you are signed in. Open to end one.</span>
+                            </summary>
                             <div id="admin-device-list"></div>
-                        </section>
+                        </details>
                     </div>
 
                     <section class="panel" data-region="admins" aria-labelledby="admins-title" style="margin-top:28px">
