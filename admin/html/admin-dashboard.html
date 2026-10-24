@@ -35,7 +35,7 @@
     <link rel="stylesheet" href="../../styles/pages/admin.css">
     <link rel="stylesheet" href="../../styles/pages/admin-console.css">
     <link rel="stylesheet" href="../../styles/pages/admin-topnav.css?v=20261027b">
-    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028b">
+    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028e">
 </head>
 
 <body data-boot="pending">
@@ -255,6 +255,11 @@
                     <div class="page-head">
                         <h1 class="page-title">Students</h1>
                         <div class="page-actions">
+                            <div class="head-search" role="search">
+                                <label class="sr-only" for="student-search">Search students</label>
+                                <input type="search" class="input" id="student-search" placeholder="Name or email, in all sections">
+                                <button type="button" class="pill-toggle" id="all-sections" aria-pressed="false" title="Search every section, not only the chosen one">All sections</button>
+                            </div>
                             <button type="button" class="btn btn-secondary is-hidden" data-modal-open="modal-manage-sections">Manage sections</button>
                             <button type="button" class="btn btn-secondary" data-modal-open="modal-add-students">Add Students</button>
                         </div>
@@ -308,14 +313,6 @@
                                     <option value="control">Control</option>
                                 </select>
                             </div>
-                            <div class="filter-field filter-search">
-                                <label class="filter-label" for="student-search">Search</label>
-                                <input type="search" class="input input-sm" id="student-search"
-                                    placeholder="Name or email, in all sections">
-                            </div>
-                            <label class="filter-check" for="all-sections">
-                                <input type="checkbox" id="all-sections"> All sections
-                            </label>
                         </div>
 
                         <div class="table-wrap" tabindex="0" role="region" aria-label="Students table">
@@ -1841,7 +1838,7 @@
     <script src="../js/math-task-generator.js"></script>
     <script src="../js/students-tools.js?v=20261028a"></script>
     <script src="../js/add-students.js?v=20261019c"></script>
-    <script src="../js/admin-dashboard.js?v=20261028a"></script>
+    <script src="../js/admin-dashboard.js?v=20261028b"></script>
 </body>
 
 </html>

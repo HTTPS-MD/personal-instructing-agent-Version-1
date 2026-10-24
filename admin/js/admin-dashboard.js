@@ -2064,10 +2064,12 @@
 
         var allBox = $('#all-sections');
         if (allBox) {
-            allBox.addEventListener('change', function () {
-                state.allSections = allBox.checked;
-                window.PIAAllSections = allBox.checked;
-                document.documentElement.classList.toggle('pia-all-sections', allBox.checked);
+            allBox.addEventListener('click', function () {
+                var on = allBox.getAttribute('aria-pressed') !== 'true';
+                allBox.setAttribute('aria-pressed', on ? 'true' : 'false');
+                state.allSections = on;
+                window.PIAAllSections = on;
+                document.documentElement.classList.toggle('pia-all-sections', on);
                 state.page = 1;
                 renderScope();
                 loadRoster();
