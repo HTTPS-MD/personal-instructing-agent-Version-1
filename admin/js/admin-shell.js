@@ -39,7 +39,7 @@
     var ROUTES = {
         overview: { trail: ['Overview'] },
         live: { trail: ['Live Sessions'] },
-        students: { trail: ['People', 'Students'] },
+        students: { trail: ['People', 'Sections'] },
         faculty: { trail: ['People', 'Professors'] },
         controls: { trail: ['Stage Controls'] },
         mathtask: { trail: ['Math Task'] },
