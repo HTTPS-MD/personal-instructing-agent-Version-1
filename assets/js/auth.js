@@ -1281,6 +1281,25 @@
         if (typeof clearLocalSession === 'function') { clearLocalSession(); }
     }
 
+    function goStraightToDashboard(email, role) {
+        var query;
+        try { query = new URL(window.PIA_ENTRY_URL || window.location.href).searchParams; } catch (err) { return false; }
+        if (query.has('stay') || query.has('signin') || query.has('reason')) { return false; }
+
+        var now = Date.now();
+        try {
+            var last = Number(sessionStorage.getItem('pia_straight_to_dashboard') || 0);
+            if (now - last < 10000) { return false; }
+            sessionStorage.setItem('pia_straight_to_dashboard', String(now));
+        } catch (err) { /* no storage: the single redirect below is still safe */ }
+
+        try { localStorage.setItem('pia_user_email', email); } catch (err) { /* private mode */ }
+        if (role === 'admin') { window.location.replace('admin/html/admin-dashboard.html'); }
+        else if (role === 'teacher') { window.location.replace('teacher/html/teacher-dashboard.html'); }
+        else { window.location.replace('student/html/waiting-room.html'); }
+        return true;
+    }
+
     async function offerResume() {
         var root = document.documentElement;
         var session = null;
@@ -1312,6 +1331,14 @@
             var roleRes = await sb.from('profiles').select('role').eq('email', email).maybeSingle();
             if (!roleRes.error && roleRes.data) { role = normalizeRole(roleRes.data.role); }
         } catch (err) { /* continuation stays unavailable until verified */ }
+        /* Already signed in: go straight to the dashboard, no landing page and no "Continue"
+           button. Not when the address asks for the sign-in dialog (?signin=, ?reason=: a
+           console sent them here), not with ?stay (to read the landing page while signed in),
+           and not twice within 10 seconds, so a console that bounces back here can never make
+           a loop. If the role could not be verified (offline), the page shows the old Continue
+           button instead. */
+        if (role && goStraightToDashboard(email, role)) { return; }
+
         var finale = $('.finale-sub');
         if (finale) { finale.textContent = 'You are signed in. Continue to the activities available to your account.'; }
         var heroCopy = $('.drop-sub');
