@@ -572,14 +572,15 @@
         var bar = $('#stage-tabs') && $('#stage-tabs').parentNode;
         if (!bar) { return; }
         var label = document.createElement('label');
-        label.style.cssText = 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-left:auto;white-space:nowrap';
+        label.className = 'show-details';
         label.innerHTML = '<input type="checkbox" id="hide-details" checked> Show details';
+        /* It masks names, emails and numbers for the WHOLE page (students and the professor), so it sits
+           at the top, on the line with the counts, not inside the table's filters. */
+        var scopeRow = $('#view-students .scope-row');
         var filterRow = bar.parentNode.querySelector('.filter-row');
-        if (filterRow) {
-            label.style.alignSelf = 'flex-end';
-            label.style.height = '40px';
-            filterRow.appendChild(label);
-        } else { bar.appendChild(label); }
+        if (scopeRow) { scopeRow.appendChild(label); }
+        else if (filterRow) { filterRow.appendChild(label); }
+        else { bar.appendChild(label); }
         label.firstChild.addEventListener('change', function (e) { setHidden(!e.target.checked); });
         var toggle = document.createElement('button');
         toggle.type = 'button';

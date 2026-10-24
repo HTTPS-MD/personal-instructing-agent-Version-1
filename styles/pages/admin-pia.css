@@ -283,3 +283,13 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
     font-family: var(--font-body); letter-spacing: 0; border-radius: 16px; overflow: hidden;
     box-shadow: 0 14px 34px rgb(0 0 0 / 0.22);
 }
+
+/* "Show details": a small pill on the line with the counts, at the right. */
+#view-students .scope-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.show-details {
+    display: inline-flex; align-items: center; gap: 8px; margin-left: auto;
+    height: 34px; padding: 0 14px; border: 1px solid var(--line-input); border-radius: 999px;
+    background: var(--bg-surface); color: var(--text);
+    font: 600 var(--fs-sm) var(--font-body); white-space: nowrap; cursor: pointer;
+}
+.show-details:hover { background: var(--bg-chip); }
