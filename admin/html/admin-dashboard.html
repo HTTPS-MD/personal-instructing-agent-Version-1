@@ -35,7 +35,7 @@
     <link rel="stylesheet" href="../../styles/pages/admin.css">
     <link rel="stylesheet" href="../../styles/pages/admin-console.css">
     <link rel="stylesheet" href="../../styles/pages/admin-topnav.css?v=20261027b">
-    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028o">
+    <link rel="stylesheet" href="../../styles/pages/admin-pia.css?v=20261028p">
 </head>
 
 <body data-boot="pending">
@@ -392,13 +392,11 @@
                 <section class="page is-hidden" id="view-settings" data-view-panel="settings">
                     <div class="page-head">
                         <h1 class="page-title">Settings</h1>
-                        <div class="page-actions">
-                            <button type="button" class="btn btn-outline" data-modal-open="modal-add-admin">+ Add administrator</button>
-                        </div>
                     </div>
 
                     <!-- Your own account (it used to be the Profile page): name, password, signed-in browsers. -->
-                    <div class="stack">
+                    <h2 class="settings-group" id="your-account-title">Your account</h2>
+                    <div class="stack" aria-labelledby="your-account-title">
                         <section class="panel panel-pad" aria-labelledby="profile-details-title">
                             <h2 class="panel-title" id="profile-details-title">Personal details</h2>
                             <dl class="facts">
@@ -426,8 +424,11 @@
                         </section>
                     </div>
 
-                    <section class="panel" data-region="admins" aria-labelledby="admins-title" style="margin-top:16px">
-                        <div class="panel-bar"><h2 class="panel-title" id="admins-title">Administrators</h2></div>
+                    <section class="panel" data-region="admins" aria-labelledby="admins-title" style="margin-top:28px">
+                        <div class="panel-bar">
+                            <h2 class="panel-title" id="admins-title">Administrators</h2>
+                            <button type="button" class="btn btn-outline btn-sm" data-modal-open="modal-add-admin">+ Add administrator</button>
+                        </div>
                         <div class="table-wrap" tabindex="0" role="region" aria-label="Administrators table">
                             <table class="table">
                                 <caption class="sr-only">Administrators</caption>

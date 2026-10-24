@@ -306,3 +306,7 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 #view-students .panel-bar #att-toggle { margin-left: 0 !important; min-width: 0; }
 #view-students .panel-bar .bar-group .custom-select { width: 11rem; }
 #view-students .panel-bar .bar-group .custom-select-trigger { min-height: 38px; height: 38px; padding: 0 16px; border-radius: 999px; box-sizing: border-box; }
+
+/* Settings: a small heading over "Your account"; the Administrators panel carries its own button. */
+.settings-group { margin: 0 0 10px; font: 700 var(--fs-xs) var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+#view-settings .panel-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
