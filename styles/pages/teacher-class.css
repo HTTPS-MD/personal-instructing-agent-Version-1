@@ -1,0 +1,82 @@
+/* ============================================================================
+   PIA TEACHER PAGE -- one read-only roster in the homepage look
+   ============================================================================
+   Loaded after admin-pia.css (the wallpaper, pills, panels and table come from there). This
+   file only adds the small bar and the few teacher-only pieces. */
+
+.t-boot {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: var(--bg-body); color: var(--text);
+    font-size: var(--fs-body);
+}
+.t-boot p { margin: 0; }
+.t-boot[hidden] { display: none; }
+
+.t-app[hidden] { display: none; }
+
+/* The bar: logo on the left, the rest on the right, on the same column as the homepage. */
+.t-bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    height: 64px;
+    padding-inline: var(--bar-edge);
+    background: color-mix(in srgb, var(--bg-body) 82%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+.t-brand { display: inline-flex; border-radius: 12px; }
+.t-brand .site-logo { display: block; width: auto; height: auto; max-height: var(--logo-h); }
+.t-bar-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.t-who { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-muted); }
+.theme-toggle .icon-moon { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
+.t-bar-right .btn .icon { width: 16px; height: 16px; margin-right: 6px; }
+
+.t-main { padding: 8px var(--bar-edge) 48px; }
+.t-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.t-title select { width: auto; max-width: 14rem; }
+
+.t-empty-section {
+    margin: 0 0 16px; padding: 18px 20px;
+    border: 1px dashed var(--line-input); border-radius: var(--r-card);
+    color: var(--text-muted);
+}
+
+/* The name. With "Show names" off it turns into asterisks, like the admin's Show details. */
+.t-name { font-weight: 600; }
+.t-hide-names .t-name { position: relative; display: inline-block; min-width: 9ch; color: transparent !important; user-select: none; }
+.t-hide-names .t-name::after {
+    content: "********"; position: absolute; inset: 0; display: flex; align-items: center;
+    color: var(--text); letter-spacing: 2px; font-weight: 400;
+}
+
+.t-dot { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; background: var(--track); }
+.t-dot.is-on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+.t-att-present { color: var(--ok); font-weight: 600; }
+.t-att-absent { color: var(--danger); }
+
+@media (max-width: 40rem) {
+    .t-who { display: none; }
+    .t-main { padding-inline: 16px; }
+    .t-bar { padding-inline: 16px; }
+}
+
+.t-main [hidden] { display: none !important; }
+.t-main .scope-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.t-main .scope-line { margin: 0; }
+.t-main .head-search .input { padding-right: 16px; }
+.t-main .page-head { margin-bottom: 12px; }
+
+/* Title left, search right (the admin page puts the search first). */
+.t-main .head-search { order: 0; margin-left: auto; }
+/* With several sections the dropdown IS the title: "Earth ▾". The heading stays for screen readers. */
+.t-multi .page-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+html[data-surface="admin"] .t-title.t-multi select {
+    height: auto; min-height: 0; padding: 2px 34px 2px 4px; border-radius: 12px;
+    border: 0; box-shadow: none; background-color: transparent;
+    font: 700 1.75rem var(--font-display); letter-spacing: -0.03em; color: var(--text);
+    cursor: pointer;
+}
+.t-main .table td { white-space: nowrap; }
