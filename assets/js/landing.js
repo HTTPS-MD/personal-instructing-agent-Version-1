@@ -565,6 +565,100 @@
      * 9. BOOT                                                              *
      * ==================================================================== */
 
+    /* BACK TO TOP. The button above the footer: smooth unless the person asked for less motion,
+       and focus goes back to the top so a keyboard user does not start from the footer. */
+    function initToTop() {
+        var button = $('[data-scroll-top]');
+        if (!button) { return; }
+        button.addEventListener('click', function () {
+            var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
+            var top = document.getElementById('top');
+            if (top) {
+                if (!top.hasAttribute('tabindex')) { top.setAttribute('tabindex', '-1'); }
+                top.focus({ preventScroll: true });
+            }
+        });
+    }
+
+    /* HOW IT WORKS VIDEO. Click to play, never autoplay. The page ships with the browser's own controls (so it
+       works with no script); with script, the controls stay hidden behind a big play button until the first
+       play, and the button comes back when the video ends. */
+    function initHowVideo() {
+        var video = $('#how-video');
+        var play = $('#how-play');
+        if (!video || !play) { return; }
+        var frame = play.parentNode;
+        frame.classList.add('has-play');
+        video.controls = false;
+        function start() {
+            video.controls = true;
+            frame.classList.add('is-playing');
+            var started = video.play();
+            if (started && started.catch) { started.catch(function () { frame.classList.remove('is-playing'); video.controls = false; }); }
+        }
+        play.addEventListener('click', start);
+        video.addEventListener('ended', function () {
+            frame.classList.remove('is-playing');
+            video.controls = false;
+            video.currentTime = 0;
+        });
+        video.addEventListener('click', function () { if (!frame.classList.contains('is-playing')) { start(); } });
+    }
+
+    /* WELCOME. "Welcome to" is typed out once, when the section is mostly on screen, and then the logo
+       fades in (CSS, on .is-typed). With reduced motion, or no IntersectionObserver, nothing here runs and
+       the full line and the logo just show. Text goes in through textContent only. */
+    function initWelcomeType() {
+        var host = $('#welcome');
+        var text = host && $('.welcome-text', host);
+        if (!host || !text || !('IntersectionObserver' in window)) { return; }
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { return; }
+        var full = text.getAttribute('data-type') || text.textContent;
+        text.textContent = '';
+        host.classList.add('is-typing-ready');
+        var seen = new IntersectionObserver(function (entries) {
+            if (!entries[0].isIntersecting) { return; }
+            seen.disconnect();
+            var i = 0;
+            host.classList.add('is-typing');
+            var timer = setInterval(function () {
+                i += 1;
+                text.textContent = full.slice(0, i);
+                if (i >= full.length) {
+                    clearInterval(timer);
+                    window.setTimeout(function () {
+                        host.classList.remove('is-typing');
+                        host.classList.add('is-typed');
+                    }, 350);
+                }
+            }, 95);
+        }, { threshold: 0.6 });
+        seen.observe(host);
+    }
+
+    /* PRIVACY BURST. The padlock and the keys burst outward from behind the words as the privacy section
+       scrolls into view, and are drawn back in as it scrolls out again. --burst goes 0 to 1 (smoothly, never
+       past 1) from where the section sits on screen: 0 while its top is at the bottom edge of the window,
+       1 once its middle reaches the window's middle. With reduced motion this does nothing, and CSS shows
+       them in their places. */
+    function initPrivacyBurst() {
+        var host = $('#privacy');
+        if (!host || reduceMotion) { return; }
+        var last = -1;
+        addReader(function () {
+            var rect = host.getBoundingClientRect();
+            var vh = window.innerHeight || document.documentElement.clientHeight;
+            var p = clamp((vh - rect.top) / (vh / 2 + rect.height / 2), 0, 1);
+            /* smooth start and finish, and never past 1: the padlock and keys stop at their places */
+            var e = p * p * (3 - 2 * p);
+            if (Math.abs(e - last) < 0.002) { return false; }
+            last = e;
+            host.style.setProperty('--burst', e.toFixed(3));
+            return false;
+        });
+    }
+
     function boot() {
         initWire();          /* first, so it can catch a throw from any of the rest */
         $$('img[data-fallback]').forEach(function (img) {
@@ -585,6 +679,10 @@
         initHeroVideo();
         initHoverIntent();
         initFooterRise();
+        initToTop();
+        initHowVideo();
+        initWelcomeType();
+        initPrivacyBurst();
         wake();
 
         /* For whoever opens the console. Every project should have one.

@@ -91,7 +91,26 @@
         var img = fig.querySelector('.stage-art img');
         if (poses.length < 2 || !img) { return; }
 
-        poses.forEach(function (src) { new Image().src = src; });
+        /* The extra poses are fetched only when this tutor is first on screen (or picked), not for all six
+           tutors at page load: that was about 1.2 MB nobody had asked for yet. */
+        var preloaded = false;
+        function preload() {
+            if (preloaded) { return; }
+            preloaded = true;
+            poses.forEach(function (src) { new Image().src = src; });
+        }
+        if (!fig.hidden) {
+            if ('IntersectionObserver' in window) {
+                var near = new IntersectionObserver(function (entries) {
+                    if (entries[0].isIntersecting) { near.disconnect(); preload(); }
+                }, { rootMargin: '600px 0px' });
+                near.observe(fig);
+            } else { preload(); }
+        }
+        if ('MutationObserver' in window) {
+            new MutationObserver(function () { if (!fig.hidden) { preload(); } })
+                .observe(fig, { attributes: true, attributeFilter: ['hidden'] });
+        }
 
         var tab = tabs.filter(function (t) { return t.getAttribute('data-agent') === fig.getAttribute('data-figure'); })[0];
         var name = tab ? tab.querySelector('.roster-name').textContent.trim() : 'the tutor';

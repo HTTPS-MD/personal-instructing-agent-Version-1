@@ -8,7 +8,7 @@
     var $ = function (s, r) { return (r || document).querySelector(s); };
     var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-    /* Must match the 64rem breakpoint in landing.css section 3.6. */
+    /* Must match the 64rem breakpoint in landing.css sections 4.6, 12 and 30. */
     var DESKTOP = window.matchMedia('(min-width: 64rem)');
 
     function boot() {
@@ -23,14 +23,14 @@
 
 
     /* ==================================================================== *
-     * 1B. SIGN IN / ACTIVATE — ONE PLACE AT A TIME                         *
+     * 1B. JOIN — ONE PLACE AT A TIME                                       *
      * ==================================================================== *
-     * The hero carries Sign in and Activate account beside its headline, so
-     * while those are on screen the bar's own copies stand down (CSS hides
-     * .nav-auth unless the bar has .has-auth). Once the hero's buttons have
-     * left the visible area below the bar — scrolled up under it, or never
-     * in view on a very short screen — the bar's copies come back, so the
-     * two actions are always exactly one click away and never shown twice.  */
+     * The hero carries the student-number field, so while it is on screen the
+     * bar's own Join stands down (CSS hides .nav-auth unless the bar has
+     * .has-auth). Once the field has left the visible area below the bar —
+     * scrolled up under it, or never in view on a very short screen — Join
+     * comes back, so the way in is always one tap away and never shown
+     * twice. Teacher / Admin is not managed here: it is always in the bar.  */
 
     function initAuthSwap(nav) {
         var hero = $('#hero-cta');
@@ -41,22 +41,11 @@
             var top = nav.getBoundingClientRect().bottom;
             var viewport = window.visualViewport;
             var bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
-            var right = viewport ? viewport.offsetLeft + viewport.width : window.innerWidth;
-            var buttons = hero ? $$('button', hero).filter(function (button) {
-                return getComputedStyle(button).display !== 'none';
-            }) : [];
-            var signedIn = document.documentElement.hasAttribute('data-session');
-            var visible = buttons.length === (signedIn ? 1 : 2) && buttons.every(function (button) {
-                var rect = button.getBoundingClientRect();
-                if (!rect.width || !rect.height || rect.top < top || rect.bottom > bottom || rect.left < 0 || rect.right > right) { return false; }
-                if (getComputedStyle(button).visibility !== 'visible') { return false; }
-                return [[rect.left + 2, rect.top + 2], [rect.right - 2, rect.bottom - 2],
-                    [rect.left + rect.width / 2, rect.top + rect.height / 2]].every(function (point) {
-                    var hit = document.elementFromPoint(point[0], point[1]);
-                    return hit && button.contains(hit);
-                });
-            });
-            var show = !visible || nav.classList.contains('is-open') || controls.some(function (button) {
+            var rect = hero ? hero.getBoundingClientRect() : null;
+            /* The hero's field (or, signed in, its Continue button) counts as on screen
+               while it is still mostly below the bar and above the bottom edge. */
+            var visible = !!rect && rect.height > 0 && rect.bottom > top + 12 && rect.top < bottom - 12;
+            var show = !visible || controls.some(function (button) {
                 return button.contains(document.activeElement);
             });
             if (nav.classList.contains('has-auth') !== show) { nav.classList.toggle('has-auth', show); }
