@@ -198,7 +198,7 @@
         if (!h1) { return; }
         var chips = $('#section-chips'); if (chips) { chips.style.display = 'none'; }
         var now = chosen();
-        var label = now ? now : 'Choose a section';
+        var label = window.PIAAllSections ? 'All sections' : (now ? now : 'Choose a section');
         var item = 'display:block;width:100%;padding:8px 12px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer';
         var row = function (value, name, count, open) {
             return '<button type="button" role="menuitemradio" aria-checked="' + (now === value) + '" data-chip="' + esc(value) + '" style="display:flex;width:100%;justify-content:space-between;gap:16px;align-items:center;padding:8px 12px;border:0;background:' + (now === value ? 'var(--line-soft)' : 'transparent') + ';color:var(--text);font:inherit;font-weight:' + (now === value ? '600' : '400') + ';text-align:left;cursor:pointer">' +
@@ -401,6 +401,9 @@
 
     function pickSection(name) {
         confirmDelete = false;
+        /* Choosing a section from the title leaves "All sections". */
+        var pill = $('#all-sections');
+        if (window.PIAAllSections && pill) { pill.click(); }
         var select = $('#section-filter');
         if (!name) { return; }
         try { localStorage.setItem(LAST_KEY, name); } catch (e) { /* private mode */ }

@@ -1726,7 +1726,7 @@
         var scores = $('#section-scores-open');
         if (scores) { scores.classList.toggle('is-hidden', !section); }
         var search = $('#student-search');
-        if (search) { search.placeholder = 'Name or email, in ' + (section || 'all sections'); }
+        if (search) { search.placeholder = section ? 'Search ' + section : 'Search all sections'; }
 
         if (!state.cohortLoaded) { line.textContent = 'Loading…'; return; }
 

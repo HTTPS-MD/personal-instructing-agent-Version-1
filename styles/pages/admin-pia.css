@@ -66,18 +66,16 @@ html[data-surface="admin"] .topbar {
     border-bottom: 0;
 }
 html[data-surface="admin"] .sidebar-brand { gap: 12px; background: transparent; border: 0; }
-html[data-surface="admin"] .site-logo { width: 40px; height: 40px; }
+/* The logo is the landing page's: same file, same height (--logo-h), same left edge as the page
+   content there (a 78rem column, gutter clamp(1.25rem, 5vw, 3rem)). The word "Admin" is kept for
+   screen readers only. */
+html[data-surface="admin"] .site-logo {
+    display: block; width: auto; height: auto;
+    max-height: var(--logo-h); max-width: 100%;
+}
 html[data-surface="admin"] .brand-name {
-    padding: 2px 14px 4px;
-    border-radius: 14px;
-    background: var(--admin-pill);
-    color: var(--admin-pill-ink);
-    font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.25;
-    box-shadow: 0 6px 16px rgb(0 0 0 / 0.18);
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 html[data-surface="admin"] .brand-link { transition: transform var(--t-base); }
 html[data-surface="admin"] .brand-link:hover { transform: rotate(-6deg); }
@@ -96,13 +94,16 @@ html[data-surface="admin"] .sidebar-user .avatar { box-shadow: 0 0 0 2px var(--a
 @media (min-width: 56.3125rem) {
     /* One bar: logo and "Admin", then the tabs, then the theme button and the account. */
     html[data-surface="admin"] .app {
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        --bar-gutter: clamp(1.25rem, 5vw, 3rem);
+        --bar-edge: max(var(--bar-gutter), calc((100vw - 78rem) / 2 + var(--bar-gutter)));
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
         grid-template-rows: var(--topbar-h) minmax(0, 1fr);
         grid-template-areas: "brand tabs foot" "main main main";
     }
     html[data-surface="admin"] .topbar { grid-area: 1 / 1 / 2 / 4; }
-    html[data-surface="admin"] .sidebar-brand { grid-area: brand; }
-    html[data-surface="admin"] .sidebar-foot { grid-area: foot; }
+    html[data-surface="admin"] .sidebar-brand { grid-area: brand; padding-left: var(--bar-edge); padding-right: 0; }
+    html[data-surface="admin"] .sidebar-foot { grid-area: foot; margin-right: var(--bar-edge); }
+    html[data-surface="admin"] .topbar { padding-left: 12rem; padding-right: calc(var(--bar-edge) + 3.25rem); }
     html[data-surface="admin"] .main { grid-area: main; }
     html[data-surface="admin"] .sidebar-nav {
         grid-area: tabs;
@@ -191,7 +192,7 @@ html[data-surface="admin"] .user-menu { border-radius: 18px; overflow: hidden; }
 html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 
 @media (max-width: 56.25rem) {
-    html[data-surface="admin"] .brand-name { font-size: 1rem; }
+    
 }
 
 @media (prefers-reduced-motion: reduce) {
