@@ -1,0 +1,182 @@
+/* ============================================================================
+   PIA ADMIN CONSOLE -- THE HOMEPAGE LOOK
+   ============================================================================
+   Loaded last on the admin page. It changes how the console LOOKS, nothing about what it
+   does: same markup, same scripts, same class names.
+
+   The homepage's vocabulary, applied to a working screen:
+     - one soft navy (dark) or sky (light) gradient behind everything
+     - big rounded corners, pill buttons and pill fields
+     - yellow for the main action and the active tab (the homepage "backup!" highlight)
+     - Space Grotesk for titles, a little more air in tables
+
+   To go back to the plain console, remove the <link> to this file.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- 1. TOKENS */
+:root[data-surface="admin"] {
+    --r-card: 20px; --r-pill: 999px; --r-xs: 8px; --r-sm: 12px; --r-md: 14px;
+    --r-lg: 20px; --r-xl: 24px; --r-2xl: 28px;
+    --control-h: 38px; --field-h: 40px; --row-h: 52px;
+    --topbar-h: 64px;
+
+    --admin-sky-a: #d2e8f6;
+    --admin-sky-b: #c1def3;
+    --admin-pill: #FFD83D;
+    --admin-pill-ink: #0B1233;
+}
+:root[data-surface="admin"][data-theme="dark"],
+:root[data-surface="admin"][data-theme="light"] {
+    --primary: #FFD83D;
+    --primary-hover: #FFE270;
+    --on-primary-btn: #0B1233;
+    --on-primary: #0B1233;
+}
+:root[data-surface="admin"][data-theme="dark"] {
+    --bg-body: #142849;
+    --bg-surface: color-mix(in srgb, #ffffff 5%, #142849);
+    --bg-main: color-mix(in srgb, #ffffff 5%, #142849);
+    --bg-surface-hi: color-mix(in srgb, #ffffff 9%, #142849);
+    --admin-sky-a: #122546;
+    --admin-sky-b: #182b4c;
+    --line: color-mix(in srgb, #fff8e7 18%, #142849);
+    --line-soft: color-mix(in srgb, #fff8e7 10%, #142849);
+}
+:root[data-surface="admin"][data-theme="light"] {
+    --bg-body: #cfe5f5;
+    --bg-surface: #fffaf0;
+    --bg-main: #fffaf0;
+    --bg-surface-hi: #ffffff;
+    --bg-field: #ffffff;
+    --accent-text: #0e3a9a;
+}
+
+/* ------------------------------------------------------------- 2. THE PAGE */
+html[data-surface="admin"] body {
+    background: linear-gradient(180deg, var(--admin-sky-a), var(--admin-sky-b)) fixed;
+    font-family: var(--font-body);
+}
+html[data-surface="admin"] .app { background: transparent; }
+
+/* ------------------------------------------------- 3. TOP BAR: LOGO + ADMIN */
+html[data-surface="admin"] .topbar {
+    background: transparent;
+    border-bottom: 0;
+}
+html[data-surface="admin"] .sidebar-brand { gap: 12px; background: transparent; border: 0; }
+html[data-surface="admin"] .site-logo { width: 40px; height: 40px; }
+html[data-surface="admin"] .brand-name {
+    padding: 2px 14px 4px;
+    border-radius: 14px;
+    background: var(--admin-pill);
+    color: var(--admin-pill-ink);
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.25;
+    box-shadow: 0 6px 16px rgb(0 0 0 / 0.18);
+}
+html[data-surface="admin"] .brand-link { transition: transform var(--t-base); }
+html[data-surface="admin"] .brand-link:hover { transform: rotate(-6deg); }
+
+/* round icon buttons, like the homepage's theme button */
+html[data-surface="admin"] .btn-icon {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--bg-surface);
+}
+html[data-surface="admin"] .btn-icon:hover { background: var(--bg-chip); }
+html[data-surface="admin"] .sidebar-user .avatar { box-shadow: 0 0 0 2px var(--admin-pill); }
+
+/* ------------------------------------------------------------------ 4. TABS */
+@media (min-width: 56.3125rem) {
+    html[data-surface="admin"] .sidebar-nav {
+        background: transparent;
+        border-bottom: 0;
+        padding: 0 24px 8px;
+    }
+    html[data-surface="admin"] .nav-list { gap: 8px; }
+    html[data-surface="admin"] .nav-item {
+        min-height: 40px;
+        padding: 0 18px;
+        border-radius: 999px;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+    html[data-surface="admin"] .nav-item:hover { background: var(--bg-chip); color: var(--text); }
+    html[data-surface="admin"] .nav-item.is-active {
+        background: var(--admin-pill);
+        color: var(--admin-pill-ink);
+        box-shadow: 0 6px 16px rgb(0 0 0 / 0.16);
+    }
+}
+
+/* ---------------------------------------------------- 5. TITLES AND PANELS */
+html[data-surface="admin"] .page-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+    letter-spacing: -0.04em;
+}
+html[data-surface="admin"] .panel,
+html[data-surface="admin"] .modal,
+html[data-surface="admin"] .drawer {
+    border-radius: var(--r-card);
+    border: 1px solid var(--line);
+    box-shadow: 0 14px 34px rgb(0 0 0 / 0.16);
+}
+html[data-surface="admin"] .panel { overflow: clip; }
+html[data-surface="admin"] .panel-bar { padding: 12px 16px; }
+html[data-surface="admin"] .filter-row { padding: 14px 16px; gap: 12px 18px; }
+html[data-surface="admin"] .panel-foot { padding: 12px 16px; }
+
+/* stage tabs inside the Students panel: pills too */
+html[data-surface="admin"] .tabs { gap: 6px; }
+html[data-surface="admin"] .tab { border-radius: 999px; padding: 0 14px; }
+html[data-surface="admin"] .tab.is-active {
+    border-radius: 999px;
+    background: var(--admin-pill);
+    color: var(--admin-pill-ink);
+    box-shadow: none;
+}
+html[data-surface="admin"] .tab.is-active .mono { color: inherit; }
+
+/* ------------------------------------------------- 6. BUTTONS AND FIELDS */
+html[data-surface="admin"] .btn { border-radius: 999px; padding: 0 18px; font-weight: 600; }
+html[data-surface="admin"] .btn-sm { border-radius: 999px; padding: 0 14px; }
+html[data-surface="admin"] .btn-primary { box-shadow: 0 6px 16px rgb(0 0 0 / 0.16); }
+html[data-surface="admin"] .btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+html[data-surface="admin"] .btn-secondary,
+html[data-surface="admin"] .btn-outline { border-color: var(--line-input); }
+
+html[data-surface="admin"] .input,
+html[data-surface="admin"] .select { border-radius: 999px; padding: 0 16px; }
+html[data-surface="admin"] .textarea { border-radius: 16px; }
+html[data-surface="admin"] .search .input { padding-left: 34px; }
+html[data-surface="admin"] .search .icon { left: 12px; }
+html[data-surface="admin"] select.input { padding-right: 32px; }
+
+/* ----------------------------------------------------------------- 7. TABLE */
+html[data-surface="admin"] .table thead th {
+    padding-block: 14px;
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+html[data-surface="admin"] .table tbody td { padding-block: 12px; }
+html[data-surface="admin"] .table tbody tr:hover { background: color-mix(in srgb, var(--admin-pill) 9%, transparent); }
+
+/* ----------------------------------------------------------- 8. SMALL PIECES */
+html[data-surface="admin"] .stage-switch { border-radius: 999px; }
+html[data-surface="admin"] .stage-switch.is-on { background: var(--accent); }
+html[data-surface="admin"] .user-menu { border-radius: 18px; overflow: hidden; }
+html[data-surface="admin"] .modal-head { padding: 18px 22px; }
+
+@media (max-width: 56.25rem) {
+    html[data-surface="admin"] .brand-name { font-size: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-surface="admin"] .brand-link,
+    html[data-surface="admin"] .btn-primary { transition: none; }
+    html[data-surface="admin"] .brand-link:hover { transform: none; }
+}
