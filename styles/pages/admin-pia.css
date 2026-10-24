@@ -226,7 +226,7 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
     background: var(--bg-surface);
     box-shadow: 0 14px 34px rgb(0 0 0 / 0.14);
 }
-@media (min-width: 48rem) {
+@media (min-width: 75rem) {
     .prof-card:not(.is-empty) { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); align-items: center; gap: 28px; }
 }
 .prof-card.is-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -245,7 +245,7 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 .prof-card-status { margin: 0 0 8px; font-weight: 600; font-size: var(--fs-sm); color: var(--text-muted); }
 .prof-card-status.is-done { color: var(--ok); }
 .prof-card-note { margin: 8px 0 0; font-size: var(--fs-xs); color: var(--text-muted); }
-.prof-ocean { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+.prof-ocean { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px 28px; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
 .prof-ocean li { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr) 2rem; align-items: center; gap: 8px; }
 .prof-ocean-k { font: 700 var(--fs-sm) var(--font-display); }
 .prof-ocean-bar { height: 8px; border-radius: 999px; background: var(--bg-chip); overflow: hidden; }
@@ -349,3 +349,23 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 
 /* Active sessions: an ordinary panel again, always open. */
 .sessions-panel .panel-title { margin-bottom: 8px; }
+
+/* Long names and emails wrap inside the professor card instead of running over the Change button. */
+.prof-card-name, .prof-card-name span { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.prof-card-head > .btn { flex: none; }
+
+/* The attendance check and cross are small round buttons, not oversized circles. */
+html[data-surface="admin"] .mk-pair .btn { height: 30px; min-width: 30px; padding: 0 10px; }
+
+/* On a tablet the stage tabs get the whole row; the group filter and Start attendance sit on the next, at the right. */
+@media (max-width: 75rem) {
+    #view-students .panel-bar .tabs { flex: 1 1 100%; }
+    #view-students .panel-bar .bar-group { margin-left: auto; }
+    #view-students .panel-bar #att-toggle { margin-left: 0 !important; }
+}
+
+/* On a narrow screen the table keeps its width and scrolls sideways, instead of squeezing the name into a column of single letters. */
+@media (max-width: 56.25rem) {
+    #view-students .table { min-width: 48rem; }
+    #view-students #student-tbody td:first-child { min-width: 12rem; }
+}
