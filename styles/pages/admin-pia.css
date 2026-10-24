@@ -52,9 +52,19 @@
 }
 
 /* ------------------------------------------------------------- 2. THE PAGE */
+/* The wallpaper (one picture per theme, books and shapes in the bottom corners). The gradient under
+   it is what shows until the picture has loaded. */
 html[data-surface="admin"] body {
-    background: linear-gradient(180deg, var(--admin-sky-a), var(--admin-sky-b)) fixed;
+    background-color: var(--admin-sky-b);
+    background-image: url("../../assets/images/admin-wallpaper-light.webp"), linear-gradient(180deg, var(--admin-sky-a), var(--admin-sky-b));
+    background-size: cover, auto;
+    background-position: center bottom, center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     font-family: var(--font-body);
+}
+html[data-surface="admin"][data-theme="dark"] body {
+    background-image: url("../../assets/images/admin-wallpaper-dark.webp"), linear-gradient(180deg, var(--admin-sky-a), var(--admin-sky-b));
 }
 html[data-surface="admin"] .app { background: transparent; }
 
