@@ -199,3 +199,15 @@ html[data-surface="admin"] .modal-head { padding: 18px 22px; }
 .pia-all-sections .stage-switch,
 .pia-all-sections .stage-state { display: none !important; }
 #att-toggle[hidden] { display: none !important; }
+
+/* ------------------------------------------------ 11. THE SECTION IN THE TITLE --- */
+#view-students .page-title #section-host { display: inline-flex; }
+#view-students .page-title #section-host [data-section-toggle] {
+    padding: 0 10px 0 0; border: 0; background: transparent; color: inherit;
+    font: inherit; font-weight: 700; letter-spacing: inherit; border-radius: 12px;
+}
+#view-students .page-title #section-host [data-section-toggle]:hover { background: var(--bg-chip); }
+#view-students .page-title #section-host [data-section-menu] {
+    font-family: var(--font-body); letter-spacing: 0; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 14px 34px rgb(0 0 0 / 0.22);
+}

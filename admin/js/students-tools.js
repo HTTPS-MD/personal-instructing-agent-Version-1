@@ -154,17 +154,22 @@
     /* ---- the section chips ---------------------------------------------------- */
     function isOpen(name) { return overview.open.some(function (c) { return c.section === name; }); }
 
-    /* The section picker lives in the top bar, so it follows the admin to every page that is about
-       one class (Students, Live Sessions, Stage Controls). */
+    /* The section picker IS the page title: "Earth ▾" where it used to say "Students" (the tab above
+       already says which page this is). Choosing a section changes the table, the counts, the
+       professor line and Input Scores. */
     function titleHost() {
         var host = $('#section-host');
         if (host) { return host; }
-        var left = $('.topbar-left');
-        if (!left) { return null; }
+        var title = $('#view-students .page-title');
+        if (!title) { return null; }
+        title.textContent = '';
+        var lead = document.createElement('span');
+        lead.className = 'sr-only';
+        lead.textContent = 'Students, section ';
         host = document.createElement('div');
         host.id = 'section-host';
-        host.hidden = true;
-        left.appendChild(host);
+        title.appendChild(lead);
+        title.appendChild(host);
         return host;
     }
 
