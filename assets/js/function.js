@@ -621,15 +621,22 @@ function startIdleWatchdog(opts) {
         idleTimeoutId = setTimeout(showIdleWarning, quietMs);
     };
 
-    function showIdleWarning() {
+    // fromSeconds: when the page comes back into view after a long time away, the countdown starts
+    // with what is LEFT of the minute, not a fresh 60.
+    function showIdleWarning(fromSeconds) {
         if (document.getElementById('pia-idle-modal')) return;
+        const resumed = typeof fromSeconds === 'number';
         // Someone was active in another tab meanwhile: wait out the rest of the quiet time instead.
-        const sinceActive = Date.now() - lastActivityAnywhere();
-        if (sinceActive < quietMs - 1000) {
-            idleTimeoutId = setTimeout(showIdleWarning, quietMs - sinceActive);
-            return;
+        if (!resumed) {
+            const sinceActive = Date.now() - lastActivityAnywhere();
+            if (sinceActive < quietMs - 1000) {
+                idleTimeoutId = setTimeout(showIdleWarning, quietMs - sinceActive);
+                return;
+            }
         }
-        let left = Math.round(IDLE_WARNING_MS / 1000);
+        let left = resumed ? Math.max(1, Math.round(fromSeconds)) : Math.round(IDLE_WARNING_MS / 1000);
+        // The countdown follows the clock, not the number of ticks: a hidden tab slows its timers down.
+        const deadline = Date.now() + left * 1000;
 
         const modal = document.createElement('div');
         modal.id = 'pia-idle-modal';
@@ -645,7 +652,7 @@ function startIdleWatchdog(opts) {
         document.getElementById('pia-idle-stay').addEventListener('click', resetIdle);
 
         idleCountdownId = setInterval(() => {
-            left--;
+            left = Math.ceil((deadline - Date.now()) / 1000);
             const el = document.getElementById('pia-idle-count');
             if (el) el.textContent = left;
             if (left <= 0) {
@@ -658,7 +665,18 @@ function startIdleWatchdog(opts) {
 
     ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(evt =>
         window.addEventListener(evt, resetIdle, { passive: true }));
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) resetIdle(); });
+    // Coming back to the tab is NOT activity by itself. After a long time away: past the limit,
+    // sign out now; inside the last minute, show what is left; otherwise carry on as before.
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden || piaSessionEnded) return;
+        const last = lastActivityAnywhere();
+        if (last) {
+            const since = Date.now() - last;
+            if (since >= limitMs) { onTimeout(); return; }
+            if (since >= quietMs) { showIdleWarning((limitMs - since) / 1000); return; }
+        }
+        resetIdle();
+    });
     // Activity in another tab dismisses this tab's warning and restarts its quiet time.
     window.addEventListener('storage', (event) => {
         if (event.key === IDLE_ACTIVITY_KEY && event.newValue) resetIdle();
